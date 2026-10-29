@@ -18,6 +18,7 @@ __all__ = [
     "NamedFeatureExtractor",
     "ImageClassificationDatum",
     "ImageClassificationDataset",
+    "ImageDataset",
     "CodedMetadataLike",
     "LabelsLike",
     "LossFn",
@@ -47,6 +48,7 @@ __all__ = [
     "TrainingStrategy",
     "Transform",
     "UpdateStrategy",
+    "VideoDataset",
     "VideoFrame",
     "VideoStream",
 ]
@@ -759,6 +761,15 @@ class AnnotatedDataset(Dataset[_T_co], Protocol[_T_co]):
         ...
 
 
+ImageDataset: TypeAlias = Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
+"""
+Type alias for a :class:`Dataset` of images.
+
+Each datum is either a bare image array, or a MAITE ``(image, target, metadata)`` tuple. Only indexed access
+and a length are required, so neither annotations nor a ``metadata`` attribute are.
+"""
+
+
 # ========== IMAGE CLASSIFICATION DATASETS ==========
 
 
@@ -840,6 +851,20 @@ fetches ``dataset[i]`` again for every walk of a video -- a second
 :meth:`~dataeval.data.SequenceFrames.stream`, a two-pass selector's second pass, random access --
 and refuses a stream that yields nothing because an earlier walk spent it -- this view's, or
 another reader's such as :class:`~dataeval.Metadata` -- with an error naming this contract.
+"""
+
+
+VideoDataset: TypeAlias = Dataset[VideoStream] | Dataset[tuple[VideoStream, Any, Any]]
+"""
+Type alias for a :class:`Dataset` of videos.
+
+Each datum is either a bare :obj:`VideoStream`, or a MAITE ``(stream, target, metadata)`` tuple whose target is a
+:obj:`MultiobjectTrackingTarget`, which is what a :obj:`MultiobjectTrackingDataset` yields. Only indexed access and a
+length are required, so neither annotations nor a ``metadata`` attribute are. A dataset of bare streams, or of streams
+with no tracking target, is measured as video with no detections.
+
+A stream must be walkable from its first frame, independently of any earlier stream for the same index, as for
+:obj:`MultiobjectTrackingDataset`.
 """
 
 

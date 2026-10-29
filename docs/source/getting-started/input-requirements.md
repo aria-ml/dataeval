@@ -22,7 +22,7 @@ supply and the table below narrows to a handful of candidates.
 
 | Input shape | What you assemble | Evaluators |
 | ----------- | ----------------- | ---------- |
-| Dataset only (raw images) | A `Dataset` of images. Nothing else is required; the Evaluators table lists the optional inputs | {class}`.Duplicates`, {class}`.Outliers` |
+| Dataset only (raw images) | A `Dataset` of images, or for {class}`.Duplicates` and {class}`.Outliers` of videos. Nothing else is required; the Evaluators table lists the optional inputs | {class}`.Duplicates`, {class}`.Outliers` |
 | Dataset + extractor (embeddings) | A dataset plus a {class}`.FeatureExtractor`, or pre-computed {class}`.Embeddings` | {class}`.Coverage`, {class}`.Prioritize`, every `Drift*` and `OOD*` detector |
 | Dataset + binning (metadata) | A {class}`.Metadata` (or {class}`.MetadataLike`) whose factors are already binned | {class}`.Balance`, {class}`.Diversity`, {class}`.Parity` |
 | Labels + ontology | Class-label counts plus an {class}`.Ontology` | {class}`.Representation` |

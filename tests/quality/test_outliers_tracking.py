@@ -17,7 +17,7 @@ from dataeval.quality._factor_stats import factor_kind, factor_levels, factor_st
 from dataeval.quality._outliers import DEFAULT_OUTLIERS_FLAGS
 from dataeval.quality._shared import is_tracking, yields_frames
 from dataeval.types import FactorLevel, SourceIndex
-from tests.quality.test_duplicates import make_tracking_dataset
+from tests.quality.test_duplicates import WithoutMetadata, make_tracking_dataset
 
 _SHAPE = (3, 24, 32)
 _ROW = ["item_index", "target_index", "level", "metric_name", "metric_value"]
@@ -106,6 +106,14 @@ class TestTrackingDataset:
     def test_a_raw_tracking_dataset_flags_the_planted_frame(self):
         rows = Outliers().evaluate(_planted()).data()
         assert len(_hit(rows, 1, 12, "brightness")) == 1
+
+    def test_a_tracking_dataset_without_a_metadata_attribute_is_judged_like_one_with_it(self):
+        dataset = _planted()
+        bare = WithoutMetadata(dataset)
+        assert not hasattr(bare, "metadata")
+        expected = Outliers().evaluate(dataset).data()
+        assert_frame_equal(Outliers().evaluate(bare).data(), expected)
+        assert len(_hit(expected, 1, 12, "brightness")) == 1
 
     def test_target_index_is_the_frame_index_not_the_position(self):
         rows = Outliers().evaluate(_planted(frame_offset=100)).data()

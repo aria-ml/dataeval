@@ -37,12 +37,12 @@ from dataeval.data import SequenceFrames
 from dataeval.data._frames import frame_numbers_at
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
-    ArrayLike,
     Dataset,
     FeatureExtractor,
+    ImageDataset,
     MetadataLike,
-    MultiobjectTrackingDataset,
     ObjectDetectionTarget,
+    VideoDataset,
     _is_protocol_instance,
     _optional_attr,
 )
@@ -56,7 +56,6 @@ from dataeval.quality._shared import (
     drop_null_index_columns,
     get_dataset_step_from_idx,
     is_metadata,
-    is_tracking,
     reported_level,
     resolve_levels,
     yields_frames,
@@ -2329,7 +2328,7 @@ def _as_frames(
     """
     if isinstance(data, SequenceFrames):
         frames = data
-    elif not is_tracking(data):
+    elif not yields_frames(data):
         return _FrameView(data, None, None)
     else:
         frames = SequenceFrames(data)
@@ -4462,15 +4461,13 @@ class Duplicates(Evaluator):
             frame_map=None,
         )
 
-    # Video is in here too: a tracking datum's first element is a VideoStream rather than an
-    # array, so a MOT dataset satisfies neither of the image spellings and would be refused by a
-    # type checker despite `evaluate` dispatching on it at runtime.
-    _DatasetInput = Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]] | MultiobjectTrackingDataset
-
+    # VideoDataset is in every signature as well as ImageDataset: a tracking datum's first element is a
+    # VideoStream rather than an array, so a MOT dataset is not an ImageDataset and a type checker would refuse
+    # it although `evaluate` dispatches on it at runtime.
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _DatasetInput,
+        data: ImageDataset | VideoDataset,
         *,
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
@@ -4482,7 +4479,7 @@ class Duplicates(Evaluator):
     @overload
     def evaluate(  # type: ignore[reportOverlappingOverload]
         self,
-        data: _DatasetInput,
+        data: ImageDataset | VideoDataset,
         *,
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
@@ -4494,8 +4491,8 @@ class Duplicates(Evaluator):
     @overload
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: ImageDataset | VideoDataset,
+        *other: ImageDataset | VideoDataset,
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[False] | None = ...,
@@ -4506,8 +4503,8 @@ class Duplicates(Evaluator):
     @overload
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: ImageDataset | VideoDataset,
+        *other: ImageDataset | VideoDataset,
         levels: str | Sequence[str] | None = ...,
         per_image: bool | None = ...,
         per_target: Literal[True],
@@ -4533,8 +4530,8 @@ class Duplicates(Evaluator):
     )
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: ImageDataset | VideoDataset,
+        *other: ImageDataset | VideoDataset,
         levels: str | Sequence[str] | None = None,
         per_image: bool | None = None,
         per_target: bool | None = None,
@@ -4563,6 +4560,8 @@ class Duplicates(Evaluator):
             A multi-object-tracking dataset is measured frame by frame, every frame. To measure
             fewer, pass a :class:`~dataeval.data.SequenceFrames` whose selector chooses them, such
             as ``SequenceFrames(dataset, Stride(5))``; the execution record names that selector.
+            A dataset of videos with no tracking targets, whose items are bare streams or
+            ``(stream, None, metadata)``, is measured the same way with no detections in any frame.
 
             A :class:`~dataeval.Metadata` instance is also accepted directly without a
             dataset. In that case, ``duplicate_factors`` is required. Results are reported
@@ -4765,7 +4764,7 @@ class Duplicates(Evaluator):
 
     def _evaluate_single(
         self,
-        data: _DatasetInput,
+        data: ImageDataset | VideoDataset,
         plan: LevelPlan,
         radius: int,
         factor_groups: MethodGroups | None = None,
@@ -4881,7 +4880,9 @@ class Duplicates(Evaluator):
             factor_cardinality=factor_cardinality,
         )
 
-    def _evaluate_multi(self, datasets: Sequence[_DatasetInput], plan: LevelPlan, radius: int) -> MultiDuplicatesOutput:
+    def _evaluate_multi(
+        self, datasets: Sequence[ImageDataset | VideoDataset], plan: LevelPlan, radius: int
+    ) -> MultiDuplicatesOutput:
         """Multi-dataset evaluate: compute stats per dataset, then combine."""
         has_hash_detection = bool(self.flags & ImageStats.HASH)
         has_cluster_detection = self.extractor is not None and self.cluster_sensitivity is not None

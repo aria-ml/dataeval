@@ -355,6 +355,21 @@ class TestConstruction:
         assert frames.metadata["id"] == "videos-frames"
         assert cast(dict, frames.metadata)["index2label"] == {0: "thing"}
 
+    def test_a_dataset_without_metadata_gives_its_view_a_default_id_and_no_labels(self):
+        dataset, _ = make_dataset((3,))
+
+        class Bare:
+            def __len__(self) -> int:
+                return len(dataset)
+
+            def __getitem__(self, index: int) -> Any:
+                return dataset[index]
+
+        frames = SequenceFrames(cast(Any, Bare()))
+        assert frames.metadata["id"] == "dataset-frames"
+        assert "index2label" not in frames.metadata
+        assert len(frames) == 3
+
     def test_repr_and_str(self):
         dataset, _ = make_dataset((3,))
         frames = SequenceFrames(dataset, Stride(2))

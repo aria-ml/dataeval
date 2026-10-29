@@ -93,8 +93,8 @@ from dataeval.core._bin import (
 from dataeval.core._compute_stats import FactorResult, StatsResult
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.protocols import (
-    AnnotatedDataset,
     Array,
+    Dataset,
     DatumMetadata,
     FeatureExtractor,
     ProgressCallback,
@@ -549,7 +549,7 @@ class Metadata(Array, FeatureExtractor):
 
     Parameters
     ----------
-    dataset : AnnotatedDataset or None, default None
+    dataset : Dataset or None, default None
         Dataset that provides original targets and metadata for processing. When None,
         creates an unbound instance that can be used as a reusable feature extractor.
         Use :meth:`bind` to attach a dataset later, or pass data directly to :meth:`__call__`.
@@ -650,7 +650,7 @@ class Metadata(Array, FeatureExtractor):
     @requires_maite_dataset("dataset", expected="any_target")
     def __init__(
         self,
-        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
+        dataset: Dataset[tuple[Any, Any, DatumMetadata]] | None = None,
         *,
         task: TaskOverride | None = None,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
@@ -999,7 +999,7 @@ class Metadata(Array, FeatureExtractor):
     def load(
         cls,
         path: Path | str,
-        dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None = None,
+        dataset: Dataset[tuple[Any, Any, DatumMetadata]] | None = None,
         *,
         continuous_factor_bins: Mapping[str, int | Sequence[float]] | None = None,
         encoding: str | Path | Mapping[str, FactorEncoding] | None = None,
@@ -1271,7 +1271,7 @@ class Metadata(Array, FeatureExtractor):
         return self._dataset is not None
 
     @property
-    def dataset(self) -> AnnotatedDataset[tuple[Any, Any, DatumMetadata]] | None:
+    def dataset(self) -> Dataset[tuple[Any, Any, DatumMetadata]] | None:
         """The dataset these factors describe, or None when none is bound.
 
         Metadata references its dataset; it does not contain it or serve its images.
@@ -1283,7 +1283,7 @@ class Metadata(Array, FeatureExtractor):
 
         Returns
         -------
-        AnnotatedDataset or None
+        Dataset or None
             The bound dataset, the same object that was passed in.
 
         Example
@@ -1301,7 +1301,7 @@ class Metadata(Array, FeatureExtractor):
         return self._dataset is not None or self._is_structured
 
     @requires_maite_dataset("dataset", expected="any_target")
-    def bind(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
+    def bind(self, dataset: Dataset[tuple[Any, Any, DatumMetadata]]) -> Self:
         """Bind this instance to a dataset.
 
         Attaches a dataset to this Metadata instance for metadata extraction.
@@ -1309,7 +1309,7 @@ class Metadata(Array, FeatureExtractor):
 
         Parameters
         ----------
-        dataset : AnnotatedDataset
+        dataset : Dataset
             Dataset to bind for metadata extraction.
 
         Returns
@@ -1501,7 +1501,7 @@ class Metadata(Array, FeatureExtractor):
             return data[index]
         raise TypeError("Index must be an int, str, or slice.")
 
-    def new(self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> Self:
+    def new(self, dataset: Dataset[tuple[Any, Any, DatumMetadata]]) -> Self:
         """Create new Metadata instance with a different dataset.
 
         Generate a new Metadata object using the same configuration
@@ -1509,7 +1509,7 @@ class Metadata(Array, FeatureExtractor):
 
         Parameters
         ----------
-        dataset : AnnotatedDataset
+        dataset : Dataset
             Dataset that provides metadata for the new Metadata instance.
 
         Returns
@@ -1672,7 +1672,7 @@ class Metadata(Array, FeatureExtractor):
         data = derived.factor_data
         return data[:, [columns[name] for name in names]]
 
-    def _fit(self, data: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]) -> None:
+    def _fit(self, data: Dataset[tuple[Any, Any, DatumMetadata]]) -> None:
         """Bind to ``data`` and freeze the encoding derived from it.
 
         Notes
@@ -5146,7 +5146,9 @@ class Metadata(Array, FeatureExtractor):
         data = hold_back_invalid_known(data)
 
         unique_labels = np.unique(data.class_labels) if len(data.class_labels) else np.array([], dtype=np.intp)
-        self._index2label = build_index2label(self._dataset.metadata.get("index2label", None), unique_labels)
+        self._index2label = build_index2label(
+            (getattr(self._dataset, "metadata", None) or {}).get("index2label", None), unique_labels
+        )
         self._adopt(structurer, data)
         # From the bound dataset rather than the `_structuring_source` replacement: the replacement holds
         # the datums of a view, and it is the view's own chain that says which items share a root.

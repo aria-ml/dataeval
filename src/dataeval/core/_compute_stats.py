@@ -10,7 +10,7 @@ from typing_extensions import TypedDict, TypeVar
 from dataeval._experimental import deprecated
 from dataeval.core._calculators._base import Calculator
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, ProgressCallback
+from dataeval.protocols import ArrayLike, ImageDataset, ProgressCallback
 from dataeval.types import Aggregator, SourceIndex, StatsMap
 from dataeval.utils.preprocessing import (
     BoxLike,
@@ -166,7 +166,7 @@ def _produced_stat_names(calculators: Sequence[tuple[type[Calculator[Any]], Flag
 
 @deprecated(since="1.2", removal="2.0", alternative="image_stats")
 def compute_stats(
-    data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: StatsRequest = ImageStats.ALL,

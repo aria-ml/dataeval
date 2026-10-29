@@ -25,9 +25,9 @@ from dataeval.data._video_proxies import (
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
+    Dataset,
     DatasetMetadata,
     DatumMetadata,
-    MultiobjectTrackingDataset,
     MultiobjectTrackingDatum,
 )
 from dataeval.utils.data import requires_maite_dataset
@@ -79,7 +79,7 @@ def _plan_costs(plan: NDArray[np.intp], info: SequenceInfo) -> tuple[int, int]:
 
 
 def _plan_dataset(
-    dataset: MultiobjectTrackingDataset, planner: SegmentPlanner
+    dataset: Dataset[MultiobjectTrackingDatum], planner: SegmentPlanner
 ) -> tuple[list[SequenceInfo], list[NDArray[np.intp]], set[int], int, int]:
     """Compute segment plans for each video in the dataset without decoding frames."""
     sequences: list[SequenceInfo] = []
@@ -120,7 +120,7 @@ class VideoSegments(AnnotatedDataset[MultiobjectTrackingDatum]):
 
     Parameters
     ----------
-    dataset : MultiobjectTrackingDataset
+    dataset : Dataset of MultiobjectTrackingDatum
         The source tracking dataset.
     planner : SegmentPlanner
         Planner determining where to cut each video. See :class:`~dataeval.data.Window`
@@ -181,7 +181,7 @@ class VideoSegments(AnnotatedDataset[MultiobjectTrackingDatum]):
     @requires_maite_dataset("dataset", expected="multiobject_tracking")
     def __init__(
         self,
-        dataset: MultiobjectTrackingDataset,
+        dataset: Dataset[MultiobjectTrackingDatum],
         planner: SegmentPlanner,
         *,
         timestamps: TimestampPolicy = "source",
@@ -240,7 +240,7 @@ class VideoSegments(AnnotatedDataset[MultiobjectTrackingDatum]):
     # ------------------------------------------------------------------
 
     @property
-    def source(self) -> MultiobjectTrackingDataset:
+    def source(self) -> Dataset[MultiobjectTrackingDatum]:
         """Underlying tracking dataset wrapped by this view."""
         return self._dataset
 

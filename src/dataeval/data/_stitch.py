@@ -26,9 +26,9 @@ from dataeval.data._video_proxies import (
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
+    Dataset,
     DatasetMetadata,
     DatumMetadata,
-    MultiobjectTrackingDataset,
     MultiobjectTrackingDatum,
 )
 from dataeval.types._target import detection_count, track_ids_of
@@ -78,7 +78,7 @@ def _track_id_summary(target: Any, collect: bool) -> tuple[int, set[int]]:
 
 
 def _read_videos(
-    dataset: MultiobjectTrackingDataset, scan_ids: bool, collect_ids: bool = False
+    dataset: Dataset[MultiobjectTrackingDatum], scan_ids: bool, collect_ids: bool = False
 ) -> tuple[list[SequenceInfo], list[int], list[set[int]]]:
     """Read sequence info and track ID summaries for all videos without decoding frames."""
     sequences: list[SequenceInfo] = []
@@ -231,7 +231,7 @@ class VideoStitch(AnnotatedDataset[MultiobjectTrackingDatum]):
 
     Parameters
     ----------
-    dataset : MultiobjectTrackingDataset
+    dataset : Dataset of MultiobjectTrackingDatum
         The source dataset.
     group_by : str, callable, or None
         Metadata key or callable ``(DatumMetadata) -> Hashable`` defining video groups.
@@ -290,7 +290,7 @@ class VideoStitch(AnnotatedDataset[MultiobjectTrackingDatum]):
     @requires_maite_dataset("dataset", expected="multiobject_tracking")
     def __init__(
         self,
-        dataset: MultiobjectTrackingDataset,
+        dataset: Dataset[MultiobjectTrackingDatum],
         *,
         group_by: KeySpec | None,
         order_by: KeySpec | None = None,
@@ -347,7 +347,7 @@ class VideoStitch(AnnotatedDataset[MultiobjectTrackingDatum]):
     # ------------------------------------------------------------------
 
     @property
-    def source(self) -> MultiobjectTrackingDataset:
+    def source(self) -> Dataset[MultiobjectTrackingDatum]:
         """Underlying tracking dataset wrapped by this view."""
         return self._dataset
 

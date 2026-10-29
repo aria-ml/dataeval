@@ -28,7 +28,14 @@ from dataeval.core._compute_stats import (
 )
 from dataeval.data import unzip_dataset
 from dataeval.flags import ImageStats
-from dataeval.protocols import ArrayLike, Dataset, ObjectDetectionTarget, ProgressCallback, _is_protocol_instance
+from dataeval.protocols import (
+    ArrayLike,
+    Dataset,
+    ImageDataset,
+    ObjectDetectionTarget,
+    ProgressCallback,
+    _is_protocol_instance,
+)
 from dataeval.types import FactorLevel, SourceIndex
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
@@ -825,7 +832,7 @@ def _aggregate_batch(
 
 
 def image_stats(  # noqa: C901
-    data: Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+    data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
     stats: StatsRequest = ImageStats.ALL,
@@ -845,7 +852,7 @@ def image_stats(  # noqa: C901
 
     Parameters
     ----------
-    data : Iterable[ArrayLike] | Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
+    data : Iterable[ArrayLike] | ImageDataset
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.

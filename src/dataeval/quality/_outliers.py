@@ -26,13 +26,12 @@ from dataeval.exceptions import MaiteShapeError
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
-    ArrayLike,
-    Dataset,
     FeatureExtractor,
+    ImageDataset,
     MetadataLike,
-    MultiobjectTrackingDataset,
     Threshold,
     ThresholdLike,
+    VideoDataset,
 )
 from dataeval.quality._factor_stats import eligible_factors, factor_kind, factor_levels, factor_stats
 from dataeval.quality._outliers_neighbors import neighbor_checks, restratified, score_neighbors
@@ -2860,7 +2859,7 @@ class Outliers(Evaluator):
 
     def _get_cluster_outliers(
         self,
-        data: Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]],
+        data: ImageDataset,
     ) -> tuple[pl.DataFrame, ClusterStats]:
         """Extract embeddings, cluster them, and return cluster-based outlier DataFrame and stats."""
         embeddings = Embeddings(data, self.extractor, batch_size=self.batch_size)
@@ -2883,16 +2882,11 @@ class Outliers(Evaluator):
         )
         return self._find_outliers_adaptive(cluster_stats=cs, threshold=resolved_ct), cs
 
-    # A MOT dataset yields a (stream, target, metadata) item whose first element is not an image array, so it satisfies
-    # neither image spelling and a type checker would refuse it although `evaluate` judges it in video terms.
-    _DatasetInput = Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
-    _EvaluateInput = _DatasetInput | MultiobjectTrackingDataset
-
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _EvaluateInput,
-        *other: _EvaluateInput,
+        data: ImageDataset | VideoDataset | SequenceFrames,
+        *other: ImageDataset | VideoDataset | SequenceFrames,
         levels: str | Sequence[str],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
@@ -2907,7 +2901,7 @@ class Outliers(Evaluator):
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: MultiobjectTrackingDataset,
+        data: SequenceFrames,
         *,
         levels: None = None,
         per_image: bool | None = None,
@@ -2925,7 +2919,7 @@ class Outliers(Evaluator):
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _EvaluateInput,
+        data: ImageDataset,
         *,
         levels: None = None,
         per_image: bool | None = None,
@@ -2943,7 +2937,7 @@ class Outliers(Evaluator):
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _EvaluateInput,
+        data: ImageDataset,
         *,
         levels: None = None,
         per_image: bool | None = None,
@@ -2959,10 +2953,28 @@ class Outliers(Evaluator):
     ) -> SingleTargetOutliersOutput: ...
 
     @overload
+    def evaluate(  # pyright: ignore[reportOverlappingOverload]
+        self,
+        data: VideoDataset,
+        *,
+        levels: None = None,
+        per_image: bool | None = None,
+        per_target: bool | None = None,
+        per_class: bool = False,
+        metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
+    ) -> SingleTargetOutliersOutput: ...
+
+    @overload
     def evaluate(
         self,
-        data: _EvaluateInput,
-        *other: _EvaluateInput,
+        data: ImageDataset,
+        *other: ImageDataset,
         levels: None = None,
         per_image: bool | None = None,
         per_target: Literal[False] | None = ...,
@@ -2979,8 +2991,8 @@ class Outliers(Evaluator):
     @overload
     def evaluate(
         self,
-        data: _EvaluateInput,
-        *other: _EvaluateInput,
+        data: ImageDataset,
+        *other: ImageDataset,
         levels: None = None,
         per_image: bool | None = None,
         per_target: Literal[True],
@@ -3005,8 +3017,8 @@ class Outliers(Evaluator):
     )
     def evaluate(
         self,
-        data: _EvaluateInput,
-        *other: _EvaluateInput,
+        data: ImageDataset | VideoDataset | SequenceFrames,
+        *other: ImageDataset | VideoDataset | SequenceFrames,
         levels: str | Sequence[str] | None = None,
         per_image: bool | None = None,
         per_target: bool | None = None,
@@ -3044,7 +3056,10 @@ class Outliers(Evaluator):
             video terms: its videos, frames, tracks and detections (see `levels`). To measure fewer
             frames, pass a :class:`~dataeval.data.SequenceFrames` whose selector chooses them, such
             as ``SequenceFrames(dataset, Stride(5))``; it is judged in the same terms, and every
-            unweighted statistic then describes the frames kept. Statistics are computed once per
+            unweighted statistic then describes the frames kept. A dataset of videos with no
+            tracking targets, whose items are bare streams or ``(stream, None, metadata)``, is
+            judged the same way with no detections in any frame, so only the sequence and frame
+            levels exist. Statistics are computed once per
             measured frame, plus once per detection with ``per_target=True`` or a track or
             detection level in `levels`. Each video's stream
             is read more than once per call; selecting fewer frames reduces the statistics
@@ -3440,7 +3455,7 @@ class Outliers(Evaluator):
 
         plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
         # The video branch above took every tracking dataset, so what remains is an image dataset.
-        images = cast("list[Outliers._DatasetInput]", [data, *other])
+        images = cast(list[ImageDataset], [data, *other])
         if other:
             return self._evaluate_multi(
                 images,
@@ -3660,7 +3675,7 @@ class Outliers(Evaluator):
 
     def _evaluate_single(
         self,
-        data: _DatasetInput,
+        data: ImageDataset,
         *,
         per_image: bool = True,
         per_target: bool = True,
@@ -3719,7 +3734,7 @@ class Outliers(Evaluator):
 
     def _evaluate_multi(
         self,
-        datasets: Sequence[_DatasetInput],
+        datasets: Sequence[ImageDataset],
         *,
         per_image: bool = True,
         per_target: bool = True,

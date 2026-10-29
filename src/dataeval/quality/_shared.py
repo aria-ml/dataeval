@@ -11,6 +11,7 @@ import polars as pl
 from dataeval.core import StatsResult, image_stats
 from dataeval.data import SequenceFrames
 from dataeval.data._invalidates import invalidating_sources
+from dataeval.data._video_proxies import is_pure_video
 from dataeval.exceptions import StatsInvalidatedWarning
 from dataeval.flags import ImageStats
 from dataeval.protocols import Dataset, MetadataLike, MultiobjectTrackingTarget, _is_protocol_instance
@@ -413,4 +414,4 @@ def yields_frames(data: Any) -> bool:
     only the first would give a hand-wrapped view the image level vocabulary, which then matches
     nothing.
     """
-    return isinstance(data, SequenceFrames) or is_tracking(data)
+    return isinstance(data, SequenceFrames) or is_tracking(data) or is_pure_video(data)

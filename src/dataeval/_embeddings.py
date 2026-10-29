@@ -19,9 +19,8 @@ from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
-    ArrayLike,
-    Dataset,
     FeatureExtractor,
+    ImageDataset,
     ProgressCallback,
 )
 from dataeval.utils.data import requires_maite_dataset, unwrap_image
@@ -121,7 +120,7 @@ class Embeddings(Array, FeatureExtractor):
     def __init__(
         self,
         # Technically more permissive than ImageClassificationDataset or ObjectDetectionDataset
-        dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike] | None = None,
+        dataset: ImageDataset | None = None,
         extractor: FeatureExtractor | None = None,
         batch_size: int | None = None,
         path: Path | str | None = None,
@@ -184,7 +183,7 @@ class Embeddings(Array, FeatureExtractor):
         return self._dataset is not None
 
     @requires_maite_dataset("dataset", expected="image_only")
-    def bind(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Self:
+    def bind(self, dataset: ImageDataset) -> Self:
         """Bind this instance to a dataset.
 
         Attaches a dataset to this Embeddings instance for embedding computation.
@@ -414,7 +413,7 @@ class Embeddings(Array, FeatureExtractor):
             # In-memory only
             self._embeddings = np.empty(full_shape, dtype=dtype)
 
-    def new(self, dataset: Dataset[tuple[ArrayLike, Any, Any]] | Dataset[ArrayLike]) -> Self:
+    def new(self, dataset: ImageDataset) -> Self:
         """
         Create new Embeddings instance with a different dataset.
 

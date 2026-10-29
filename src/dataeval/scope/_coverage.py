@@ -301,7 +301,7 @@ class Coverage(Evaluator):
                     "This Metadata has no dataset bound (as after Metadata.load), so there are no images "
                     "to embed. Pass embeddings=..., or the dataset it was built from."
                 )
-            dataset = dataset.dataset
+            dataset = cast("AnnotatedDataset[Any]", dataset.dataset)
         # Reached only when no embeddings were supplied, i.e. ``dataset`` is a real image
         # dataset (raw labels / LabelsLike are rejected upstream unless embeddings are given).
         image_source = cast("AnnotatedDataset[Any]", dataset)
