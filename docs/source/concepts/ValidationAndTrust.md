@@ -1230,6 +1230,8 @@ Experimental ⚠️ (API may change or be removed):
   directly, through the group or through `ALL`) raises
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in
   a process. Every other {func}`.video_stats` statistic is stable.
+  {class}`~dataeval.protocols.SharpnessMeasure`, the protocol a `blur_measure`
+  follows, is experimental with them and raises nothing on its own.
 - The inputs and evidence of {class}`.Feasibility` ({class}`.TargetSpec`,
   {class}`.SamplingPlan`, {class}`.Evidence` and {class}`.Endpoint`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

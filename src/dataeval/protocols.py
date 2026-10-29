@@ -1039,6 +1039,9 @@ class SharpnessMeasure(Protocol):
     """
     Protocol for the per-cell sharpness measure inside the `PERSISTENCE` blur maps.
 
+    .. warning::
+       This feature is experimental and may change or be removed in future releases.
+
     :func:`~dataeval.core.video_stats` compares the same content's sharpness at two places
     in the frame, so a measure is called on whole frames and answers once per cell of a
     grid. Pass one as ``blur_measure`` to study another definition of sharpness without
