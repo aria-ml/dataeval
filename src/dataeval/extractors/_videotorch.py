@@ -2,8 +2,9 @@
 
 __all__ = ["VideoTorchExtractor"]
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import nullcontext
+from itertools import islice
 from typing import Any
 
 import numpy as np
@@ -14,6 +15,8 @@ from dataeval._log import get_logger
 from dataeval.config import get_device
 from dataeval.extractors._torch import get_valid_layer, normalize_transforms
 from dataeval.protocols import Array, DeviceLike, Transform
+from dataeval.utils._array import as_numpy
+from dataeval.utils.preprocessing import normalize_image_shape
 
 _logger = get_logger(__name__)
 
@@ -34,11 +37,26 @@ _CLIP_AGGREGATION: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor
     "max": torch.maximum,
 }
 
-# Beyond this many clips a video is long enough that releasing cached CUDA blocks now and
-# then is worth the synchronization, and that progress is worth reporting.
+# Past this many clips a video is long enough that releasing cached CUDA blocks now and
+# then is worth the synchronization, and that progress is worth reporting. A stream's
+# length is unknown until it ends, so both are decided by the clips read so far.
 _LONG_VIDEO_CLIPS = 100
 _CACHE_RELEASE_CLIPS = 500
 _CACHE_RELEASE_EVERY = 100
+
+
+def _frame_of(frame: Any) -> Any:
+    """Return a stream frame's pixels as an ``(H, W, C)`` array, and any other frame as it came.
+
+    A MAITE frame carries its pixels channel first, where an array video is channel last, so
+    the stream frame is turned to match what the processor already receives from an array. A
+    frame with no channel axis is read as one channel, as every other reader of stream frames
+    reads it, so it arrives as a ``(T, H, W, 1)`` array video's frame does.
+    """
+    pixels = getattr(frame, "pixels", None)
+    if pixels is None:
+        return frame
+    return np.moveaxis(normalize_image_shape(as_numpy(pixels)), 0, -1)
 
 
 def _tensor_of(model_output: Any) -> Any:  # noqa: C901
@@ -80,7 +98,12 @@ class VideoTorchExtractor:
     Extracts embeddings from videos using a pretrained model.
 
     Videos are automatically split into non-overlapping clips of the required length,
-    processed separately, then aggregated into a single embedding per video.
+    processed separately, then aggregated into a single embedding per video. A video
+    can be a (num_frames, height, width, channels) numpy array, a list of frames, or
+    a MAITE video stream (:obj:`~dataeval.protocols.VideoStream`) such as a
+    multi-object tracking dataset yields, so ``Embeddings(tracking_dataset,
+    extractor=VideoTorchExtractor(...))`` embeds each sequence. Frames past the last
+    complete clip are left out.
 
     Encapsulates all PyTorch-specific logic for video feature extraction:
 
@@ -308,68 +331,82 @@ class VideoTorchExtractor:
 
         return tensor.contiguous()
 
-    def _split_video_into_clips(self, video: Any) -> list[list]:
+    def _split_video_into_clips(self, video: Any) -> Iterator[Any]:
         """
-        Split a video into non-overlapping clips.
+        Yield a video's complete, non-overlapping clips, one at a time.
 
         Parameters
         ----------
         video : Any
-            Video data as numpy array of shape (num_frames, height, width, channels)
-            or list of frames.
+            Video as a numpy array of shape (num_frames, height, width, channels), a
+            list of frames, or a MAITE video stream.
 
-        Returns
-        -------
-        list[list]
-            List of clips, where each clip is a list of frames.
+        Yields
+        ------
+        Any
+            One clip of ``num_frames`` frames: a list of frames, or for an array of
+            any rank but 4 a slice of it. A trailing incomplete clip is skipped.
         """
-        # Convert to list of frames if numpy array
-        video_frames = list(video) if isinstance(video, np.ndarray) and video.ndim == 4 else video
+        n = self._num_frames
+        if isinstance(video, Array) and not (isinstance(video, np.ndarray) and video.ndim == 4):
+            # Sliced as is: the layout an array of any other rank has always reached the processor in.
+            chunks: Iterator[Any] = (video[start : start + n] for start in range(0, len(video), n))
+        else:
+            # One pass, n frames at a time: a stream is never measured, indexed or held whole.
+            frames = iter(video)
+            chunks = iter(lambda: [_frame_of(frame) for frame in islice(frames, n)], [])
 
-        # Split into non-overlapping clips
-        clips = []
-        for start_idx in range(0, len(video_frames), self._num_frames):
-            clip_frames = video_frames[start_idx : start_idx + self._num_frames]
-
-            # Only keep complete clips
-            if len(clip_frames) == self._num_frames:
-                clips.append(clip_frames)
+        for clip_frames in chunks:
+            if len(clip_frames) == n:
+                yield clip_frames
             else:
-                _logger.debug(f"Skipping incomplete clip with {len(clip_frames)}/{self._num_frames} frames")
+                _logger.debug(f"Skipping incomplete clip with {len(clip_frames)}/{n} frames")
 
-        return clips
-
-    def _aggregate_clips_incremental(self, clips: list[list]) -> torch.Tensor:
+    def _aggregate_clips_incremental(self, clips: Iterator[Any], video_idx: int) -> torch.Tensor:
         """
         Process and aggregate clips incrementally to minimize memory usage.
 
-        This does slow things down, and could be sped up a bit
-        by iterating through batches rather than individual clips.
+        Only the clip in hand and the running aggregate are held, so a stream is never
+        read further ahead than one clip. This does slow things down, and could be sped
+        up a bit by iterating through batches rather than individual clips.
 
         Parameters
         ----------
-        clips : list[list]
-            List of clips, where each clip is a list of frames.
+        clips : Iterator
+            The video's clips, each a sequence of frames.
+        video_idx : int
+            Position of the video in the batch, for messages.
 
         Returns
         -------
         torch.Tensor
             Aggregated video embedding.
-        """
-        if not clips:
-            raise ValueError("No clips to process")
 
-        n_clips = len(clips)
+        Raises
+        ------
+        ValueError
+            When `clips` is empty: the video is too short to fill even one clip.
+        """
+        first = next(clips, None)
+        if first is None:
+            raise ValueError(
+                f"Video at index {video_idx} is shorter than one clip of {self._num_frames} "
+                "frames, so it yields no embedding, and the result is read by position. "
+                "Drop the video from the dataset, or lower num_frames.",
+            )
+
         combine = _CLIP_AGGREGATION[self._clip_aggregation]
         # Cloned so the accumulator owns its memory: the pooled embedding can be a view of
         # the model's output, which the in-place ``mean`` combine would otherwise write to.
-        running_aggregate = self._embed_clip(clips[0]).clone()
+        running_aggregate = self._embed_clip(first).clone()
 
-        for clip_idx, clip_frames in enumerate(clips[1:], start=2):
-            clip_embedding = self._embed_clip(clip_frames)
-            running_aggregate = combine(running_aggregate, clip_embedding)
-            del clip_embedding  # no longer needed
-            self._relieve_memory(clip_idx, n_clips)
+        n_clips = 1
+        for n_clips, clip_frames in enumerate(clips, start=2):
+            running_aggregate = combine(running_aggregate, self._embed_clip(clip_frames))
+            self._relieve_memory(n_clips)
+
+        if n_clips > _LONG_VIDEO_CLIPS:
+            _logger.info(f"Processed long video {video_idx + 1} with {n_clips} clips")
 
         # Finalize aggregation
         if self._clip_aggregation == "mean":
@@ -381,13 +418,13 @@ class VideoTorchExtractor:
         """Preprocess one clip and run it through the model."""
         return self._extract_clip_embedding(self._preprocess_clip(clip_frames))
 
-    def _relieve_memory(self, processed: int, n_clips: int) -> None:
+    def _relieve_memory(self, processed: int) -> None:
         """Release cached CUDA blocks now and then while working through a very long video."""
-        if n_clips <= _CACHE_RELEASE_CLIPS or processed % _CACHE_RELEASE_EVERY:
+        if processed <= _CACHE_RELEASE_CLIPS or processed % _CACHE_RELEASE_EVERY:
             return
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
-        _logger.debug(f"Processed {processed}/{n_clips} clips")
+        _logger.debug(f"Processed {processed} clips")
 
     def _forward(self, clip_tensor: torch.Tensor) -> torch.Tensor:
         """Run one clip through the model and return the tensor to pool.
@@ -449,9 +486,19 @@ class VideoTorchExtractor:
         Parameters
         ----------
         data : Any
-            Iterable of videos to extract features from. Each video should be
-            in a format compatible with the processor (e.g., numpy array of shape
-            (num_frames, height, width, channels) or list of PIL Images).
+            Iterable of videos to extract features from. Each video is one of:
+
+            - a numpy array of shape (num_frames, height, width, channels);
+            - a list of frames in a format the processor accepts, such as
+              (height, width, channels) arrays or PIL Images;
+            - a MAITE video stream (:obj:`~dataeval.protocols.VideoStream`), as a
+              multi-object tracking dataset holds in its image slot: any iterable
+              of frames with a ``pixels`` attribute in (channels, height, width)
+              order. Each frame's pixels reach the processor as a (height, width,
+              channels) array, a frame with no channel axis as one channel. Each
+              call walks the stream once, in order, one clip at a time: it is never
+              asked for its length or indexed, and no more than one clip of it is
+              held in memory.
 
         Returns
         -------
@@ -475,22 +522,8 @@ class VideoTorchExtractor:
         all_video_embeddings = []
 
         for video_idx, video in enumerate(data):
-            # Split video into clips
             clips = self._split_video_into_clips(video)
-
-            if not clips:
-                raise ValueError(
-                    f"Video at index {video_idx} is shorter than one clip of {self._num_frames} "
-                    "frames, so it yields no embedding, and the result is read by position. "
-                    "Drop the video from the dataset, or lower num_frames.",
-                )
-
-            # Log for very long videos
-            if len(clips) > _LONG_VIDEO_CLIPS:
-                _logger.info(f"Processing long video {video_idx + 1} with {len(clips)} clips")
-
-            # Process clips incrementally
-            video_embedding = self._aggregate_clips_incremental(clips)
+            video_embedding = self._aggregate_clips_incremental(clips, video_idx)
             all_video_embeddings.append(video_embedding.cpu())
 
         if not all_video_embeddings:
