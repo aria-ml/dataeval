@@ -55,6 +55,7 @@ datasets for machine learning.
 :hidden:
 
 ../notebooks/h2_wrap_dataframe_dataset.py
+../notebooks/h2_wrap_video_files.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_build_dataset_views.py
 ../notebooks/h2_create_embeddings.py
@@ -87,6 +88,11 @@ datasets for machine learning.
     DataEval dataset, and defer image decoding to speed up
     metadata-only analysis
   - [![Open In Colab][colab-badge]][wdf-colab]
+- - [](../notebooks/h2_wrap_video_files.py)
+  - Wrap video files and their tracking annotations as a multi-object
+    tracking dataset, and serve each file's frame rate and duration as
+    named factors
+  - [![Open In Colab][colab-badge]][wvf-colab]
 - - [](../notebooks/h2_metadata_from_dataframe.py)
   - Build a MetadataLike object from a DataFrame for bias
     analysis without loading images
@@ -209,6 +215,7 @@ datasets for machine learning.
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_reconcile_labels_ontology.ipynb
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_align_label_spaces.ipynb
 [cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_conform_and_merge_datasets.ipynb
+[wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_wrap_video_files.ipynb
 
 ## Model development
 
