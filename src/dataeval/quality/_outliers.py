@@ -30,6 +30,7 @@ from dataeval.protocols import (
     Dataset,
     FeatureExtractor,
     MetadataLike,
+    MultiobjectTrackingDataset,
     Threshold,
     ThresholdLike,
 )
@@ -2882,13 +2883,16 @@ class Outliers(Evaluator):
         )
         return self._find_outliers_adaptive(cluster_stats=cs, threshold=resolved_ct), cs
 
+    # A MOT dataset yields a (stream, target, metadata) item whose first element is not an image array, so it satisfies
+    # neither image spelling and a type checker would refuse it although `evaluate` judges it in video terms.
     _DatasetInput = Dataset[ArrayLike] | Dataset[tuple[ArrayLike, Any, Any]]
+    _EvaluateInput = _DatasetInput | MultiobjectTrackingDataset
 
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: _EvaluateInput,
+        *other: _EvaluateInput,
         levels: str | Sequence[str],
         per_class: bool = False,
         metadata: MetadataLike | None = None,
@@ -2903,7 +2907,25 @@ class Outliers(Evaluator):
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _DatasetInput,
+        data: MultiobjectTrackingDataset,
+        *,
+        levels: None = None,
+        per_image: bool | None = None,
+        per_target: bool | None = None,
+        per_class: bool = False,
+        metadata: MetadataLike | None = None,
+        factors: Sequence[str] | None = None,
+        strata: str | Sequence[str] | None = None,
+        combinations: Sequence[Sequence[str]] | Literal["all"] | None = None,
+        given: Mapping[str, str] | None = None,
+        kinds: Mapping[str, ColumnKind] | None = None,
+        neighbors: Sequence[str] | Literal["all"] | None = None,
+    ) -> SingleTargetOutliersOutput: ...
+
+    @overload
+    def evaluate(  # pyright: ignore[reportOverlappingOverload]
+        self,
+        data: _EvaluateInput,
         *,
         levels: None = None,
         per_image: bool | None = None,
@@ -2921,7 +2943,7 @@ class Outliers(Evaluator):
     @overload
     def evaluate(  # pyright: ignore[reportOverlappingOverload]
         self,
-        data: _DatasetInput,
+        data: _EvaluateInput,
         *,
         levels: None = None,
         per_image: bool | None = None,
@@ -2939,8 +2961,8 @@ class Outliers(Evaluator):
     @overload
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: _EvaluateInput,
+        *other: _EvaluateInput,
         levels: None = None,
         per_image: bool | None = None,
         per_target: Literal[False] | None = ...,
@@ -2957,8 +2979,8 @@ class Outliers(Evaluator):
     @overload
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: _EvaluateInput,
+        *other: _EvaluateInput,
         levels: None = None,
         per_image: bool | None = None,
         per_target: Literal[True],
@@ -2983,8 +3005,8 @@ class Outliers(Evaluator):
     )
     def evaluate(
         self,
-        data: _DatasetInput,
-        *other: _DatasetInput,
+        data: _EvaluateInput,
+        *other: _EvaluateInput,
         levels: str | Sequence[str] | None = None,
         per_image: bool | None = None,
         per_target: bool | None = None,
@@ -3417,9 +3439,11 @@ class Outliers(Evaluator):
         _refuse_factor_arguments(factors, checks)
 
         plan = _plan_for(levels, per_image, per_target, tracking=False, subject="dataset")
+        # The video branch above took every tracking dataset, so what remains is an image dataset.
+        images = cast("list[Outliers._DatasetInput]", [data, *other])
         if other:
             return self._evaluate_multi(
-                [data, *other],
+                images,
                 per_image=plan.per_image,
                 per_target=plan.per_target,
                 per_class=per_class,
@@ -3428,7 +3452,7 @@ class Outliers(Evaluator):
             )
 
         return self._evaluate_single(
-            data,
+            images[0],
             per_image=plan.per_image,
             per_target=plan.per_target,
             per_class=per_class,
