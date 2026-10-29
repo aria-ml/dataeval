@@ -17,8 +17,8 @@
 # # How to wrap video files as a multi-object tracking dataset
 #
 # DataEval reads video through the MAITE multi-object tracking protocol. Each datum is a stream of frames, the tracked
-# boxes of every frame, and a metadata dictionary. Footage on disk takes two small classes to fit that: a stream that
-# reopens the file, and a dataset that reads the file's properties as factors.
+# boxes of every frame, and a metadata dictionary. Footage on disk needs two small classes to fit it. A stream reopens
+# the file, and a dataset reads the file's properties as factors.
 #
 # Use this guide to:
 #
@@ -94,9 +94,9 @@ print([path.name for path in paths])
 # %% [markdown]
 # ## Stream frames from the file
 #
-# A video stream is an iterable that DataEval walks from the first frame, more than once. Open the file inside
-# `__iter__` so that every walk starts fresh, and close it when the walk ends, including when the consumer stops early.
-# Each frame carries `pixels` as a `(C, H, W)` array, its own `frame_index`, and `time_s` and `pts` from the file.
+# DataEval walks a video stream from the first frame, more than once, so open the file inside `__iter__` and close it
+# when the walk ends, including when the consumer stops early. Each frame carries `pixels` as a `(C, H, W)` array, its
+# own `frame_index`, and `time_s` and `pts` from the file.
 
 
 # %%
@@ -197,8 +197,8 @@ metadata = Metadata(dataset)
 print(metadata.rows_at("sequence").select("item_index", "frame_rate", "video_duration", "codec_name"))
 
 # %% [markdown]
-# A value that breaks a known factor's definition sets the factor aside, so a bad frame rate cannot reach an analysis
-# unnoticed. {attr}`.Metadata.dropped_factors` names the factor, and {meth}`.Metadata.unusable_rows` places its values.
+# A value that breaks a known factor's definition sets the factor aside. {attr}`.Metadata.dropped_factors` names the
+# factor, and {meth}`.Metadata.unusable_rows` places its values.
 
 # %%
 broken = Metadata(VideoFileDataset(paths, boxes, frame_rates=[-1.0, 15.0, 15.0]))
@@ -208,8 +208,8 @@ print(broken.unusable_rows("frame_rate").sort("value").head(1))
 # %% [markdown]
 # ## Run an evaluator and follow a finding
 #
-# Pass the dataset to {class}`.Outliers`. It decodes every frame and reports frames, and with `per_target=True` tracks,
-# as {class}`.SourceIndex` addresses of the dataset. {class}`.SourceLocator` resolves an address to the frame.
+# Pass the dataset to {class}`.Outliers`. It decodes every frame and reports frames as {class}`.SourceIndex` addresses
+# of the dataset, and with `per_target=True` tracks as well. {class}`.SourceLocator` resolves an address to the frame.
 
 # %%
 result = Outliers().evaluate(dataset)
