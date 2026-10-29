@@ -249,6 +249,10 @@ include = ["src/dataeval"]
 [tool.hatch.version]
 source = "vcs"
 
+# Dev builds on main number the next minor and on release/vN.N the next patch, instead of always the next patch.
+[tool.hatch.version.raw-options]
+version_scheme = "release-branch-semver"
+
 [tool.hatch.build.hooks.vcs]
 version-file = "src/dataeval/_version.py"
 
