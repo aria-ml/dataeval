@@ -41,6 +41,7 @@ aliases:
   types: verification/nonfunctional/test_type_safety.py::TestTypeSafety
   cfg: verification/nonfunctional/test_config_reproducibility.py::TestConfigReproducibility
   perf: verification/nonfunctional/test_performance.py::TestPerformance
+  video: verification/functional/test_video_workflow.py::TestVideoWorkflow
 requirements:
 - id: FR-1
   name: Installation & Optional Dependencies
@@ -175,6 +176,17 @@ requirements:
   - The schema rejects a document with none of `dataset`, `model`, or `extractor`, and rejects unknown fields.
   origin: IR-3-S-12
   origin_link: https://jatic.pages.jatic.net/internal-docs/standards/product/software/interoperability/#ir-3-model-and-data-interoperability
+- id: FR-13
+  name: Video Dataset Workflow
+  description: DataEval shall evaluate a multi-object tracking (video) dataset through a frame view, report findings
+    by the video and frame they came from, and split the frames without splitting a video.
+  criteria:
+  - A frame selector thins each video, and the view records the video and frame number of every kept frame and how
+    many source frames it stands for.
+  - Per-video and per-frame statistics attach to the metadata rows they describe.
+  - '`Duplicates` and `Outliers` report findings on the frame view as addresses in the source dataset.'
+  - An address resolves to the frame it names, and a view position translates to its source address.
+  - '`split_dataset` on `sequence` keeps every video in one partition.'
 - id: NFR-1
   name: Platform Compatibility
   description: DataEval shall behave consistently on every supported Python version, installer, and hardware configuration.
@@ -717,6 +729,39 @@ test_cases:
     tests:
     - mjson::test_schema_rejects_empty_payload
     - mjson::test_schema_rejects_unknown_fields
+- id: 13-1
+  req: FR-13
+  name: Video Workflow
+  type: Integration
+  business: An integrator can thin a video dataset, measure it, find problems and follow each finding back to the footage
+    without the frame view hiding where a frame came from.
+  conditions:
+  - DataEval installed
+  - A tracking dataset of six videos with a planted copy of three frames and one planted flash
+  steps:
+  - do: Select every second frame of each video with `SequenceFrames` and read the source address and weight of each
+      kept frame.
+    expect: Each kept frame names its video and frame number, and stands for the frames its selector dropped.
+    tests:
+    - video::test_selection_records_the_source_of_every_kept_frame
+  - do: Attach per-video and per-frame statistics to the source dataset's `Metadata`.
+    expect: Each statistic lands on the rows of the videos and frames it was measured on, and on no others.
+    tests:
+    - video::test_statistics_attach_to_the_rows_they_describe
+  - do: Run `Outliers` and `Duplicates` on the frame view.
+    expect: The flash is reported as one frame of one video, and each planted copy as a pair of videos and frames.
+    tests:
+    - video::test_outliers_reports_the_flash_by_video_and_frame
+    - video::test_duplicates_reports_the_copies_by_video_and_frame
+  - do: Resolve each finding with `SourceLocator`, and translate a view position with `to_source`.
+    expect: The frames resolved are the planted ones, and the view position translates to its source address.
+    tests:
+    - video::test_a_finding_resolves_to_the_frame_it_names
+    - video::test_a_view_position_translates_to_its_source_address
+  - do: Split the frame view on `sequence`.
+    expect: Every video is in exactly one partition and every frame is in a partition.
+    tests:
+    - video::test_splitting_on_sequence_keeps_every_video_in_one_partition
 - id: 21-1
   req: NFR-1
   name: Platform Compatibility
