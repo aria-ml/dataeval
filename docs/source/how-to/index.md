@@ -56,6 +56,7 @@ datasets for machine learning.
 
 ../notebooks/h2_wrap_dataframe_dataset.py
 ../notebooks/h2_wrap_video_files.py
+../notebooks/h2_select_frames.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_build_dataset_views.py
 ../notebooks/h2_create_embeddings.py
@@ -93,6 +94,10 @@ datasets for machine learning.
     tracking dataset, and serve each file's frame rate and duration as
     named factors
   - [![Open In Colab][colab-badge]][wvf-colab]
+- - [](../notebooks/h2_select_frames.py)
+  - Thin each video to a budget of frames with Stride, EvenlySpaced or
+    Representative, and read how many source frames each kept frame stands for
+  - [![Open In Colab][colab-badge]][sel-colab]
 - - [](../notebooks/h2_metadata_from_dataframe.py)
   - Build a MetadataLike object from a DataFrame for bias
     analysis without loading images
@@ -216,6 +221,7 @@ datasets for machine learning.
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_align_label_spaces.ipynb
 [cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_conform_and_merge_datasets.ipynb
 [wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_wrap_video_files.ipynb
+[sel-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_select_frames.ipynb
 
 ## Model development
 
