@@ -1,5 +1,299 @@
 # DataEval Change Log
 
+## v1.2.0-rc0
+
+🌟 **Feature Release**
+
+- `a0544e490` - [feat] Evaluate Outliers on a tracking dataset in video terms
+- `32a8996ec` - [feat] Export the experimental DriftKnownDomains detector from dataeval.shift
+- `844314206` - [feat] Add VideoStats PERSISTENCE: per-video maps of what is fixed to the camera and of local blur
+- `d3f954658` - [feat] Default an unset Duplicates hash_radius to 6 for video and 0 for images, resolved per evaluation
+- `ea4e62d5c` - [feat] Add the experimental Feasibility evaluator, which decides whether a classification accuracy or AP target is reachable on a dataset and returns the evidence behind each answer, and keep ber_knn lower bounds below the Bayes error
+- `c6176a15e` - [feat] Exclude a burned-in overlay from camera ego-motion with mask= on ego_stats, video_stats and CameraTravel
+- `83b869aed` - [feat] Add CameraTravel, keeping a frame each time the estimated camera travel reaches a set fraction of the frame, and refuse ego readings optical flow cannot make
+- `3350abb08` - [feat] Select frames by image quality or annotations with QualityGate, TrackEvents, BestPerTrack and HasLabels, and report what each selection stage kept
+- `a04988de0` - [feat] Compose frame selectors with Chain, and make frames_represented an exact count of the source frames each kept frame stands for
+- `930667639` - [feat] Trace frame-view findings to their source videos with SequenceFrames.to_source, a selection fixed by its first walk, and partial keyed source_index
+- `7bba36f35` - [feat] Report where Metadata.add_factors values disagree with existing factors, keep overwritten columns as <name>_original, and record each factor's source name
+- `f321b876c` - [feat] Add VideoStats and video_stats for per-video statistics
+- `0da47ce38` - [feat] Make Parity valid over grouped data with per-cell findings, and label_parity a two-sample homogeneity test
+- `9d4c266a5` - [feat] Add label_cooccurrence stats and stats on Metadata factors
+- `eb2bae419` - [feat] Judge an annotated dataset through the Metadata built for it, attach dataset and metadata to Outliers output, and prefix per-level metric names
+- `5a36ed12e` - [feat] Add known metadata factors with validated definitions, documented on the ExtrinsicFactors concept page
+- `7f154f6b8` - [feat] Add DriftKnownDomains detector
+- `8514871c6` - [feat] Judge metadata factors against their sequence neighbors in Outliers with neighbors= and dataeval.core.sequence_residuals
+- `4bf5042de` - [feat] Stratify Outliers, floor small populations, judge categorical rarity and flag unusual factor combinations
+- `487eba35e` - [feat] Score how unusual each row is as a combination of metadata factors with dataeval.core.combination_scores
+- `d4375267c` - [feat] Judge Outliers at named levels with levels= and level views
+- `af8148b30` - [feat] Filter dataset views by class and metadata factor, replacing ClassFilter
+- `764cf3e89` - [feat] Metadata analysis in Outliers evaluator
+- `dfc6146be` - [feat] Duplicates.deduplicate and Outliers.prune return a RemovalPlan of items, detections and tracks, which Indices(plan, exclude=True) removes
+- `75ced475c` - [feat] chunked() takes incomplete to keep, drop or append the reference's short final chunk
+- `b27eb0cc9` - [feat] Metadata.unusable_rows names the items and rows that hold an unusable factor's values
+- `770f5a8c6` - [feat] Metadata analysis in Duplicates evaluator
+- `5593b270a` - [feat] Generate the metarepo test-results.log from nox -s verify
+- `ea34f376f` - [feat] Add ego_stats for per-frame camera motion factors
+- `eb12e58e9` - [feat] Let stats producers declare how their factors roll up to a coarser level
+- `ca6610293` - [feat] Add alpha prerelease tier selected with PRERELEASE_TYPE
+- `e3dd95330` - [feat] Take parity's G-test evidence against entities rather than rows
+- `9dddcbfbb` - [feat] Count the distinct entities a level offers over the rows in view
+- `da74444c7` - [feat] Take the chance correction against entities rather than rows in mutual_info
+- `cd71378b8` - [feat] Integrate new frame selection methods
+- `867beac61` - [feat] Enable MOT dataset for Duplicates evaluator
+- `9b5faa249` - [feat] Persist last_aggregation so a restored metadata keeps its coverage diagnostics
+- `c049f1312` - [feat] Accept corrections and aggregations as constructor arguments
+- `8ca0a65d3` - [feat] Export the factor vocabularies and array helpers as public API
+- `8204487cc` - [feat] Allow Metadata to handle mixed data inputs and apply corrective measures
+- `8088b79c9` - [feat] Metadata Aggregator to move metadata from bottom up
+- `56f41a3b8` - [feat] Add ability to validate MOT datasets
+- `dfba223b0` - [feat] First class metadata feature extractor
+- `c0809307e` - [feat] Allow custom classed_by axis for Metadata
+- `22cb6ee38` - [feat] Allow band groups for stats calculations
+- `77f95fb63` - [feat] Expose source item and target addresses on DetectionCrops
+- `f0993f59c` - [feat] Add SourceLocator for SourceIndex lookup
+- `3a63bf56c` - [feat] SourceIndex becomes a universal address
+- `e8789fc49` - [feat] Merge FMV development branch work
+
+🚧 **Deprecations and Removals**
+
+- `0ec454836` - [depr] Remove all deprecated functionality declared in v1.1
+
+🛠️ **Improvements and Enhancements**
+
+- `ed86ddae7` - [impr] Remove Duplicates frame_sample so frames are chosen only through SequenceFrames, and name the selector in execution records
+- `3b4331e9b` - [impr] Warn when BoVWExtractor fits its vocabulary inside a single call, and fit it explicitly in the augmentation tutorial
+- `c509aa6cf` - [impr] Convert RGB frames to grayscale about 5x faster at 4K, bit-identical to before, by summing luma into one float64 buffer
+- `fdefe88e0` - [impr] Tidy VideoStats follow-ups: abstract calculator hooks, grouped hash warnings, docs and tests
+- `b84fa6cac` - [impr] Move image_stats into its own _image_stats module
+- `20635ae2d` - [impr] Rename compute_stats to image_stats
+- `3f295f06a` - [impr] Cache the docs datasets in Harbor from the docs CI job, outside the docs build
+- `e8244ff5b` - [impr] Deprecate compute_ratios in favor of the rel_* statistics and Metadata instance and unit columns
+- `1da6a8500` - [impr] Run BoVW on threads so set_max_processes speeds it up
+- `a19219f61` - [impr] Drop python 3.10 support
+- `b48fb639f` - [impr] Publish main-<variant> from the branch and point latest at the newest release
+- `5173baec5` - [impr] Publish only :latest from main and version tags from releases
+- `b1238053c` - [impr] Expand dup_types input to accept str and add some tests
+- `859a58f03` - [impr] Add dropped_indices attribute and drop_empty param
+- `07881cb25` - [impr] Share the effective sample size helpers between the two corrected statistics
+- `3e41e3743` - [impr] Return an empty tuple instead of None for DriftOutput.feature_names
+- `f6b8948ab` - [impr] Make repair answer with a copy, as aggregate already does
+- `63312b8b4` - [impr] Use metadata levels first as a qualifier when resolving factor names
+- `4997d3b01` - [impr] Remove id from metadata factors
+- `f485345b7` - [impr] Add exclude option for Indices
+- `f0bd45ea5` - [impr] Declare each task's level model once, outside the metadata package
+
+👾 **Fixes**
+
+- `faa46a007` - [fix] Key ego_stats frame rows by each frame's own number so they attach to the Metadata rows of a selected or offset video
+- `8de951b85` - [fix] Fix ClassBalance failing on a tracking dataset with KeyError and the stock image extractors returning a row of objects for a video stream
+- `449f1a130` - [fix] Fix the naive coverage radius overflow on wide embeddings and the unclear errors from image statistics on tracking datasets and from Prioritize
+- `6b6734344` - [fix] Keep each split_on group in one partition when splitting detection and frame datasets, which v1.1 ignored
+- `9e2c55452` - [fix] Raise from image_stats when images and boxes differ in length instead of dropping boxes or leaving images unannotated
+- `b89e6934b` - [fix] Return a full-image box, width and height the right way round, for a missing box on a non-square or 2-D image
+- `45566d5c6` - [fix] Correct the quickstart's torchvision requirement, the JATIC name and two page descriptions
+- `67b5844a3` - [fix] State the inputs that Duplicates and Outliers accept on the input requirements page
+- `53b9bfbc8` - [fix] Correct wrong and overstated claims on the concept pages
+- `b4739140f` - [fix] Refuse an ego fit that settles between the camera and a large mover, judged per frame of gap
+- `1d33bae9b` - [fix] Make Parity and Balance treat the source video or image as the independent unit over frame, crop and merged views
+- `b1609b538` - [fix] Show the missing figure in the clean dataset tutorial and correct statements in eight notebooks that the library or the environment contradict
+- `33abca407` - [fix] Correct statements in six tutorials that the library or the tutorials' own results contradict
+- `6d5894557` - [fix] Stop Duplicates warning about the hash_radius default when no hash statistic is requested
+- `18c374d72` - [fix] Make dataeval.log reuse its default handler so repeated calls stop duplicating log lines
+- `1232c3c1e` - [fix] Improve tests and fix warnings and other lint issues
+- `ac0487423` - [fix] Compute GMM covariances without an N x K x D x D tensor so OODReconstruction fits large reference sets
+- `755687e29` - [fix] Correct the quickstart Duplicates example and run it in a smoke test
+- `e1c72dac7` - [fix] Make Embeddings reject extractor output with the wrong row count or no array, and state the one-row-per-item contract
+- `3ef99ecc8` - [fix] Fail the docs tests on reST roles and mismatched fences in Markdown, and correct the ones found
+- `3e06ed8a4` - [fix] Replace the private API imports in two notebooks and correct stale text in four
+- `328ab8e0e` - [fix] Refuse an ego reading whose fitted motion does not explain the new frame, so CameraTravel keeps the first frame after a hard cut or field-of-view switch
+- `e4a5afedc` - [fix] Scale integer images deeper than 8 bits into grayscale from their decoded encoding, so 16-bit IR no longer saturates to a flat white frame
+- `6466823cb` - [fix] Read variability across unrecorded readings, so a thinned frame column no longer rolls up to null
+- `e6b7032fa` - [fix] Add Metadata.dataset and stop embedding Metadata factor rows as images
+- `dccd319a4` - [fix] Cap xdist workers at the CPUs the container may use
+- `50c8d1724` - [fix] Re-baseline the DriftKNeighbors time budget for the 2-CPU k8s medium runner
+- `2c5b843f1` - [fix] Read xdist workers from TEST_WORKERS, 2 on the medium CI runner
+- `0ad54d3a0` - [fix] Mark the project dir as a git safe.directory on the k8s runners
+- `61c1e2087` - [fix] polars version-aware categorical in outliers tests
+- `31974a5f4` - [fix] Stop using polars' deprecated Categorical ordering argument and torch.jit.script
+- `faf9ff3ed` - [fix] Keep missing metadata values null and report factors mixing booleans with numbers or text as mixed_types
+- `ba1b4ed50` - [fix] Build the aggregate working frame with its group column so polars 2 does not fail to broadcast
+- `354e5fbe0` - [fix] Update how-to assertion for duplicate
+- `98f6949d7` - [fix] ClassFilter and Indices keep an (H, W) segmentation label map whole, where they cut rows of pixels when its height matched the detection count
+- `1ae6fde6e` - [fix] Outliers.evaluate reads pixel statistics in stored units, agreeing with...
+- `e1dbbac79` - [fix] ChunkedDrift accepts any Chunker the protocol describes rather than requiring a private split method
+- `d6171b209` - [fix] ChunkedDrift.fit rejects a reference that splits into fewer than 3 chunks unless its threshold is constant
+- `07d95468b` - [fix] Force tag fetches so a re-cut release tag does not fail the job
+- `8b9789980` - [fix] Spell the Harbor robot name inline so GitLab cannot expand it
+- `c7ea2e368` - [fix] Rebuild the dataeval wheel so images carry the resolved version
+- `38332157a` - [fix] Generate Dockerfiles without depending on git tag history
+- `d43d84da4` - [fix] Keep main from overwriting the released verification evidence
+- `90376fb5f` - [fix] Update docstrings for litert extras
+- `b3219852d` - [fix] Fail loudly on incorrect params and typing improvements
+- `78c4eeb59` - [fix] Harden release cutting against stale refs and missing series tags
+- `4fe9dd5be` - [fix] Mark prerelease tags as prereleases on the GitHub release
+- `bc6822004` - [fix] Versioning constraints for scipy
+- `e79326861` - [fix] Accept integer feature matrices in the ranking core
+- `6c40fb416` - [fix] MaskedTarget is not properly wrapping MAITE targets
+- `66d6e09a5` - [fix] Update the Parity evaluator surface for the corrected statistic and flag
+- `550e3dbcd` - [fix] Compute parity from Pearson's chi-square and judge sufficiency by Cochran's rule
+- `680bc8693` - [fix] Stop Parity rejecting independence on replication alone
+- `3be01134a` - [fix] Stop Balance reading replication as correlation between coarse factors
+- `acfdb18f1` - [fix] Read a threshold spec written as lists, as JSON and YAML deliver it
+- `d832d8e1c` - [fix] Read a descriptor's corrections back through the encoding constructor path
+- `846a626f0` - [fix] Bump descriptor version to 3 for the four-kind correction vocabulary
+- `1b2be30b5` - [fix] Adjust Relabel to match API structure of v1.1 patch release
+- `39d395b25` - [fix] Read detection scores down to one confidence per detection
+- `63f50ed55` - [fix] Allow merge_datasets to accept packed collections of datasets
+- `1a001a92f` - [fix] Reject a nested column as a key instead of panicking on polars 1.0.0
+
+📝 **Miscellaneous**
+
+- `ab4a87c7c` - [devops] Install the graphviz neato layout plugin for the docs build
+- `7a04812de` - [docs] Add Outliers on tracking datasets, DriftKnownDomains and the persistence limits to the roadmap and v1.2 migration guide
+- `81e84e575` - [devsecops] Quiet test output for doctest and min deps
+- `fe0a68f78` - [docs] Update the roadmap and migration guide for the v1.2 release candidate
+- `19781f918` - [docs] Rewrite the Functional overview around the dataset task, with a Video tracking column, an adapters section, the missing functions and corrected task flags
+- `c9be8594e` - [docs] Say that Outliers cluster_distance reports the raw distance to the cluster center, not standard deviations
+- `ebd651574` - [docs] Use sentence case for every title, rename the Beginner's guide page to Quickstart and correct the JATIC and platform wording
+- `bd8127f2f` - [docs] Describe the real-footage video studies on the Validation and Trust page, with their footage, method and results
+- `71180ba40` - [docs] Bring the getting-started and index pages into house voice
+- `704ae1fca` - [docs] Bring the concept pages into house voice
+- `13323149a` - [docs] Bring the Leakage concept page into house voice
+- `e089e51c8` - [devsecops] Reduce verbosity of test logs
+- `a518e06e6` - [devsecops] Improve docs notebook cache information
+- `aad3fd002` - [misc] Drop Sphinx style attribute comments
+- `2ff70deac` - [docs] Wrap the Markdown cells of the tutorials and how-tos at 120 columns and check the width in the structure test
+- `58ff626e2` - [test] Check the voice and emphasis rules of the style guide in the notebook structure test and fix the four sentences that break them
+- `ab46070ec` - [docs] Rewrite the monitoring how-tos in house style
+- `07390fff3` - [docs] Rewrite the ontology, configuration and model development how-tos in house style
+- `a3d943022` - [docs] Rewrite the metadata and bias how-tos in house style
+- `4b6d72331` - [docs] Rewrite the data quality how-tos in house style
+- `e61eaa0d8` - [docs] Rewrite the data preparation how-tos in house style
+- `eb7ec7ba6` - [docs] Correct the classes with the fewest objects and images in the clean dataset tutorial and check them
+- `218353ce1` - [docs] Rewrite the monitoring tutorials in house style
+- `5dbf36e71` - [docs] Rewrite the clean dataset, surroundings and bias tutorials in house style
+- `822c456bf` - [docs] Keep the only-those-detections meaning in the image-level filter sentence of the levels tutorial
+- `a6485ced4` - [docs] Rewrite the levels and duplicate video tutorials in house style
+- `9da8b94ec` - [docs] Rewrite the data space, dataset gaps and class axis tutorials in house style
+- `527228f30` - [docs] Rewrite the Feasibility tutorial in house style
+- `00dfa0f63` - [docs] Rewrite the augmentation duplicates tutorial in house style and apply the emphasis rules to tables
+- `c78c424b8` - [test] Add assertion cells to seven notebooks whose prose quotes results
+- `691ba9976` - [docs] Update the v1.2 release checklist with the Duplicates decisions and two correctness fixes
+- `e843865a3` - [devsecops] Skip the documentation and repository tests in the conda lane
+- `9dea354bd` - [devsecops] Quiet the git tag fetch in docs job
+- `0855f8d2a` - [devsecops] Use cache invalidation for notebook execution on main
+- `0532dcd85` - [docs] Cut the metadata preparation in the bias tutorial to one short step and check the numbers its findings quote
+- `ea61e0910` - [test] Check that Next steps links use the title of their target page and correct the ones that do not
+- `1b0b8a76e` - [devsecops] Run typecheck on merge requests that change the notebooks, verification or pyproject.toml
+- `95d35e958` - [docs] Link the unlinked how-tos and tutorials from their concept pages and use their titles in the See this in practice lists
+- `03028a618` - [docs] Group the data engineering how-tos by task and refresh stale descriptions on the how-to and tutorial index pages
+- `ff75cd19c` - [test] Check the headings, template sections and Next steps of the tutorials and how-tos
+- `25ace3750` - [docs] List every reason an ego reading is refused, on the concept page and in the ego_trusted field doc
+- `d9b79c6fb` - [docs] Add the missing Conclusion sections to three tutorials and bring two how-tos within the template limits
+- `1cd7691a2` - [docs] Bring the Feasibility tutorial, how-to and concept pages into house style
+- `7ce6e7d4c` - [docs] Replace the unsupported guidance in the OOD and augmentation tutorials with observations tied to their printed results
+- `e3aa430d6` - [docs] Point the tool-choice guide at Coverage and say what it adds in the data space tutorial
+- `ec7a448f5` - [docs] Fix the pyright error in the hidden assertion cell of the level tutorial
+- `b51d969d8` - [docs] Replace the docsync advice on the how-to and tutorial index pages with the docs session and jupytext
+- `0230526c0` - [docs] Cut the label parity section from the monitor-shift tutorial and link the label independence how-to
+- `cfd0b77c8` - [docs] Remove the cleaning-issues how-to and add its classwise step to the clean-a-dataset tutorial
+- `dd92f7c53` - [docs] Fold the bin-by-level how-to into the level tutorial, trim the tutorial and move its sync and cache steps into a how-to
+- `839505d82` - [docs] Move the transform placement rule to the concept pages and turn the place-transforms how-to into the StatsInvalidatedWarning recipe
+- `6f94ab35f` - [docs] Share a base class between the DataFrame adapters so the detection adapter type-checks without ignores
+- `aedfba52e` - [docs] Fix pyright errors in the intrinsic factors and DataFrame wrapping how-tos
+- `334697a37` - [docs] Combine the DataFrame wrapping and lazy image loading how-tos into one how-to
+- `7bf62fca6` - [docs] Apply the simplified how-to template to the intrinsic factor, factor binning and channel group how-tos and trim them to the recipe
+- `426a9f0f9` - [devops] Prestage MilitaryVehicles for the docs build so the Harbor datasets cache stores it
+- `7fcc792d7` - [test] Seed the outliers from_clusters no-outliers test data so an unlucky draw cannot flag a point
+- `a6c8b729f` - [docs] Apply the simplified how-to template to the outlier and tracing how-tos and trim them to the recipe
+- `0cd41f733` - [docs] Apply the simplified how-to template to the configuration and drift how-tos and trim them to the recipe
+- `ec8b42774` - [docs] Apply the simplified how-to template to nine how-tos
+- `f42f8694b` - [devsecops] Quiet system package installation in CI
+- `8c33eb250` - [docs] Trim the data preparation how-tos to the recipe and simplify the how-to template
+- `8b94fd105` - [docs] Promote the video duplicates how-to to the Identify duplicate video tutorial
+- `9ed654a11` - [docs] Promote the custom class axis how-to to the Analyze bias against a custom class axis tutorial
+- `ea9c47184` - [docs] Curate the Next steps lists of the data preparation, metadata and performance how-tos to at most four links
+- `6479216bf` - [docs] Curate the Next steps lists of the quality, coverage and monitoring how-tos to at most four links
+- `26bdb3e51` - [docs] Curate the Next steps lists of the tutorials to at most four links
+- `a9d1022bc` - [devsecops] Prune the uv cache from hatchling's project walk so verify jobs stop failing with FileNotFoundError
+- `1f6e8793c` - [docs] Add a documentation style guide and link it from CONTRIBUTING
+- `34b1b9056` - [docs] Remove the summaries and takeaways that closed ten how-tos with a lesson
+- `4d65088ee` - [docs] Normalize the headings of the tutorials and how-tos and update the references that used the old ones
+- `f9f6ccd6b` - [docs] Measure coverage in the undersampling how-to with Coverage and label its autoencoder as a stand-in for your own model
+- `56ddd2dbb` - [docs] Build the data space tutorial embeddings with the standard avgpool block and drop its unneeded normalization step
+- `597d0c7bc` - [docs] Rename the embeddings how-to to h2_create_embeddings and update the links that described it as an ONNX guide
+- `a9ef6be50` - [docs] Align the divergence how-to on the standard Embeddings recipe and correct its claims about the divergence values
+- `a6d1ea11c` - [docs] Correct the Embeddings docstring on whether batching changes the embeddings
+- `b7a011a32` - [docs] Align the notebooks on the standard Embeddings recipe and point them to the embeddings how-to
+- `c75bed37f` - [docs] Rewrite the Embeddings concept page around one standard recipe and document how each tool takes embeddings
+- `b5331cb3b` - [docs] Rewrite the ONNX encoding how-to as a guide to creating embeddings with PyTorch, ONNX and model-free extractors
+- `5d54f7138` - [docs] Normalize the headings and rewrite the prose of the dataset gaps tutorial and the clustering how-to
+- `a027a9544` - [deps] Require filelock>=4.2.1 for its fix of CVE-2026-112940
+- `736a02ac8` - [deps] Require pillow>=13.0.0 for its security release fixing nine CVEs
+- `08a0ac6f2` - [misc] Run main-branch docs on k8s-single-gpu
+- `e6b18ec37` - [docs] Add a how-to on judging metadata factors within strata, by rarity, given another factor and in combination
+- `0b41da8fd` - [misc] Run verify on k8s-medium-cpu
+- `cb557df23` - [misc] Run typecheck on k8s-medium-cpu
+- `4add816f5` - [misc] Move CI jobs to k8s runners, medium for test, conda, doctest and deps
+- `12936b20d` - [misc] Add oup.com and nih.gov links to skip pattern
+- `2941508cb` - [deps] Bump locked polars version to 2.0.0
+- `4c13d026a` - [misc] Record CI job results as verification evidence, run the gate on release tags, check PyPI, and enforce type completeness and DataEval deprecation warnings
+- `745a7172f` - [misc] Cite the real CI job names in the verification registry and check them in tests
+- `19a018dcd` - [misc] Report a verification test case with skipped steps as skipped, not passed
+- `99e3c8d34` - [misc] Publish verification evidence only from version tags and release branches
+- `5a78c933a` - [misc] Generate requirements, test cases, VCRM, and test log from a step-based verification registry (port from release/v1.1)
+- `5e90c587c` - [docs] Note the containerization exemption and point to DataEval-Flow
+- `4f3a2547d` - [devsecops] Remove container export
+- `ba5d56ea5` - [docs] Update ROADMAP.md
+- `494fda0bc` - [docs] Say dataset instead of corpus in the guides, glossary and docstrings
+- `3ea160f73` - [docs] Label only approved mature releases on the maturity page
+- `1e2690461` - [docs] Track the v1.3 draft product standards on the maturity page
+- `164b7ae18` - [docs] Add a JATIC maturity reference page recording the level each release holds
+- `e88d54532` - [devops] Keep security scans out of publish-verification pipelines
+- `811428a35` - [test] Register NFR-5 container packaging and map the container contract suite to it
+- `c410f7e06` - [misc] Fix lint
+- `39a0ba083` - [devsecops] Ship the SBOM inside the image alongside the scan report
+- `f43ef1bf7` - [devsecops] Ship the vulnerability scan report inside the published image
+- `20cb0a7eb` - [docs] Point the cosign link at a URL sigstore still serves
+- `21216bdf5` - [docs] Document the two container tags that are actually published
+- `31ccba361` - [devsecops] Add containerization infrastructure
+- `f89a07db6` - [misc] Update verification tests
+- `43515a9d1` - [misc] Update spelling in codebase
+- `de733aa38` - [test] Add video files for internal tests
+- `bd41735f3` - [docs] Align markdown table columns to satisfy MD060
+- `cab7169ae` - [docs] Name the GitHub mirror as the publish path and its misleading status
+- `c88fe8359` - [devops] Publish releases from version tags instead of pipeline variables
+- `bc46b9f65` - [test] Add self-check for release version and category logic
+- `ffe70bd65` - [devops] Validate merge request title prefix instead of release label
+- `9e068e354` - [devops] Add release script to cut releases from a local checkout
+- `6f6ba3436` - [devsecops] Workaround SAST path ignore list
+- `3474cea2d` - [devsecops] Fix false positive SAST scans in documentation support files
+- `dec3388ca` - [test] Add coverage to functions below 90%
+- `7076c1218` - [deps] Fix open pin requirement for devsecops components
+- `f36fd03b6` - Add capabilities to DuplicatesOutput and OutliersOutput
+- `89a7a97a0` - Add video segmentation and stitching
+- `40c42c950` - [devops] Rename CREATE_PRE_RELEASE to CREATE_PRERELEASE and normalize prerelease spelling
+- `7a7892fe8` - [type] Wrap SciPy stats functions with typed results in dataeval.utils.scipy
+- `dd98c1093` - [misc] Update docstring prose
+- `de7285809` - [docs] Describe parity's statistic and sufficiency check as they now stand
+- `338f7a578` - [docs] Drop the None fallback for DriftOutput.feature_names in the drift how-to
+- `adf3c439c` - [type] Fix typecheck failures in scripts
+- `b29ad0355` - [type] Adjust ThresholdLike protocol
+- `ffed59426` - [imrp] Split internal utilities
+- `268ca33bd` - [docs] Fetch intersphinx inventory with retry before generating docs
+- `6afb75c25` - [docs] Update documentation with new maite-datasets
+- `f3383148a` - [test] Boost per-function code coverage
+- `c379b14af` - [misc] Mirror MAITE protocols to enable stable isinstance checks
+- `a5fa0ac2f` - [misc] Fix py3.10 typecheck failure
+- `11ee894e7` - [misc] Update typecheck dependencies for pyyaml and requests
+- `95fa840df` - [test] Verify frame view provenance through View transforms
+- `a34a6585d` - [misc] Fix documentation links and expand on Metadata levels
+- `732ea7fb5` - [misc] Fix typos in README.md
+- `38a6a2ed7` - [devsecops] Add additional test and typecheck fixes
+- `759e5ef3f` - [devsecops] Switch to uv-support branch for components
+- `4a131be2d` - [devsecops] Remove poetry from supported package managers
+- `24e5fc5f6` - [devsecops] Simplify release branching strategy
+
 ## v1.1.0
 
 🌟 **Feature Release**
