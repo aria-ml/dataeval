@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 
 from dataeval.data._crops import CropPolicy, FillType, RegionType, SquareType
 from dataeval.data._tracks import build_tracks
+from dataeval.data._video_proxies import as_tracking
 from dataeval.data._view import View
 from dataeval.protocols import (
     DatumMetadata,
@@ -519,6 +520,7 @@ class SourceLocator:
     """
 
     def __init__(self, dataset: Any, *, source: Any | None = None) -> None:
+        dataset = as_tracking(dataset)
         self._dataset = dataset
         self._view = dataset if isinstance(dataset, View) else None
         # A view's root, not its `source`: `resolve_indices` steps one link, and a chain of

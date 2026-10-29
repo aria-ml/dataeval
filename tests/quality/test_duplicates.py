@@ -1174,6 +1174,19 @@ class _ReplayStream:
             yield _ReplayFrame(self._offset + index, pixels, self._timed)
 
 
+class WithoutMetadata:
+    """Presents a dataset through indexing and a length alone, as a VideoDataset needs nothing more."""
+
+    def __init__(self, dataset: Any) -> None:
+        self._dataset = dataset
+
+    def __len__(self) -> int:
+        return len(self._dataset)
+
+    def __getitem__(self, index: int) -> Any:
+        return self._dataset[index]
+
+
 def make_tracking_dataset(sequences, shape=(3, 24, 32), timed=True, annotate=None, frame_offset=0) -> Any:
     """A MAITE-shaped tracking dataset whose frames replay the given fill values.
 
@@ -1314,6 +1327,15 @@ class _DeterministicResizeImage:
 @pytest.mark.required
 class TestTrackingDispatch:
     """Duplicates over a multi-object-tracking dataset, one frame at a time."""
+
+    def test_a_tracking_dataset_without_a_metadata_attribute_is_measured_like_one_with_it(self):
+        sequences = [[1, 2, 3, 4], [1, 2, 3, 4]]
+        dataset = make_tracking_dataset(sequences)
+        bare = WithoutMetadata(dataset)
+        assert not hasattr(bare, "metadata")
+        with_metadata = Duplicates().evaluate(dataset)
+        without = Duplicates().evaluate(bare)
+        assert without.sequences.data().to_dicts() == with_metadata.sequences.data().to_dicts()
 
     def test_finds_a_clip_replayed_from_another_sequence(self):
         # Sequence 1 is frames 2-4 of sequence 0, re-encoded byte-identically.

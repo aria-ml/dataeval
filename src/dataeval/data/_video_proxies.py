@@ -2,14 +2,25 @@
 
 __all__ = []
 
-from collections.abc import Callable, Iterable, Iterator, Sequence
-from typing import Any
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.protocols import AnnotatedDataset, DatasetMetadata, SingleFrameObjectTrackingTarget, VideoFrame
+from dataeval._log import get_logger
+from dataeval.protocols import (
+    Dataset,
+    DatasetMetadata,
+    MultiobjectTrackingDatum,
+    MultiobjectTrackingTarget,
+    SingleFrameObjectTrackingTarget,
+    VideoFrame,
+    _is_protocol_instance,
+)
 from dataeval.types._target import detection_count, track_ids_of
+
+_logger = get_logger(__name__)
 
 
 class _Forwarding:
@@ -106,6 +117,106 @@ class _FrameTracksTarget:
         return f"_FrameTracksTarget(n_frames={len(self._frame_tracks)})"
 
 
+class _NoDetections:
+    """A :obj:`~dataeval.protocols.SingleFrameObjectTrackingTarget` for a frame with nothing annotated."""
+
+    __slots__ = ()
+
+    @property
+    def boxes(self) -> NDArray[np.float32]:
+        return np.zeros((0, 4), dtype=np.float32)
+
+    @property
+    def labels(self) -> NDArray[np.intp]:
+        return np.zeros(0, dtype=np.intp)
+
+    @property
+    def scores(self) -> NDArray[np.float32]:
+        return np.zeros(0, dtype=np.float32)
+
+    @property
+    def track_ids(self) -> NDArray[np.intp]:
+        return np.zeros(0, dtype=np.intp)
+
+    def __repr__(self) -> str:
+        return "_NoDetections()"
+
+
+_NO_DETECTIONS = _NoDetections()
+
+
+def _is_stream(candidate: Any) -> bool:
+    """Whether `candidate` is a video stream: an iterable whose first frame has pixels.
+
+    An array or tensor is rejected without a decode, so an image dataset costs nothing to rule out. A
+    stream costs the decode of its first frame.
+    """
+    if isinstance(candidate, str | bytes | Mapping) or not isinstance(candidate, Iterable):
+        return False
+    if hasattr(candidate, "shape") or hasattr(candidate, "__array__"):
+        return False
+    return hasattr(next(iter(candidate), None), "pixels")
+
+
+def is_pure_video(data: Any) -> bool:
+    """Whether `data` is a dataset of videos with no tracking targets.
+
+    True when the first datum is a bare stream, or a MAITE 3-tuple whose first element is a stream and whose
+    second is not a :obj:`~dataeval.protocols.MultiobjectTrackingTarget`. A tracking dataset, an image
+    dataset and anything else is False. A 3-tuple is always read as a MAITE datum, never as a stream of three frames.
+    """
+    try:
+        if not isinstance(data, Dataset) or len(data) == 0:
+            return False
+        datum = data[0]
+    except (TypeError, IndexError, KeyError):
+        return False
+    if isinstance(datum, tuple):
+        if len(datum) != 3 or _is_protocol_instance(datum[1], MultiobjectTrackingTarget):
+            return False
+        datum = datum[0]
+    return _is_stream(datum)
+
+
+class _UntrackedVideos:
+    """A tracking dataset over videos that carry no targets: every frame has no detections.
+
+    The frame count of a video is ``len(stream)`` when the stream has one, and otherwise one walk of the
+    stream, made on first use and kept.
+    """
+
+    def __init__(self, videos: Any) -> None:
+        self._videos = videos
+        declared = getattr(videos, "metadata", None) or {}
+        self.metadata = DatasetMetadata({"id": str(declared.get("id", "dataset"))})  # type: ignore[typeddict-item]
+        self._counts: dict[int, int] = {}
+
+    def __len__(self) -> int:
+        return len(self._videos)
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+        datum = self._videos[index]
+        stream, metadata = (datum[0], datum[2]) if isinstance(datum, tuple) else (datum, {"id": index})
+        return stream, _FrameTracksTarget([_NO_DETECTIONS] * self._frame_count(index, stream)), metadata
+
+    def _frame_count(self, index: int, stream: Any) -> int:
+        if index not in self._counts:
+            if isinstance(stream, Sized):
+                self._counts[index] = len(stream)
+            else:
+                _logger.info("Video %d has no length, so its frames are counted by decoding it once.", index)
+                self._counts[index] = sum(1 for _ in stream)
+        return self._counts[index]
+
+    def __repr__(self) -> str:
+        return f"_UntrackedVideos({self._videos!r})"
+
+
+def as_tracking(data: Any) -> Dataset[MultiobjectTrackingDatum]:
+    """Return `data` as a tracking dataset: a dataset of videos with no targets gets no detections in any frame."""
+    return cast("Dataset[MultiobjectTrackingDatum]", _UntrackedVideos(data) if is_pure_video(data) else data)
+
+
 class _LazyStream:
     """A re-iterable :obj:`~dataeval.protocols.VideoStream` backed by a generator factory."""
 
@@ -146,10 +257,14 @@ def long_stream(view: str, source_id: Any, n_frames: int) -> str:
     return f"{view}: video {source_id!r} yields more frames than its {n_frames} frame target(s)."
 
 
-def inherited_metadata(dataset: AnnotatedDataset[Any], suffix: str) -> DatasetMetadata:
-    """Build dataset metadata for a view, preserving ``index2label`` and suffixing ``id``."""
-    source_id = str(dataset.metadata.get("id", "dataset"))
-    index2label = dataset.metadata.get("index2label", None)
+def inherited_metadata(dataset: Dataset[Any], suffix: str) -> DatasetMetadata:
+    """Build dataset metadata for a view, preserving ``index2label`` and suffixing ``id``.
+
+    A dataset without a ``metadata`` attribute gives its view the id ``dataset`` and no ``index2label``.
+    """
+    declared = getattr(dataset, "metadata", None) or {}
+    source_id = str(declared.get("id", "dataset"))
+    index2label = declared.get("index2label", None)
     inherited: dict[str, Any] = {"id": f"{source_id}-{suffix}"}
     if index2label is not None:
         inherited["index2label"] = {int(key): str(value) for key, value in index2label.items()}

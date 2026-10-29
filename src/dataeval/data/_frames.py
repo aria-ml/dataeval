@@ -23,24 +23,26 @@ from dataeval.data._selectors import (
     _StageTrace,
     sequence_infos,
 )
-from dataeval.data._video_proxies import checked_index, inherited_metadata
+from dataeval.data._video_proxies import as_tracking, checked_index, inherited_metadata
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
     ArrayLike,
+    Dataset,
     DatasetMetadata,
     DatumMetadata,
-    MultiobjectTrackingDataset,
+    MultiobjectTrackingDatum,
     MultiobjectTrackingTarget,
     ObjectDetectionDatum,
     ObjectDetectionTarget,
     SingleFrameObjectTrackingTarget,
+    VideoDataset,
 )
 from dataeval.types import FactorLevel, SourceIndex
 from dataeval.types._target import instance_arrays
 from dataeval.types._track import frame_number
 from dataeval.utils._array import as_numpy
-from dataeval.utils.data import requires_maite_dataset
+from dataeval.utils.data import validate_dataset
 from dataeval.utils.preprocessing import BoundingBox, normalize_image_shape
 
 _logger = get_logger(__name__)
@@ -202,9 +204,10 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     Parameters
     ----------
-    dataset : MultiobjectTrackingDataset
+    dataset : VideoDataset
         The source dataset. Each datum is a MAITE ``(VideoStream, MultiobjectTrackingTarget,
-        metadata)`` 3-tuple.
+        metadata)`` 3-tuple. The dataset's own ``metadata`` attribute, when it has one, supplies the ``id`` and
+        ``index2label`` of the view; without it the view is named ``dataset-frames`` and has no class names.
     selector : FrameSelector or None, default None
         Which frames take part, and what to record about each. None keeps every frame
         (:class:`~dataeval.data.AllFrames`). See :class:`~dataeval.data.FrameSelector`.
@@ -317,12 +320,18 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     >>> stats = image_stats(frames, stats=ImageStats.HASH)  # doctest: +SKIP
     """
 
-    @requires_maite_dataset("dataset", expected="multiobject_tracking")
     def __init__(
         self,
-        dataset: MultiobjectTrackingDataset,
+        dataset: VideoDataset,
         selector: FrameSelector | None = None,
     ) -> None:
+        # Videos with no targets become a tracking dataset of frames with no detections, so everything below
+        # reads one kind of dataset. The check is the one the signature would have made.
+        dataset = as_tracking(dataset)
+        if dataset is not None:
+            validate_dataset(
+                dataset, expected="multiobject_tracking", arg_name="dataset", caller="SequenceFrames.__init__"
+            )
         self._dataset = dataset
         self._selector = AllFrames() if selector is None else selector
         self._reads_pixels = bool(self._selector.needs & FrameInput.PIXELS)
@@ -381,11 +390,12 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     # ------------------------------------------------------------------
 
     @property
-    def source(self) -> MultiobjectTrackingDataset:
+    def source(self) -> Dataset[MultiobjectTrackingDatum]:
         """The tracking dataset this wraps -- one link up the chain.
 
         Named to match :attr:`~dataeval.data.View.source`, so a mixed wrapping chain is walkable
-        through one public attribute and an invalidating operation inside it stays visible.
+        through one public attribute and an invalidating operation inside it stays visible. For a dataset of
+        videos with no targets this is the tracking dataset that gives every frame none, not the dataset passed in.
         """
         return self._dataset
 
