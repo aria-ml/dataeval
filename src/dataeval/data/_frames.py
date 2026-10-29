@@ -235,6 +235,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     --------
     :class:`~dataeval.data.FrameSelector` : The frame-selection extension point
     :class:`~dataeval.data.DetectionCrops` : The same reframing one level down
+    :doc:`/notebooks/h2_select_frames` : Thin each video to a budget of frames and read what a kept frame stands for
 
     Notes
     -----
