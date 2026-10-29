@@ -46,9 +46,7 @@
 #
 # ## What you will need
 #
-# - A Python environment with the following packages installed:
-#   - `dataeval`
-#   - `maite-datasets`
+# - A Python environment with `dataeval` installed
 # - No video of your own: this tutorial builds a small dataset in memory
 #
 
@@ -84,22 +82,17 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval
 except Exception:
     pass
 
 # %%
 from collections.abc import Iterator
-from typing import cast
+from typing import NamedTuple, cast
 
 import numpy as np
 import polars as pl
 from IPython.display import display
-from maite_datasets.multiobject_tracking import (
-    MultiobjectTrackingTargetTuple,
-    SingleFrameObjectTrackingTargetTuple,
-    VideoFrameTuple,
-)
 
 from dataeval.config import set_max_processes
 from dataeval.data import FrameIndices, SequenceFrames
@@ -166,14 +159,38 @@ def transcode(frames: list[np.ndarray], seed: int) -> list[np.ndarray]:
 
 
 # %%
-def boxes_at(frame_index: int) -> SingleFrameObjectTrackingTargetTuple:
+class FrameTargets(NamedTuple):
+    """The boxes in one frame, which MAITE calls a `SingleFrameObjectTrackingTarget`."""
+
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+    track_ids: np.ndarray
+
+
+class VideoTargets(NamedTuple):
+    """The boxes in every frame of one video, which MAITE calls a `MultiobjectTrackingTarget`."""
+
+    frame_tracks: list[FrameTargets]
+
+
+class Frame(NamedTuple):
+    """One decoded frame, which MAITE calls a `VideoFrame`."""
+
+    pixels: np.ndarray
+    time_s: float
+    pts: int
+    frame_index: int
+
+
+def boxes_at(frame_index: int) -> FrameTargets:
     """Two tracked objects, boxed where the frame index puts them."""
     corners, tracks = [], []
     for track, speed, y0 in ((0, 1.4, 0.30), (1, 0.9, 0.68)):
         cx = (6 + frame_index * speed * 1.6) % (WIDTH - 12) + 6
         corners.append([cx - 9, HEIGHT * y0 - 9, cx + 9, HEIGHT * y0 + 9])
         tracks.append(track)
-    return SingleFrameObjectTrackingTargetTuple(
+    return FrameTargets(
         boxes=np.array(corners, dtype=np.float32),
         labels=np.array([0, 1], dtype=np.int64),
         scores=np.ones(2, dtype=np.float32),
@@ -190,7 +207,7 @@ class VideoStream:
     def __iter__(self) -> Iterator[VideoFrame]:
         for index, frame in enumerate(self._frames):
             pixels = np.stack([frame, frame, frame])
-            yield VideoFrameTuple(pixels=pixels, time_s=index / self._fps, pts=index, frame_index=index)
+            yield Frame(pixels=pixels, time_s=index / self._fps, pts=index, frame_index=index)
 
 
 class VideoDataset:
@@ -201,7 +218,7 @@ class VideoDataset:
         self._data: list[MultiobjectTrackingDatum] = [
             (
                 VideoStream(frames),
-                MultiobjectTrackingTargetTuple(frame_tracks=[boxes_at(i) for i in range(len(frames))]),
+                VideoTargets(frame_tracks=[boxes_at(i) for i in range(len(frames))]),
                 cast(DatumMetadata, {"id": name, "height": HEIGHT, "width": WIDTH}),
             )
             for name, frames in sequences.items()
