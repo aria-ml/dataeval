@@ -130,11 +130,13 @@ print(f"{len(dataset)} videos of {N_FRAMES} frames")
 # %% [markdown]
 # ## Keep a budget of frames
 #
-# Each selector takes the budget you can afford. {class}`.Stride` fixes the spacing, so a longer video keeps more
-# frames. With `jitter=True` it keeps a random frame from each block rather than the first, so a periodic scene cannot
-# line up with the spacing. {class}`.EvenlySpaced` fixes the count, so every video keeps the same number however long it
-# is. {class}`.Representative` fixes the count too, but picks by appearance: it describes every frame and keeps those
-# whose spread matches the video's own. It needs a batch size for describing frames.
+# Each selector takes the budget you can afford:
+#
+# - {class}`.Stride` fixes the spacing, so a longer video keeps more frames. With `jitter=True` it keeps a random frame
+#   from each block, so a periodic scene cannot line up with the spacing.
+# - {class}`.EvenlySpaced` fixes the count, so every video keeps the same number of frames however long it is.
+# - {class}`.Representative` fixes the count and picks by appearance. It describes every frame, in batches of
+#   `batch_size`, and keeps those whose spread matches the video's own.
 
 # %%
 selections = {
@@ -147,8 +149,8 @@ for name, frames in selections.items():
     print(f"{name:<15} {len(frames):>2} frames, video 0 keeps {first}")
 
 # %% [markdown]
-# A selection is fixed by its seed, so a `seed` replays it. Without one, a jittered selection is not reproducible
-# unless {func}`.set_seed` was called. {class}`.Representative` needs no seed because it is deterministic.
+# Pass a `seed` to replay a jittered selection. Without one, the selection is not reproducible unless {func}`.set_seed`
+# was called. {class}`.Representative` needs no seed because it is deterministic.
 #
 # Use {class}`.Stride` when the spacing in time matters, {class}`.EvenlySpaced` for an equal share per video, and
 # {class}`.Representative` when the footage holds long stretches of stillness. It describes frames from raw pixels by
@@ -157,9 +159,10 @@ for name, frames in selections.items():
 # %% [markdown]
 # ## Read what a kept frame stands for
 #
-# A dropped frame is not forgotten. Each kept frame records `frames_represented`, the number of source frames nearer
-# to it than to any other kept frame, so a statistic can be weighted back to the whole video.
-# {meth}`.SequenceFrames.to_source` gives the address of a kept frame in the source dataset.
+# Each kept frame records `frames_represented`, the number of source frames nearer to it than to any other kept frame,
+# so a statistic can be weighted back to the whole video. No evaluator reads these weights yet, so a result over kept
+# frames describes the selection and not the source video's distribution. {meth}`.SequenceFrames.to_source` gives the
+# address of a kept frame in the source dataset.
 
 # %%
 frames = selections["Representative"]
@@ -200,12 +203,12 @@ assert (
 assert kept == sources[3]
 
 # %% [markdown]
-# ## Keep selected frames independent
+# ## Count each video as one unit
 #
-# Thinning removes repeats, not dependence. Frames of one video still share a scene, a camera and a day, and an
-# evaluator that treats them as independent samples overstates how much data it has. Judge the video as the unit where
-# the question is about the scene. [Parity](../concepts/Parity.md) counts a video as one unit however many of its
-# frames the view keeps.
+# Frames of one video share a scene and a camera, so thinning them does not make them independent samples. An evaluator
+# that treats them as independent overstates how much data you have. Where the question is about the scene, count the
+# video as the unit. [Parity](../concepts/Parity.md) counts a video as one unit however many of its frames the view
+# keeps.
 
 # %% [markdown]
 # ## Next steps

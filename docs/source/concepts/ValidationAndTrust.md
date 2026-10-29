@@ -1182,8 +1182,8 @@ The footage is eleven public drone clips of 120 to 600 frames each: seven
 low-altitude urban sequences from the VisDrone2019-MOT validation set and four
 landscape and town clips from Wikimedia Commons. Burned-in overlays, parts of
 the vehicle and, for the maps, a smudge and a scratch on the lens are rendered
-onto it with a known mask. Ego motion is scored only
-where the clean footage's reading is trusted. A pair is wrong while trusted when
+onto it with a known mask. Ego motion is scored only where the clean
+footage's reading is trusted. A pair is wrong while trusted when
 `ego_stats` trusts it and reads more than 0.5 px from the clean reading.
 
 | Study | Result |
@@ -1195,50 +1195,7 @@ where the clean footage's reading is trusted. A pair is wrong while trusted when
 | A gate that drops the lowest 10% of sharpness, on 60 frames per clip with six blurred by 5, 9 or 21 px | With or without a part, the gate dropped all six blurred frames on 10 clips and none of them on the eleventh. |
 | Constructed scenes: the two-motion check on 2,095 cases of still, panning, zooming and rolling cameras, with and without movers | Still-camera readings that were wrong while trusted fell from 255 to 3, each with a mover covering 71% to 85% of the samples. One correct camera motion was newly refused. |
 | Constructed scenes: a half-frame mover in front of a still camera, pixel noise with a standard deviation of 3, five seeds | The pair read as a trusted zoom in every seed at 1 and 2 px per frame and in four of five at 3 px. It was refused at 4 and 5 px. |
-| `video_stats` `PERSISTENCE` maps on 99 videos: each clip's first 150 frames, clean, under four overlay layouts, under a hood and a bow, and behind a smudge and a scratch | Before the camera-motion rule below, the maps reproduced the prototype they were ported from: the same groups of videos by overlay layout, and the same smudge and scratch detection on every video, to the percentage point. |
-| The same 99 videos, before and after the camera-motion rule | Cells read as fixed outside any overlay fell from 2.9% to 0.36% on average, and on the near-still clip from 19.5% to none: it now reads NaN. Overlay and part recall fell from 28.1% to 24.7%, nearly all of it on the two slowest clips. |
-
-**How the `PERSISTENCE` camera-motion rule was chosen.** The first version of
-`ego_map` counted a frame pair whenever 30% of its textured pixels changed. It
-read 19.5% of a near-still clip's scenery as fixed to the camera, although the
-studies treat that clip (VisDrone `uav0000268`) as a control that must answer
-"can't tell". The clip is not still: its camera moves about 1.25 px per pair at
-a 360 px short side, and at that speed weak-edged scenery barely changes. Four
-acceptance checks were fixed before any alternative was run:
-
-1. the near-still clip reads NaN, or its scenery reads below 0.1;
-2. the groups of videos confirmed by three or more scenes stay as they were;
-3. a constructed still camera over a band of movers changing 30% or more of
-   the textured pixels reads NaN;
-4. the cost per video stays small.
-
-Each rule below adds to the one above it, and each was run on the same 99
-videos. Recall is the share of an overlay's or part's cells read as fixed,
-averaged over its 66 videos.
-
-| Rule | Near-still clip | Cells read as fixed outside any overlay | Overlay and part recall | Groups confirmed by three or more scenes |
-| --- | --- | --- | --- | --- |
-| Before: a pair counts when 30% of its textured pixels change | 19.5% of its scenery fixed | 2.9% | 28.1% | as recorded |
-| A pair counts only when one camera motion, fitted to what changed, explains more of the frame than "nothing moved" | unchanged | 2.9% | 28.1% | unchanged |
-| A pixel counts only where moving it with that motion would visibly change it | 2.3% | 0.30% | 25.6% | the bow group lost 2 of its 5 scenes; the others gained one |
-| A pixel counts only where that motion moves it at least 2 px (adopted) | NaN everywhere | 0.36% | 24.7% | the corner group and the pilot layout each gained a scene; none lost one |
-
-The pair rule alone fixed the constructed still camera but not the clip.
-Requiring a visible change dropped smooth fixed parts, such as the defocused
-bow, even on fast footage, because moving smooth content barely changes it.
-Requiring a 2 px displacement judges geometry rather than content: 97% of the
-net loss in recall fell on the two slowest clips, where the first version had
-also read 5% to 20% of the clean scenery as fixed, and the largest loss
-elsewhere was the bow on one clip, from 28% to 13%. Thresholds of
-1.5 and 3 px were also run, as was a version that also required the moved frame
-to cover the pixel, which lost corner overlays on fast footage. The adopted rule
-met checks 1, 3 and 4: its added time per video, at 720p and at 4K, was within
-the run-to-run variation of the timings, and its peak memory was unchanged. It
-did not meet check 2 as written: the groups changed, though only by gaining
-scenes, and the smudge and scratch detection moved by up to 7 points against
-the reproduction's 3-point tolerance, because the blur solve leaves out the
-cells `ego_map` reads as fixed. The rule was accepted on review with those
-differences stated.
+| `video_stats` `PERSISTENCE` maps on 99 videos: each clip's first 150 frames, clean, under four overlay layouts, under a hood and a bow, and behind a smudge and a scratch | Cells read as fixed outside any overlay averaged 0.36%. The near-still clip (VisDrone `uav0000268`, about 1.25 px of camera motion per pair at a 360 px short side) reads NaN. Overlay and part recall, the share of an overlay's or part's cells read as fixed, averaged 24.7% over its 66 videos. |
 
 ### API stability discipline
 
@@ -1268,10 +1225,11 @@ Experimental ⚠️ (API may change or be removed):
   `ParityOutput` and `FeasibilityOutput` raise
   {class}`~dataeval.exceptions.ExperimentalWarning` on first call or
   instantiation.
-- {func}`.video_stats` with any `VideoStats.PERSISTENCE` flag (`PERSISTENCE_EGO`, `PERSISTENCE_BLUR`,
-  `PERSISTENCE_BLUR_RAW`, selected directly, through the group or through `ALL`) raises
-  {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process. Every other
-  {func}`.video_stats` statistic is stable.
+- {func}`.video_stats` with any `VideoStats.PERSISTENCE` flag
+  (`PERSISTENCE_EGO`, `PERSISTENCE_BLUR`, `PERSISTENCE_BLUR_RAW`, selected
+  directly, through the group or through `ALL`) raises
+  {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in
+  a process. Every other {func}`.video_stats` statistic is stable.
 - The inputs and evidence of {class}`.Feasibility` ({class}`.TargetSpec`,
   {class}`.SamplingPlan`, {class}`.Evidence` and {class}`.Endpoint`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,
