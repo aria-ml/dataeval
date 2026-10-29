@@ -1029,7 +1029,7 @@ it, and reads a run of more than five departing frames as a segment.
 
 6. [Hanley, J. A., & Lippman-Hand, A. (1983). If nothing goes wrong, is
    everything all right? Interpreting zero numerators. *JAMA*, 249(13),
-   1743–1745. [paper](https://jhanley.biostat.mcgill.ca/c607/ch08/zero_numerator.pdf)]{#ref6}
+   1743–1745. [paper](https://pubmed.ncbi.nlm.nih.gov/6827763/)]{#ref6}
 
 7. [Das, K., & Schneider, J. (2007). Detecting anomalous records in categorical
    datasets. In *Proceedings of the 13th ACM SIGKDD International Conference on
