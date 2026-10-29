@@ -25,7 +25,7 @@
 # Use it when you have attached measurements to a `Metadata` and want each one checked the way `Outliers` checks image
 # statistics. On a multi-object tracking (MOT) dataset, the track level gives a re-annotation worklist.
 #
-# You need `dataeval` and `maite-datasets`. This guide plants known defects in a synthetic tracking dataset.
+# You need `dataeval`. This guide plants known defects in a synthetic tracking dataset.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -33,22 +33,17 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval
 except Exception:
     pass
 
 # %%
 from collections.abc import Iterator
-from typing import cast
+from typing import NamedTuple, cast
 
 import numpy as np
 import polars as pl
 from IPython.display import display
-from maite_datasets.multiobject_tracking import (
-    MultiobjectTrackingTargetTuple,
-    SingleFrameObjectTrackingTargetTuple,
-    VideoFrameTuple,
-)
 
 from dataeval import Metadata
 from dataeval.core import track_stats
@@ -98,7 +93,31 @@ def tracks_for(defect: str | None) -> dict[int, tuple[np.ndarray, np.ndarray]]:
     return tracks
 
 
-def frame_targets(defect: str | None) -> list[SingleFrameObjectTrackingTargetTuple]:
+class FrameTargets(NamedTuple):
+    """The boxes in one frame, which MAITE calls a `SingleFrameObjectTrackingTarget`."""
+
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+    track_ids: np.ndarray
+
+
+class VideoTargets(NamedTuple):
+    """The boxes in every frame of one video, which MAITE calls a `MultiobjectTrackingTarget`."""
+
+    frame_tracks: list[FrameTargets]
+
+
+class Frame(NamedTuple):
+    """One decoded frame, which MAITE calls a `VideoFrame`."""
+
+    pixels: np.ndarray
+    time_s: float
+    pts: int
+    frame_index: int
+
+
+def frame_targets(defect: str | None) -> list[FrameTargets]:
     """One target per frame, holding a 12-pixel box for every track present in it."""
     tracks = tracks_for(defect)
     targets = []
@@ -111,7 +130,7 @@ def frame_targets(defect: str | None) -> list[SingleFrameObjectTrackingTargetTup
                 boxes.append([cx - 6, cy - 6, cx + 6, cy + 6])
                 ids.append(track)
         targets.append(
-            SingleFrameObjectTrackingTargetTuple(
+            FrameTargets(
                 boxes=np.array(boxes, dtype=np.float32).reshape(-1, 4),
                 labels=np.zeros(len(ids), dtype=np.int64),
                 scores=np.ones(len(ids), dtype=np.float32),
@@ -127,7 +146,7 @@ class BlankVideo:
     def __iter__(self) -> Iterator[VideoFrame]:
         blank = np.zeros((3, HEIGHT, WIDTH), dtype=np.uint8)
         for index in range(N_FRAMES):
-            yield VideoFrameTuple(pixels=blank, time_s=index / 30, pts=index, frame_index=index)
+            yield Frame(pixels=blank, time_s=index / 30, pts=index, frame_index=index)
 
 
 class TrackingDataset:
@@ -138,7 +157,7 @@ class TrackingDataset:
         self._data: list[MultiobjectTrackingDatum] = [
             (
                 BlankVideo(),
-                MultiobjectTrackingTargetTuple(frame_tracks=frame_targets(defects.get(index))),
+                VideoTargets(frame_tracks=frame_targets(defects.get(index))),
                 cast(DatumMetadata, {"id": f"sequence_{index}", "height": HEIGHT, "width": WIDTH}),
             )
             for index in range(N_SEQUENCES)

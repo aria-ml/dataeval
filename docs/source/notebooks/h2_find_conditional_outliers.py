@@ -23,7 +23,7 @@
 # Use it after [How to find outliers in metadata factors](./h2_find_factor_outliers.py), when a single threshold per
 # factor is not enough.
 #
-# You need `dataeval` and `maite-datasets`.
+# You need `dataeval`.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -31,7 +31,7 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval
 except Exception:
     pass
 
@@ -43,16 +43,11 @@ warnings.filterwarnings("ignore", message=".*binned automatically")
 
 # %%
 from collections.abc import Iterator
-from typing import cast
+from typing import NamedTuple, cast
 
 import numpy as np
 import polars as pl
 from IPython.display import display
-from maite_datasets.multiobject_tracking import (
-    MultiobjectTrackingTargetTuple,
-    SingleFrameObjectTrackingTargetTuple,
-    VideoFrameTuple,
-)
 
 from dataeval import Metadata
 from dataeval.config import use_seed
@@ -91,13 +86,37 @@ def track_ids(video: int, frame: int) -> list[int]:
     return [0, 1, 2, 3] if video == BUS_VIDEO and frame < BUS_FRAMES else [0, 1, 2]
 
 
-def frame_targets(video: int) -> list[SingleFrameObjectTrackingTargetTuple]:
+class FrameTargets(NamedTuple):
+    """The boxes in one frame, which MAITE calls a `SingleFrameObjectTrackingTarget`."""
+
+    boxes: np.ndarray
+    labels: np.ndarray
+    scores: np.ndarray
+    track_ids: np.ndarray
+
+
+class VideoTargets(NamedTuple):
+    """The boxes in every frame of one video, which MAITE calls a `MultiobjectTrackingTarget`."""
+
+    frame_tracks: list[FrameTargets]
+
+
+class Frame(NamedTuple):
+    """One decoded frame, which MAITE calls a `VideoFrame`."""
+
+    pixels: np.ndarray
+    time_s: float
+    pts: int
+    frame_index: int
+
+
+def frame_targets(video: int) -> list[FrameTargets]:
     """One target per frame, holding a box for each track present."""
     targets = []
     for frame in range(N_FRAMES):
         ids = track_ids(video, frame)
         targets.append(
-            SingleFrameObjectTrackingTargetTuple(
+            FrameTargets(
                 boxes=np.tile(np.array([10, 10, 22, 22], dtype=np.float32), (len(ids), 1)),
                 labels=np.zeros(len(ids), dtype=np.int64),
                 scores=np.ones(len(ids), dtype=np.float32),
@@ -117,7 +136,7 @@ class BlankVideo:
         blank = np.zeros((3, HEIGHT, WIDTH), dtype=np.uint8)
         for index in range(N_FRAMES):
             late = 3 * 3600 if (self.video, index) == (LATE_VIDEO, LATE_FRAME) else 0
-            yield VideoFrameTuple(pixels=blank, time_s=index / 30 + late, pts=index, frame_index=index)
+            yield Frame(pixels=blank, time_s=index / 30 + late, pts=index, frame_index=index)
 
 
 class TrackingDataset:
@@ -128,7 +147,7 @@ class TrackingDataset:
         self._data: list[MultiobjectTrackingDatum] = [
             (
                 BlankVideo(video),
-                MultiobjectTrackingTargetTuple(frame_tracks=frame_targets(video)),
+                VideoTargets(frame_tracks=frame_targets(video)),
                 cast(DatumMetadata, {"id": f"video_{video}", "height": HEIGHT, "width": WIDTH}),
             )
             for video in range(N_VIDEOS)
