@@ -375,7 +375,7 @@ assert result_test.distance < drift_detector.ratio_threshold < result_drone.dist
 #   uncertainty-based detection is and is not the right tool.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Compare prediction uncertainty with feature-based
 #   drift detection on dataset embeddings.
-# - [How to detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Test the entropy of a MAITE
+# - [Detect uncertainty drift with a MAITE model](./h2_detect_uncertainty_drift.py) — Test the entropy of a MAITE
 #   model's predictions for drift.
 
 # %% [markdown]

@@ -295,7 +295,7 @@ print(representation.dark_branches)
 # 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run the
 # dataset through {class}`.Embeddings`. That yields a 512-dimensional feature per image.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
+# For other ways to build embeddings, see [Create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -482,7 +482,7 @@ assert 0.3 < coverage_by_class["truck"]["near_duplicate_fraction"] < 0.35
 #   metrics for assessing dataset coverage.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in
 #   unlabeled dataset embeddings.
-# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels
+# - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Map and validate dataset labels
 #   against a target domain ontology.
 
 # %% [markdown]

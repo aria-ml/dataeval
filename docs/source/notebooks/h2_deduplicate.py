@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to identify duplicates
+# # Identify duplicates
 #
 # Duplicates add no new information and can distort model training by over-emphasizing the features that appear in them.
 # {class}`.Duplicates` finds exact and near duplicate images so you can remove them before you train. It also looks past

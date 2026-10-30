@@ -108,7 +108,7 @@ Pass the dataset first and everything else by keyword. `Embeddings` computes the
 vectors when you first use them and keeps them, so build one `Embeddings` object
 for each dataset and give it to every tool that needs it. Call
 `np.asarray(embeddings)` when you need a plain array.
-[How to create embeddings](../notebooks/h2_create_embeddings.py) runs this recipe
+[Create embeddings](../notebooks/h2_create_embeddings.py) runs this recipe
 with PyTorch, with ONNX and with the extractors that need no model.
 
 ### Choose an extractor
@@ -241,10 +241,10 @@ lists them in one table.
 
 ### How-to guides
 
-- [How to create embeddings](../notebooks/h2_create_embeddings.py)
-- [How to embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
-- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
-- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [Create embeddings](../notebooks/h2_create_embeddings.py)
+- [Embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
+- [Measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
+- [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
 
 ### Tutorials
 

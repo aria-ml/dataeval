@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to reconcile labels against an ontology
+# # Reconcile labels against an ontology
 #
 # A dataset's class names belong to a domain taxonomy: "sedan" and "pickup truck" are both land vehicles, and "fighter
 # jet" is an aircraft. {func}`.label_reconciliation` matches class names against a reference {class}`.Ontology` and

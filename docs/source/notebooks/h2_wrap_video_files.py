@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to wrap video files as a multi-object tracking dataset
+# # Wrap video files as a multi-object tracking dataset
 #
 # DataEval reads video through the MAITE multi-object tracking protocol. Each datum is a stream of frames, the tracked
 # boxes of every frame, and a metadata dictionary. Footage on disk needs two small classes to fit it. A stream reopens
@@ -245,5 +245,5 @@ assert found.pixels.mean() > 240
 #
 # - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find repeated, re-encoded and leaked footage in a
 #   multi-object tracking dataset.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Follow an address through views to
+# - [Trace a finding back to its source](./h2_trace_findings_to_source.py) — Follow an address through views to
 #   the data on disk.

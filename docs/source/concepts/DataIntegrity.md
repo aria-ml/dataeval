@@ -992,11 +992,11 @@ it, and reads a run of more than five departing frames as a segment.
 
 ### How-to guides
 
-- [How to identify duplicates](../notebooks/h2_deduplicate.py)
-- [How to find outliers in metadata factors](../notebooks/h2_find_factor_outliers.py)
-- [How to find outliers that depend on their context](../notebooks/h2_find_conditional_outliers.py)
-- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
-- [How to specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
+- [Identify duplicates](../notebooks/h2_deduplicate.py)
+- [Find outliers in metadata factors](../notebooks/h2_find_factor_outliers.py)
+- [Find outliers that depend on their context](../notebooks/h2_find_conditional_outliers.py)
+- [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [Specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
 
 ### Tutorials
 

@@ -682,7 +682,7 @@ print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
 #   clustering](../concepts/DataIntegrity.md#duplicate-detection-hashing-and-clustering) — Read how exact hashes,
 #   perceptual hashes and clustering find redundant images.
 # - [Clean a dataset](./tt_clean_dataset.py) — Identify label noise and corrupt samples in a labeled dataset.
-# - [How to identify duplicates](./h2_deduplicate.py) — Learn how to remove duplicate images from a PyTorch dataset.
+# - [Identify duplicates](./h2_deduplicate.py) — Learn how to remove duplicate images from a PyTorch dataset.
 
 # %% [markdown]
 # ## On your own

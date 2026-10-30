@@ -15,7 +15,7 @@
 
 # %% [markdown]
 # (control-factor-binning)=
-# # How to control and reuse a factor's binning
+# # Control and reuse a factor's binning
 #
 # {class}`.Metadata` derives a factor's bins from the values it was handed, so the same factor measured on two
 # collections is cut at different places and their {class}`.Balance` results are not comparable. A bin edge is a claim

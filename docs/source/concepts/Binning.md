@@ -1092,10 +1092,10 @@ which caveats attach to each evaluator), see
 
 ### How-to guides
 
-- [How to control and reuse a factor's binning](../notebooks/h2_control_factor_binning.py) —
+- [Control and reuse a factor's binning](../notebooks/h2_control_factor_binning.py) —
   declaring the cuts you mean, ratifying the ones you do not, and carrying the
   whole map to the next collection so two results are comparable.
-- [How to configure logging with DataEval](../notebooks/h2_configure_logging.py) — surfacing the
+- [Configure logging with DataEval](../notebooks/h2_configure_logging.py) — surfacing the
   auto-binning warnings the default silences.
 
 ### Tutorials

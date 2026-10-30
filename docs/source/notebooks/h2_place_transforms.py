@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to respond to a StatsInvalidatedWarning
+# # Respond to a StatsInvalidatedWarning
 #
 # A {class}`~dataeval.exceptions.StatsInvalidatedWarning` says that a transform in your {class}`.View` has changed what
 # some of the statistics you asked for measure. Every operation declares the {class}`.ImageStats` it invalidates, and
@@ -152,5 +152,5 @@ assert warned == {"DIMENSION": False, "VISUAL": True}
 #   channels.
 # - [Embeddings](../concepts/Embeddings.md) — Learn how feature embeddings represent dataset samples in low-dimensional
 #   space.
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
+# - [Build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
 #   transformations.

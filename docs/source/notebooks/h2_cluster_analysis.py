@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to run clustering analysis
+# # Run clustering analysis
 #
 # Data does not typically come labeled, and labeling or verifying labels takes time and resources. Clustering groups
 # data of shape (samples, features) into similar groups with an algorithm based on HDBSCAN, and {class}`.Outliers` and
@@ -137,4 +137,4 @@ assert len(duplicates_result.near) == 2
 # - [Embeddings](../concepts/Embeddings.md) — Understand feature extraction and vector embeddings for clustering.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate unlabeled image datasets using clustering and
 #   coverage metrics.
-# - [How to identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.
+# - [Identify duplicates](./h2_deduplicate.py) — Detect exact and near-duplicate images in dataset collections.

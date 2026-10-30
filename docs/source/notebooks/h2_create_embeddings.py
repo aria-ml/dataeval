@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to create embeddings
+# # Create embeddings
 #
 # Most DataEval analyses that group or compare images start from [embeddings](../concepts/Embeddings.md), one vector for
 # each image. You choose an extractor, then pass the dataset and the extractor to {class}`.Embeddings`.
@@ -208,5 +208,5 @@ assert bovw_embeddings.shape == (100, 64)
 # - [Feature extractors: a dependency of both
 #   layers](../concepts/ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers) — See what each extractor
 #   embeds and how each can mislead a metric.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and
+# - [Run clustering analysis](./h2_cluster_analysis.py) — Cluster embeddings to find groups, outliers and
 #   duplicates.

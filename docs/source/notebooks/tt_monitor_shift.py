@@ -169,7 +169,7 @@ print(f"vocabulary:  {train_view.metadata.get('index2label')}")
 # 1000-class logits), and give it the standard resize-and-normalize preprocessing of the model as `transforms`. Then run
 # each split through {class}`.Embeddings`. Keeping the `transforms` in a variable lets you reuse them further down.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
+# For other ways to build embeddings, see [Create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -479,7 +479,7 @@ for name, result in chunked_results.items():
 #   in deployed ML models.
 # - [Identify out-of-distribution samples](./tt_identify_ood_samples.py) — Compare how many images autoencoder and k-NN
 #   detectors flag as unlike the training data.
-# - [How to measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two
+# - [Measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two
 #   datasets to assess class representation.
 
 # %% [markdown]

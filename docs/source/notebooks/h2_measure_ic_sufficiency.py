@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to measure dataset sufficiency for image classification
+# # Measure dataset sufficiency for image classification
 #
 # When data collection is expensive, you can evaluate a model on a small, preliminary dataset and extrapolate its
 # performance to a larger one. {class}`.Sufficiency` trains your model on growing subsets of the data to build
@@ -342,7 +342,7 @@ assert needed["TPR at 0.5 Fixed FPR"][0] > 0
 #
 # - [Performance limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in
 #   dataset scaling.
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to
+# - [Determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to
 #   evaluate classification task difficulty.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented
+# - [Detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented
 #   regions in dataset feature space.

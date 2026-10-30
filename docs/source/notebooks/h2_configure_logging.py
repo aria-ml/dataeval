@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to configure logging with DataEval
+# # Configure logging with DataEval
 #
 # DataEval logs through Python's standard `logging` module, on a `dataeval` logger and its subsystem loggers. Attach
 # handlers to send the messages to the console or to a file. DataEval primarily logs at the DEBUG, INFO and WARNING
@@ -138,5 +138,5 @@ logging.disable(logging.NOTSET)
 #
 # - [Clean a dataset](./tt_clean_dataset.py) — Clean and prepare datasets for model training by finding duplicates,
 #   outliers, and corrupted data.
-# - [How to configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size,
+# - [Configure global DataEval defaults](./h2_configure_defaults.py) — Set global default device, batch size,
 #   worker processes, and seed.

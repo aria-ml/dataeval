@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to select frames from a video dataset for image tools
+# # Select frames from a video dataset for image tools
 #
 # Neighboring frames of a video are nearly the same picture. Run an image tool over all of them and the tool counts
 # one scene many times, at the cost of decoding every frame. {class}`.SequenceFrames` thins each video to the frames
@@ -214,4 +214,4 @@ assert kept == sources[3]
 # ## Next steps
 #
 # - [Identify duplicate video](./tt_identify_duplicate_video.py) — Find repeated, re-encoded and leaked footage.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Follow an address back to its data.
+# - [Trace a finding back to its source](./h2_trace_findings_to_source.py) — Follow an address back to its data.

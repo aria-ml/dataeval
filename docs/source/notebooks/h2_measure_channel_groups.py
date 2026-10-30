@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to measure named groups of channels
+# # Measure named groups of channels
 #
 # By default {func}`.image_stats` averages every band of an image together, which hides what each band says. In
 # multispectral and hyperspectral imagery, or RGB with near-infrared or LIDAR added, the bands carry different physical
@@ -53,7 +53,7 @@ from dataeval.utils.preprocessing import ChannelGroup
 set_max_processes(4)
 
 # You should configure logging to see warning messages that are logged rather than
-# raised. Refer to [how to configure logging](./h2_configure_logging.py).
+# raised. Refer to [Configure logging with DataEval](./h2_configure_logging.py).
 logging.basicConfig(format="%(levelname)s: %(message)s", force=True)
 logging.getLogger("dataeval").setLevel(logging.WARNING)
 
@@ -283,7 +283,7 @@ assert set(per_group) == {"width", "channels", "rgb_brightness", "rgb_xxhash", "
 #
 # - [Image statistics](../concepts/ImageStatistics.md) — Understand image statistics and metrics computed across
 #   channels.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
+# - [Specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
 #   Compute custom bounding box and image statistics for object detection tasks.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to
+# - [Add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Add domain-specific intrinsic factors to
 #   Metadata for deeper analysis.

@@ -974,7 +974,7 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 # The detection rates above belong to this data and to three epochs of training. How each detector behaves on yours
 # depends on its embeddings or architecture, so run the comparison on a sample of your own data.
 # [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) describes the methods,
-# and [How to create embeddings](./h2_create_embeddings.py) shows how to build the embeddings that the KNN detectors
+# and [Create embeddings](./h2_create_embeddings.py) shows how to build the embeddings that the KNN detectors
 # need.
 
 # %% [markdown]
@@ -984,7 +984,7 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 #   reconstruction-based and distance-based methods.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect drift on image embeddings and across chunks of
 #   incoming data.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
+# - [Create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
 #   extractor.
 
 # %% [markdown]

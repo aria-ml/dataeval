@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to conform and merge datasets with different label vocabularies
+# # Conform and merge datasets with different label vocabularies
 #
 # A second, incoming dataset can arrive labeled under a different scheme: different class names, reordered indices and
 # an overlapping but not identical set of classes. You cannot concatenate it with your reference dataset, because index
@@ -196,5 +196,5 @@ except ValueError:
 #
 # - [Ontology](../concepts/Ontology.md) — Explore the taxonomic model the reference is built on, correspondences,
 #   relations, and mergeability.
-# - [How to align two label spaces](./h2_align_label_spaces.py) — Relate class names and categories between different
+# - [Align two label spaces](./h2_align_label_spaces.py) — Relate class names and categories between different
 #   dataset label spaces.

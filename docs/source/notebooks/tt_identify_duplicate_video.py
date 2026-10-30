@@ -69,7 +69,7 @@
 #
 # Use this tutorial when you work with full-motion video (FMV) or any multi-object tracking (MOT) dataset and you need
 # to know what the dataset contains before you split it or train on it. For still images, use
-# [How to identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
+# [Identify duplicates](./h2_deduplicate.py), which covers the same class on simpler, image-level cases.
 #
 
 # %% [markdown]
@@ -329,7 +329,7 @@ for name, radius in (("hash_radius=0", 0), ("hash_radius=6", 6)):
 # radius its run used.
 #
 # `Duplicates` logs a warning when it runs on video with an explicit `hash_radius=0`. To see it, configure the
-# standard library `logging` module as described in [How to configure logging](./h2_configure_logging.py):
+# standard library `logging` module as described in [Configure logging with DataEval](./h2_configure_logging.py):
 #
 # ```python
 # import logging
@@ -739,10 +739,10 @@ assert set(tracked.data()["level"].to_list()) == {"track"}
 # %% [markdown]
 # ## Next steps
 #
-# - [How to identify duplicates](./h2_deduplicate.py) — The same class on still-image datasets.
+# - [Identify duplicates](./h2_deduplicate.py) — The same class on still-image datasets.
 # - [Data integrity](../concepts/DataIntegrity.md) — Image-level and target-level statistics for finding data quality
 #   issues.
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Filter, balance, reorder or
+# - [Build dataset views with View and Operation](./h2_build_dataset_views.py) — Filter, balance, reorder or
 #   relabel a dataset without copying it.
 # - [Validation and trust](../concepts/ValidationAndTrust.md) — Build splits that hold up, and know what your evaluation
 #   is measuring.

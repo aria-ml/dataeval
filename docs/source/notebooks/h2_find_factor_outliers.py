@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to find outliers in metadata factors
+# # Find outliers in metadata factors
 #
 # Much of what describes a dataset never touches a pixel: sensor telemetry, capture conditions and derived statistics
 # such as the per-track measurements {func}`~dataeval.core.track_stats` produces. {class}`~dataeval.quality.Outliers`
@@ -257,7 +257,7 @@ except ValueError:
 # ## Next steps
 #
 # - [Data integrity](../concepts/DataIntegrity.md) — What makes a factor thresholdable, and why bins are never read.
-# - [How to find outliers that depend on their context](./h2_find_conditional_outliers.py) — Judge factors within
+# - [Find outliers that depend on their context](./h2_find_conditional_outliers.py) — Judge factors within
 #   strata, by rarity, given another factor, and in combination.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or
+# - [Trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the frame, track or
 #   detection a `SourceIndex` names.

@@ -1158,7 +1158,7 @@ In brief:
 
 ### How-to guides
 
-- [How to measure label independence](../notebooks/h2_measure_label_independence.py)
+- [Measure label independence](../notebooks/h2_measure_label_independence.py)
 
 ## References
 

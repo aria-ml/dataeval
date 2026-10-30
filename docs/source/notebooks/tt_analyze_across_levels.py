@@ -374,7 +374,7 @@ print("at instance, inherited=False:", sorted(own_only.factor_names))
 # ```{note}
 # This cell reads and measures 200 4K frames and takes a couple of minutes. That is why the sample is capped at 200, and
 # why the first cell called {func}`.set_max_processes` with 4: {func}`.image_stats` reads each frame independently, so
-# it splits the work across worker processes. [How to configure global DataEval defaults](./h2_configure_defaults.py)
+# it splits the work across worker processes. [Configure global DataEval defaults](./h2_configure_defaults.py)
 # explains how to size the pool.
 # ```
 
@@ -587,7 +587,7 @@ print("altitude > 60 m:", high.level_counts)
 
 # %% [markdown]
 # The dataset is untouched by a filter, so a filtered metadata no longer matches the dataset it was built from.
-# [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) shows how to realign the
+# [Keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) shows how to realign the
 # two and how to cache the metadata.
 
 # %% [markdown]
@@ -622,7 +622,7 @@ print("altitude > 60 m:", high.level_counts)
 # - [Metadata levels](../concepts/MetadataLevels.md) — The full level model, including the four-level graph used by
 #   tracking datasets.
 # - [Identify bias and correlations](./tt_identify_bias.py) — The bias evaluators used here, in depth.
-# - [How to keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) — Realign a filtered
+# - [Keep metadata in sync with its dataset and cache it](./h2_sync_and_cache_metadata.py) — Realign a filtered
 #   metadata with its dataset and cache the metadata so it is built once.
 #
 # ## On your own

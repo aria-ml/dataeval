@@ -139,7 +139,7 @@ print(f"Image shape: {dataset[0][0].shape}")
 # 1000-class logits), give it the model's standard resize-and-normalize preprocessing as `transforms`, and run the
 # dataset through {class}`.Embeddings`.
 #
-# For other ways to build embeddings, see [How to create embeddings](./h2_create_embeddings.py).
+# For other ways to build embeddings, see [Create embeddings](./h2_create_embeddings.py).
 
 # %%
 resnet = resnet18(weights=ResNet18_Weights.DEFAULT, progress=False)
@@ -385,9 +385,9 @@ assert len(cov["uncovered_indices"]) > 0
 # - [Measuring coverage: geometry in embedding
 #   space](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive
 #   coverage find the images in sparse regions of the space.
-# - [How to run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
+# - [Run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
 #   in the clusters.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few
+# - [Detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few
 #   images cover.
 
 # %% [markdown]

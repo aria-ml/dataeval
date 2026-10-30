@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to detect drift in metadata factors
+# # Detect drift in metadata factors
 #
 # Embedding-space drift detection reports that features drifted but not what changed. Metadata factors such as altitude
 # and camera angle give checkable, human-readable drift statements: a {class}`.Metadata` extractor plugs into a drift
@@ -123,7 +123,7 @@ print(Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES).drop
 #
 # Build a reusable {class}`.Metadata` extractor. The first call fits the reference and records the cuts and
 # vocabularies, so the operational stream maps to the same bins. To declare the cuts yourself, see
-# [How to control and reuse a factor's binning](./h2_control_factor_binning.py).
+# [Control and reuse a factor's binning](./h2_control_factor_binning.py).
 
 # %%
 extractor = Metadata(reference, view="unit", exclude=EXCLUDE).repair(COORDINATES)
@@ -229,7 +229,7 @@ for label, indices in by_year.items():
 # The collection context confirms each finding: `drone` drifts because the drone types changed, `width` and `height`
 # stop drifting because the surviving frames share one resolution, and `altitude` still drifts in range and spread more
 # than in median. The `item_index` column of {attr}`~.Metadata.dataframe` locates the frames behind any row, and
-# [How to trace a finding back to its source](./h2_trace_findings_to_source.py) retrieves and shows them.
+# [Trace a finding back to its source](./h2_trace_findings_to_source.py) retrieves and shows them.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -250,5 +250,5 @@ assert set(comparison.filter(pl.col("changed"))["factor"]) == {"drone", "gimbal_
 #   datasets.
 # - [Monitor shifts in operational data](./tt_monitor_shift.py) — Detect distribution shift between training and
 #   operational data.
-# - [How to trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the specific frames
+# - [Trace a finding back to its source](./h2_trace_findings_to_source.py) — Retrieve the specific frames
 #   associated with a drift finding.

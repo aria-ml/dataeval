@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to detect uncertainty drift with a MAITE model
+# # Detect uncertainty drift with a MAITE model
 #
 # As data moves into regions that a deployed model was not trained on, its predictions grow less confident. An upward
 # shift in the {term}`Shannon entropy<Shannon Entropy>` of the predicted probabilities is a label-free drift signal. See
@@ -265,5 +265,5 @@ assert not result_test.drifted
 #   Uncertainty-based drift detection.
 # - [Detect drift with prediction uncertainty](./tt_detect_drift_with_uncertainty.py) — Monitor deployed object
 #   detectors for drift using prediction uncertainty.
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
+# - [Measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
 #   between baseline and operational data distributions.

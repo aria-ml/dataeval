@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to measure label independence
+# # Measure label independence
 #
 # A discrepancy in label frequencies between training and test datasets can hurt model performance. The
 # [label parity](../concepts/DistributionShift.md#label-parity) test compares the label distributions of two datasets.
@@ -99,5 +99,5 @@ assert abs(results["p_value"] - 0.97) < 0.01  # and about 0.97
 #   distribution changes.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.
-# - [How to measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
+# - [Measure train and test dataset divergence](./h2_measure_divergence.py) — Calculate divergence metrics
 #   between baseline and operational data distributions.

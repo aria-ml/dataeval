@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to build a MetadataLike object from a DataFrame
+# # Build a MetadataLike object from a DataFrame
 #
 # DataEval's bias evaluators, {class}`.Balance`, {class}`.Diversity` and {class}`.Parity`, need your factors and labels
 # but not your images. They accept any object that satisfies the {class}`.MetadataLike` protocol, so a pandas
@@ -281,5 +281,5 @@ for balance in (ic_balance, od_balance):
 #   model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.
-# - [How to wrap a DataFrame as a dataset](./h2_wrap_dataframe_dataset.py) — Wrap a pandas DataFrame catalog as a
+# - [Wrap a DataFrame as a dataset](./h2_wrap_dataframe_dataset.py) — Wrap a pandas DataFrame catalog as a
 #   classification or detection dataset, with optional lazy image loading.

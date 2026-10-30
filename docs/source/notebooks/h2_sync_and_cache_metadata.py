@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to keep metadata in sync with its dataset and cache it
+# # Keep metadata in sync with its dataset and cache it
 #
 # Filtering {class}`.Metadata` with {meth}`.Metadata.where` or {meth}`.Metadata.having` removes rows from the metadata
 # but nothing from its dataset, so anything computed from the dataset, embeddings above all, no longer
@@ -145,5 +145,5 @@ assert reloaded.rows_at("instance")["item_index"].to_list() == metadata.rows_at(
 # - [Metadata levels](../concepts/MetadataLevels.md) — Explore dataset, datum, and factor levels in DataEval metadata.
 # - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
 #   unit, instance, and background factors.
-# - [How to build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
+# - [Build dataset views with View and Operation](./h2_build_dataset_views.py) — Construct and chain dataset view
 #   transformations.

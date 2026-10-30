@@ -11,7 +11,7 @@ That information is worth extracting. Much of it describes the collection and pr
 treats some videos differently from others, a model can learn those differences instead of the intended task. This page
 recommends which factors to extract, gives the known factor names that DataEval checks, and shows where in a video file
 each factor can be found. To serve the factors from video files you read, see
-[How to wrap video files as a multi-object tracking dataset](../notebooks/h2_wrap_video_files.py).
+[Wrap video files as a multi-object tracking dataset](../notebooks/h2_wrap_video_files.py).
 
 ## Why extrinsic factors matter
 

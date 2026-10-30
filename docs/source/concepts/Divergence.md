@@ -162,7 +162,7 @@ sparse relative to the dimensionality of the embedding space.
 
 ### How-to guides
 
-- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
+- [Measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
 
 ## References
 

@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to specify custom statistics on object detection datasets
+# # Specify custom statistics on object detection datasets
 #
 # When you analyze an object detection dataset, you often need
 # [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at three granularities:
@@ -180,5 +180,5 @@ assert "instance_background_sharpness" in metadata.dropped_factors
 #   to identify data quality issues.
 # - [Analyze a dataset across its levels](./tt_analyze_across_levels.py) — Perform multi-level dataset analysis across
 #   unit, instance, and background factors.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors
+# - [Add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Compute and attach intrinsic factors
 #   such as dimensions and pixel statistics to dataset metadata.

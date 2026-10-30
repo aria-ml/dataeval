@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to trace a finding back to its source
+# # Trace a finding back to its source
 #
 # An evaluator tells you that something is wrong and where, but not what it looks like. {class}`.Outliers` returns a
 # mapping keyed on {class}`.SourceIndex`, an address naming one row of your dataset, and the next question is to see
@@ -243,7 +243,7 @@ assert "unit_is_outlier" in metadata.rows_at("unit").columns
 # ## Next steps
 #
 # - [Metadata levels](../concepts/MetadataLevels.md) — Learn the level graph that an address names a row in.
-# - [How to specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
+# - [Specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) —
 #   Choose flags and read `source_index`.
-# - [How to find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold measured factors at each level
+# - [Find outliers in metadata factors](./h2_find_factor_outliers.py) — Threshold measured factors at each level
 #   and trace the flagged rows.

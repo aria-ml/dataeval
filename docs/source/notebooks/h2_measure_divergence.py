@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to measure train and test dataset divergence
+# # Measure train and test dataset divergence
 #
 # When you evaluate new test data or compare two datasets, you often want a quantitative measure of the shift in
 # covariates. HP [divergence](../concepts/Divergence.md) is a nonparametric measure of the distance between two
@@ -54,7 +54,7 @@ from dataeval.extractors import FlattenExtractor
 # The embeddings here are the flattened pixels of each image, made by a {class}`.FlattenExtractor`. Flattened pixels are
 # a baseline, because distances between raw pixels follow brightness and alignment more than content. They work in this
 # example because MNIST images are small and share one shape. For photographs, use an extractor that wraps a model, as
-# described in [How to create embeddings](./h2_create_embeddings.py).
+# described in [Create embeddings](./h2_create_embeddings.py).
 
 # %%
 # Load in the training mnist dataset and use the first 4000

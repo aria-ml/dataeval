@@ -205,8 +205,8 @@ into a test report.
 
 ### How-to guides
 
-- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
-- [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+- [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 
 ### Tutorials
 

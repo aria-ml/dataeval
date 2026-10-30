@@ -147,7 +147,7 @@ leaves the pixel statistics, the channel count and the hashes alone, so resize-t
 check across heterogeneous source resolutions, not a worse one. The quality evaluators intersect the declaration with
 the {class}`.ImageStats` you asked for, and where the two overlap they raise a
 {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now describe the
-transform. [How to respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
+transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
 responses.
 
 The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, because an arbitrary
@@ -168,7 +168,7 @@ reason to prefer the curated operations.
 
 ### How-to guides
 
-- [How to measure named groups of channels](../notebooks/h2_measure_channel_groups.py) — naming groups of bands so
+- [Measure named groups of channels](../notebooks/h2_measure_channel_groups.py) — naming groups of bands so
   that each group is measured separately.
-- [How to respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) — what an operation invalidates
+- [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) — what an operation invalidates
   and the three ways to respond.

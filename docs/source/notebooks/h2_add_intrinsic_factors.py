@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to add intrinsic factors to Metadata
+# # Add intrinsic factors to Metadata
 #
 # Bias analysis needs factors to correlate with the labels, and a dataset often arrives with few or none.
 # {func}`.image_stats` measures intrinsic factors from the pixels, such as brightness, sharpness and contrast, and
@@ -144,5 +144,5 @@ assert moments.sort("diversity_value")["factor_name"][0] == "kurtosis"
 #   model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.
-# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare the cuts you mean and apply
+# - [Control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare the cuts you mean and apply
 #   them unchanged to the next dataset.

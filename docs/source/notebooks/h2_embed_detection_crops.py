@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to embed object detection crops and visualize class clusters
+# # Embed object detection crops and visualize class clusters
 #
 # DataEval's embedding-based tools, {class}`.Coverage`, {func}`.ber_mst` and {class}`.Balance`, assume one embedding per
 # label, the image-classification shape. An object detection image holds many objects of different classes, so one
@@ -167,5 +167,5 @@ assert set(np.unique(metadata.class_labels)).issubset(set(focus_indices))  # onl
 #
 # - [Embeddings](../concepts/Embeddings.md) — Feature vectors extracted per crop for evaluation and analysis.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Embed, project, and reason about a dataset end to end.
-# - [How to determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through
+# - [Determine image classification feasibility](./h2_measure_ic_feasibility.py) — Put crop embeddings through
 #   BER to bound achievable classification accuracy.

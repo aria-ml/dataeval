@@ -661,10 +661,10 @@ high-dimensional embeddings.
 
 ### How-to guides
 
-- [How to create embeddings](../notebooks/h2_create_embeddings.py)
-- [How to detect drift in metadata factors](../notebooks/h2_detect_metadata_drift.py)
-- [How to detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
-- [How to detect distribution shift from precomputed model outputs](../notebooks/h2_detect_drift_from_model_outputs.py)
+- [Create embeddings](../notebooks/h2_create_embeddings.py)
+- [Detect drift in metadata factors](../notebooks/h2_detect_metadata_drift.py)
+- [Detect uncertainty drift with a MAITE model](../notebooks/h2_detect_uncertainty_drift.py)
+- [Detect distribution shift from precomputed model outputs](../notebooks/h2_detect_drift_from_model_outputs.py)
 
 ### Tutorials
 

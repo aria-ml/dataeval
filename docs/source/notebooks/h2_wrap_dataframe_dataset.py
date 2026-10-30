@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to wrap a DataFrame as a dataset
+# # Wrap a DataFrame as a dataset
 #
 # Datasets are often cataloged as a table, such as a CSV or parquet file, with a row per image or per box and columns
 # for the file location, the label and any metadata. DataEval's evaluators accept any object that satisfies the
@@ -360,5 +360,5 @@ assert lazy_seconds < eager_seconds
 #   model reliability.
 # - [Identify bias and correlations](./tt_identify_bias.py) — Analyze class and metadata correlations to spot potential
 #   dataset bias.
-# - [How to build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py) — Build a MetadataLike object
+# - [Build a MetadataLike object from a DataFrame](./h2_metadata_from_dataframe.py) — Build a MetadataLike object
 #   from a DataFrame for bias analysis without loading images.

@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to align two label spaces
+# # Align two label spaces
 #
 # Two datasets rarely name things the same way. {func}`.label_alignment` relates each class of a source vocabulary to a
 # reference {class}`.Ontology` as equivalent, narrower or broader, and reports whether the source can be expressed in
@@ -281,5 +281,5 @@ for labels in sources.values():
 #   mergeability.
 # - [Distribution shift](../concepts/DistributionShift.md) — Understand distributional differences between sources that
 #   remain after label alignment.
-# - [How to reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Match class names against a
+# - [Reconcile labels against an ontology](./h2_reconcile_labels_ontology.py) — Match class names against a
 #   reference ontology and recover their hierarchy.

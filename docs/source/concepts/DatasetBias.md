@@ -560,13 +560,13 @@ effective groups at each level; see
 
 ### How-to guides
 
-- [How to add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py)
-- [How to measure label independence](../notebooks/h2_measure_label_independence.py)
-- [How to detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
-- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
-- [How to configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
-- [How to build a MetadataLike object from a DataFrame](../notebooks/h2_metadata_from_dataframe.py)
-- [How to build dataset views with View and Operation](../notebooks/h2_build_dataset_views.py)
+- [Add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py)
+- [Measure label independence](../notebooks/h2_measure_label_independence.py)
+- [Detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
+- [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
+- [Build a MetadataLike object from a DataFrame](../notebooks/h2_metadata_from_dataframe.py)
+- [Build dataset views with View and Operation](../notebooks/h2_build_dataset_views.py)
 
 ### Tutorials
 

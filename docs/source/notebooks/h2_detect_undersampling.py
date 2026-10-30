@@ -14,7 +14,7 @@
 # ---
 
 # %% [markdown]
-# # How to detect undersampled data subsets
+# # Detect undersampled data subsets
 #
 # Most computer vision datasets have many images, but some subsets, such as a label or a style within a label, can be
 # undersampled. [Coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) analysis finds
@@ -242,5 +242,5 @@ assert (wonky / 20) > 0.4
 #   geometry.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover structure, clusters, and coverage in
 #   unlabeled datasets.
-# - [How to create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
+# - [Create embeddings](./h2_create_embeddings.py) — Create image embeddings with PyTorch, ONNX or a model-free
 #   extractor.

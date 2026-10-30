@@ -202,7 +202,7 @@ for name, held in metadata.unusable.items():
 # A repair declares what the values of a column are, and a bin declares how they are grouped. DataEval records both on
 # the metadata, so you can read them back, store them with {meth}`~.Metadata.save` and apply them to the next dataset.
 # See [Binning](../concepts/Binning.md) and
-# [How to control and reuse a factor's binning](./h2_control_factor_binning.py) for how to choose and reuse them.
+# [Control and reuse a factor's binning](./h2_control_factor_binning.py) for how to choose and reuse them.
 #
 # The repairs below do three things. {class}`~dataeval.types.Remap` marks the missing coordinates as NaN, which DataEval
 # bins in a group of its own. `latitude` and `longitude` are known factors that DataEval checks as real coordinates, so
@@ -559,9 +559,9 @@ assert size_diversity["swimmer"] > 0.7
 #
 # - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity
 #   indices for measuring dataset bias.
-# - [How to add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Measure brightness, sharpness and other
+# - [Add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Measure brightness, sharpness and other
 #   image statistics and add them to the metadata.
-# - [How to measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two
+# - [Measure label independence](./h2_measure_label_independence.py) — Compare label distributions between two
 #   datasets to assess class representation.
 
 # %% [markdown]

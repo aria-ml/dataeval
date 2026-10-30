@@ -458,9 +458,9 @@ print(f"stratified on: {splits.class_axis.name} ({splits.class_axis.source})")
 # %% [markdown]
 # ## Next steps
 #
-# - [How to control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare explicit bin edges for
+# - [Control and reuse a factor's binning](./h2_control_factor_binning.py) — Declare explicit bin edges for
 #   consistent factor levels across collections.
-# - [How to detect undersampled data subsets](./h2_detect_undersampling.py) — Measure coverage across custom groups and
+# - [Detect undersampled data subsets](./h2_detect_undersampling.py) — Measure coverage across custom groups and
 #   classes.
 # - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
 #   metrics.

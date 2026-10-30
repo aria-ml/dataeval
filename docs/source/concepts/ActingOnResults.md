@@ -808,12 +808,12 @@ threat to the established performance bounds.
 
 ### How-to guides
 
-- [How to identify duplicates](../notebooks/h2_deduplicate.py)
-- [How to run clustering analysis](../notebooks/h2_cluster_analysis.py)
-- [How to determine image classification feasibility](../notebooks/h2_measure_ic_feasibility.py)
-- [How to measure dataset sufficiency for image classification](../notebooks/h2_measure_ic_sufficiency.py)
-- [How to measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
-- [How to detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
+- [Identify duplicates](../notebooks/h2_deduplicate.py)
+- [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
+- [Determine image classification feasibility](../notebooks/h2_measure_ic_feasibility.py)
+- [Measure dataset sufficiency for image classification](../notebooks/h2_measure_ic_sufficiency.py)
+- [Measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
+- [Detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
 
 ### Tutorials
 

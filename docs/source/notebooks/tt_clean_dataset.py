@@ -620,7 +620,7 @@ display(duplicates)
 #   outliers.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Evaluate coverage, bias, and dimensionality across
 #   dataset splits.
-# - [How to identify duplicates](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
+# - [Identify duplicates](./h2_deduplicate.py) — Remove exact, duplicate, or near-duplicate images from datasets.
 
 # %% [markdown]
 # ## On your own
