@@ -378,6 +378,15 @@ def _validate_groupable(groups: NDArray[np.intp], num_partitions: int) -> None:
         raise ValueError(f"Unique groups ({num_unique_groups}) must be greater than num partitions ({num_partitions}).")
 
 
+def _validate_groups_left(left: int, total: int, num_folds: int) -> None:
+    """Refuse a train side with fewer groups than its folds need, which scikit-learn reports as samples."""
+    if left < (need := max(num_folds, 2)):
+        raise ValueError(
+            f"The test split leaves {left} of the {total} groups for {num_folds} [train, val] fold(s), which need at "
+            f"least {need}. Ask for fewer folds or a smaller test_frac, or split on a finer grouping.",
+        )
+
+
 def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArray[np.intp] | None:
     """
     Return individual group numbers based on a subset of metadata defined by groupnames.
@@ -637,14 +646,13 @@ def _split_od(  # noqa: C901
     its images do, so the split, its validation and its fractions all count groups, and the
     result is expanded back to every image of each group.
     """
-    unit, needed = "images", total_partitions
+    # A class needs a row in every partition, and total_partitions leaves out the validation
+    # side of a single split.
+    unit, needed = "images", total_partitions + 1 if num_folds == 1 else total_partitions
     if groups is not None:
         unit, image_multilabel = "groups", multilabel
         multilabel = np.zeros((groups.max() + 1, multilabel.shape[1]), dtype=np.int8)
         np.maximum.at(multilabel, groups, image_multilabel)
-        # A class needs a group in every partition, and total_partitions leaves out the
-        # validation side of a single split.
-        needed = total_partitions + 1 if num_folds == 1 else total_partitions
     n_rows = len(multilabel)
     index = np.arange(n_rows)
 
@@ -672,6 +680,8 @@ def _split_od(  # noqa: C901
     else:
         tvs = TrainValSplit(index, np.array([], dtype=np.intp))
     _logger.debug("OD test split: train=%d, test=%d", len(tvs.train), len(tvs.val))
+    if groups is not None:
+        _validate_groups_left(len(tvs.train), n_rows, num_folds)
 
     # --- Train/Val split ---
     tv_ml = multilabel[tvs.train]
@@ -688,20 +698,30 @@ def _split_od(  # noqa: C901
             tv_splits = _make_splits(tvs.train, tv_labels, num_folds, None, False)
     _logger.debug("OD train/val: %d fold(s)", len(tv_splits))
 
-    if groups is None:
-        return tvs, tv_splits
-
-    # A whole group goes to one side, so a fold over too few groups of a class can leave a side
-    # with none at all, which the splitters return without complaint.
+    # A split over too few rows of a class can leave a side with none at all, which the splitters
+    # return without complaint: a whole group goes to one side, and a class left in one row of the
+    # train side clips that split to a single fold, all of it validation.
     sides = [("test", tvs.val)] if test_frac else []
     for i, s in enumerate(tv_splits):
-        sides += [(f"fold {i} train", s.train), (f"fold {i} val", s.val)]
+        sides += [(f"fold {i} train", tvs.train[s.train]), (f"fold {i} val", tvs.train[s.val])]
     if not all(len(part) for _, part in sides):
         sizes = ", ".join(f"{name} {len(part)}" for name, part in sides)
+        finer = ", or split on a finer grouping" if groups is not None else ""
         raise ValueError(
-            f"Splitting {n_rows} groups left a partition empty ({sizes} groups). Ask for fewer partitions or "
-            "less extreme fractions, or split on a finer grouping.",
+            f"Splitting {n_rows} {unit} left a partition empty ({sizes} {unit}). Ask for fewer partitions or "
+            f"less extreme fractions{finer}.",
         )
+    if stratify:
+        # Every class present passed the count above, so each could have reached every partition.
+        present = multilabel.any(axis=0)
+        lacking = [(name, np.flatnonzero(present & ~multilabel[part].any(axis=0))) for name, part in sides]
+        if gaps := ", ".join(f"{name} lacks class {', '.join(map(str, c))}" for name, c in lacking if len(c)):
+            _logger.warning(
+                "Unable to create a good split definition, not all classes are represented in each split: %s.", gaps
+            )
+
+    if groups is None:
+        return tvs, tv_splits
 
     def members(chosen: NDArray[np.intp], within: NDArray[np.intp]) -> NDArray[np.intp]:
         """Positions in ``within`` of the images whose group is in ``chosen``."""
@@ -713,7 +733,7 @@ def _split_od(  # noqa: C901
     return TrainValSplit(train, members(tvs.val, np.arange(len(groups)))), folds
 
 
-def _split_ic(
+def _split_ic(  # noqa: C901
     metadata: MetadataLike,
     labels: NDArray[np.intp],
     num_folds: int,
@@ -728,7 +748,9 @@ def _split_ic(
 
     _validate_labels(labels, total_partitions)
     if stratify:
-        _validate_stratifiable(labels, total_partitions)
+        # A class needs a row in train, validation and test, and total_partitions leaves out
+        # the validation side of a single split.
+        _validate_stratifiable(labels, total_partitions + 1 if num_folds == 1 else total_partitions)
 
     groups = _get_groups(metadata, split_on)
     if groups is not None:
@@ -741,6 +763,8 @@ def _split_ic(
     else:
         tvs = TrainValSplit(index, np.array([], dtype=np.intp))
     _logger.debug("IC test split: train=%d, test=%d", len(tvs.train), len(tvs.val))
+    if groups is not None:
+        _validate_groups_left(len(np.unique(groups[tvs.train])), len(np.unique(groups)), num_folds)
 
     # --- Train/Val split ---
     tv_labels = labels[tvs.train]
@@ -771,14 +795,15 @@ def _dense_item_positions(item_indices: NDArray[np.intp], n_images: int) -> NDAr
 
     The renumbering assumes every surviving item contributes at least one row, which is all
     the detection-level indices can say: an item whose every detection was filtered away is
-    indistinguishable from one that was dropped outright.
+    indistinguishable from one that was dropped outright. :func:`split_dataset` therefore
+    refuses to stratify a filtered metadata that keeps an item without detections.
     """
     if not len(item_indices) or item_indices.max() < n_images:
         return item_indices
     return np.unique(item_indices, return_inverse=True)[1].astype(np.intp)
 
 
-def split_dataset(
+def split_dataset(  # noqa: C901
     dataset: AnnotatedDataset[Any] | MetadataLike | Sequence[int] | NDArray[Any],
     num_folds: int = 1,
     stratify: bool = False,
@@ -851,11 +876,22 @@ def split_dataset(
         partitions; or if ``dataset`` is a metadata container
         other than :class:`~dataeval.Metadata` holding more labels than items, which has no row
         for an image without detections.
+    ValueError
+        If ``stratify`` is set and the rarest class is in fewer items than there are partitions,
+        counting train, validation and test, or if a detection split leaves a partition empty.
+    ValueError
+        If ``stratify`` is set on a filtered :class:`~dataeval.Metadata` of a detection dataset
+        that keeps an item without detections. Without ``stratify`` such a metadata splits.
+    ValueError
+        If ``split_on`` leaves fewer groups after the test split than the [train, val] folds
+        need: ``num_folds`` of them, or two for a single split.
 
     Notes
     -----
     When specifying groups and/or stratification, ratios for test and validation splits can vary
-    as the stratification and grouping take higher priority than the percentages
+    as the stratification and grouping take higher priority than the percentages. A stratified
+    detection split that leaves a class out of a partition logs a warning on the ``dataeval.data``
+    logger naming the partition and the class.
     """
     _logger.info(
         "split_dataset: num_folds=%d, stratify=%s, test_frac=%.2f, val_frac=%.2f",
@@ -907,6 +943,16 @@ def split_dataset(
     # images. Only split_on is rerouted, so the numbers of an ungrouped split do not move.
     grouped_detections = split_on is not None and isinstance(metadata, Metadata) and metadata.multi_target
     is_od = len(item_indices) > 0 and (len(class_labels) > n_images or grouped_detections)
+    # ponytail: fails closed; v1.3 numbers the matrix rows by the filtered metadata's own items (#1622).
+    # _dense_item_positions assumes every kept item has a detection, so the classes of a later item
+    # slide onto the row of one without, and only stratification reads them.
+    n_empty = n_images - len(np.unique(item_indices))
+    if stratify and is_od and n_empty and getattr(metadata, "is_filtered", False):
+        raise ValueError(
+            f"{n_empty} of the {n_images} items this filtered Metadata keeps hold no detections, and stratifying "
+            "it would credit them with other items' classes. Pass stratify=False, or filter so that every kept "
+            "item holds a detection.",
+        )
 
     n_classes = len(np.unique(class_labels))
     if is_od:
