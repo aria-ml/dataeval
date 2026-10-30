@@ -240,6 +240,7 @@ Welcome <self>
 :hidden:
 
 getting-started/quickstart
+New in v1.2 <getting-started/new-in-v1.2>
 getting-started/installation
 getting-started/where-to-go-next
 getting-started/which-tool

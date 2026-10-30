@@ -213,11 +213,11 @@ only in the [API reference](autoapi/dataeval/index.rst).
   - ✔
   - Frames
 * - {class}`.Outliers`
-  - Flags images, boxes and metadata values that lie far from the rest of the dataset, by statistics or by embedding
-    clusters
+  - Flags images, videos, boxes and metadata values that lie far from the rest of the dataset, by statistics or by
+    embedding clusters
   - ✔
   - ✔
-  - Frames
+  - ✔
 * - {class}`.Parity` ⚠️
   - Tests each factor, and each factor-level and class cell, for association with the class labels over independent
     images or videos
