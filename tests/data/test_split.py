@@ -1,5 +1,6 @@
 import logging
 import re
+import warnings
 from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any, cast
@@ -11,10 +12,12 @@ import pytest
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval import Metadata
+from dataeval.bias import Diversity
 from dataeval.data import DatasetSplits, TrainValSplit, split_dataset
 from dataeval.data._split import (
     _build_multilabel_matrix,
     _calculate_validation_fraction,
+    _get_groups,
     _item_groups,
     _IterativeStratifiedKFold,
     _multilabel_find_best_split,
@@ -25,6 +28,7 @@ from dataeval.data._split import (
     _validate_labels,
     _validate_stratifiable,
 )
+from dataeval.types import BinSpec
 
 
 @pytest.fixture(scope="module")
@@ -45,13 +49,14 @@ def groups(_base, RNG):
     return {"Discrete": values, "Binned": RNG.choice(_base, size=100).astype(np.intp)}
 
 
-def get_metadata(labels, groups=None) -> Metadata:
+def get_metadata(labels, groups=None) -> Any:
+    if groups is not None:
+        # A bare container, not a Metadata: it carries codes alone, which are what split_on groups it by.
+        codes = np.column_stack(tuple(groups.values()))
+        return SimpleNamespace(class_labels=labels, factor_names=list(groups), factor_data=codes, is_binned=[True] * 2)
     metadata = MagicMock(spec=Metadata)
     metadata.class_labels = labels
     metadata.multi_target = False  # classification, as a real Metadata would declare
-    if groups is not None:
-        metadata.factor_names = ["Discrete", "Binned"]
-        metadata.factor_data = np.column_stack(tuple(groups.values()))
     return metadata
 
 
@@ -679,23 +684,13 @@ class TestSplitOnForDetectionAndFrames:
         with pytest.raises(ValueError, match=re.escape("Got 2 groups and 3 total [train, val, test] partitions")):
             split_dataset(_videos([(0, 1)] * 2), split_on=["sequence"], test_frac=0.2, val_frac=0.2)
 
-    @pytest.mark.filterwarnings("ignore:`sequence` was binned automatically:UserWarning")
     @pytest.mark.filterwarnings("ignore:Declared encodings are finer:UserWarning")
-    def test_past_20_videos_groups_are_runs_of_videos_unless_levels_are_declared(self):
+    def test_declared_sequence_levels_still_give_one_group_per_video(self):
+        """The v1.2 workaround for #1624 is no longer needed, and still works."""
         n = 25
         frames = _videos([(0, 1)] * n)
-        video = np.asarray(frames.frame_map)[:, 0]
-
-        binned = _item_groups(Metadata(frames), ["sequence"], len(frames))
-        assert len(np.unique(binned)) < n
-        for v in range(n):  # a video is never split, binned or not
-            assert len(np.unique(binned[video == v])) == 1
-
         declared = Metadata(frames, factor_levels={"sequence": range(n)})
         assert len(np.unique(_item_groups(declared, ["sequence"], len(frames)))) == n
-        splits = split_dataset(declared, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
-        _assert_groups_disjoint(splits, video)
-        assert len(set(video[splits.test].tolist())) == round(0.2 * n)
 
     def test_stratified_grouped_split_keeps_each_class(self):
         """Sorted single-class videos, so unstratified blocks would miss a class.
@@ -901,3 +896,65 @@ class TestStratifiedDetectionSplitLogsAMissedClass:
             frames = _videos([(0, 1)] * 4 + [(0, 0)] * 4)
             split_dataset(frames, stratify=True, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
         assert _NOT_EVERY_CLASS not in caplog.text
+
+
+def _auto_binned(caught: list[warnings.WarningMessage]) -> list[str]:
+    return [str(w.message) for w in caught if "binned automatically" in str(w.message)]
+
+
+@pytest.mark.required
+class TestSplitOnGroupsByRawValues:
+    """Past 20 videos ``sequence`` is binned automatically, and split_on once grouped runs of videos (#1624)."""
+
+    @pytest.mark.parametrize("n", [20, 21, 25])
+    def test_every_video_is_its_own_group(self, n):
+        frames = _videos([(0, 1)] * n)
+        video = np.asarray(frames.frame_map)[:, 0]
+        assert len(np.unique(_item_groups(Metadata(frames), ["sequence"], len(frames)))) == n
+        # One fold per video but one, which runs of videos are too few groups to fill.
+        splits = split_dataset(frames, num_folds=n - 1, split_on=["sequence"])
+        _assert_groups_disjoint(splits, video)
+        assert sum(len(set(video[fold.val].tolist())) for fold in splits.folds) == n
+
+    @pytest.mark.parametrize("make", [lambda frames: frames, Metadata], ids=["frames", "metadata"])
+    def test_the_split_does_not_warn_about_bins_it_never_reads(self, make):
+        frames = _videos([(0, 1)] * 25)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            split_dataset(make(frames), split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        assert not _auto_binned(caught)
+
+    def test_the_bias_evaluators_still_read_sequence_binned(self):
+        """Only the split reads raw values: binning, and its warning, wait for the evaluator."""
+        n = 25
+        md = Metadata(_videos([(0, 1)] * n))
+        split_dataset(md, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        with pytest.warns(UserWarning, match="`sequence` was binned automatically"):
+            Diversity().evaluate(md)
+        assert isinstance(md.encoding("sequence"), BinSpec)
+        assert len(np.unique(md.factor_data[:, list(md.factor_names).index("sequence")])) < n
+
+    def test_a_classification_integer_factor_groups_by_its_values(self):
+        site = np.arange(300) % 30
+        md = Metadata.from_factors({"site": site}, class_labels=np.arange(300) % 2)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            groups = _get_groups(md, ["site"])
+        assert not _auto_binned(caught)
+        np.testing.assert_array_equal(groups, site)
+
+    def test_a_float_factor_keeps_its_bins(self):
+        altitude = np.random.default_rng(0).uniform(0, 100, 300)
+        md = Metadata.from_factors({"altitude": altitude}, class_labels=np.arange(300) % 2)
+        with pytest.warns(UserWarning, match="`altitude` was binned automatically"):
+            groups = _get_groups(md, ["altitude"])
+        assert groups is not None
+        np.testing.assert_array_equal(groups, np.unique(md.factor_data[:, 0], return_inverse=True)[1])
+        assert len(np.unique(groups)) < len(altitude)
+
+    def test_a_declared_cut_keeps_its_bins(self):
+        age = np.arange(300) % 90
+        md = Metadata.from_factors(
+            {"age": age}, class_labels=np.arange(300) % 2, continuous_factor_bins={"age": [30, 60]}
+        )
+        np.testing.assert_array_equal(_get_groups(md, ["age"]), np.digitize(age, [30, 60]))

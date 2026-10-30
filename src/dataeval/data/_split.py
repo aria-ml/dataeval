@@ -5,9 +5,10 @@ __all__ = []
 import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import numpy as np
+import polars as pl
 from numpy.typing import NDArray
 from sklearn.model_selection import GroupKFold, KFold, StratifiedGroupKFold, StratifiedKFold
 from sklearn.utils.multiclass import type_of_target
@@ -15,9 +16,12 @@ from sklearn.utils.multiclass import type_of_target
 from dataeval._helpers import is_metadata_like
 from dataeval._log import get_logger
 from dataeval.protocols import AnnotatedDataset, MetadataLike
-from dataeval.types import ClassAxis
+from dataeval.types import BinSpec, ClassAxis, FactorLevel
 from dataeval.utils._internal import EPSILON
 from dataeval.utils.data import validate_dataset
+
+if TYPE_CHECKING:
+    from dataeval import Metadata
 
 _logger = get_logger(__name__)
 
@@ -387,6 +391,58 @@ def _validate_groups_left(left: int, total: int, num_folds: int) -> None:
         )
 
 
+def _keeps_bins(metadata: "Metadata", name: str) -> bool:
+    """Whether ``split_on`` groups ``name`` by its codes rather than by its values as recorded.
+
+    A float is a measurement, which takes a new value at nearly every item, so its values would
+    make every item a group of its own; a declared cut is the caller saying which values belong
+    together. Every other factor is grouped by its values: its codes are those values one to
+    one, or bins :class:`~dataeval.Metadata` chose for scoring, which would merge whole groups.
+    """
+    spec = metadata._encoding.get(name)
+    declared = name in metadata.continuous_factor_bins or (isinstance(spec, BinSpec) and spec.provenance != "derived")
+    return declared or metadata._store.dtype_of(name).is_float()
+
+
+def _group_ids(metadata: MetadataLike, names: Sequence[str]) -> NDArray[np.intp]:
+    """Return one dense group id per row of the metadata's view, over the named factors.
+
+    A :class:`~dataeval.Metadata` is read without binning, unless a factor keeps its bins
+    (see :func:`_keeps_bins`): binning every factor to group on raw values would warn about
+    bins the split never reads. A bare container carries codes alone, so they are what it groups by.
+    """
+    from dataeval import Metadata
+
+    factors = list(metadata.factor_names)
+    if not isinstance(metadata, Metadata):
+        keys = metadata.factor_data[:, [factors.index(name) for name in names]]
+    else:
+        columns = [
+            pl.Series(name, metadata.factor_data[:, factors.index(name)])
+            if _keeps_bins(metadata, name)
+            else metadata._store.column(metadata.view, name)
+            for name in names
+        ]
+        # A dense rank numbers any sortable dtype in the order of its codes, and the missing rows
+        # share a rank above every value, as they share the missing code.
+        keys = pl.DataFrame(columns).select(pl.all().rank("dense").fill_null(pl.len() + 1)).to_numpy()
+    return np.unique(keys, axis=0, return_inverse=True)[1].reshape(-1).astype(np.intp)
+
+
+def _unbinned_at(metadata: "Metadata", level: FactorLevel) -> "Metadata":
+    """Return ``metadata.at(level)`` without the binning it runs on the source first.
+
+    The view is built the way :meth:`~dataeval.Metadata.at` builds it, as ``factor_levels`` in
+    ``dataeval.quality._factor_stats`` does, so a split grouping on raw values does not warn
+    about bins it never reads.
+    """
+    metadata._structure()
+    view = metadata._derived_copy()
+    view._view, view._is_binned = level, False
+    view._build_factors()
+    return view
+
+
 def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArray[np.intp] | None:
     """
     Return individual group numbers based on a subset of metadata defined by groupnames.
@@ -401,7 +457,9 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
     Returns
     -------
     np.ndarray
-        group identifiers from metadata
+        group identifiers from metadata, one group per distinct combination of the named
+        factors' values as recorded; a float factor or one with a declared cut is grouped by
+        its bins instead (see :func:`_keeps_bins`)
 
     Raises
     ------
@@ -428,9 +486,7 @@ def _get_groups(metadata: MetadataLike, split_on: Sequence[str] | None) -> NDArr
             f"metadata's factors {names}.{detail} Grouping by the rest would return folds that do not "
             "honor the request, so it is refused. Name only factors the metadata carries.",
         )
-    indices = [i for i, name in enumerate(names) if name in split_set]
-    binned_features = metadata.factor_data[:, indices]
-    return np.unique(binned_features, axis=0, return_inverse=True)[1]
+    return _group_ids(metadata, [name for name in names if name in split_set])
 
 
 def _item_groups(metadata: MetadataLike, split_on: Sequence[str], n_items: int) -> NDArray[np.intp]:
@@ -439,7 +495,8 @@ def _item_groups(metadata: MetadataLike, split_on: Sequence[str], n_items: int) 
     :func:`_get_groups` reads the label-level rows, which a detection dataset has one of per
     detection and none of for an item without detections. The ids are read off the item-level
     rows instead, so every item is placed, once no ``split_on`` factor is found to differ
-    between the rows of one item: such an item could not be kept in one group.
+    between the rows of one item: such an item could not be kept in one group. Both reads take
+    the values :func:`_group_ids` groups by, so neither bins a factor grouped by its values.
 
     Raises
     ------
@@ -455,16 +512,16 @@ def _item_groups(metadata: MetadataLike, split_on: Sequence[str], n_items: int) 
             "metadata container has no row for an item without detections, so it cannot place one. "
             "Pass the dataset, or a Metadata built from it.",
         )
-    names, rows, codes = list(metadata.factor_names), metadata.item_indices, metadata.factor_data
+    names, rows = list(metadata.factor_names), metadata.item_indices
     n_items_with_rows = len(np.unique(rows))
     for name in (name for name in split_on if name in names):
         # More distinct (item, value) pairs than items means some item holds two values.
-        if len(np.unique(np.column_stack([rows, codes[:, names.index(name)]]), axis=0)) > n_items_with_rows:
+        if len(np.unique(np.column_stack([rows, _group_ids(metadata, [name])]), axis=0)) > n_items_with_rows:
             raise ValueError(
                 f"`split_on` factor {name!r} varies within one item, so the item cannot be kept in one group. "
                 "Group on factors recorded per item or above, such as `sequence` on a frame view.",
             )
-    items = metadata.at(metadata.item_level)
+    items = _unbinned_at(metadata, metadata.item_level)
     groups = np.empty(n_items, dtype=np.intp)
     groups[_dense_item_positions(items.item_indices, n_items)] = cast(NDArray[np.intp], _get_groups(items, split_on))
     return groups
@@ -840,18 +897,26 @@ def split_dataset(  # noqa: C901
         validation set. Split_on groups should be selected to mitigate validation bias.
         Requires factor metadata; not supported when ``dataset`` is a raw label array.
 
+        A group is one combination of the named factors' values as recorded, not of the bins
+        :class:`~dataeval.Metadata` cuts for scoring, so ``split_on=["sequence"]`` gives one
+        group per video however many videos there are. Two kinds of factor keep their bins: one
+        holding floats, a measurement whose every value would be a group of its own, and one
+        whose cut was declared with ``continuous_factor_bins`` or a recorded encoding. A
+        metadata container other than :class:`~dataeval.Metadata` is grouped by its
+        ``factor_data`` codes.
+
         On a detection dataset, a :class:`~dataeval.data.SequenceFrames` view among them, or a
         :class:`~dataeval.Metadata` built from one, each group is split as one unit, however few
         detections the dataset holds. ``test_frac`` and ``val_frac`` then count groups rather
         than images: over five videos, ``test_frac=0.2`` aims at one whole video, however many
-        frames it has. An image without detections stays with its group. A ``sequence`` factor
-        with more than 20 distinct values is binned automatically, so a group is then a run of
-        consecutive videos (a video is still never split); for one group per video, pass
-        ``Metadata(frames, factor_levels={"sequence": range(n_videos)})``.
+        frames it has. An image without detections stays with its group.
 
         .. versionchanged:: 1.2
             Honored on detection datasets. v1.1 logged a warning, ignored ``split_on`` and
-            split by image, so one group could land in several partitions.
+            split by image, so one group could land in several partitions. Groups are the
+            factors' recorded values: v1.1 grouped an integer factor with more distinct values
+            than :class:`~dataeval.Metadata` scores one at a time by its automatic bins, which
+            merged whole groups.
     test_frac : float, default 0.0
         Fraction of data to be optionally held out for test set
     val_frac : float, default 0.0
