@@ -125,11 +125,11 @@ frame.
 ### Metadata across levels
 
 - **Aggregation.** `Metadata.aggregate` rolls factors from a finer level to a coarser one,
-  including temporal reductions (variance, trend, and run length), and statistics
-  producers declare how their own factors roll up, so frame statistics reach track and
-  sequence level without hand-written reductions.
+  including temporal reductions (variance, trend, and run length). A statistics output
+  can declare how its factors roll up, which `Metadata.add_factors` applies; `ego_stats`
+  does, so its frame readings reach sequence level without a hand-written reduction.
 - **Corrections and repair.** `Metadata` accepts mixed inputs and applies declared
-  corrections; `Metadata.repair` returns a corrected copy, `Metadata.unusable_rows` names
+  corrections; `Metadata.repair` declares how a column is read, `Metadata.unusable_rows` names
   the items and rows behind a factor that could not be used, and `Metadata.add_factors`
   reports where new values disagree with existing ones.
 - **Metadata as an analysis input.** `Metadata.classed_by` makes any factor the class axis
@@ -228,8 +228,8 @@ frame.
 
 ### Experimental in v1.2
 
-These names warn with an `ExperimentalWarning`, and they may change or be removed without
-a deprecation cycle:
+These names are experimental and may change or be removed without a deprecation cycle.
+Each warns with an `ExperimentalWarning`, except the `SharpnessMeasure` protocol:
 
 - `Parity` and `dataeval.core.parity` (experimental since v1.1).
 - `dataeval.core.uap` (experimental since v1.1).
@@ -283,9 +283,9 @@ mind, not as promises of a fix:
   problem. Compare one row per video instead, such as an embedding of each video.
 - **Roll-ups restored from a file.** A `Metadata` loaded from a file and bound to new data
   with `new()` drops the roll-ups it carried when a new factor arrives without its own
-  declarations, such as a hand-built dict. The outputs of DataEval's statistics functions
-  carry their declarations, so they roll up as usual; otherwise apply the roll-up with
-  `aggregate`.
+  declarations, such as a hand-built dict or the output of `image_stats`. An output that
+  declares its roll-ups, such as that of `ego_stats`, rolls up as usual; otherwise apply
+  the roll-up with `aggregate`.
 
 ### Moved out of v1.2
 

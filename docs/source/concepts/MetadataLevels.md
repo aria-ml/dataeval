@@ -987,8 +987,8 @@ The roll-ups a statistics output declared are saved too. A loaded metadata bound
 to a different dataset with {meth}`.Metadata.new` drops them, though, when a new
 factor arrives without declarations of its own, such as a hand-built dict,
 rather than keeping them until the factor they read lands. Add the factor from an
-output that declares its roll-up, as DataEval's statistics functions do, or
-apply the roll-up with {meth}`.Metadata.aggregate`.
+output that declares its roll-up, such as that of {func}`.ego_stats`, or apply
+the roll-up with {meth}`.Metadata.aggregate`.
 
 ```{warning}
 This is a cache, not an interchange format. The file holds DataEval's internal
