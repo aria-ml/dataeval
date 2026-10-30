@@ -611,6 +611,17 @@ statistical power and may miss real shift. The operational significance of a
 drift detection always requires judgment about the magnitude and nature of the
 shift, not just the p-value.
 
+The tests read each row as an independent sample. Frames of one video share a
+scene and a camera, so a few videos presented frame by frame look like many
+samples, and a test reports a shift as more certain than the data supports.
+Thinning the frames with a selector lowers the cost but does not make the kept
+frames independent, and clips cut from one long video with
+{class}`.VideoSegments` are not independent videos either. Compare one row per
+video instead: a drift detector takes the tracking dataset as it is, one item
+for each video, with an extractor that reads a video such as
+{class}`.VideoTorchExtractor`. Videos from one flight or collection can still
+depend on each other.
+
 Univariate tests are independent per feature and cannot detect shift that
 manifests only in feature correlations. Multivariate tests address this but at
 higher computational cost and with reduced interpretability.
