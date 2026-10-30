@@ -6,7 +6,7 @@ catch by eye:
 
 * Headings: one H1 and no skipped levels, sentence case, no numbering, no bold, em dash or trailing colon, and
   the fixed template strings.
-* Titles: ``How to <verb> ...`` for a how-to and an imperative phrase for a tutorial.
+* Titles: an imperative phrase for tutorials and how-tos.
 * Tutorials: the opening and three metadata lines, and the template sections in order.
 * How-tos: no boilerplate or teaching headings, at most five steps and a lead of at most 120 words.
 * Next steps: the entry form, the counts the guide allows and a link text that is the title of its target.
@@ -202,7 +202,9 @@ def _title_cased(heading: str) -> bool:
     words = re.findall(r"[A-Za-z][A-Za-z'\-]*", re.sub(r"`[^`]*`", "", heading))
     if len(words) < 3:
         return False
-    rest = [w for w in words[1:] if w.lower() not in SMALL_WORDS and not w.isupper()]
+    rest = [
+        w for w in words[1:] if w.lower() not in SMALL_WORDS and not w.isupper() and not re.search(r"[a-z][A-Z]", w)
+    ]
     return bool(rest) and sum(w[0].isupper() for w in rest) / len(rest) >= 0.6
 
 
@@ -271,10 +273,8 @@ def heading_problems(nb: Notebook) -> list[str]:
         if nb.kind == "tutorial" and canonical and canonical != text:
             problems.append(f"template heading is spelled '{canonical}', not '{text}'")
     title = nb.h1 or ""
-    if nb.kind == "how-to" and not title.startswith("How to "):
-        problems.append(f"a how-to title starts with 'How to ': {title}")
-    if nb.kind == "tutorial" and GERUND_TITLE.match(title):
-        problems.append(f"a tutorial title is an imperative phrase, not a gerund: {title}")
+    if GERUND_TITLE.match(title):
+        problems.append(f"a {nb.kind} title is an imperative phrase, not a gerund: {title}")
     return problems
 
 
@@ -478,6 +478,11 @@ def test_the_checks_are_wired_up():
     assert _title_cased("Marginal Class Probability Shift")
     assert not _title_cased("Marginal class probability shift")
     assert not _title_cased("Compute the `MMD` statistic")
+    assert not _title_cased("Build a MetadataLike object from a DataFrame")
+    assert not _title_cased("Respond to a StatsInvalidatedWarning")
+    assert _title_cased("Build a MetadataLike Object From a DataFrame")
+    for name in ("h2_example.py", "tt_example.py"):
+        assert heading_problems(parse(name, "# %% [markdown]\n# # Measure things\n")) == []
     assert NUMBERED.match("Question 1: the vehicle type")
     assert NUMBERED.match("Step 3 Choose the level")
     assert not NUMBERED.match("Choose your level with `at()`")
@@ -490,12 +495,12 @@ def test_the_checks_are_wired_up():
     entries += "# - [E](../concepts/E.md) — Concept.\n# - [F](../concepts/F.md) Missing the dash\n"
     bad_howto = parse(
         "h2_example.py",
-        f"# %% [markdown]\n# # Measure things\n#\n# {' '.join(['word'] * 130)}\n#\n# ## When to use\n#\n# ## Summary\n"
+        f"# %% [markdown]\n# # Measuring data\n#\n# {' '.join(['word'] * 130)}\n#\n# ## When to use\n#\n# ## Summary\n"
         f"{steps}\n# %% [markdown]\n# ## Next steps\n#\n{entries}",
     )
     found = heading_problems(bad_howto) + howto_problems(bad_howto) + next_steps_problems(bad_howto)
     for expected in (
-        "a how-to title starts with 'How to '",
+        "a how-to title is an imperative phrase, not a gerund",
         "not sentence case: Run Every Step 0",
         "boilerplate heading, the lead replaces it: When to use",
         "tutorial section in a how-to: Summary",
@@ -532,7 +537,7 @@ def test_the_checks_are_wired_up():
     assert expected_title(f"./{real.name}") == real.h1
     assert expected_title(f"./{real.name}#{_slug(section)}") == section, "an anchor names its heading"
     assert expected_title(f"./{real.name}#no-such-heading") == real.h1, "an unknown anchor falls back to the page title"
-    link = "# %% [markdown]\n# # How to link\n\n# %% [markdown]\n# ## Next steps\n#\n# - [{text}](./{name}) — Entry.\n"
+    link = "# %% [markdown]\n# # Link pages\n\n# %% [markdown]\n# ## Next steps\n#\n# - [{text}](./{name}) — Entry.\n"
     wrong = parse("h2_link.py", link.format(text="Wrong text", name=real.name))
     assert f"link text 'Wrong text' is not the title '{real.h1}' of ./{real.name}" in next_steps_problems(wrong)
     right = parse("h2_link.py", link.format(text=real.h1, name=real.name))
@@ -544,7 +549,7 @@ def test_the_voice_checks_are_wired_up():
     """Guard against a voice rule silently matching nothing, and against flagging what is not prose."""
     bad = parse(
         "h2_voice.py",
-        "# %% [markdown]\n# # How to sound right\n#\n"
+        "# %% [markdown]\n# # Sound right\n#\n"
         "# We don't write this way — it is *loud* and _also loud_, so simply stop. A corpus is not a dataset.\n"
         "# - **Label:** a bold list label\n"
         "#\n# | **Row label** | Used With Python |\n# | --- | --- |\n# | a | b |\n",
@@ -566,7 +571,7 @@ def test_the_voice_checks_are_wired_up():
 
     good = parse(
         "h2_voice.py",
-        "# %% [markdown]\n# # How to sound right\n#\n"
+        "# %% [markdown]\n# # Sound right\n#\n"
         "# The dataset's page has `don't`, {class}`.Coverage` and [a link](./a_b_c.py) to read.\n"
         "# A **codebook** is a term that the page defines, and 2 * 3 * 4 is a product. Read https://example.com/a_b_c.\n"
         "#\n# ```text\n# We don't — *loud*\n# ```\n"
@@ -582,7 +587,7 @@ def test_the_width_check_is_wired_up():
     words = " ".join(["word"] * 30)
     url_line = f"word https://example.com/{'a' * 110}"
     text = (
-        "# %% [markdown]\n# # How to wrap\n#\n"
+        "# %% [markdown]\n# # Wrap lines\n#\n"
         f"# {'x' * 118}\n"  # 120 columns with the '# ' is allowed
         f"# {words}\n"
         f"# | {words} | y |\n"

@@ -140,7 +140,7 @@ lines and the order of the sections.
 
 | Section | Level | Required | Content |
 | ------- | ----- | -------- | ------- |
-| Title | H1 | yes | `How to <verb> ...` |
+| Title | H1 | yes | An imperative verb phrase, for example `Create embeddings` |
 | Lead | | yes | No heading. At most 120 words in up to three short blocks: the problem and the tool that solves it, with a link to its concept page; when to use it, as a sentence or a short list; and any requirement beyond `pip install dataeval` |
 | Working sections | H2 | yes | One per step, named for the action, for example `Create embeddings with PyTorch` |
 | `Next steps` | H2 | yes | See the Next steps section |
@@ -179,7 +179,7 @@ titles, the sidebar titles and captions of a toctree, and card titles.
 | Rule | Statement | Example |
 | ---- | --------- | ------- |
 | Sentence case | Capitalize the first word and proper names only | `Marginal class probability shift`, not `Marginal Class Probability Shift` |
-| Titles | A how-to is `How to <verb> ...`. A tutorial is an imperative verb phrase. No `Introduction to`, no gerund, no colon subtitle | `Clean a dataset`, not `Introduction to data cleaning` |
+| Titles | Tutorials and how-tos use an imperative verb phrase. Omit the `How to` prefix. No `Introduction to`, no gerund, no colon subtitle | `Clean a dataset`, not `Introduction to data cleaning` |
 | No numbering | No `Step 3:` and no `3.`. Position carries the order, and numbers go stale when steps move | `` Choose your level with `at()` ``, not `` Step 3: Choose your level with `at()` `` |
 | Plain text | No bold, no em dash and no trailing colon. Use backticks only around an identifier | `Quick decision table`, not `**Quick decision table:**` |
 | One H1, no skips | A notebook has one H1, and heading levels never skip | |
@@ -288,7 +288,7 @@ In a how-to, the visible sections show the task and the assertion cells hold the
 ## Create embeddings the standard way
 
 Every notebook, page and docstring example that creates embeddings follows one recipe.
-[How to create embeddings](source/notebooks/h2_create_embeddings.py) runs it with PyTorch, ONNX and the extractors that
+[Create embeddings](source/notebooks/h2_create_embeddings.py) runs it with PyTorch, ONNX and the extractors that
 need no model.
 
 ```python
