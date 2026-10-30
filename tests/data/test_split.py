@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Sequence
 from types import SimpleNamespace
@@ -5,6 +6,7 @@ from typing import Any, cast
 from unittest.mock import MagicMock
 
 import numpy as np
+import polars as pl
 import pytest
 from numpy.typing import ArrayLike, NDArray
 
@@ -770,3 +772,132 @@ class TestSplitOnForDetectionAndFrames:
 
         monkeypatch.setattr("dataeval.data._split._split_od", detection_path)
         _assert_groups_disjoint(split_dataset(md, split_on=["site"], test_frac=0.2, val_frac=0.2), site)
+
+
+def _rare_class_frames(n_frames: int, n_rare: int):
+    """One video of ``n_frames`` frames holding class 0, the first ``n_rare`` of them class 1 as well."""
+    return _videos([], extra=[[[(0, 1)] + [(1, 2)] * (f < n_rare) for f in range(n_frames)]])
+
+
+@pytest.mark.required
+class TestStratifiedSplitCountsEveryPartition:
+    """Train, validation and test are three partitions; v1.1 counted two and could return an empty train (#1621)."""
+
+    @pytest.mark.parametrize("n_frames", [4, 24, 100])
+    def test_a_class_in_fewer_frames_than_partitions_raises(self, n_frames):
+        """One class in 2 of 100 frames once gave train 0, validation 50, test 50."""
+        message = "the rarest class has only 2 images, fewer than the 3 partitions requested"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(_rare_class_frames(n_frames, 2), stratify=True, test_frac=0.2, val_frac=0.2)
+
+    @pytest.mark.parametrize("n_labels", [4, 24, 100])
+    def test_a_class_in_fewer_labels_than_partitions_raises(self, n_labels):
+        """The classification path once passed the count and failed inside scikit-learn on ``n_splits=1``."""
+        labels = (np.arange(n_labels) < 2).astype(np.intp)
+        message = "The lowest label count (2) is fewer than the total number of partitions (3) requested"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(labels, stratify=True, test_frac=0.2, val_frac=0.2)
+
+    def test_a_detection_split_that_empties_a_partition_raises(self):
+        """Class 1 in 3 of 100 frames passes the count, but holding out half leaves its train side one frame of it."""
+        message = "Splitting 100 images left a partition empty (test 50, fold 0 train 0, fold 0 val 50 images)"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(_rare_class_frames(100, 3), stratify=True, test_frac=0.5, val_frac=0.2)
+
+    def test_a_class_in_as_many_frames_as_partitions_reaches_each(self):
+        splits = split_dataset(_rare_class_frames(100, 3), stratify=True, test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            assert all(np.isin(np.arange(3), p).any() for p in parts), "a partition lacks the rare class"
+
+    def test_a_class_in_as_many_labels_as_partitions_reaches_each(self):
+        labels = (np.arange(30) < 3).astype(np.intp)
+        splits = split_dataset(labels, stratify=True, test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            assert all(labels[p].any() for p in parts), "a partition lacks the rare class"
+
+
+def _filtered_frames(empty_frame: int | None):
+    """Five single-class videos, frames 0-2 filtered away so the kept frames' item indices are sparse."""
+    frames = _videos([(0, 0), (1, 1), (0, 0), (1, 1), (0, 0)], empty_frame=empty_frame)
+    return Metadata(frames).where(pl.col("frame") >= 3, level="unit")
+
+
+@pytest.mark.required
+class TestStratifyRefusesAFilteredMetadataWithEmptyItems:
+    """Stratifying it credited items with other items' classes, so single-class videos read as holding both (#1622)."""
+
+    @pytest.mark.parametrize("split_on", [None, ["sequence"]])
+    def test_stratify_raises(self, split_on):
+        message = "5 of the 85 items this filtered Metadata keeps hold no detections"
+        with pytest.raises(ValueError, match=re.escape(message) + ".*stratify=False"):
+            split_dataset(_filtered_frames(5), stratify=True, split_on=split_on, test_frac=0.2, val_frac=0.2)
+
+    @pytest.mark.parametrize("split_on", [None, ["sequence"]])
+    def test_without_stratify_every_item_is_placed_once(self, split_on):
+        splits = split_dataset(_filtered_frames(5), split_on=split_on, test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            np.testing.assert_array_equal(np.sort(np.concatenate(parts)), np.arange(85))
+
+    def test_a_filtered_metadata_whose_items_all_hold_detections_still_stratifies(self):
+        splits = split_dataset(_filtered_frames(None), stratify=True, test_frac=0.2, val_frac=0.2)
+        for parts in _partitions(splits):
+            np.testing.assert_array_equal(np.sort(np.concatenate(parts)), np.arange(85))
+
+
+@pytest.mark.required
+class TestGroupedSplitErrorsNameGroups:
+    """Too few groups left after the test split once surfaced scikit-learn's "samples" or ``n_splits=1`` (#1623)."""
+
+    @pytest.mark.parametrize("stratify", [False, True])
+    def test_a_detection_split_with_fewer_groups_than_folds_raises(self, stratify):
+        message = "The test split leaves 4 of the 8 groups for 5 [train, val] fold(s), which need at least 5"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(_videos([(0, 1)] * 8), num_folds=5, stratify=stratify, split_on=["sequence"], test_frac=0.5)
+
+    @pytest.mark.parametrize("stratify", [False, True])
+    def test_a_single_detection_split_with_one_group_left_raises(self, stratify):
+        message = "The test split leaves 1 of the 3 groups for 1 [train, val] fold(s), which need at least 2"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(_videos([(0, 1)] * 3), stratify=stratify, split_on=["sequence"], test_frac=0.5, val_frac=0.2)
+
+    @pytest.mark.parametrize(("num_folds", "n_groups", "left", "need"), [(5, 8, 4, 5), (1, 3, 1, 2)])
+    def test_a_classification_split_with_too_few_groups_left_raises(self, num_folds, n_groups, left, need):
+        site = np.arange(12 * n_groups) % n_groups
+        md = Metadata.from_factors({"site": site.astype(str)}, class_labels=np.arange(len(site)) % 2)
+        message = f"The test split leaves {left} of the {n_groups} groups for {num_folds} [train, val] fold(s), "
+        message += f"which need at least {need}"
+        with pytest.raises(ValueError, match=re.escape(message)):
+            split_dataset(md, num_folds=num_folds, split_on=["site"], test_frac=0.5, val_frac=0.2 * (num_folds == 1))
+
+    def test_enough_groups_left_still_splits(self):
+        frames = _videos([(0, 1)] * 8)
+        splits = split_dataset(frames, num_folds=3, split_on=["sequence"], test_frac=0.25)
+        assert len(splits.folds) == 3
+        _assert_groups_disjoint(splits, np.asarray(frames.frame_map)[:, 0])
+
+
+_NOT_EVERY_CLASS = "Unable to create a good split definition, not all classes are represented in each split"
+
+
+@pytest.mark.required
+class TestStratifiedDetectionSplitLogsAMissedClass:
+    """The classification path logged a class missing from a split; neither detection path said anything (#1623)."""
+
+    def test_an_ungrouped_split_logs_the_partition_and_class(self, caplog):
+        """Class 1 in 4 frames reaches every partition, but the test split takes 2 and leaves 3 folds 2."""
+        with caplog.at_level(logging.WARNING, logger="dataeval"):
+            split_dataset(_rare_class_frames(100, 4), num_folds=3, stratify=True, test_frac=0.5)
+        assert f"{_NOT_EVERY_CLASS}: fold 2 val lacks class 1." in caplog.text
+
+    def test_a_grouped_split_logs_the_partition_and_class(self, caplog):
+        frames = _videos([(0, 1)] * 3 + [(0, 0)] * 5)
+        with caplog.at_level(logging.WARNING, logger="dataeval"):
+            split_dataset(frames, num_folds=2, stratify=True, split_on=["sequence"], test_frac=0.5)
+        assert f"{_NOT_EVERY_CLASS}: fold 0 train lacks class 1, fold 1 val lacks class 1." in caplog.text
+
+    def test_a_split_that_keeps_every_class_logs_nothing(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="dataeval"):
+            split_dataset(_rare_class_frames(100, 3), stratify=True, test_frac=0.2, val_frac=0.2)
+            frames = _videos([(0, 1)] * 4 + [(0, 0)] * 4)
+            split_dataset(frames, stratify=True, split_on=["sequence"], test_frac=0.2, val_frac=0.2)
+        assert _NOT_EVERY_CLASS not in caplog.text
