@@ -51,7 +51,7 @@ jobs:
           body: ${{ steps.changelog.outputs.NOTES }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          files: dist/*
+          files: dist/dataeval-*  # the wheel and sdist, not the .gitignore uv writes into dist/
           generate_release_notes: true  # Adds auto-generated release notes
 
       - name: Publish to PyPI
