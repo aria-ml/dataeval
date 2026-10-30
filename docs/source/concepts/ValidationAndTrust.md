@@ -311,16 +311,17 @@ bear on trusting a result:
     choose, though the mutual information above the line still shifts with the
     binning. See [Binning](Binning.md#binning-reaches-the-three-outputs-differently).
 - - {func}`.split_dataset` with `split_on`
-  - Required
-  - Groups are formed from binned factor values, so grouping granularity is the
-    binning's. A factor the automatic path reduced to two bins gives you two
-    groups, silently weakening the split constraint you asked for.
+  - Floats and declared cuts only
+  - Groups are formed from recorded factor values, except for a float factor or
+    one with a declared cut, whose grouping granularity is the binning's. A float
+    factor the automatic path reduced to two bins gives you two groups, silently
+    weakening the split constraint you asked for.
 - - Anything reading `Metadata.factor_data`
   - Applied
   - `factor_data` is the binned, integer-valued view and is what the bias
-    evaluators and grouping code consume. `Metadata.rows_at(md.view)` carries
-    the unbinned values, and `Metadata.factor_info` reports per factor whether it
-    was binned or digitized.
+    evaluators and the grouping of a float factor consume.
+    `Metadata.rows_at(md.view)` carries the unbinned values, and
+    `Metadata.factor_info` reports per factor whether it was binned or digitized.
 - - {func}`.factor_deviation`, {func}`.factor_predictors`
   - Not applied
   - These take plain mappings of factor name to raw array, so they are

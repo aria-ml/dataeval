@@ -266,9 +266,8 @@ mind, not as promises of a fix:
 - **Grouped splits count groups.** On detection and frame datasets,
   `split_dataset(split_on=)` keeps each group of the named factor in one partition, so the
   split fractions count groups, not images or frames, and a few groups give uneven
-  fractions. Splitting a frame view of more than 20 videos on `sequence` groups runs of
-  consecutive videos (a video is still never split) unless `Metadata` is given
-  `factor_levels={"sequence": range(n)}`.
+  fractions. A group is one video however many videos a frame view holds, since the
+  split reads the recorded `sequence` values rather than the bins the bias evaluators read.
 
 ### Moved out of v1.2
 

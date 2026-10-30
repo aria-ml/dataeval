@@ -300,9 +300,13 @@ reasons: most of them mathematically, one as a consequence of what it is handed.
     cells reported as `too_thin` in {attr}`.ParityOutput.cells`, at the cost of
     resolution.
 - - {func}`.split_dataset` with `split_on`
-  - Required
-  - Grouping needs discrete group identities. On object detection datasets each
-    group is split as one unit, so the split fractions count groups, not images.
+  - Floats and declared cuts only
+  - Grouping needs discrete group identities, and a factor's recorded values are
+    already that, so a video or a site is one group however many there are. A
+    float factor, whose every value would be a group of its own, and a factor
+    with a declared cut are grouped by their bins. On object detection datasets
+    each group is split as one unit, so the split fractions count groups, not
+    images.
 - - {class}`.Balance`
   - Required in practice
   - It reads `factor_data`, which is bin and category indices throughout, so the
