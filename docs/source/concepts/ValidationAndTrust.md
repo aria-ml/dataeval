@@ -1223,7 +1223,7 @@ As of v{{ release }}:
 Experimental ⚠️ (API may change or be removed):
 
 - {func}`.parity`, {class}`.Parity`, {func}`.uap`, {class}`.Feasibility`,
-  `ParityOutput` and `FeasibilityOutput` raise
+  {class}`.DriftKnownDomains`, `ParityOutput` and `FeasibilityOutput` raise
   {class}`~dataeval.exceptions.ExperimentalWarning` on first call or
   instantiation.
 - {func}`.video_stats` with any `VideoStats.PERSISTENCE` flag

@@ -175,7 +175,12 @@ frame.
   reading that optical flow cannot make reliably. A mask (`mask=` on `ego_stats` and
   `CameraTravel`, `ego_mask=` on `video_stats`) excludes a burned-in overlay.
 - **Tracks and embeddings.** `track_stats` runs directly on a tracking dataset, and
-  `VideoTorchExtractor` embeds clips.
+  `VideoTorchExtractor` embeds a video given as an array or as a MAITE video stream, so
+  `Embeddings` over a tracking dataset gives one embedding per video.
+- **Videos without annotations.** `SequenceFrames`, `Duplicates`, `Outliers`, and
+  `SourceLocator` also take a dataset of videos that carries no tracking targets or no
+  metadata, and measure it as video with no detections. `ImageDataset` and `VideoDataset`
+  in `dataeval.protocols` name the inputs the evaluators accept.
 - **Up-front validation.** `validate_dataset` rejects a MOT dataset whose per-frame
   detection arrays disagree, before any frame is decoded.
 
@@ -234,7 +239,8 @@ a deprecation cycle:
 - `DriftKnownDomains`.
 - `Relabel.fold_scores`.
 - `VideoStats.PERSISTENCE`: per-video maps of what is fixed to the camera, such as a
-  burned-in overlay, and of local blur.
+  burned-in overlay, and of local blur, and the `SharpnessMeasure` protocol that a custom
+  blur measure follows.
 
 ### Known limits at release
 
@@ -268,6 +274,18 @@ mind, not as promises of a fix:
   split fractions count groups, not images or frames, and a few groups give uneven
   fractions. A group is one video however many videos a frame view holds, since the
   split reads the recorded `sequence` values rather than the bins the bias evaluators read.
+- **Stratifying filtered detection metadata.** `split_dataset(stratify=True)` refuses a
+  filtered detection `Metadata` that keeps items without detections, because the class
+  rows of such a metadata would land on the wrong items. Split it with `stratify=False`.
+- **Drift tests over frames.** The drift detectors read each row as an independent sample,
+  so a few videos presented frame by frame look like many samples, and a shift reads as
+  more certain than the data supports. Clips cut from one long video have the same
+  problem. Compare one row per video instead, such as an embedding of each video.
+- **Roll-ups restored from a file.** A `Metadata` loaded from a file and bound to new data
+  with `new()` drops the roll-ups it carried when a new factor arrives without its own
+  declarations, such as a hand-built dict. The outputs of DataEval's statistics functions
+  carry their declarations, so they roll up as usual; otherwise apply the roll-up with
+  `aggregate`.
 
 ### Moved out of v1.2
 
@@ -367,8 +385,9 @@ proves out on the planted-defect evaluation corpus, and some will land after v1.
   `dataeval.config`; the scikit-learn and scipy chain reached through `dataeval.core` is
   the next largest block. Making both lazy has been deferred twice as too broad for a
   release eve, and belongs early in a cycle.
-- Verification coverage for video, ego motion, and `Feasibility`, none of which the
-  verification suite covers yet.
+- Verification coverage for ego motion and `Feasibility`, which the verification suite
+  does not cover yet. The video workflow, from frame selection to a split that keeps each
+  video whole, is covered since v1.2.
 
 ### Design items
 

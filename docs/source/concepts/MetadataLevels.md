@@ -359,6 +359,9 @@ rolled = md.aggregate("instance_brightness", level="sequence", how="mean")
 # adds `instance_brightness_mean`, one value per video
 ```
 
+`aggregate` returns a new metadata carrying the rolled-up factors and leaves `md`
+as it was, so keep the result.
+
 The source level is inferred from where each factor is defined, so you say what
 you want and where, not where each number happens to live. Naming several
 factors at different levels is fine: a `sequence` destination fed from `unit`
@@ -368,14 +371,14 @@ A mapping asks for a different reduction per factor, and its keys are the factor
 when none are named:
 
 ```python
-md.aggregate(level="unit", how={"instance_brightness": "mean", "occlusion": "mode"})
+rolled = md.aggregate(level="unit", how={"instance_brightness": "mean", "occlusion": "mode"})
 ```
 
 Naming no factor at all is a rule rather than a request: every factor below the
 destination that the reduction applies to.
 
 ```python
-md.aggregate(level="sequence", how="mean")  # every numeric factor below `sequence`
+rolled = md.aggregate(level="sequence", how="mean")  # every numeric factor below `sequence`
 ```
 
 The **positional** reductions read a bag of values and do not care what order
@@ -407,8 +410,8 @@ raises, and the rule form passes the level over.
 ```python
 from dataeval.types import Aggregator
 
-md.aggregate(Aggregator("variability", "unit", "sequence", ("brightness",)))
-md.aggregate(
+rolled = md.aggregate(Aggregator("variability", "unit", "sequence", ("brightness",)))
+rolled = md.aggregate(
     Aggregator("longest_run", "unit", "sequence", ("brightness",), options={"tolerance": ("iqr", (None, 1.5))})
 )
 ```
@@ -492,10 +495,10 @@ does. `via=` narrows it to one branch:
 ```python
 from dataeval.types import Aggregator
 
-md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",)))
+rolled = md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",)))
 # every detection contributes, through its frame
 
-md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",), via="track"))
+rolled = md.aggregate(Aggregator("mean", "instance", "sequence", ("box_area",), via="track"))
 # only the detections a tracker linked; lands as `box_area_mean_via_track`
 ```
 
@@ -979,6 +982,13 @@ is defined where. It does not hold the three following things:
 A filtered metadata saves and reloads as filtered, so
 {attr}`.Metadata.is_filtered` still reports `True` and the evaluators that refuse
 one still refuse it.
+
+The roll-ups a statistics output declared are saved too. A loaded metadata bound
+to a different dataset with {meth}`.Metadata.new` drops them, though, when a new
+factor arrives without declarations of its own, such as a hand-built dict,
+rather than keeping them until the factor they read lands. Add the factor from an
+output that declares its roll-up, as DataEval's statistics functions do, or
+apply the roll-up with {meth}`.Metadata.aggregate`.
 
 ```{warning}
 This is a cache, not an interchange format. The file holds DataEval's internal
