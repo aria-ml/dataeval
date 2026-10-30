@@ -1,5 +1,8 @@
 """Tests for VideoTorchExtractor."""
 
+from collections.abc import Iterator
+from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -21,6 +24,39 @@ HIDDEN_SIZE = 8
 def make_video(n_frames: int) -> np.ndarray:
     """Create a random video of shape (n_frames, H, W, C)."""
     return np.random.rand(n_frames, *FRAME_SHAPE).astype(np.float32)
+
+
+@dataclass(frozen=True)
+class StreamFrame:
+    """A decoded frame as a MAITE video stream yields it: channel-first pixels plus timing."""
+
+    pixels: np.ndarray
+    time_s: float
+    pts: int
+    frame_index: int
+
+
+def frames_of(video: np.ndarray, pulled: list[int] | None = None) -> Iterator[StreamFrame]:
+    """Yield a (T, H, W, C) video's frames channel first, as a generator: no len, no indexing.
+
+    ``pulled``, when given, counts the frames handed out so far in its only element.
+    """
+    for i, frame in enumerate(video):
+        if pulled is not None:
+            pulled[0] += 1
+        yield StreamFrame(np.ascontiguousarray(np.moveaxis(frame, -1, 0)), i / 30, i, i)
+
+
+class ReplayableStream:
+    """A stream that decodes afresh on every walk, as a file-backed reader does."""
+
+    def __init__(self, video: np.ndarray) -> None:
+        self.video = video
+        self.walks = 0
+
+    def __iter__(self) -> Iterator[StreamFrame]:
+        self.walks += 1
+        return frames_of(self.video)
 
 
 # Mock VideoMAE-like model for testing
@@ -208,6 +244,96 @@ class TestVideoTorchExtractorCall:
         # 101 clips exercises the long-video code path
         result = extractor([make_video(NUM_FRAMES * 101)])
         assert result.shape == (1, HIDDEN_SIZE)
+
+
+@pytest.mark.required
+class TestVideoTorchExtractorStreams:
+    """A MAITE video stream embeds as the same frames do in a (T, H, W, C) array."""
+
+    @pytest.mark.parametrize("n_clips", [1, 3])
+    def test_stream_matches_array(self, extractor, n_clips):
+        """Whole clips read from a stream give the embedding the same frames give as an array."""
+        video = make_video(NUM_FRAMES * n_clips)
+        np.testing.assert_allclose(extractor([frames_of(video)]), extractor([video]), rtol=1e-6)
+
+    def test_stream_drops_a_trailing_partial_clip(self, extractor):
+        """Frames past the last whole clip are left out, as they are from an array."""
+        video = make_video(NUM_FRAMES * 2 + 1)
+        result = extractor([frames_of(video)])
+
+        np.testing.assert_allclose(result, extractor([video]), rtol=1e-6)
+        np.testing.assert_allclose(result, extractor([video[: NUM_FRAMES * 2]]), rtol=1e-6)
+
+    def test_stream_shorter_than_one_clip_raises(self, extractor):
+        """A stream with no whole clip has no embedding, and the positional result cannot skip it."""
+        streams = [frames_of(make_video(NUM_FRAMES)), frames_of(make_video(NUM_FRAMES - 1))]
+        with pytest.raises(ValueError, match="index 1 is shorter than one clip"):
+            extractor(streams)
+
+    def test_stream_is_read_one_clip_at_a_time(self):
+        """A generator, never measured or indexed: each clip is embedded before the next is read."""
+        pulled = [0]
+        pulled_at_each_clip = []
+
+        class RecordingProcessor(MockProcessor):
+            def __call__(self, frames, return_tensors="pt"):
+                pulled_at_each_clip.append(pulled[0])
+                return super().__call__(frames, return_tensors)
+
+        extractor = VideoTorchExtractor(MockVideoModel(), processor=RecordingProcessor(), device="cpu")
+        stream = frames_of(make_video(NUM_FRAMES * 3), pulled)
+        assert not hasattr(stream, "__len__")
+        assert not hasattr(stream, "__getitem__")
+
+        assert extractor([stream]).shape == (1, HIDDEN_SIZE)
+        assert pulled_at_each_clip == [NUM_FRAMES, NUM_FRAMES * 2, NUM_FRAMES * 3]
+
+    def test_a_replayable_stream_is_walked_once_per_call(self, extractor):
+        """The stream is left for its caller to walk again, and walking it again gives the same embedding."""
+        stream = ReplayableStream(make_video(NUM_FRAMES * 2))
+        first, second = extractor([stream]), extractor([stream])
+
+        assert stream.walks == 2
+        np.testing.assert_allclose(first, second, rtol=1e-6)
+
+    @pytest.mark.parametrize("pixels_shape", [(1, 8, 8), (8, 8)], ids=["one_channel", "no_channel_axis"])
+    def test_single_channel_stream_reads_as_a_single_channel_array(self, pixels_shape):
+        """A one-channel frame, with or without its channel axis, reaches the pipeline as (T, H, W, 1) does."""
+        video = np.random.rand(NUM_FRAMES, 8, 8, 1).astype(np.float32)
+        stream = (StreamFrame(frame.reshape(pixels_shape), i / 30, i, i) for i, frame in enumerate(video))
+        clip_shapes = []
+
+        def record(clip: torch.Tensor) -> torch.Tensor:
+            clip_shapes.append(tuple(clip.shape))
+            return clip
+
+        model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(NUM_FRAMES * 8 * 8, HIDDEN_SIZE))
+        extractor = VideoTorchExtractor(model, transforms=record, device="cpu", num_frames=NUM_FRAMES)
+
+        result = extractor([stream])
+        assert clip_shapes == [(NUM_FRAMES, 8, 8, 1)]
+        np.testing.assert_allclose(result, extractor([video]), rtol=1e-6)
+        assert clip_shapes == [(NUM_FRAMES, 8, 8, 1)] * 2
+
+    @pytest.mark.parametrize("tracking_datum", [True, False], ids=["stream_target_metadata", "bare_stream"])
+    def test_embeddings_of_a_video_stream_dataset(self, extractor, tracking_datum):
+        """Embeddings hands each datum's stream to the extractor and stores one row per video."""
+        videos = [make_video(NUM_FRAMES * (i + 1)) for i in range(5)]
+
+        class StreamDataset:
+            def __len__(self) -> int:
+                return len(videos)
+
+            def __getitem__(self, idx: int) -> Any:
+                stream = ReplayableStream(videos[idx])
+                if not tracking_datum:
+                    return stream
+                empty_frame = SimpleNamespace(boxes=np.zeros((0, 4)), labels=np.zeros(0, dtype=int))
+                return stream, SimpleNamespace(frame_tracks=[empty_frame] * len(videos[idx])), {"id": idx}
+
+        embeddings = Embeddings(StreamDataset(), extractor=extractor, batch_size=2)
+
+        np.testing.assert_allclose(embeddings[:], extractor(videos), rtol=1e-6)
 
 
 @pytest.mark.required
