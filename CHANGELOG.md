@@ -1,5 +1,29 @@
 # DataEval Change Log
 
+## v1.2.0-rc1
+
+🌟 **Feature Release**
+
+- `407694c2a` - [feat] Let VideoTorchExtractor embed MAITE video streams
+- `d6dd84a11` - [feat] Widen the evaluator dataset types with ImageDataset and VideoDataset, and measure videos that carry no tracking targets or metadata
+
+👾 **Fixes**
+
+- `f890a1913` - [fix] Split on the raw values of a grouping factor so every video is its own group at any size
+- `4ab7a26d1` - [fix] Refuse a split that leaves a partition empty and name groups in split errors
+- `b7497dbe9` - [fix] Accept a tracking dataset in the type of Outliers.evaluate and return results keyed by source address
+
+📝 **Miscellaneous**
+
+- `eeafefb3e` - [docs] Point the zero-numerator reference at PubMed instead of the unreachable McGill PDF
+- `0e16a63d3` - [docs] Mark the SharpnessMeasure protocol experimental with the PERSISTENCE maps
+- `9d66a9dd3` - [docs] State the PERSISTENCE evidence as findings and tighten the prose of the new video how-tos and migration notes
+- `266544e79` - [test] Check the video workflow end to end and register its verification evidence
+- `ce4261787` - [docs] Define the frame and target tuples in the video notebooks instead of requiring maite-datasets
+- `f7cc814aa` - [docs] Add a how-to that selects frames from a video dataset for image tools with Stride, EvenlySpaced and Representative
+- `71cd62977` - [docs] Add a how-to that wraps on-disk video and tracking annotations as a MOT dataset with PyAV and serves its named factors
+- `aa424bda4` - [devops] Publish to PyPI with PEP 740 attestations through the PyPI publish action
+
 ## v1.2.0-rc0
 
 🌟 **Feature Release**

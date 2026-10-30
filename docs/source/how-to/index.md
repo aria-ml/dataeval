@@ -43,8 +43,8 @@ environment.
 
 :::
 
-[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_configure_defaults.ipynb
-[log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_configure_logging.ipynb
+[hdw-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_configure_defaults.ipynb
+[log-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_configure_logging.ipynb
 
 ## Data engineering
 
@@ -200,28 +200,28 @@ datasets for machine learning.
 
 :::
 
-[onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_create_embeddings.ipynb
-[crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_embed_detection_crops.ipynb
-[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_cluster_analysis.ipynb
-[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_deduplicate.ipynb
-[fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_find_factor_outliers.ipynb
-[cout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_find_conditional_outliers.ipynb
-[trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_trace_findings_to_source.ipynb
-[calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_custom_image_stats_object_detection.ipynb
-[band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_measure_channel_groups.ipynb
-[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_add_intrinsic_factors.ipynb
-[ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_control_factor_binning.ipynb
-[sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_sync_and_cache_metadata.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_detect_undersampling.ipynb
-[wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_wrap_dataframe_dataset.ipynb
-[mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_metadata_from_dataframe.ipynb
-[view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_build_dataset_views.ipynb
-[xfrm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_place_transforms.ipynb
-[onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_reconcile_labels_ontology.ipynb
-[algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_align_label_spaces.ipynb
-[cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_conform_and_merge_datasets.ipynb
-[wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_wrap_video_files.ipynb
-[sel-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_select_frames.ipynb
+[onx-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_create_embeddings.ipynb
+[crop-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_embed_detection_crops.ipynb
+[clst-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_cluster_analysis.ipynb
+[dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_deduplicate.ipynb
+[fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_find_factor_outliers.ipynb
+[cout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_find_conditional_outliers.ipynb
+[trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_trace_findings_to_source.ipynb
+[calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_custom_image_stats_object_detection.ipynb
+[band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_channel_groups.ipynb
+[imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_add_intrinsic_factors.ipynb
+[ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_control_factor_binning.ipynb
+[sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_sync_and_cache_metadata.ipynb
+[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_detect_undersampling.ipynb
+[wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_wrap_dataframe_dataset.ipynb
+[mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_metadata_from_dataframe.ipynb
+[view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_build_dataset_views.ipynb
+[xfrm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_place_transforms.ipynb
+[onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_reconcile_labels_ontology.ipynb
+[algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_align_label_spaces.ipynb
+[cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_conform_and_merge_datasets.ipynb
+[wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_wrap_video_files.ipynb
+[sel-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_select_frames.ipynb
 
 ## Model development
 
@@ -250,8 +250,8 @@ for model training.
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_measure_ic_feasibility.ipynb
-[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_measure_ic_sufficiency.ipynb
+[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_ic_feasibility.ipynb
+[suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_ic_sufficiency.ipynb
 
 ## Monitoring
 
@@ -292,11 +292,11 @@ shifts in deployed systems.
 
 :::
 
-[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_measure_divergence.ipynb
-[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_measure_label_independence.ipynb
-[mdd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_detect_metadata_drift.ipynb
-[unc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_detect_uncertainty_drift.ipynb
-[mdo-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc0/notebooks/h2_detect_drift_from_model_outputs.ipynb
+[div-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_divergence.ipynb
+[lbl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_label_independence.ipynb
+[mdd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_detect_metadata_drift.ipynb
+[unc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_detect_uncertainty_drift.ipynb
+[mdo-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_detect_drift_from_model_outputs.ipynb
 
 <!-- Google collab badge icon for all collab links -->
 
