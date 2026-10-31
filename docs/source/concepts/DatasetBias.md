@@ -430,6 +430,27 @@ distance, identifying the samples that are most isolated from any neighbor.
 These are the dataset's rarest examples: either valuable hard cases or
 collection artifacts, depending on context.
 
+The {class}`.Coverage` evaluator reports three variety signals for each class.
+`dispersion` is how far the class spreads, relative to the median class.
+`isotropy` is how evenly it spreads across the directions it occupies.
+`near_duplicate_fraction` is the share of its images with an unusually close
+neighbor. Each signal has a flag in the same table. `is_clustered` is true when
+`dispersion` is below `dispersion_factor`. `is_one_dimensional` is true when
+`isotropy` is below `isotropy_factor` times the median isotropy of the classes.
+`has_near_duplicates` is true when `near_duplicate_fraction` is above
+`near_duplicate_threshold`. The flags are independent, so a class can trip more
+than one.
+
+The defaults are 0.5 for both factors and 0.1 for the threshold. They are
+conservative. At these values a flag means that the class has collapsed, and a
+class a little below its peers is not flagged. You can tighten a factor to catch
+a partial collapse when your classes are of similar size, because isotropy rises
+with class size. A flag is null when it cannot judge, which happens when the
+class is too small to measure or when the median it is compared with is zero.
+The defaults are tuned for the deep embeddings of a pretrained extractor. On an
+embedding of fewer than about 8 dimensions, healthy classes can have a
+near-duplicate share above 0.1, so you should raise the threshold there.
+
 ### Correcting for imbalance: ClassBalance
 
 {class}`.ClassBalance` is a dataset selection tool rather than a measurement

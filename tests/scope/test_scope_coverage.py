@@ -7,6 +7,7 @@ from dataeval import Metadata
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.extractors import FlattenExtractor, TorchExtractor
 from dataeval.protocols import DatasetMetadata, DatumMetadata
+from dataeval.scope import _coverage as coverage_module
 from dataeval.scope._coverage import _PER_CLASS_SCHEMA, Coverage, CoverageOutput
 
 
@@ -192,8 +193,166 @@ class TestCoverageNearDuplicates:
         assert rows["b"]["near_duplicate_fraction"] is None
 
 
+_FLAGS = ["is_clustered", "is_one_dimensional", "has_near_duplicates"]
+
+
+def _signal_table(monkeypatch, spreads, isotropies):
+    """Classes of 30 points whose raw spread and isotropy are set by hand, one class per entry.
+
+    Class k's points carry k in their first coordinate, which the stand-ins read back.
+    """
+    labels = np.repeat(np.arange(len(spreads), dtype=np.intp), 30)
+    embeddings = np.column_stack([labels, np.random.default_rng(0).random((len(labels), 3))])
+    completeness = coverage_module._completeness
+    monkeypatch.setattr(coverage_module, "_mean_dispersion", lambda points: spreads[int(points[0, 0])])
+    monkeypatch.setattr(
+        coverage_module,
+        "_completeness",
+        lambda points: {**completeness(points), "isotropy": isotropies[int(points[0, 0])]},
+    )
+    return embeddings, labels, dict(enumerate("abcd"))
+
+
+def _two_grids():
+    """Class a: a unit grid plus 4 near-copies, so 8 of its 40 images sit in tight pairs. Class b: the grid alone."""
+    grid = np.stack(np.meshgrid(np.arange(6.0), np.arange(6.0)), axis=-1).reshape(-1, 2)
+    return _two_class_embeddings(None, np.vstack([grid, grid[:4] + [0.01, 0.0]]), grid + 100.0)
+
+
+@pytest.mark.required
+class TestCoverageFlags:
+    @pytest.mark.parametrize(("spread", "flagged"), [(0.49, True), (0.5, False), (0.51, False)])
+    def test_is_clustered_is_strict_at_the_factor(self, monkeypatch, spread, flagged):
+        """dispersion < dispersion_factor, where the other two classes set the median spread to 1."""
+        rows = _rows_by_class(Coverage(), *_signal_table(monkeypatch, [spread, 1.0, 1.0], [0.9, 0.9, 0.9]))
+        assert rows["a"]["dispersion"] == spread
+        assert rows["a"]["is_clustered"] is flagged
+
+    @pytest.mark.parametrize(("isotropy", "flagged"), [(0.39, True), (0.4, False), (0.41, False)])
+    def test_is_one_dimensional_is_strict_at_the_factor(self, monkeypatch, isotropy, flagged):
+        """isotropy < isotropy_factor * median isotropy, here 0.5 * 0.8."""
+        rows = _rows_by_class(Coverage(), *_signal_table(monkeypatch, [1.0, 1.0, 1.0], [isotropy, 0.8, 0.8]))
+        assert rows["a"]["is_one_dimensional"] is flagged
+
+    @pytest.mark.parametrize(("threshold", "flagged"), [(0.19, True), (0.2, False), (0.21, False)])
+    def test_has_near_duplicates_is_strict_at_the_threshold(self, threshold, flagged):
+        """near_duplicate_fraction > near_duplicate_threshold, around a share of 8 / 40."""
+        rows = _rows_by_class(Coverage(min_class_samples=10, near_duplicate_threshold=threshold), *_two_grids())
+        assert rows["a"]["near_duplicate_fraction"] == 0.2
+        assert rows["a"]["has_near_duplicates"] is flagged
+
+    def test_flags_are_set_on_every_assessable_row(self):
+        """polars fills a schema column the rows lack with null, so a misspelled key would pass a value check."""
+        rng = np.random.default_rng(11)
+        scales = np.repeat([1.0, 1.0, 0.2], 50)[:, None]  # class 2 is clustered
+        embeddings = np.vstack([rng.normal(size=(150, 4)) * scales, rng.random((5, 4))])
+        labels = np.repeat(np.arange(4), [50, 50, 50, 5])
+        data = Coverage(num_observations=5).evaluate(labels, embeddings=embeddings).data()
+
+        assert data.columns == list(_PER_CLASS_SCHEMA)
+        assert data.filter(pl.col("assessable")).select(_FLAGS).null_count().row(0) == (0, 0, 0)
+        assert data.filter(~pl.col("assessable")).select(_FLAGS).null_count().row(0) == (1, 1, 1)
+        assert data.filter(pl.col("class") == "2")["is_clustered"].item() is True
+
+    def test_flags_null_where_their_signal_is_null(self):
+        """An unassessable class has no flags; a class below the isotropy floor has no is_one_dimensional."""
+        rng = np.random.default_rng(12)
+        embeddings = rng.random((70, 4))
+        labels = np.repeat(np.arange(3), [40, 25, 5])
+        rows = _rows_by_class(Coverage(min_class_samples=10, isotropy_min_samples=30), embeddings, labels, {})
+
+        assert all(rows["0"][flag] is not None for flag in _FLAGS)
+        assert rows["1"]["is_one_dimensional"] is None
+        assert rows["1"]["is_clustered"] is not None
+        assert rows["1"]["has_near_duplicates"] is not None
+        assert all(rows["2"][flag] is None for flag in _FLAGS)
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_no_assessable_class_leaves_every_flag_null(self):
+        rng = np.random.default_rng(13)
+        cov = Coverage(min_class_samples=100)
+        rows = _rows_by_class(cov, *_two_class_embeddings(rng, rng.random((30, 4)), rng.random((30, 4))))
+        assert all(row[flag] is None for row in rows.values() for flag in _FLAGS)
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_zero_median_spread_leaves_is_clustered_null(self, monkeypatch):
+        """Dispersion falls back to raw units when the median spread is 0, so a factor of it means nothing."""
+        rows = _rows_by_class(Coverage(), *_signal_table(monkeypatch, [0.0, 0.0, 1.0], [0.9, 0.9, 0.9]))
+        assert all(row["is_clustered"] is None for row in rows.values())
+        assert all(row["is_one_dimensional"] is False for row in rows.values())
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_zero_median_isotropy_leaves_is_one_dimensional_null(self, monkeypatch):
+        """Against a median of 0 no class could be flagged, so the flag says it cannot judge."""
+        rows = _rows_by_class(Coverage(), *_signal_table(monkeypatch, [1.0, 1.0, 1.0], [0.0, 0.0, 0.93]))
+        assert all(row["is_one_dimensional"] is None for row in rows.values())
+        assert all(row["is_clustered"] is False for row in rows.values())
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_no_isotropy_leaves_is_one_dimensional_null(self):
+        rng = np.random.default_rng(14)
+        cov = Coverage(min_class_samples=10, isotropy_min_samples=1000)
+        rows = _rows_by_class(cov, *_two_class_embeddings(rng, rng.random((30, 4)), rng.random((30, 4))))
+        assert all(row["is_one_dimensional"] is None for row in rows.values())
+        assert all(row["is_clustered"] is False for row in rows.values())
+
+    def test_one_class_is_never_flagged_against_itself(self):
+        """A lone class is its own median, and x < 0.5x is false however flat the class is."""
+        rng = np.random.default_rng(15)
+        flat = rng.normal(size=(60, 4)) * [5.0, 0.01, 0.01, 0.01]
+        rows = _rows_by_class(Coverage(min_class_samples=10), flat, np.zeros(60, dtype=np.intp), {0: "a"})
+        assert rows["a"]["isotropy"] < 0.5
+        assert rows["a"]["is_one_dimensional"] is False
+        assert rows["a"]["is_clustered"] is False
+
+    @pytest.mark.parametrize(("low", "flagged"), [(0.29, True), (0.31, False)])
+    def test_two_classes_flag_the_low_one_below_a_third_of_the_other(self, monkeypatch, low, flagged):
+        """The median of two is their mean, so x < 0.5 * (x + 0.9) / 2 holds only for x < 0.3."""
+        rows = _rows_by_class(Coverage(), *_signal_table(monkeypatch, [low, 0.9], [low, 0.9]))
+        assert rows["a"]["is_clustered"] is flagged
+        assert rows["a"]["is_one_dimensional"] is flagged
+        assert rows["b"]["is_clustered"] is False
+        assert rows["b"]["is_one_dimensional"] is False
+
+    def test_identical_class_is_one_dimensional(self):
+        """A class of one repeated image has isotropy 0.0, which is below any positive median."""
+        rng = np.random.default_rng(16)
+        cov = Coverage(min_class_samples=10)
+        rows = _rows_by_class(cov, *_two_class_embeddings(rng, np.ones((30, 4)), rng.random((30, 4))))
+        assert rows["a"]["isotropy"] == 0.0
+        assert rows["a"]["is_one_dimensional"] is True
+
+    def test_arguments_and_config_give_the_same_flags(self):
+        rng = np.random.default_rng(17)
+        embeddings = rng.normal(size=(150, 4)) * np.repeat([1.0, 1.0, 0.7], 50)[:, None]
+        labels = np.repeat(np.arange(3), 50)
+        config = Coverage.Config(dispersion_factor=0.9, isotropy_factor=0.9, near_duplicate_threshold=0.0)
+        from_arguments = Coverage(dispersion_factor=0.9, isotropy_factor=0.9, near_duplicate_threshold=0.0)
+        tuned = from_arguments.evaluate(labels, embeddings=embeddings).data()
+
+        assert tuned.equals(Coverage(config=config).evaluate(labels, embeddings=embeddings).data())
+        assert tuned.filter(pl.col("class") == "2")["is_clustered"].item() is True
+        default = Coverage().evaluate(labels, embeddings=embeddings).data()
+        assert default.filter(pl.col("class") == "2")["is_clustered"].item() is False
+
+
 @pytest.mark.required
 class TestCoverageSchema:
+    def test_flags_follow_the_released_columns(self):
+        """Appended after assessable, so a reader that unpacks rows by position still gets the v1.1 columns."""
+        released = [
+            "class",
+            "count",
+            "uncovered",
+            "uncovered_fraction",
+            "dispersion",
+            "isotropy",
+            "near_duplicate_fraction",
+            "assessable",
+        ]
+        assert list(_PER_CLASS_SCHEMA) == released + _FLAGS
+        assert all(_PER_CLASS_SCHEMA[flag] == pl.Boolean for flag in _FLAGS)
+
     def test_rows_with_null_signals_build_dataframe(self):
         """The per-class schema (used by evaluate) accepts null isotropy / near_duplicate_fraction."""
         rng = np.random.default_rng(5)

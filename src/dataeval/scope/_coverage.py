@@ -47,7 +47,7 @@ from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.protocols import AnnotatedDataset, Array, ArrayLike, FeatureExtractor, LabelsLike
 from dataeval.types import ClassAxis, DataFrameOutput, Evaluator, EvaluatorConfig, set_metadata
-from dataeval.types._config import OpenUnitInterval
+from dataeval.types._config import OpenUnitInterval, UnitInterval
 
 _logger = get_logger(__name__)
 
@@ -62,6 +62,10 @@ _PER_CLASS_SCHEMA: dict[str, pl.DataType] = {
     "isotropy": pl.Float64(),
     "near_duplicate_fraction": pl.Float64(),
     "assessable": pl.Boolean(),
+    # Appended, so the columns released before them keep their positions.
+    "is_clustered": pl.Boolean(),
+    "is_one_dimensional": pl.Boolean(),
+    "has_near_duplicates": pl.Boolean(),
 }
 
 
@@ -90,10 +94,47 @@ class CoverageOutput(DataFrameOutput):
     The wrapped DataFrame is the per-class breakdown — one row per class, sorted with the
     lowest-dispersion assessable classes first (the ones most worth collecting varied data
     for) and unassessable classes last — with columns ``class``, ``count``, ``uncovered``,
-    ``uncovered_fraction``, ``dispersion``, ``isotropy``, ``near_duplicate_fraction``, and
-    ``assessable``. ``isotropy`` and ``near_duplicate_fraction`` are null for classes below
-    the sample floors that make them meaningful. The sample-level coverage detail hangs off
-    it as attributes.
+    ``uncovered_fraction``, ``dispersion``, ``isotropy``, ``near_duplicate_fraction``,
+    ``assessable``, ``is_clustered``, ``is_one_dimensional``, and ``has_near_duplicates``.
+    ``isotropy`` and ``near_duplicate_fraction`` are null for classes below the sample floors
+    that make them meaningful. The sample-level coverage detail hangs off it as attributes.
+
+    The last three columns are a verdict on each variety signal, with cutoffs that are
+    parameters of :class:`Coverage`. They are independent, and a class can trip more than one:
+
+    - is_clustered: bool - True if dispersion < dispersion_factor (default 0.5): the class
+      spreads less than half as far from its centroid as the median class.
+    - is_one_dimensional: bool - True if isotropy < isotropy_factor (default 0.5) x the median
+      isotropy of the classes that report one, the class itself included. Isotropy is not
+      normalized by the evaluator, since it depends on the embedding dimension and on any
+      reduction applied first, so it is judged against its peers.
+    - has_near_duplicates: bool - True if near_duplicate_fraction > near_duplicate_threshold
+      (default 0.1).
+
+    A flag is null where it cannot judge, which is new: the flags of
+    :class:`~dataeval.bias.Balance` and :class:`~dataeval.bias.Diversity` are never null. A
+    flag is null where its signal is null, that is, for a class below ``min_class_samples`` or,
+    for ``is_one_dimensional``, below the isotropy sample floor. It is also null on every row
+    where the median it is judged against is not positive. A median spread of 0 leaves
+    ``dispersion`` in raw embedding units, and a median isotropy of 0 would flag no class at
+    all. With a single assessable class the median is the class itself, so neither
+    ``is_clustered`` nor ``is_one_dimensional`` can trip however flat the class is.
+
+    The defaults are conservative, so a flag means a class has collapsed, not that it sits a
+    little below its peers. Tighten a factor to catch a partial collapse. They are tuned for
+    deep embeddings, and two signals depend on more than the data:
+
+    - Isotropy rises with class size, so a small class reads lower beside large ones.
+      Tighten ``isotropy_factor`` only for classes of similar size.
+    - The near-duplicate share of a class with no duplicates rises as the embedding dimension
+      falls. On simulated Gaussian classes of 100 to 400 images it exceeded 0.1 for most
+      classes in 2 dimensions, for about half in 3 and for a few up to 7, and for none in 8
+      or more. Raise ``near_duplicate_threshold`` before reading ``has_near_duplicates`` on a
+      low-dimensional embedding, such as a few principal components.
+
+    .. versionadded:: 1.2
+        The ``is_clustered``, ``is_one_dimensional`` and ``has_near_duplicates`` columns,
+        after ``assessable`` so the earlier columns keep their positions.
 
     Attributes
     ----------
@@ -147,6 +188,10 @@ class Coverage(Evaluator):
     * **near_duplicate_fraction** — redundancy (share of the class's images whose nearest
       neighbor is unusually close); high means repeated / near-identical samples.
 
+    Each signal comes with a boolean verdict, ``is_clustered``, ``is_one_dimensional`` and
+    ``has_near_duplicates``, so the output table is the per-class gap report. See
+    :class:`CoverageOutput` for the exact rules and when a flag is null.
+
     Parameters
     ----------
     extractor : FeatureExtractor or None, default None
@@ -172,6 +217,25 @@ class Coverage(Evaluator):
     near_duplicate_factor : float, default 0.5
         An image counts as a near-duplicate when its nearest neighbor in its class is no farther
         than this fraction of a typical class's median nearest-neighbor distance (scale-free).
+        A scale for a distance, which sets ``near_duplicate_fraction``. Not to be confused with
+        ``near_duplicate_threshold``, the share of images that sets the flag.
+    dispersion_factor : float, default 0.5
+        ``is_clustered`` is True where ``dispersion < dispersion_factor``, that is, where a class
+        spreads less than this share of the median class's spread. Must be in (0, 1); a factor
+        near 1 flags about half the classes by construction.
+
+        .. versionadded:: 1.2
+    isotropy_factor : float, default 0.5
+        ``is_one_dimensional`` is True where ``isotropy < isotropy_factor * median(isotropy)``,
+        the median taken over the classes that report an isotropy. Must be in (0, 1).
+
+        .. versionadded:: 1.2
+    near_duplicate_threshold : float, default 0.1
+        ``has_near_duplicates`` is True where ``near_duplicate_fraction`` is above this share of
+        the class's images. Must be in [0, 1]: 0 flags any near-duplicate, and 1 turns the flag
+        off. A share, where ``near_duplicate_factor`` is a distance scale.
+
+        .. versionadded:: 1.2
     config : Coverage.Config or None, default None
         Optional configuration object; parameters passed directly to ``__init__`` override
         its values.
@@ -208,7 +272,16 @@ class Coverage(Evaluator):
     the cost is that a class whose images sit that close together by nature reads high too.
     With a single assessable class there are no peers, and a clump of more than half of it goes
     unflagged. Embeddings are auto-rescaled to the unit interval for the coverage
-    computation. This evaluator assumes one embedding per label (image classification). For
+    computation.
+
+    The flag defaults are conservative and tuned for deep embeddings: at 0.5 a flag means a
+    class has collapsed. A flag is null where its signal is null, and on every row where the
+    median it is judged against is not positive. On an embedding of fewer than about 8
+    dimensions, healthy classes can have a near-duplicate share above the 0.1 default, so raise
+    ``near_duplicate_threshold`` there. Isotropy rises with class size, so tighten
+    ``isotropy_factor`` only for classes of similar size.
+
+    This evaluator assumes one embedding per label (image classification). For
     object detection, wrap the dataset with :class:`~dataeval.data.DetectionCrops` to present
     its boxes as an image-classification dataset (one crop per detection, aligned 1:1 with the
     labels) and evaluate that, or supply detection-level embeddings you have computed yourself.
@@ -265,7 +338,16 @@ class Coverage(Evaluator):
             Minimum samples for a class's isotropy to be reported (None: dims + 1).
         near_duplicate_factor : float, default 0.5
             Fraction of a typical class's median nearest-neighbor distance within which an
-            image's nearest neighbor makes it a near-duplicate.
+            image's nearest neighbor makes it a near-duplicate (a distance scale, which sets
+            ``near_duplicate_fraction``).
+        dispersion_factor : float, default 0.5
+            ``is_clustered`` is True where ``dispersion`` is below this, in (0, 1).
+        isotropy_factor : float, default 0.5
+            ``is_one_dimensional`` is True where ``isotropy`` is below this share of the median
+            isotropy, in (0, 1).
+        near_duplicate_threshold : float, default 0.1
+            ``has_near_duplicates`` is True where ``near_duplicate_fraction`` is above this
+            share of images, in [0, 1].
         """
 
         extractor: FeatureExtractor | None = None
@@ -276,6 +358,9 @@ class Coverage(Evaluator):
         min_class_samples: PositiveInt = 20
         isotropy_min_samples: PositiveInt | None = None
         near_duplicate_factor: PositiveFloat = 0.5
+        dispersion_factor: OpenUnitInterval = 0.5
+        isotropy_factor: OpenUnitInterval = 0.5
+        near_duplicate_threshold: UnitInterval = 0.1
 
     # Set by apply_config from Config.
     extractor: FeatureExtractor | None
@@ -286,6 +371,9 @@ class Coverage(Evaluator):
     min_class_samples: int
     isotropy_min_samples: int | None
     near_duplicate_factor: float
+    dispersion_factor: float
+    isotropy_factor: float
+    near_duplicate_threshold: float
     config: Config
 
     def __init__(
@@ -299,6 +387,9 @@ class Coverage(Evaluator):
         min_class_samples: int | None = None,
         isotropy_min_samples: int | None = None,
         near_duplicate_factor: float | None = None,
+        dispersion_factor: float | None = None,
+        isotropy_factor: float | None = None,
+        near_duplicate_threshold: float | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
@@ -382,7 +473,8 @@ class Coverage(Evaluator):
         # Normalize by the median assessable class, so a typical class scores ~1 regardless of
         # how far apart the classes sit in the embedding space (the global spread would conflate
         # within-class variety with between-class separation). Avoid /0.
-        reference = (float(np.median(list(raw_spread.values()))) if raw_spread else 1.0) or 1.0
+        median_spread = float(np.median(list(raw_spread.values()))) if raw_spread else 0.0
+        reference = median_spread or 1.0
 
         # One completeness pass per assessable class yields both directional variety (isotropy)
         # and the nearest-neighbor distances that expose near-duplicates.
@@ -394,6 +486,8 @@ class Coverage(Evaluator):
         # don't exceed dimensions, so it needs more samples than dispersion (default: more than dims).
         isotropy_floor = max(self.min_class_samples, self._isotropy_floor(embeddings.shape[1]))
         isotropy = {cls: float(r["isotropy"]) for cls, r in results.items() if counts[cls] >= isotropy_floor}
+        # Isotropy is not normalized, so its flag compares each class with the median class instead.
+        median_isotropy = float(np.median(list(isotropy.values()))) if isotropy else 0.0
         # Each image's distance to its nearest other image in its class; a class of one has none.
         nearest = {cls: _nearest_distances(r, counts[cls]) for cls, r in results.items() if counts[cls] > 1}
         # Like dispersion, measure against a typical (median) class's nearest-neighbor spacing rather than
@@ -407,18 +501,31 @@ class Coverage(Evaluator):
             count = counts[cls]
             uncovered = int(is_uncovered[mask].sum())
             assessable = cls in raw_spread
+            dispersion = raw_spread[cls] / reference if assessable else None
+            class_isotropy = isotropy.get(cls)
+            duplicates = near_duplicate.get(cls)
             rows.append({
                 "class": index2label.get(cls, str(cls)),
                 "count": count,
                 "uncovered": uncovered,
                 "uncovered_fraction": uncovered / count if count else 0.0,
                 # Spread relative to a typical class; < 1 == clustered / near-duplicate.
-                "dispersion": raw_spread[cls] / reference if assessable else None,
+                "dispersion": dispersion,
                 # In how many independent directions the class varies; null when too few samples.
-                "isotropy": isotropy.get(cls),
+                "isotropy": class_isotropy,
                 # Share of the class's images whose nearest neighbor is a near-duplicate.
-                "near_duplicate_fraction": near_duplicate.get(cls),
+                "near_duplicate_fraction": duplicates,
                 "assessable": assessable,
+                # A flag is null where its signal is, or where the median it is judged against is not positive.
+                "is_clustered": (
+                    dispersion < self.dispersion_factor if dispersion is not None and median_spread > 0 else None
+                ),
+                "is_one_dimensional": (
+                    class_isotropy < self.isotropy_factor * median_isotropy
+                    if class_isotropy is not None and median_isotropy > 0
+                    else None
+                ),
+                "has_near_duplicates": duplicates > self.near_duplicate_threshold if duplicates is not None else None,
             })
         # Lowest-dispersion assessable classes first (most worth broadening); unassessable last.
         return sorted(rows, key=lambda row: (not row["assessable"], row["dispersion"] or 0.0, row["class"]))
@@ -484,6 +591,23 @@ class Coverage(Evaluator):
         │ plane  ┆ 27    ┆ 0         ┆ 1.194517   │
         │ person ┆ 20    ┆ 1         ┆ 1.488841   │
         └────────┴───────┴───────────┴────────────┘
+
+        The flags give the verdict. ``car`` spreads less than half as far as the median class.
+        ``is_one_dimensional`` is null because no class has more crops than the embedding has
+        dimensions, so none reports an isotropy:
+
+        >>> result.data().select("class", "is_clustered", "is_one_dimensional", "has_near_duplicates")
+        shape: (4, 4)
+        ┌────────┬──────────────┬────────────────────┬─────────────────────┐
+        │ class  ┆ is_clustered ┆ is_one_dimensional ┆ has_near_duplicates │
+        │ ---    ┆ ---          ┆ ---                ┆ ---                 │
+        │ str    ┆ bool         ┆ bool               ┆ bool                │
+        ╞════════╪══════════════╪════════════════════╪═════════════════════╡
+        │ car    ┆ true         ┆ null               ┆ false               │
+        │ boat   ┆ false        ┆ null               ┆ false               │
+        │ plane  ┆ false        ┆ null               ┆ false               │
+        │ person ┆ false        ┆ null               ┆ false               │
+        └────────┴──────────────┴────────────────────┴─────────────────────┘
         """
         reject_filtered_metadata(dataset, "Coverage")
 
