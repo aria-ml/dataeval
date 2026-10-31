@@ -346,12 +346,14 @@ coverage = Coverage(num_observations=20, min_class_samples=20).evaluate(metadata
 print(coverage.data().select(["class", "count", "dispersion", "isotropy", "near_duplicate_fraction", "assessable"]))
 
 # %% [markdown]
-# Three classes look healthy by count, yet each trips a different signal while the other two signals stay normal:
+# Three classes look healthy by count, yet each trips a signal that the counts cannot show:
 #
 # - `ship` has dispersion of 0.16, against 0.75 to 1.10 for every other class: its 300 images collapse into a tiny
-#   region of the space, so the class is clustered.
+#   region of the space, so the class is clustered. Every image is a copy of the same frame, so its near-duplicate
+#   fraction is 1 as well.
 # - `automobile` has normal dispersion but isotropy near zero: it spreads out, yet all along a single axis, because the
-#   interpolation gave it one degree of freedom.
+#   interpolation gave it one degree of freedom. Its 300 frames also sit so close together along that axis that each
+#   has a near-identical neighbor, so its near-duplicate fraction is 1 too.
 # - `truck` has normal dispersion and isotropy but a high near-duplicate fraction (about a third): that share of it sits
 #   in near-identical pairs, the duplicated frame.
 #
@@ -382,7 +384,9 @@ dep.project(
 #
 # Now join the two axes into one per-class view over every sanctioned class. A class is a label gap if it is missing or
 # under-collected. It is an embedding gap if one of the three signals trips: clustered (low dispersion), one-dimensional
-# (low isotropy), or padded with duplicates (high near-duplicate fraction). Each maps to a different fix.
+# (low isotropy), or padded with duplicates (high near-duplicate fraction). Each maps to a different fix. Padding is a
+# share of the class: when every image has a near-identical neighbor, as in `ship` and `automobile`, removing repeats
+# would leave almost nothing, so the class gets the clustered or one-dimensional fix instead.
 
 # %%
 worklist = representation.data()
@@ -397,7 +401,7 @@ near_duplicate = dict(zip(cov["class"].to_list(), cov["near_duplicate_fraction"]
 # Peer-relative cutoffs: "well below a typical (median) class".
 disp_cutoff = 0.5 * float(np.median([v for v in dispersion.values() if v is not None]))
 iso_cutoff = 0.5 * float(np.median([v for v in isotropy.values() if v is not None]))
-NEAR_DUPLICATE_CUTOFF = 0.1  # more than 10% of the class sitting in near-duplicate pairs
+NEAR_DUPLICATE_CUTOFF = 0.1  # more than 10% of the class sitting in near-duplicate pairs, but not all of it
 
 report = []
 for leaf in ontology.leaves:
@@ -408,7 +412,7 @@ for leaf in ontology.leaves:
         label_status, gap = "under-collected", "collect more (label gap)"
     elif disp is not None and disp < disp_cutoff:
         label_status, gap = "present", "broaden (clustered)"
-    elif ndup is not None and ndup > NEAR_DUPLICATE_CUTOFF:
+    elif ndup is not None and NEAR_DUPLICATE_CUTOFF < ndup < 1 - NEAR_DUPLICATE_CUTOFF:
         label_status, gap = "present", "deduplicate (repeated frames)"
     elif iso is not None and iso < iso_cutoff:
         label_status, gap = "present", "vary the axis (one-dimensional)"
@@ -452,6 +456,7 @@ assert coverage_by_class["ship"]["dispersion"] < 0.2
 assert all(0.7 < row["dispersion"] < 1.2 for name, row in coverage_by_class.items() if name != "ship")
 assert coverage_by_class["automobile"]["isotropy"] < 0.05
 assert 0.3 < coverage_by_class["truck"]["near_duplicate_fraction"] < 0.35
+assert all(coverage_by_class[c]["near_duplicate_fraction"] > 0.99 for c in ["ship", "automobile"])
 
 # %% [markdown]
 # Each check caught a gap the others missed:

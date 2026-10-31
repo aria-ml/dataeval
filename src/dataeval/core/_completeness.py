@@ -27,10 +27,13 @@ class CompletenessResult(TypedDict):
         space actually spanned by embeddings.
     nearest_neighbor_pairs : Sequence[tuple[int, int]]
         Sequence of tuples (i, j) representing point indices and their nearest neighbors,
-        sorted by decreasing nearest neighbor distance. Each pair appears only once.
+        sorted by decreasing nearest neighbor distance. Each pair appears only once, so two
+        points that are each other's nearest neighbor share one entry. ``j`` is never ``i``,
+        even when ``i`` has an exact duplicate.
     nearest_neighbor_distances : Sequence[float]
         Distance between each pair in ``nearest_neighbor_pairs``, aligned 1:1 and sharing
         the same decreasing order. The small-distance tail flags near-duplicate samples.
+        Each point's own nearest-neighbor distance is the smallest among the pairs it is in.
     """
 
     completeness: float
@@ -246,16 +249,12 @@ def completeness(embeddings: Array) -> CompletenessResult:
             nearest_neighbor_distances=[],
         )
 
-    # Fit nearest neighbors model (k=2 because first neighbor is always the point itself)
-    nn_model = NearestNeighbors(n_neighbors=2, algorithm="auto")
-    nn_model.fit(embeddings)
-
-    # Get distances and indices for nearest neighbors
-    distances, indices = nn_model.kneighbors(embeddings)
-
-    # Extract the actual nearest neighbor (second column, index 1)
-    nearest_neighbors = indices[:, 1]
-    nearest_distances = distances[:, 1]
+    # Each point's nearest other point. Querying the fitted points themselves (no X) makes sklearn drop each
+    # point from its own neighbors by index, which stays right for exact duplicates: there a zero-distance tie
+    # can rank the point after its copy, so "the first neighbor is the point itself" does not hold.
+    distances, indices = NearestNeighbors(n_neighbors=1).fit(embeddings).kneighbors()
+    nearest_neighbors = indices[:, 0]
+    nearest_distances = distances[:, 0]
 
     # Create pairs, deduplicating so each pair appears only once
     seen_pairs = set()

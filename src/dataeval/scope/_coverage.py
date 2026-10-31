@@ -15,8 +15,8 @@ label counts cannot reveal:
   varies (via :func:`~dataeval.core.completeness`). A class can spread far yet vary along a
   single axis — all images shot from one angle, lighting or zoom aside — which dispersion's
   single radius cannot distinguish.
-* **near-duplicate fraction** — the *redundancy*, the share of a class sitting in unusually
-  tight nearest-neighbor pairs (repeated stock frames), derived from the same computation.
+* **near-duplicate fraction** — the *redundancy*, the share of a class's images whose nearest
+  neighbor is unusually close (repeated stock frames), derived from the same computation.
 
 Alongside them, the global :func:`~dataeval.core.coverage_adaptive` result flags individual
 samples in under-sampled regions of the whole space.
@@ -41,6 +41,7 @@ from pydantic import PositiveFloat, PositiveInt
 from dataeval import Metadata
 from dataeval._helpers import BareLabels, is_labels_like, reject_filtered_metadata
 from dataeval._log import get_logger
+from dataeval.core._completeness import CompletenessResult
 from dataeval.core._completeness import completeness as _completeness
 from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_naive
 from dataeval.exceptions import ShapeMismatchError
@@ -67,6 +68,19 @@ _PER_CLASS_SCHEMA: dict[str, pl.DataType] = {
 def _mean_dispersion(points: NDArray[np.float64]) -> float:
     """Mean Euclidean distance of ``points`` to their centroid (their spread)."""
     return float(np.linalg.norm(points - points.mean(axis=0), axis=1).mean())
+
+
+def _nearest_distances(result: CompletenessResult, n: int) -> NDArray[np.float64]:
+    """Each of the ``n`` points' distance to its nearest other point, from ``completeness``'s pairs.
+
+    The pairs list two mutual nearest neighbors once, so they count pairs, not points. A point's
+    nearest-neighbor distance is the smallest among the pairs it is in.
+    """
+    nearest = np.full(n, np.inf)
+    distances = np.asarray(result["nearest_neighbor_distances"], dtype=np.float64)
+    for points in np.asarray(result["nearest_neighbor_pairs"], dtype=np.intp).reshape(-1, 2).T:
+        np.minimum.at(nearest, points, distances)
+    return nearest
 
 
 class CoverageOutput(DataFrameOutput):
@@ -130,8 +144,8 @@ class Coverage(Evaluator):
       class); low means clustered even if numerous.
     * **isotropy** — shape of that spread (in how many independent directions the class
       varies); low means it varies along few axes even when dispersion is high.
-    * **near_duplicate_fraction** — redundancy (share of the class in unusually tight
-      nearest-neighbor pairs); high means repeated / near-identical samples.
+    * **near_duplicate_fraction** — redundancy (share of the class's images whose nearest
+      neighbor is unusually close); high means repeated / near-identical samples.
 
     Parameters
     ----------
@@ -156,8 +170,8 @@ class Coverage(Evaluator):
         effective-dimension estimate is degenerate when samples do not exceed dimensions).
         When None, defaults to one more than the embedding dimensionality.
     near_duplicate_factor : float, default 0.5
-        A nearest-neighbor pair counts as a near-duplicate when its distance is below this
-        fraction of the class's median nearest-neighbor distance (scale-free).
+        An image counts as a near-duplicate when its nearest neighbor in its class is no farther
+        than this fraction of a typical class's median nearest-neighbor distance (scale-free).
     config : Coverage.Config or None, default None
         Optional configuration object; parameters passed directly to ``__init__`` override
         its values.
@@ -185,9 +199,15 @@ class Coverage(Evaluator):
     high-dimensional extractor most classes fall below that floor and report ``isotropy``
     as null rather than zero. Reduce the embedding dimensionality (for example with PCA) if
     you need the signal on classes of a few hundred samples. ``near_duplicate_fraction`` is the
-    share of within-class nearest-neighbor pairs closer than ``near_duplicate_factor`` x the
-    class median, surfacing repeated / near-identical samples that inflate counts without
-    adding variety. Embeddings are auto-rescaled to the unit interval for the coverage
+    share of a class's images whose nearest other image in the class is within
+    ``near_duplicate_factor`` x the *median* across assessable classes of each class's median
+    nearest-neighbor distance, surfacing repeated / near-identical samples that inflate counts
+    without adding variety. Both images of a near-identical pair count, and an exact copy counts
+    the same as one that differs by float noise. Like ``dispersion``, the scale comes from the
+    peers rather than the class itself, so a tight clump that is most of its class still shows;
+    the cost is that a class whose images sit that close together by nature reads high too.
+    With a single assessable class there are no peers, and a clump of more than half of it goes
+    unflagged. Embeddings are auto-rescaled to the unit interval for the coverage
     computation. This evaluator assumes one embedding per label (image classification). For
     object detection, wrap the dataset with :class:`~dataeval.data.DetectionCrops` to present
     its boxes as an image-classification dataset (one crop per detection, aligned 1:1 with the
@@ -244,8 +264,8 @@ class Coverage(Evaluator):
         isotropy_min_samples : int or None, default None
             Minimum samples for a class's isotropy to be reported (None: dims + 1).
         near_duplicate_factor : float, default 0.5
-            Fraction of the class median nearest-neighbor distance below which a pair is a
-            near-duplicate.
+            Fraction of a typical class's median nearest-neighbor distance within which an
+            image's nearest neighbor makes it a near-duplicate.
         """
 
         extractor: FeatureExtractor | None = None
@@ -340,20 +360,6 @@ class Coverage(Evaluator):
         """Minimum class size for a non-degenerate isotropy estimate (samples must exceed dims)."""
         return self.isotropy_min_samples if self.isotropy_min_samples is not None else dim + 1
 
-    def _near_duplicate_fraction(self, distances: Any) -> float | None:
-        """Share of nearest-neighbor pairs closer than ``near_duplicate_factor`` x the class median.
-
-        Relative-to-median so it is scale-free. A zero median means at least half the pairs are
-        exact duplicates, so the exact-duplicate share is reported instead.
-        """
-        dists = np.asarray(distances, dtype=np.float64)
-        if dists.size == 0:
-            return None
-        median = float(np.median(dists))
-        if median == 0.0:
-            return float(np.mean(dists == 0.0))
-        return float(np.mean(dists < self.near_duplicate_factor * median))
-
     def _per_class(
         self,
         embeddings: NDArray[np.float64],
@@ -388,9 +394,13 @@ class Coverage(Evaluator):
         # don't exceed dimensions, so it needs more samples than dispersion (default: more than dims).
         isotropy_floor = max(self.min_class_samples, self._isotropy_floor(embeddings.shape[1]))
         isotropy = {cls: float(r["isotropy"]) for cls, r in results.items() if counts[cls] >= isotropy_floor}
-        near_duplicate = {
-            cls: self._near_duplicate_fraction(r["nearest_neighbor_distances"]) for cls, r in results.items()
-        }
+        # Each image's distance to its nearest other image in its class; a class of one has none.
+        nearest = {cls: _nearest_distances(r, counts[cls]) for cls, r in results.items() if counts[cls] > 1}
+        # Like dispersion, measure against a typical (median) class's nearest-neighbor spacing rather than
+        # the class's own, which a tight clump covering most of the class would set. `<=` keeps exact
+        # duplicates when that spacing is itself zero.
+        spacing = float(np.median([np.median(d) for d in nearest.values()])) if nearest else 0.0
+        near_duplicate = {cls: float(np.mean(d <= self.near_duplicate_factor * spacing)) for cls, d in nearest.items()}
 
         rows: list[dict[str, Any]] = []
         for cls, mask in masks.items():
@@ -406,7 +416,7 @@ class Coverage(Evaluator):
                 "dispersion": raw_spread[cls] / reference if assessable else None,
                 # In how many independent directions the class varies; null when too few samples.
                 "isotropy": isotropy.get(cls),
-                # Share of the class sitting in near-duplicate nearest-neighbor pairs.
+                # Share of the class's images whose nearest neighbor is a near-duplicate.
                 "near_duplicate_fraction": near_duplicate.get(cls),
                 "assessable": assessable,
             })
