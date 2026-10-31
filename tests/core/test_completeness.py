@@ -26,6 +26,17 @@ class TestNearestNeighborDistancesUnit:
         distances = completeness(embs)["nearest_neighbor_distances"]
         assert list(distances) == sorted(distances, reverse=True)
 
+    def test_exact_duplicates_pair_with_each_other(self):
+        """A bit-identical copy is a point's nearest neighbor, never the point itself."""
+        embs = np.random.default_rng(3).random((20, 4))
+        embs = np.vstack([embs, embs[:5]])
+        result = completeness(embs)
+        pairs = result["nearest_neighbor_pairs"]
+
+        assert all(i != j for i, j in pairs)
+        zero = {tuple(sorted(p)) for p, d in zip(pairs, result["nearest_neighbor_distances"], strict=True) if d == 0}
+        assert zero == {(i, 20 + i) for i in range(5)}
+
     def test_distances_empty_for_single_point(self):
         """No neighbors, no distances."""
         result = completeness(np.random.default_rng(2).random((1, 4)))

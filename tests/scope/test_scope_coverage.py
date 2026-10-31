@@ -109,6 +109,77 @@ class TestCoverageNearDuplicates:
 
         assert loose_rows["a"]["near_duplicate_fraction"] > strict_rows["a"]["near_duplicate_fraction"]
 
+    def test_fraction_is_a_share_of_images(self):
+        """Both images of a near-identical pair count, so the fraction is a share of the class's images."""
+        grid = np.stack(np.meshgrid(np.arange(6.0), np.arange(6.0)), axis=-1).reshape(-1, 2)  # spacing 1
+        class_a = np.vstack([grid, grid[:4] + [0.01, 0.0]])  # 4 copies: 8 of 40 images in tight pairs
+        embeddings, class_labels, index2label = _two_class_embeddings(None, class_a, grid + 100.0)
+
+        rows = _rows_by_class(Coverage(min_class_samples=10), embeddings, class_labels, index2label)
+
+        assert rows["a"]["near_duplicate_fraction"] == pytest.approx(8 / 40)
+        assert rows["b"]["near_duplicate_fraction"] == 0.0
+
+    def test_exact_copies_score_like_perturbed_copies(self):
+        """Bit-identical copies and copies off by float noise are the same duplicates (device independence)."""
+        rng = np.random.default_rng(6)
+        originals, peer = rng.random((200, 8)), rng.random((250, 8))
+        exact = np.vstack([originals, originals[:50]])
+        perturbed = np.vstack([originals, originals[:50] + rng.normal(scale=1e-6, size=(50, 8))])
+        cov = Coverage(min_class_samples=10)
+
+        exact_rows = _rows_by_class(cov, *_two_class_embeddings(rng, exact, peer))
+        perturbed_rows = _rows_by_class(cov, *_two_class_embeddings(rng, perturbed, peer))
+
+        assert exact_rows["a"]["near_duplicate_fraction"] == perturbed_rows["a"]["near_duplicate_fraction"]
+        assert exact_rows["a"]["near_duplicate_fraction"] >= 100 / 250
+
+    def test_clump_covering_most_of_a_class_is_flagged(self):
+        """A tight clump of 60% of a class is measured against its peers, so it cannot set its own threshold."""
+        rng = np.random.default_rng(7)
+        clump = rng.random(8) + rng.normal(scale=1e-3, size=(60, 8))
+        class_a = np.vstack([rng.random((40, 8)), clump])
+        embeddings = np.vstack([class_a, rng.random((200, 8))])
+        class_labels = np.repeat(np.arange(3, dtype=np.intp), 100)
+        cov = Coverage(min_class_samples=10)
+
+        rows = _rows_by_class(cov, embeddings, class_labels, {0: "a", 1: "b", 2: "c"})
+        # Alone there is no peer, so the reference is the class's own median, which the clump sets.
+        alone = _rows_by_class(cov, class_a, np.zeros(100, dtype=np.intp), {0: "a"})
+
+        assert 0.6 <= rows["a"]["near_duplicate_fraction"] < 0.7
+        assert alone["a"]["near_duplicate_fraction"] < 0.1
+
+    def test_varied_classes_score_near_zero(self):
+        rng = np.random.default_rng(8)
+        rows = _rows_by_class(
+            Coverage(min_class_samples=10), rng.random((600, 8)), np.repeat(np.arange(3), 200), dict(enumerate("abc"))
+        )
+        assert all(row["near_duplicate_fraction"] < 0.05 for row in rows.values())
+
+    def test_class_of_one_reports_null(self):
+        """A single-image class has no neighbor to compare with, even when it is assessable."""
+        rng = np.random.default_rng(9)
+        embeddings, class_labels, index2label = _two_class_embeddings(rng, rng.random((30, 4)), rng.random((1, 4)))
+
+        rows = _rows_by_class(Coverage(min_class_samples=1), embeddings, class_labels, index2label)
+
+        assert rows["b"]["near_duplicate_fraction"] is None
+        assert rows["a"]["near_duplicate_fraction"] is not None
+
+    @pytest.mark.filterwarnings("error::RuntimeWarning")
+    def test_identical_class_is_all_near_duplicates(self):
+        """A class of one repeated image is entirely near-duplicates, alone or beside a varied class."""
+        rng = np.random.default_rng(10)
+        same = np.ones((30, 4))
+        cov = Coverage(min_class_samples=10)
+
+        alone = _rows_by_class(cov, same, np.zeros(30, dtype=np.intp), {0: "a"})
+        rows = _rows_by_class(cov, *_two_class_embeddings(rng, same, rng.random((30, 4))))
+
+        assert alone["a"]["near_duplicate_fraction"] == 1.0
+        assert rows["a"]["near_duplicate_fraction"] == 1.0
+
     def test_near_duplicate_fraction_null_below_min_class_samples(self):
         """A class too small to assess reports null near_duplicate_fraction."""
         rng = np.random.default_rng(4)
@@ -182,12 +253,6 @@ class TestEmbeddingsResolution:
     def test_missing_extractor_and_embeddings_raises(self):
         with pytest.raises(ValueError, match="Provide pre-computed embeddings"):
             Coverage()._embeddings(dataset=None, embeddings=None)  # type: ignore
-
-
-@pytest.mark.required
-class TestNearDuplicateFraction:
-    def test_empty_distances_return_none(self):
-        assert Coverage()._near_duplicate_fraction([]) is None
 
 
 class _SpyExtractor(FlattenExtractor):
