@@ -579,6 +579,10 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
     uncovered. `min_class_samples=20` and `near_duplicate_factor=0.5` gate the
     per-class and duplicate signals. `isotropy_min_samples=None` gates
     `isotropy` at one more than the embedding dimensionality.
+    `dispersion_factor=0.5`, `isotropy_factor=0.5` and
+    `near_duplicate_threshold=0.1` set the per-class flags. They are
+    conservative and tuned for deep embeddings. Below about 8 dimensions the
+    near-duplicate flag can trip on healthy classes.
   - Coverage of a poor embedding space is not coverage of the data. Small
     datasets return degenerate radii. `isotropy` is null, not zero, for any
     class below its sample floor, which on a high-dimensional extractor is most
