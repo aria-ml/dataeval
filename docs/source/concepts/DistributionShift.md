@@ -324,27 +324,43 @@ classifier can be blind to a shift that a better calibrated classifier reveals.
 {class}`.DriftWasserstein` detects drift by measuring the per-feature
 {term}`Wasserstein distance<Wasserstein Distance>` (earth mover's distance)
 between the reference distribution and incoming data. Unlike a hypothesis test
-that returns a p-value, it compares this distance against a **calibrated
+that returns a p-value, it compares this distance against a **validation
 baseline** to decide whether a shift is meaningful.
 
-That calibration is what sets it apart: `fit()` takes two same-distribution
-references (a training set and a validation set) and records the per-feature
-Wasserstein distance between them as the expected, benign amount of variation.
-At prediction time, the distance from training to the incoming data is divided
-by this baseline, and drift is flagged when the ratio exceeds `ratio_threshold`
-(default 1.4) for any feature:
+`fit()` takes two same-distribution references (a training set and a
+validation set) and records the per-feature Wasserstein distance between them
+as the expected amount of variation. At prediction time, the distance from
+training to the incoming data is divided by this baseline and by a correction
+$c$ for the sample sizes, and drift is flagged when the mean ratio $r$ over the
+$d$ features exceeds `ratio_threshold` (default 1.4):
 
-$$\text{drift} \iff \max_j \frac{W_j(\text{train}, \text{test})}{W_j(\text{train}, \text{val})} > \tau$$
+$$
+r = \frac{1}{d} \sum_{j=1}^{d} \frac{W_j(\text{train}, \text{test})}{c \, W_j(\text{train}, \text{val})},
+\qquad \text{drift} \iff r > \tau
+$$
 
-Anchoring the decision to train-vs-validation variation scales the decision to
-the variation between two samples of the same data. The baseline is a single
-comparison, so it is itself noisy: the ratio for a batch from the reference
-distribution varies around 1 and can pass the default threshold. Check the false
-alarm rate of your threshold on held-out batches. Because
-the Wasserstein distance is sensitive to how far probability mass moves (not
-just whether distributions differ), it is well suited to low-dimensional
-features such as the {term}`prediction uncertainty<Prediction Uncertainty>`
-scores described above.
+$$c = \sqrt{\frac{1/n_\text{train} + 1/n_\text{test}}{1/n_\text{train} + 1/n_\text{val}}}$$
+
+The expected distance between two samples of one distribution shrinks as the
+samples grow, so without $c$ a validation set larger than the test batch would
+raise the ratio of clean data above the threshold, and a smaller one would hide
+drift. The baseline is a single train-vs-validation comparison, so it is itself
+noisy. Averaging over many features smooths that noise out, which is why the
+detector decides on the mean and not on any single feature. The per-feature
+ratios and flags it reports show where to look, not whether drift happened.
+
+Measured on data from the reference distribution at the default threshold,
+about 0% to 3% of batches raise a false alarm from 16 independent continuous
+features up, and 5% to 19% when the features are correlated. With 1 to 4
+features the rate is roughly 15% to 35%, so a calibrated test such as the KS
+test of {class}`.DriftUnivariate` suits low-dimensional features such as the
+{term}`prediction uncertainty<Prediction Uncertainty>` scores described above
+better. The detector is unusable on constant or discrete features and on
+features with infinite-variance tails: drop constant and discrete features
+first. The mean also hides shifts confined to a few of many features. A shift
+in 1 of 512 features was not detected, and a 2 standard deviation shift in 2 of
+64 features was detected in 66% to 92% of trials. Lower `ratio_threshold` for
+more sensitivity, and measure the false alarm rate on held-out batches first.
 
 ### Label parity
 

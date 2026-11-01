@@ -677,10 +677,17 @@ how to choose among them.
   - Wasserstein distance against a validation baseline. See
     [Wasserstein-based drift detection](DistributionShift.md#wasserstein-based-drift-detection-driftwasserstein).
   - Internal only
-  - `ratio_threshold=1.4`: drift is flagged when the train/test distance
-    exceeds 1.4x the train/validation baseline. A pure convention.
-  - Requires a held-out validation split to calibrate the baseline. Without a
-    representative baseline the threshold is arbitrary.
+  - `ratio_threshold=1.4`: drift is flagged when the mean over features of the
+    train/test distance divided by the train/validation baseline, corrected for
+    the sample sizes, exceeds 1.4. A convention, not a calibrated false alarm
+    rate. Measured false alarms: about 0% to 3% from 16 independent continuous
+    features, 5% to 19% with correlated features, roughly 15% to 35% with 1 to
+    4 features.
+  - Requires a held-out validation split to set the baseline, and the baseline
+    is one train/validation comparison. Unusable on constant or discrete
+    features and on infinite-variance tails. The mean does not see a shift
+    confined to a few of many features (1 of 512 was not detected). In chunked
+    mode only the default constant threshold is calibrated.
 - - {class}`.ChunkedDrift`
   - Wrapper applying any detector over sequential chunks.
   - Internal only

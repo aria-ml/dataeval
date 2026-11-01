@@ -967,8 +967,11 @@ Wasserstein Distance
     A measure of the distance between two {term}`probability distributions<Probability Distribution>`,
     intuitively the minimum "cost" of transforming one distribution into the other (also called the
     *earth mover's distance*). Unlike pointwise comparisons, it accounts for how far probability mass
-    must move, making it well suited to detecting {term}`drift<Drift>` in a one-dimensional feature such
-    as {term}`prediction uncertainty<Prediction Uncertainty>`.
+    must move. {class}`.DriftWasserstein` detects {term}`drift<Drift>` with it, by comparing the distance
+    from the reference to new data against the distance from the reference to a validation set. For 1 to
+    4 features, such as {term}`prediction uncertainty<Prediction Uncertainty>`, use the calibrated KS test
+    of {class}`.DriftUnivariate` instead, because `DriftWasserstein` raises a false alarm on roughly 15%
+    to 35% of batches from the reference distribution there.
 
     See {term}`Drift`
 ```

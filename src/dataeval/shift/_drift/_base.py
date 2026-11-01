@@ -558,7 +558,7 @@ class ChunkedDrift(Generic[TDetails]):
         *reference_data : Any
             Reference dataset(s), forwarded verbatim to the underlying detector's
             ``fit()``. Most detectors take a single reference; detectors with a
-            calibrated baseline (e.g. :class:`DriftWasserstein`) take both a
+            validation baseline (e.g. :class:`DriftWasserstein`) take both a
             training and a validation reference. When the underlying detector has an
             ``extractor`` configured, each reference may be any input the extractor
             accepts (e.g. a full MAITE dataset or raw images); otherwise each must be
