@@ -117,7 +117,7 @@ with PyTorch, with ONNX and with the extractors that need no model.
 | -------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | {class}`.TorchExtractor`   | You have a PyTorch model, either your own or a pre-trained one            | The model, its preprocessing as `transforms`, and a `layer_name` |
 | {class}`.OnnxExtractor`    | You have an ONNX model, or you want to run a model without PyTorch        | The `onnx` extra and an `output_name`                            |
-| {class}`.FlattenExtractor` | You want a baseline, or the images are small, such as MNIST               | Images of one shape. No model                                    |
+| {class}`.FlattenExtractor` | You want a baseline, or the images are small, such as thumbnails          | Images of one shape. No model                                    |
 | {class}`.BoVWExtractor`    | You are looking for near-duplicates that survived a rotation or a rescale | The `opencv` extra and a call to `fit` before use. No model      |
 
 Flattened pixels are a baseline and not an assessment, because distances between

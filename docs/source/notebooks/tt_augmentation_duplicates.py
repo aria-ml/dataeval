@@ -16,7 +16,7 @@
 # %% [markdown]
 # # Detect common augmentations as duplicates
 #
-# Learn how DataEval's duplicate detection methods handle common torchvision augmentations.
+# Learn how DataEval's duplicate detection methods handle common torchvision augmentations on real images.
 #
 # Estimated time to complete: 10 minutes
 #
@@ -26,16 +26,18 @@
 #
 # ## What you will do
 #
-# - Create synthetic test images and apply 30+ torchvision transformations
+# - Apply 30 torchvision transformations to each of 12 images from MilitaryVehicles, which gives a collection that
+#   holds augmented copies
 # - Run both D4 hash-based and BoVW embedding-based duplicate detection
 # - Compare which transformations each method catches or misses
-# - Tune detection sensitivity with the `cluster_sensitivity` parameter
+# - Tune detection sensitivity with the `cluster_sensitivity` parameter, and check what the tuning costs
 #
 # ## What you will learn
 #
-# - Which of the transformations each method detects on one test image
+# - Which of the transformations each method detects on real images
 # - How D4 hashes and BoVW embeddings differ on the same transformations
 # - How the combined detector compares with either method alone
+# - That raising the sensitivity finds more copies until it merges different images into one group
 #
 # ### Quick reference: detection methods
 #
@@ -47,12 +49,13 @@
 #
 # D4 hashes handle only the 8 symmetries of a square: the rotations by 0°, 90°, 180° and 270°, each with and without a
 # flip. BoVW with SIFT features is invariant to rotation by any angle, so it can detect duplicates that are rotated by
-# an arbitrary angle.
+# an arbitrary angle. Whether it does depends on the sensitivity that you set, as the sections below show.
 #
 # ## What you will need
 #
 # - A Python environment with the following packages installed:
 #   - `dataeval`
+#   - `maite-datasets`
 #   - `opencv-python` or `opencv-python-headless`
 #   - `torchvision`
 #   - `matplotlib`
@@ -61,12 +64,16 @@
 # ## Introduction
 #
 # Data augmentation is common in deep learning. Augmented images can end up in both the training and test sets, or be
-# saved as "new" images when they are transformations of existing ones. Knowing which augmentations are detectable as
-# near duplicates helps you:
+# saved as "new" images when they are transformations of existing ones. A collection can also hold the same image more
+# than once because another system resized it, recolored it or cropped it. Knowing which
+# augmentations are detectable as near duplicates helps you:
 #
 # 1. Find augmented copies that leaked between the train and test splits
 # 1. Remove redundant transformed images from a dataset
 # 1. Check that an augmentation pipeline creates sufficiently distinct images
+#
+# In this tutorial you build such a collection from real images and measure how many of the copies each detector finds,
+# and how often it groups different images together by mistake.
 
 # %% [markdown]
 # ## Setup
@@ -78,7 +85,7 @@
 try:
     import google.colab  # noqa: F401
 
-    # %pip install -q dataeval opencv-python-headless torchvision
+    # %pip install -q dataeval maite-datasets opencv-python-headless torchvision
 except Exception:
     pass
 
@@ -88,8 +95,10 @@ from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
+import polars as pl
 import torch
 import torchvision.transforms.v2 as T
+from maite_datasets.image_classification import MilitaryVehicles
 from PIL import Image
 
 from dataeval import config
@@ -101,56 +110,15 @@ config.set_batch_size(64)
 config.set_max_processes(4)
 config.set_seed(42)
 
-
 # %% [markdown]
 # ## Creating test data
 #
-# You will create a synthetic image with texture patterns that SIFT can detect, and then apply torchvision
-# transformations to it to test detection.
+# Load the train split of MilitaryVehicles with `MilitaryVehicles` from `maite_datasets`, and take 12 images at random.
+# Resize each one to 224 by 224 pixels. You then apply torchvision transformations to each image to build the
+# collection that the detectors search.
 
 
 # %%
-def create_textured_image(seed: int, size: int) -> np.ndarray:
-    """Create an image with texture patterns that SIFT can detect.
-
-    Returns image in CHW format (3, H, W) with uint8 values.
-    """
-    rng = np.random.default_rng(seed)
-
-    # Use the seed to generate random frequencies and phases
-    # so each seed produces a genuinely different pattern
-    freqs = rng.uniform(1.0, 5.0, size=6)
-    phases = rng.uniform(0, 2 * np.pi, size=6)
-    channel_offsets = rng.integers(5, 30, size=4)
-
-    x = np.linspace(0, 6 * np.pi, size)
-    y = np.linspace(0, 6 * np.pi, size)
-    xx, yy = np.meshgrid(x, y)
-
-    # Create pattern with seed-dependent frequency components
-    pattern = (
-        np.sin(xx * freqs[0] + phases[0]) * np.cos(yy * freqs[1] + phases[1])
-        + np.sin(xx * freqs[2] + phases[2]) * np.cos(yy * freqs[3] + phases[3]) * 0.5
-        + np.sin(xx * freqs[4] + yy * freqs[5] + phases[4]) * 0.3
-        + rng.random((size, size)) * 0.2
-    )
-
-    # Normalize to 0-255
-    pattern = ((pattern - pattern.min()) / (pattern.max() - pattern.min()) * 255).astype(np.uint8)
-
-    # Create RGB image with seed-dependent channel variations
-    img = np.stack(
-        [
-            pattern,
-            np.roll(pattern, int(channel_offsets[0]), axis=0),
-            np.roll(pattern, int(channel_offsets[1]), axis=1),
-        ],
-        axis=0,
-    )  # Shape: (3, H, W)
-
-    return img.astype(np.uint8)
-
-
 def numpy_to_pil(img: np.ndarray) -> Image.Image:
     """Convert CHW numpy array to PIL Image."""
     return Image.fromarray(np.transpose(img, (1, 2, 0)))
@@ -161,31 +129,21 @@ def pil_to_numpy(img: Image.Image) -> np.ndarray:
     return np.transpose(np.array(img), (2, 0, 1))
 
 
-def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
-    """Convert torch tensor (CHW, float 0-1 or uint8) to CHW numpy uint8."""
-    if tensor.dtype == torch.float32:
-        tensor = (tensor * 255).to(torch.uint8)
-    return tensor.numpy()
-
-
-# %%
 IMG_SIZE = 224
+N_PHOTOS = 12
 
-# Create base images
-base_img1 = create_textured_image(seed=67, size=IMG_SIZE)
-base_img2 = create_textured_image(seed=123, size=IMG_SIZE)
-base_img3 = create_textured_image(seed=789, size=IMG_SIZE)
+dataset = MilitaryVehicles("./data", image_set="train", download=True)
+photo_ids = np.random.default_rng(1).choice(len(dataset), N_PHOTOS, replace=False)
+photos = [
+    pil_to_numpy(numpy_to_pil(np.asarray(dataset[int(i)][0])).resize((IMG_SIZE, IMG_SIZE), Image.Resampling.LANCZOS))
+    for i in photo_ids
+]
 
-# Display base images
-fig, axes = plt.subplots(1, 3, figsize=(12, 4))
-for i, (img, title) in enumerate([
-    (base_img1, "Base Image 1 (seed=67)"),
-    (base_img2, "Base Image 2 (seed=123)"),
-    (base_img3, "Base Image 3 (seed=789)"),
-]):
-    axes[i].imshow(np.transpose(img, (1, 2, 0)))
-    axes[i].set_title(title)
-    axes[i].axis("off")
+# Display six of the images
+fig, axes = plt.subplots(1, 6, figsize=(14, 2.5))
+for ax, photo in zip(axes, photos, strict=False):
+    ax.imshow(np.transpose(photo, (1, 2, 0)))
+    ax.axis("off")
 plt.tight_layout()
 plt.show()
 
@@ -277,296 +235,181 @@ transformations = {
 }
 
 # %%
-# Apply all transformations to base image 1
+# Apply every transformation to every image, with the original first in each block of images
 images = []
 labels = []
+for photo in photos:
+    images.append(photo)
+    labels.append("Original")
+    pil = numpy_to_pil(photo)
+    for name, transform in transformations.items():
+        torch.manual_seed(42)  # For reproducibility
+        images.append(pil_to_numpy(transform(pil)))
+        labels.append(name)
 
-# Add original images first
-images.append(base_img1)
-labels.append("Original (Base 1)")
+BLOCK = len(transformations) + 1  # One original and its copies
 
-# Apply each transformation to base image 1
-base_pil = numpy_to_pil(base_img1)
 
-for name, transform in transformations.items():
-    torch.manual_seed(42)  # For reproducibility
-    transformed = transform(base_pil)
-    images.append(pil_to_numpy(transformed))
-    labels.append(name)
+def original_of(index: int) -> int:
+    """Index of the original that image ``index`` was made from."""
+    return index - index % BLOCK
 
-# Add other base images as "unique" images (should NOT be detected as duplicates)
-images.append(base_img2)
-labels.append("Unique: Base 2")
-images.append(base_img3)
-labels.append("Unique: Base 3")
 
-print(f"Created {len(images)} test images:")
-print(f"  - {1} original")
-print(f"  - {len(transformations)} transformations")
-print(f"  - {2} unique (different base images)")
+print(f"Created {len(images)} images: {N_PHOTOS} originals and {len(images) - N_PHOTOS} augmented copies")
 
 # %%
-# Visualize a sample of transformations
-sample_indices = [0, 1, 2, 5, 6, 10, 15, 17, 20, 25, 28, 30]
-sample_indices = [i for i in sample_indices if i < len(images)]
-
-n_cols = 4
-n_rows = (len(sample_indices) + n_cols - 1) // n_cols
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 3.5 * n_rows))
-axes = axes.flatten()
-
-for ax_idx, img_idx in enumerate(sample_indices):
-    img = images[img_idx]
-    axes[ax_idx].imshow(np.transpose(img, (1, 2, 0)))
-    axes[ax_idx].set_title(f"[{img_idx}] {labels[img_idx]}", fontsize=9)
-    axes[ax_idx].axis("off")
-
-for i in range(len(sample_indices), len(axes)):
-    axes[i].axis("off")
-
+# Visualize a sample of transformations of the first image
+sample = [0, 2, 5, 6, 9, 10, 15, 17, 20, 25, 28, 30]
+fig, axes = plt.subplots(2, 6, figsize=(14, 5))
+for ax, i in zip(axes.flatten(), sample, strict=True):
+    ax.imshow(np.transpose(images[i], (1, 2, 0)))
+    ax.set_title(f"[{i}] {labels[i]}", fontsize=9)
+    ax.axis("off")
 plt.tight_layout()
-plt.suptitle("Sample of Torchvision Transformations Applied to Base Image", y=1.02, fontsize=12)
 plt.show()
 
 # %% [markdown]
 # ## Running near-duplicate detection
 #
 # You will run hash-based detection with D4 hashes and detection with `BoVWExtractor`, and compare how well each finds
-# the different transformations.
+# the copies. A detector reports groups of images that it considers the same. Count a copy as found only when it is in
+# a group with its original and that group holds no other original, because a group that mixes originals does not tell
+# you which images to remove. The `score` function counts the copies found, the copies that share a group with their
+# original whether or not the group is mixed, and the groups that mix originals.
+
+
+# %%
+def score(results: DuplicatesOutput) -> dict:
+    """Count the copies found, and the groups that mix originals."""
+    groups = [sorted(indices) for indices, _ in results.near or []]
+    found, grouped = set(), set()
+    for group in groups:
+        pure = len({original_of(i) for i in group}) == 1
+        for i in group:
+            if i != original_of(i) and original_of(i) in group:
+                grouped.add(i)
+                if pure:
+                    found.add(i)
+    mixed = [len({original_of(i) for i in group}) for group in groups]  # Originals in each group
+    return {
+        "found": found,
+        "grouped": grouped,
+        "groups": len(groups),
+        "mixed": sum(count > 1 for count in mixed),
+        "largest": max(mixed, default=0),
+    }
+
 
 # %%
 # Method 1: D4 Hash-based detection (rotation/flip invariant at 90° increments)
-d4_detector = Duplicates(flags=ImageStats.HASH_DUPLICATES_D4)
-d4_results = d4_detector.evaluate(images)
+d4_score = score(Duplicates(flags=ImageStats.HASH_DUPLICATES_D4).evaluate(images))
 
-print("=== D4 Hash Results ===")
-print("\nNear duplicates detected:")
-if d4_results.near:
-    for i, (indices, methods) in enumerate(d4_results.near):
-        print(f"  Group: {i} - {methods}")
-        for idx in indices:
-            print(f"    {idx:<2} - {labels[idx]}")
-        print()
-else:
-    print("  None found")
-
-# %%
 # Method 2: BoVW-based detection (rotation invariant at any angle)
-# Use a smaller vocab_size for this small dataset (~32 images).
-# Large vocabularies create sparse histograms that cluster poorly.
 # Fit the vocabulary once on all of the images, then share the fitted extractor with the detectors below.
-bovw_extractor = BoVWExtractor(vocab_size=32).fit(images)
-cluster_sensitivity = 1.75
-
-bovw_detector = Duplicates(
-    flags=ImageStats.NONE,  # Skip hash computation, use only clustering
-    extractor=bovw_extractor,
-    batch_size=64,
-    cluster_sensitivity=cluster_sensitivity,
+bovw_extractor = BoVWExtractor(vocab_size=64).fit(images)
+cluster_sensitivity = 2.5
+bovw_score = score(
+    Duplicates(
+        flags=ImageStats.NONE,  # Skip hash computation, use only clustering
+        extractor=bovw_extractor,
+        batch_size=64,
+        cluster_sensitivity=cluster_sensitivity,
+    ).evaluate(images)
 )
-bovw_results = bovw_detector.evaluate(images)
 
-print("=== BoVW Results ===")
-print("\nNear duplicates detected:")
-if bovw_results.near:
-    for i, (indices, methods) in enumerate(bovw_results.near):
-        print(f"  Group: {i} - {methods}")
-        for idx in indices:
-            print(f"    {idx:<2} - {labels[idx]}")
-        print()
-else:
-    print("  None found")
-
-# %%
 # Method 3: Combined detection (both hashes and BoVW)
-combined_detector = Duplicates(
-    flags=ImageStats.HASH_DUPLICATES_D4,
-    extractor=bovw_extractor,
-    cluster_sensitivity=cluster_sensitivity,
+combined_score = score(
+    Duplicates(
+        flags=ImageStats.HASH_DUPLICATES_D4,
+        extractor=bovw_extractor,
+        cluster_sensitivity=cluster_sensitivity,
+    ).evaluate(images)
 )
-combined_results = combined_detector.evaluate(images)
 
-print("=== Combined (D4 Hash + BoVW) Results ===")
-print("\nNear duplicates detected:")
-if combined_results.near:
-    for i, (indices, methods) in enumerate(combined_results.near):
-        print(f"  Group: {i} - {methods}")
-        for idx in indices:
-            print(f"    {idx:<2} - {labels[idx]}")
-        print()
-else:
-    print("  None found")
-
+n_copies = len(images) - N_PHOTOS
+print(f"{'Method':<10} {'Found':>6} {'Groups':>7} {'Mixed groups':>13} {'Originals in the largest group':>30}")
+for name, result in {"D4": d4_score, "BoVW": bovw_score, "Combined": combined_score}.items():
+    print(
+        f"{name:<10} {100 * len(result['found']) / n_copies:>5.0f}% {result['groups']:>7} {result['mixed']:>13}"
+        f" {result['largest']:>30}"
+    )
 
 # %% [markdown]
 # ## Analyzing detection results by transformation type
 #
-# Check which transformations the detectors found as near duplicates.
-
-
-# %%
-def get_detected_indices(results: DuplicatesOutput):
-    """Extract all indices detected as duplicates of index 0 (original)."""
-    detected = set()
-    if results.near:
-        for indices, _ in results.near:
-            if 0 in indices:  # Group contains the original
-                detected.update(indices)
-    detected.discard(0)  # Remove the original itself
-    return detected
-
-
-d4_detected = get_detected_indices(d4_results)
-bovw_detected = get_detected_indices(bovw_results)
-combined_detected = get_detected_indices(combined_results)
-
-print("Detection Summary:")
-print(f"  D4 Hashes detected: {len(d4_detected)} transformations")
-print(f"  BoVW detected: {len(bovw_detected)} transformations")
-print(f"  Combined detected: {len(combined_detected)} transformations")
+# The table gives the share of the 12 originals whose copy each method found, for each transformation.
 
 # %%
-# Create a detailed comparison table
-print("\nDetailed Detection Results:")
-print("=" * 70)
-print(f"{'Transformation':<35} {'D4 Hash':<10} {'BoVW':<10} {'Combined':<10}")
-print("=" * 70)
-
-# Skip index 0 (original) and last 2 (unique images)
-for i in range(1, len(images) - 2):
-    d4_status = "Yes" if i in d4_detected else "No"
-    bovw_status = "Yes" if i in bovw_detected else "No"
-    combined_status = "Yes" if i in combined_detected else "No"
-    print(f"{labels[i]:<35} {d4_status:<10} {bovw_status:<10} {combined_status:<10}")
-
-print("=" * 70)
-
-# Check unique images (should NOT be detected)
-print("\nUnique Image Verification (should NOT be detected):")
-for i in range(len(images) - 2, len(images)):
-    d4_status = "DETECTED" if i in d4_detected else "OK"
-    bovw_status = "DETECTED" if i in bovw_detected else "OK"
-    combined_status = "DETECTED" if i in combined_detected else "OK"
-    print(f"  {labels[i]}: D4={d4_status}, BoVW={bovw_status}, Combined={combined_status}")
+names = list(transformations)
+rates = pl.DataFrame({
+    "Transformation": names,
+    **{
+        method: [
+            round(100 * sum(BLOCK * photo + 1 + k in result["found"] for photo in range(N_PHOTOS)) / N_PHOTOS)
+            for k in range(len(names))
+        ]
+        for method, result in {"D4 Hash": d4_score, "BoVW": bovw_score, "Combined": combined_score}.items()
+    },
+})
+with pl.Config(tbl_rows=len(names), fmt_str_lengths=40):
+    print(rates)
 
 # %% [markdown]
 # ## Visualizing detected vs missed transformations
+#
+# The combined detector finds some copies of the first image and misses others. Mark each copy in green when the
+# detector found it, and in red when it missed it.
 
 # %%
-# Categorize results
-detected_by_both = bovw_detected & d4_detected
-detected_by_bovw_only = bovw_detected - d4_detected
-detected_by_d4_only = d4_detected - bovw_detected
-missed_by_both = set(range(1, len(images) - 2)) - bovw_detected - d4_detected
-
-print("Categorized Results:")
-print(f"\nDetected by BOTH D4 and BoVW ({len(detected_by_both)}):")
-for i in sorted(detected_by_both):
-    print(f"  [{i}] {labels[i]}")
-
-print(f"\nDetected by BoVW ONLY ({len(detected_by_bovw_only)}):")
-for i in sorted(detected_by_bovw_only):
-    print(f"  [{i}] {labels[i]}")
-
-print(f"\nDetected by D4 ONLY ({len(detected_by_d4_only)}):")
-for i in sorted(detected_by_d4_only):
-    print(f"  [{i}] {labels[i]}")
-
-print(f"\nMissed by BOTH ({len(missed_by_both)}):")
-for i in sorted(missed_by_both):
-    print(f"  [{i}] {labels[i]}")
-
-
-# %%
-# Visualize some of the detected and missed transformations
-def visualize_category(indices, title, max_display=6):
-    """Visualize images in a category."""
-    if not indices:
-        print(f"{title}: No images")
-        return
-
-    indices = sorted(indices)[:max_display]
-    n_cols = min(len(indices), 3)
-    n_rows = (len(indices) + n_cols - 1) // n_cols
-
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
-    axes = [axes] if n_rows * n_cols == 1 else axes.flatten()
-
-    for ax_idx, img_idx in enumerate(indices):
-        axes[ax_idx].imshow(np.transpose(images[img_idx], (1, 2, 0)))
-        axes[ax_idx].set_title(f"[{img_idx}] {labels[img_idx]}", fontsize=9)
-        axes[ax_idx].axis("off")
-
-    for i in range(len(indices), len(axes)):
-        axes[i].axis("off")
-
-    plt.suptitle(title, fontsize=12)
-    plt.tight_layout()
-    plt.show()
-
-
-# Show original for reference
-fig, ax = plt.subplots(1, 1, figsize=(4, 4))
-ax.imshow(np.transpose(images[0], (1, 2, 0)))
-ax.set_title("Original Image (reference)", fontsize=12)
-ax.axis("off")
+fig, axes = plt.subplots(4, 8, figsize=(16, 8.5))
+for ax in axes.flatten():
+    ax.axis("off")
+for ax, i in zip(axes.flatten(), range(BLOCK), strict=False):
+    ax.imshow(np.transpose(images[i], (1, 2, 0)))
+    status = "reference" if i == 0 else ("found" if i in combined_score["found"] else "missed")
+    ax.set_title(
+        f"{labels[i]}\n{status}", fontsize=8, color={"reference": "black", "found": "green", "missed": "red"}[status]
+    )
+plt.tight_layout()
 plt.show()
-
-# Show each category
-visualize_category(detected_by_both, "Detected by BOTH D4 Hash and BoVW")
-visualize_category(detected_by_bovw_only, "Detected by BoVW ONLY (D4 missed these)")
-visualize_category(missed_by_both, "MISSED by Both Methods")
 
 # %% [markdown]
 # ## Adjusting detection sensitivity
 #
-# The `cluster_sensitivity` parameter controls how strict near-duplicate detection is. Run the detector at different
-# thresholds to see how they change what it finds.
+# The `cluster_sensitivity` parameter controls how strict near-duplicate detection is. Run the BoVW detector at
+# different thresholds. For each one, count the copies that share a group with their original, the copies that are
+# found in a group with one original, and the number of originals in the largest group.
 
 # %%
-# Test different cluster thresholds
-thresholds = [0.75, 1.0, 1.5, 2.0, 2.5]
-threshold_results = {}
-
-for threshold in thresholds:
-    detector = Duplicates(
-        flags=ImageStats.NONE,
-        extractor=bovw_extractor,
-        cluster_sensitivity=threshold,
+thresholds = [1.0, 1.75, 2.5, 3.5, 5.0]
+sweep = {
+    t: score(Duplicates(flags=ImageStats.NONE, extractor=bovw_extractor, cluster_sensitivity=t).evaluate(images))
+    for t in thresholds
+}
+print(f"{'Sensitivity':>11} {'Grouped with original':>22} {'Found':>7} {'Originals in the largest group':>30}")
+for t, result in sweep.items():
+    print(
+        f"{t:>11} {100 * len(result['grouped']) / n_copies:>21.0f}% {100 * len(result['found']) / n_copies:>6.0f}%"
+        f" {result['largest']:>30}"
     )
-    results = detector.evaluate(images)
-    detected = get_detected_indices(results)
-    threshold_results[threshold] = detected
-    print(f"Threshold {threshold}: {len(detected)} transformations detected")
 
-# %%
-# Show how detection changes with threshold
-print("\nTransformations detected at each threshold:")
-print("=" * 90)
-header = f"{'Transformation':<35}"
-for t in thresholds:
-    header += f" {t:<8}"
-print(header)
-print("=" * 90)
-
-for i in range(1, len(images) - 2):
-    row = f"{labels[i]:<35}"
-    for t in thresholds:
-        status = "Yes" if i in threshold_results[t] else "-"
-        row += f" {status:<8}"
-    print(row)
-
-print("=" * 90)
+# %% [markdown]
+# Raising the sensitivity first finds more copies, and then it merges images. At the highest settings most copies share
+# a group with their original, but only because large groups hold many different originals. Those groups do not
+# tell you which images to remove, so few copies count as found.
 
 # %% [markdown]
 # ## Key findings
 #
-# These results are for one test image and one random seed. The cell groups the transformations into families and counts
-# how many of each family every detector found.
+# These results are for 12 images, one random seed and one set of parameters. The cell groups the transformations
+# into families and gives the share of the copies in each family that every detector found.
 
 # %%
 FAMILIES = (
-    ("Rotation", "Rotation"),
+    ("Rotation 15", "Small rotation"),
+    ("Rotation 45", "Small rotation"),
+    ("Rotation 90", "Rotation 90/180"),
+    ("Rotation 180", "Rotation 90/180"),
     ("Horizontal Flip", "Flip"),
     ("Vertical Flip", "Flip"),
     ("Affine", "Affine"),
@@ -592,88 +435,85 @@ def family(label: str) -> str:
     return next(name for prefix, name in FAMILIES if label.startswith(prefix))
 
 
-counts: dict[str, list[int]] = {}
-for i in range(1, len(images) - 2):
-    row = counts.setdefault(family(labels[i]), [0, 0, 0, 0])
-    row[0] += 1
-    row[1] += i in d4_detected
-    row[2] += i in bovw_detected
-    row[3] += i in combined_detected
+members: dict[str, list[int]] = {}
+for k, name in enumerate(names):
+    members.setdefault(family(name), []).extend(BLOCK * photo + 1 + k for photo in range(N_PHOTOS))
 
-print(f"{'Family':<12} {'Tested':>6} {'D4':>4} {'BoVW':>5} {'Combined':>9}")
-for name, (tested, d4, bovw, combined) in counts.items():
-    print(f"{name:<12} {tested:>6} {d4:>4} {bovw:>5} {combined:>9}")
-print(
-    f"{'Total':<12} {len(transformations):>6} {len(d4_detected):>4} {len(bovw_detected):>5} {len(combined_detected):>9}"
-)
+family_rates = {
+    name: [
+        round(100 * len(set(indices) & result["found"]) / len(indices))
+        for result in (d4_score, bovw_score, combined_score)
+    ]
+    for name, indices in members.items()
+}
+print(f"{'Family':<16} {'Copies':>6} {'D4':>5} {'BoVW':>6} {'Combined':>9}")
+for name, (d4, bovw, combined) in family_rates.items():
+    print(f"{name:<16} {len(members[name]):>6} {d4:>4}% {bovw:>5}% {combined:>8}%")
 
 # %% [markdown]
-# On this image:
+# On these images:
 #
-# - D4 hashes detect the 90° and 180° rotations and both flips, and BoVW detects neither flip.
-# - BoVW detects the 15° and 45° rotations, which D4 hashes miss.
-# - No detector, alone or combined, detects the center or random crops or the random erasing transformations.
-# - The combined detector finds more than either method alone, including some transformations that neither finds alone.
-# - No transformation is detected at a `cluster_sensitivity` of 0.75, and the number found never falls as the threshold
-#   rises.
+# - D4 hashes find the 90° and 180° rotations, the flips and the grayscale copies, and most blurred, resized and
+#   recolored copies. They miss the small rotations, the affine and perspective changes, the crops and the erasing,
+#   and they never merge originals.
+# - BoVW at this sensitivity finds about half of the copies. It finds some of the small rotations, affine, perspective,
+#   crop and erasing copies that D4 hashes miss, and it misses most blurred and resized copies that D4 hashes find.
+# - The combined detector finds more than either method alone.
+# - No detector finds the color-inverted copies.
+# - The copies that BoVW finds depend on the image and on the sensitivity. At a `cluster_sensitivity` of 1.75 it finds
+#   about a quarter of the copies, and at 3.5 it merges most of the originals into one group.
 #
 # The lists show how to compare the methods on a dataset. They are not a ranking of the methods: the counts change with
-# the image, the transformation parameters and the thresholds.
+# the images, the transformation parameters and the thresholds. Choose the sensitivity on a sample of your own data by
+# checking both the copies found and the groups that mix originals.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-position = {name: i for i, name in enumerate(labels)}
-assert {position[name] for name in ("Rotation 90°", "Rotation 180°", "Horizontal Flip", "Vertical Flip")} <= d4_detected
-assert not {position["Horizontal Flip"], position["Vertical Flip"]} & bovw_detected
-assert {position["Rotation 15°"], position["Rotation 45°"]} <= bovw_detected
-assert not {position["Rotation 15°"], position["Rotation 45°"]} & d4_detected
-never = {
-    position[name]
-    for name in (
-        "Center Crop (80%)",
-        "Center Crop (50%)",
-        "Random Crop (80%)",
-        "Random Erasing (10%)",
-        "Random Erasing (33%)",
-    )
+# The collection
+assert (len(images), BLOCK, n_copies) == (372, 31, 360)
+
+# No detector but a loose BoVW setting merges originals
+assert d4_score["mixed"] == 0
+assert d4_score["largest"] == 1
+share = {
+    name: len(result["found"]) / n_copies
+    for name, result in (("d4", d4_score), ("bovw", bovw_score), ("comb", combined_score))
 }
-assert not never & combined_detected
-assert len(combined_detected) > max(len(d4_detected), len(bovw_detected))
-assert combined_detected - d4_detected - bovw_detected
-found = [len(threshold_results[t]) for t in thresholds]
-assert found[0] == 0
-assert found == sorted(found)
+assert 0.4 < share["d4"] < 0.55
+assert 0.45 < share["bovw"] < 0.65
+assert share["comb"] > max(share["d4"], share["bovw"])
+assert 0.6 < share["comb"] < 0.8
 
-# %% tags=["remove_cell"]
-# TEST ASSERTION CELL ###
-# Verify that unique images are NOT detected as duplicates
-unique_indices = {len(images) - 2, len(images) - 1}
-assert unique_indices.isdisjoint(combined_detected), "Unique images should not be detected as duplicates"
+# The families the text describes
+d4, bovw, combined = ({name: rates[i] for name, rates in family_rates.items()} for i in range(3))
+assert all(d4[name] == 100 for name in ("Rotation 90/180", "Flip", "Grayscale"))
+assert all(d4[name] > 70 for name in ("Color", "Blur", "Resize"))
+assert all(d4[name] == 0 for name in ("Small rotation", "Affine", "Perspective", "Crop", "Erasing"))
+assert all(bovw[name] > 20 for name in ("Small rotation", "Affine", "Perspective", "Crop", "Erasing"))
+assert all(bovw[name] < 15 for name in ("Blur", "Resize"))
+assert all(
+    rates[0] < 10 and rates[1] < 10 and rates[2] < 10 for name, rates in family_rates.items() if name == "Invert"
+)
+assert all(combined[name] >= max(d4[name], bovw[name]) for name in family_rates)
 
-# Verify that at least some rotations are detected by BoVW
-# (BoVW uses SIFT which is inherently rotation-invariant)
-n_transforms = len(transformations)
-transform_names = list(transformations.keys())
-rotation_indices = {i + 1 for i, name in enumerate(transform_names) if name.startswith("Rotation")}
-assert len(rotation_indices & bovw_detected) >= 1, "BoVW should detect at least one rotation"
-
-# Verify that flips are detected by at least D4 hashes
-flip_indices = {i + 1 for i, name in enumerate(transform_names) if "Flip" in name}
-assert len(flip_indices & d4_detected) >= 1, "D4 should detect at least one flip"
-
-print("All assertions passed!")
-print("\nFinal Summary:")
-print(f"  Total transformations tested: {n_transforms}")
-print(f"  Detected by combined method: {len(combined_detected)}")
-print(f"  Detection rate: {len(combined_detected) / n_transforms * 100:.1f}%")
-
+# The sensitivity sweep: more copies share a group with their original as the sensitivity rises, and the groups merge
+grouped = [len(sweep[t]["grouped"]) / n_copies for t in thresholds]
+assert grouped == sorted(grouped)
+assert grouped[0] < 0.2
+assert grouped[-1] > 0.9
+found_by = {t: len(sweep[t]["found"]) / n_copies for t in thresholds}
+assert found_by[1.0] < found_by[1.75] < found_by[2.5]
+assert 0.15 < found_by[1.75] < 0.4
+assert found_by[3.5] < 0.2
+assert found_by[5.0] < 0.2
+assert sweep[3.5]["largest"] >= 9
 # %% [markdown]
 # ## Conclusion
 #
-# You created a synthetic textured image and applied the torchvision transformations to it. You ran
-# {class}`.Duplicates` with D4 hashes, with a {class}`.BoVWExtractor` and with both together, compared which
-# transformations each setup grouped with the original image, and varied `cluster_sensitivity` to see how the
-# detections change.
+# You took 12 real images, applied the torchvision transformations to each of them, and ran {class}`.Duplicates` with
+# D4 hashes, with a {class}`.BoVWExtractor` and with both together. You compared which transformations each setup
+# grouped with the original image, and varied `cluster_sensitivity` to see the trade between finding more copies and
+# merging different images into one group.
 
 # %% [markdown]
 # ## Next steps

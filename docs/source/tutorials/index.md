@@ -49,8 +49,8 @@ local checkout.
     to decide whether to remove them or collect more data.
   - [![Open In Colab][colab-badge]][eda-colab]
 * - [](../notebooks/tt_assess_data_space.py)
-  - Learn how to cluster the embeddings of an unlabeled dataset to find outliers and underrepresented images,
-    and how to decide whether to add or remove them.
+  - Learn how to cluster the embeddings of an unlabeled dataset to find duplicates, outliers and underrepresented
+    images, and how to decide whether to add or remove them.
   - [![Open In Colab][colab-badge]][dataspace-colab]
 * - [](../notebooks/tt_identify_dataset_gaps.py)
   - Combine an ontology, labels, and embeddings to find label-space and
@@ -150,8 +150,9 @@ local checkout.
     across chunks of incoming data.
   - [![Open In Colab][colab-badge]][monitoring-colab]
 * - [](../notebooks/tt_detect_drift_with_uncertainty.py)
-  - Learn how to monitor a deployed detector for drift using its own prediction
-    uncertainty as a label-free signal.
+  - Learn how to monitor a deployed classifier for drift using its own prediction
+    uncertainty as a label-free signal, and how to check what the monitor can and
+    cannot see.
   - [![Open In Colab][colab-badge]][uncertainty-drift-colab]
 * - [](../notebooks/tt_identify_ood_samples.py)
   - Learn how to fit reconstruction-based and nearest-neighbor detectors on in-distribution images and compare

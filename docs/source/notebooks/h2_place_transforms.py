@@ -24,7 +24,7 @@
 #
 # Use it when you see the warning, or before you put a resize in a view.
 #
-# You need `dataeval` and `maite-datasets`. This guide uses 500 MNIST test images.
+# You need `dataeval` and `maite-datasets`. This guide uses 300 MilitaryVehicles test photographs.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -41,9 +41,9 @@ import warnings
 
 import numpy as np
 import torch
-from maite_datasets.image_classification import MNIST
+from maite_datasets.image_classification import MilitaryVehicles
 
-from dataeval.data import Limit, Resize, View
+from dataeval.data import Limit, Resize, Shuffle, View
 from dataeval.extractors import TorchExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Outliers
@@ -53,15 +53,20 @@ from dataeval.quality import Outliers
 #
 # A resize to the resolution your system deploys at is a fact about the data, so it belongs in the view. It also makes
 # the dimension statistics, such as `width`, `height` and `aspect_ratio`, report the resize target, and makes
-# `sharpness` measure the interpolation kernel. Ask an evaluator for those statistics and it warns:
+# `sharpness` measure the interpolation kernel. Ask an evaluator for those statistics and it warns.
+#
+# The photographs in MilitaryVehicles come in many sizes. The test split is stored class by class, so shuffle before you
+# limit, or the 300 images would cover only a few classes. See
+# [Build dataset views with View and Operation](./h2_build_dataset_views.py).
 
 # %%
-mnist = View(MNIST("./data", image_set="test", download=True), [Limit(500)])
-print("source dataset size:", len(mnist))
-print("source image shape:", np.asarray(mnist[0][0]).shape)
+source = View(MilitaryVehicles("./data", image_set="test", download=True, lazy=True), [Shuffle(seed=0), Limit(300)])
+source_shapes = {np.asarray(source[i][0]).shape for i in range(len(source))}
+print("source dataset size:", len(source))
+print("distinct source image shapes:", len(source_shapes))
 
 # %%
-deployed = View(mnist, [Resize((14, 14))])
+deployed = View(source, [Resize((224, 224))])
 print("deployed image shape:", np.asarray(deployed[0][0]).shape)
 
 # %%
@@ -80,12 +85,14 @@ print(str(invalidated[0].message))
 # normalization is model-side.
 
 # %%
-model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(14 * 14, 16))
+model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(3 * 224 * 224, 16))
+mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 
 
 def normalize(image: torch.Tensor) -> torch.Tensor:
-    """Model preprocessing: scale to [0, 1], then standardize."""
-    return (image / 255.0 - 0.1307) / 0.3081
+    """Model preprocessing: scale to [0, 1], then standardize with the ImageNet mean and standard deviation."""
+    return (image / 255.0 - mean) / std
 
 
 extractor = TorchExtractor(model, transforms=normalize)
@@ -122,7 +129,7 @@ print("warnings:", [w.category.__name__ for w in caught if "Invalidated" in w.ca
 # warning.
 
 # %%
-asserted = View(mnist, [Resize((14, 14), invalidates=ImageStats.VISUAL_SHARPNESS)])
+asserted = View(source, [Resize((224, 224), invalidates=ImageStats.VISUAL_SHARPNESS)])
 
 warned = {}
 for name, flags in [("DIMENSION", ImageStats.DIMENSION), ("VISUAL", ImageStats.VISUAL)]:
@@ -139,7 +146,9 @@ for name, flags in [("DIMENSION", ImageStats.DIMENSION), ("VISUAL", ImageStats.V
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert np.asarray(deployed[0][0]).shape == (1, 14, 14)
+assert len(source) == 300
+assert len(source_shapes) > 90  # the text says the photographs come in many sizes
+assert np.asarray(deployed[0][0]).shape == (3, 224, 224)
 assert len(invalidated) == 1
 assert "sharpness" in str(invalidated[0].message)
 assert np.asarray(embedding).shape[-1] == 16

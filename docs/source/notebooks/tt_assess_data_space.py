@@ -16,7 +16,8 @@
 # %% [markdown]
 # # Assess an unlabeled data space
 #
-# This tutorial is a beginner-friendly introduction to exploratory data analysis when labels are not available.
+# This tutorial is a beginner-friendly introduction to exploratory data analysis when labels are not available. You will
+# assess a large set of collected vehicle imagery before anyone annotates it.
 #
 # Estimated time to complete: 10 minutes
 #
@@ -27,8 +28,8 @@
 # %% [markdown]
 # ## What you will do
 #
-# - Construct [embeddings](../concepts/Embeddings.md) by inferencing the PASCAL VOC 2012 dataset through a model
-# - Analyze clustered embeddings to find
+# - Construct [embeddings](../concepts/Embeddings.md) by inferencing a set of military vehicle images through a model
+# - Analyze clustered embeddings to find duplicates and
 #   [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings)
 # - Run additional analysis to find gaps in data
 #   [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
@@ -37,6 +38,7 @@
 #
 # - Learn to use cluster-based algorithms to measure dataset quality without labels
 # - Learn to distinguish whether an image is an outlier or is underrepresented
+# - Learn to find the same image stored more than once
 # - Learn to determine whether flagged images should be added or removed
 
 # %% [markdown]
@@ -46,6 +48,10 @@
 
 # %% [markdown]
 # ## Introduction
+#
+# You have collected a large set of vehicle imagery from many sources, and nobody has labeled it yet. Before you spend
+# annotation effort or train a model on it, you need to know what the set holds: what does not belong, what repeats and
+# what few images cover.
 #
 # Before you build predictive models, identify outliers and check that data groups accurately reflect the underlying
 # distribution. When labels are unavailable, for example in unsupervised learning, initial data curation or when
@@ -80,14 +86,14 @@ import dataeval_plots as dep
 import numpy as np
 import plotly.io as pio
 import torch
-from maite_datasets.object_detection import VOCDetection
+from maite_datasets.image_classification import MilitaryVehicles
 from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings
 from dataeval.config import set_device, set_max_processes, set_seed
 from dataeval.core import cluster, coverage_adaptive
 from dataeval.extractors import TorchExtractor
-from dataeval.quality import Outliers
+from dataeval.quality import Duplicates, Outliers
 
 # Set default device for notebook
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -118,14 +124,16 @@ set_max_processes(4)
 # Rather than analyze raw pixels, you will work in [embedding](../concepts/Embeddings.md) space: one feature vector per
 # image, with far fewer values than the image itself, which keeps the downstream algorithms fast and light on memory.
 #
-# ### Download VOC dataset
+# ### Download the dataset
 #
-# Download the train split with `VOCDetection` from `maite_datasets`. It has 5717 images with a varying number of
-# targets each. You can also run this tutorial with your own MAITE-compliant dataset.
+# Download the train split with `MilitaryVehicles` from `maite_datasets`. It has 7,823 images of 24 types of military
+# vehicle and equipment, assembled from other sources, so the image sizes and settings vary. The dataset comes with
+# labels. You will ignore them until the end of the duplicates section, as if the images had not been annotated yet. You
+# can also run this tutorial with your own MAITE-compliant dataset.
 
 # %%
 # Load the training dataset
-dataset = VOCDetection(root="./data", image_set="train", year="2012", download=True)
+dataset = MilitaryVehicles(root="./data", image_set="train", download=True)
 
 print(f"Images: {len(dataset)}")
 print(f"Image shape: {dataset[0][0].shape}")
@@ -189,9 +197,50 @@ output = cluster(embeddings)
 # ### Duplicates
 #
 # The `Duplicates` detector's `from_clusters` method can identify data points that are within certain distances from
-# each other in the embedding space.
-#
-# This tutorial does not focus on duplicates, because no exact duplicates are found in the PASCAL 2012 VOC dataset.
+# each other in the embedding space. Each group it returns holds images that look the same to the model. Run it on the
+# clusters you already created.
+
+# %%
+duplicates = Duplicates().from_clusters(output).data()
+groups = duplicates["item_indices"].to_list()
+
+print(f"Duplicate groups: {len(groups)}")
+print(f"Images in a group: {len({i for group in groups for i in group})}")
+
+# %% [markdown]
+# Some images have a partner that looks the same to the model. Plot the first three pairs to look at them. Each row
+# holds one pair.
+
+# %%
+pairs = [group for group in groups if len(group) == 2][:3]
+dep.plot(dataset, indices=[i for pair in pairs for i in pair], figsize=(10, 6), images_per_row=2)
+
+# %% [markdown]
+# Each pair you plotted is the same photo stored twice, which wastes annotation effort and storage. The labels can show
+# a bigger problem. This tutorial treats the images as unlabeled, but the dataset does come with labels. Look up the
+# label of each image in the pairs, and count how many groups hold images with different labels.
+
+# %%
+index2label = dataset.index2label
+
+
+def label_of(i: int) -> str:
+    """Return the class name that the dataset gives to image `i`."""
+    return index2label[int(np.argmax(dataset[i][1]))]
+
+
+for pair in pairs:
+    print([label_of(i) for i in pair])
+
+conflicting = [group for group in groups if len({label_of(i) for i in group}) > 1]
+print(f"Groups with more than one label: {len(conflicting)} of {len(groups)}")
+
+# %% [markdown]
+# Each of the first three pairs is filed under two different labels, and nearly every other group is too. At most one of
+# the labels on a photo is right. A model cannot learn both, and when the copies land in different splits, the model
+# sees the test image during training. You found the problem from the embeddings alone, without using a label. Keep one
+# copy of each photo and decide which label is correct. The [Clean a dataset](./tt_clean_dataset.py) tutorial shows how
+# to find and remove duplicates.
 #
 # ### Outliers
 #
@@ -234,7 +283,7 @@ print(f"Percent of outliers: {(100 * len(outliers) / len(dataset)):.2f}%")
 # cause the model to develop biases or limit its ability to generalize to non-training data.
 #
 # Choose which set of images to examine. Swap the indices in the call to `dep.plot()` by uncommenting your preferred
-# indices calculation. You can also adjust the `count` parameter to see more examples.
+# indices calculation. You can also change the slice to see more examples.
 
 # %%
 # To use the flagged outliers, uncomment the line below
@@ -247,13 +296,19 @@ indices = outliers
 # Now visualize your chosen set of indices.
 
 # %%
-# Plot 6 images from the dataset
+# Plot up to 12 images from the dataset
 dep.plot(
     dataset,
-    indices=list(indices)[:6],
-    figsize=(10, 6),
-    images_per_row=3,
+    indices=list(indices)[:12],
+    figsize=(10, 8),
+    images_per_row=4,
 )
+
+# %% [markdown]
+# Look at the images before you decide what to do. Some are not vehicles at all: a phone case, a T-shirt, an electrical
+# connector and parts of a scale-model kit. Others are real photos of equipment in an unusual setting, such as a rocket
+# launcher firing. The first kind does not belong in a vehicle dataset. The second kind is an edge case that a deployed
+# model could meet. Decide which kind each image is before you remove anything.
 
 # %% [markdown]
 # ## Analyze the flagged images
@@ -331,28 +386,46 @@ assert np.array_equal(np.sort(labeled.uncovered_indices), np.sort(cov["uncovered
 # You can plot a few images using the same function as before.
 
 # %%
-dep.plot(dataset, indices=cov["uncovered_indices"][:3], figsize=(10, 3))
-
-# %% [markdown]
-# You have now seen a few examples of images that were flagged as uncovered. Compare this information with the outliers
-# found earlier to determine which actions to take.
-
-# %%
 uncovered_outliers = set(cov["uncovered_indices"].tolist()).intersection(set(outliers))
 
 print(f"Number of outliers found as uncovered images: {len(uncovered_outliers)}")
 
+# %% [markdown]
+# Most of the outliers are also uncovered, but the uncovered images are a larger group. Plot six uncovered images that
+# are not outliers to see what else the coverage check finds.
+
+# %%
+underrepresented = [i for i in cov["uncovered_indices"].tolist() if i not in set(outliers)]
+dep.plot(dataset, indices=underrepresented[:6], figsize=(10, 6), images_per_row=3)
+
+# %% [markdown]
+# These images are unusual without being extreme. Scale models, a ring and a flag collage are not photos of vehicles, so
+# you would remove them as you would an outlier. A close-up of a wheel or of equipment parts is a real view that few
+# other images share. Whether you need more of those views depends on what the model has to recognize. Collect more
+# close-ups if it must recognize equipment from partial views, and leave them out if it does not.
+
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
+assert (len(dataset), len(dataset.index2label)) == (7823, 24)
 assert embeddings.shape == (len(dataset), 512)
 assert 0 < len(outliers) <= 0.05 * len(dataset)
 assert len(cov["uncovered_indices"]) > 0
+# The counts move a little with the hardware, so the checks below use bands the prose stays true in
+assert len(pairs) == 3
+assert all(len({label_of(i) for i in pair}) == 2 for pair in pairs)  # "filed under two different labels"
+assert len(conflicting) >= 0.9 * len(groups)  # "nearly every other group is too"
+assert len(set(outliers) & {2055, 5022, 7054, 5094, 4062, 7345, 7365, 7557}) >= 6  # junk and rocket launchers firing
+assert len(uncovered_outliers) >= 0.8 * len(outliers)  # "most of the outliers are also uncovered"
+assert len(cov["uncovered_indices"]) > len(outliers)  # "a larger group"
+assert len(set(underrepresented[:6]) & {3267, 4928, 278, 5104, 3867}) >= 3  # models, close-ups, a ring, a flag
 
 # %% [markdown]
 # ## Handling flagged images
 #
-# You now have enough information to decide what to do with these images. If an image is flagged as both an outlier and
-# underrepresented, handle it first as missing coverage, and then as an outlier if the solutions cannot be acted on.
+# You now have enough information to decide what to do with these images. First decide whether an image belongs in the
+# dataset at all, because that decides which flag matters. Remove an image that does not belong, whatever else it is
+# flagged for. An image that does belong, such as a rare but relevant event, is an edge case. If it is flagged as both
+# an outlier and underrepresented, handle it as missing coverage.
 #
 # ### Missing coverage
 #
@@ -363,19 +436,26 @@ assert len(cov["uncovered_indices"]) > 0
 #
 # You can handle outliers with additional sampling, but they are typically removed because they either do not contain
 # enough relevant information or would shift the underlying distribution if you added similar items.
+#
+# ### Handling duplicates
+#
+# Keep one copy of each group of duplicates. When the copies carry different labels, decide which label is right before
+# you keep the image. The [Clean a dataset](./tt_clean_dataset.py) tutorial shows how to find and remove duplicates.
 
 # %% [markdown]
 # ## Conclusion
 #
 # In this tutorial you created image embeddings for more efficient calculations, used cluster-based algorithms to find
-# outliers, checked for gaps in coverage on PASCAL VOC imagery, and made decisions on possible solutions.
+# duplicates and outliers, checked for gaps in coverage on military vehicle imagery, and made decisions on possible
+# solutions.
 #
 # ## What you learned
 #
-# - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Outliers`, {func}`.coverage_adaptive`) to
-#   evaluate unlabeled imagery.
-# - Differentiated between corrupt/irrelevant outliers (candidates for pruning) and underrepresented operational edge
-#   cases (candidates for targeted collection).
+# - Applied cluster-based feature space metrics ({func}`.cluster`, {class}`.Duplicates`, {class}`.Outliers`,
+#   {func}`.coverage_adaptive`) to evaluate unlabeled imagery.
+# - Found the same image stored under more than one label.
+# - Differentiated between irrelevant outliers (candidates for pruning) and underrepresented operational edge cases
+#   (candidates for targeted collection).
 # - Combined outlier and coverage flags to choose between removing images and collecting more data.
 
 # %% [markdown]
@@ -387,8 +467,7 @@ assert len(cov["uncovered_indices"]) > 0
 #   coverage find the images in sparse regions of the space.
 # - [Run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
 #   in the clusters.
-# - [Detect undersampled data subsets](./h2_detect_undersampling.py) — Find the regions of a dataset that few
-#   images cover.
+# - [Clean a dataset](./tt_clean_dataset.py) — Find and remove duplicates and extreme values before you train.
 
 # %% [markdown]
 # ## On your own

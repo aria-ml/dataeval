@@ -583,7 +583,6 @@ effective groups at each level; see
 
 - [Add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py)
 - [Measure label independence](../notebooks/h2_measure_label_independence.py)
-- [Detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
 - [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
 - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 - [Build a MetadataLike object from a DataFrame](../notebooks/h2_metadata_from_dataframe.py)

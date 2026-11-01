@@ -644,8 +644,6 @@ dep.plot(tank_result, plot_evidence=True)
 #   recommendations of `Feasibility`.
 # - [Feasibility evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its
 #   details hold.
-# - [Determine image classification feasibility](./h2_measure_ic_feasibility.py) — Estimate the Bayes error rate
-#   with `ber_mst` and check an accuracy requirement against it.
 # - [Measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model
 #   performance curves as a function of dataset size.
 

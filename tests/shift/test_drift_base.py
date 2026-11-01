@@ -154,6 +154,36 @@ class TestDriftChunkedOutput:
     def test_distance(self, sample_output):
         assert sample_output.distance == pytest.approx(0.5, abs=1e-6)
 
+    def test_plot_type_identifies_the_output_for_plotting(self, sample_output):
+        """`plot_type` is the discriminator dataeval-plots dispatches on."""
+        assert sample_output.plot_type == "drift"
+
+    def test_baseline_is_empty_unless_the_detector_was_chunked(self, sample_output):
+        assert sample_output.baseline == ()
+
+
+@pytest.mark.required
+class TestChunkedDriftBaseline:
+    """The output of a chunked detector carries the metric of each reference chunk."""
+
+    def test_baseline_holds_one_value_per_reference_chunk(self):
+        rng = np.random.default_rng(0)
+        detector = DriftKNeighbors().chunked(chunk_count=4).fit(rng.normal(size=(200, 8)))
+        output = detector.predict(rng.normal(size=(100, 8)))
+        baseline_values = detector._baseline_values
+        assert baseline_values is not None
+        assert len(output.baseline) == 4
+        assert list(output.baseline) == [float(v) for v in baseline_values]
+        assert all(isinstance(v, float) for v in output.baseline)
+
+    def test_baseline_lies_between_the_thresholds_that_it_defines(self):
+        rng = np.random.default_rng(0)
+        output = (
+            DriftKNeighbors().chunked(chunk_count=4).fit(rng.normal(size=(200, 8))).predict(rng.normal(size=(100, 8)))
+        )
+        lower, upper = output.details["lower_threshold"][0], output.details["upper_threshold"][0]
+        assert all(lower <= v <= upper for v in output.baseline)
+
 
 @pytest.mark.required
 class TestChunkers:

@@ -28,16 +28,20 @@
 #
 # ## What you will do
 #
-# - Train different reconstruction models (AE, VAE) for OOD detection
-# - Use Gaussian Mixture Models (GMM) to enhance OOD detection
-# - Compare KNN-based OOD detection with cosine and Euclidean distance metrics
-# - Compare model performance on different OOD scenarios
-# - Visualize reconstruction quality and OOD scores
+# - Fit six detectors on photographs of ground vehicles: KNN with cosine and with Euclidean distance on pretrained
+#   embeddings, and reconstruction with an AE, a VAE, and each of those with a Gaussian mixture model (GMM) head
+# - Score four kinds of input that the detectors never saw: noisy frames, blurred frames, aerial maritime frames, and a
+#   vehicle family that was left out of training
+# - Compare which detector catches which kind of input
+# - Read OOD scores against a percentile threshold, and visualize reconstructions
 #
 # ## What you will learn
 #
 # - How to fit the six detectors on in-distribution data and score new data with each
-# - How the detection rate changes as the OOD data gets closer to the training data
+# - That a reconstruction detector flags inputs that are hard to reconstruct, such as noise, and misses inputs that are
+#   easy to reconstruct, such as blurred or aerial frames
+# - That distance between pretrained embeddings catches a change of sensor or platform, and that no detector here
+#   catches a new vehicle of a known kind
 # - How to read OOD scores against a percentile threshold
 #
 # ## What you will need
@@ -65,8 +69,16 @@
 # 1. KNN with cosine distance: measures angular similarity in learned [embeddings](../concepts/Embeddings.md)
 # 1. KNN with Euclidean distance: measures straight-line distance in learned embeddings
 #
-# For this tutorial, you will use the MNIST dataset of handwritten digits. You will train models to recognize digits 0-7
-# and test their ability to detect digits 8-9 as out-of-distribution samples.
+# For this tutorial, you will use MilitaryVehicles, photographs of 24 types of military land vehicle. You will train the
+# detectors on every family except the one that the dataset labels Air Defense. A fielded recognizer can meet four kinds
+# of input that differ from its training data, and you will score each of them:
+#
+# - Noisy frames, such as a sensor fault produces
+# - Blurred frames, such as a focus or motion fault produces
+# - Aerial maritime frames from a different platform, taken from the SeaDrone dataset
+# - An unseen family, the one that the dataset labels Air Defense, which the training left out
+#
+# Each kind is a different change in the data, and a detector that catches one kind can miss another.
 
 # %% [markdown]
 # ## Setup
@@ -74,18 +86,18 @@
 # Install the required packages and import the libraries you need.
 
 # %% [markdown]
-# ### Important note on expected results
+# ### How to read the detection rates
 #
-# OOD detection performance depends on how different the OOD data is from the in-distribution data. This tutorial trains
-# on digits 0-7 and treats digits 8-9 as out of distribution. That is a hard case: digit 8 shares circular shapes with 0
-# and 6, and digit 9 shares curves with 3 and 5. The threshold of each detector is set so that about 95% of
-# in-distribution samples are accepted. The "Comparing use cases" section adds an easy and a medium case.
+# The threshold of each detector is set so that about 95% of in-distribution samples are accepted. A detection rate is
+# the share of a set of images that the detector flags as OOD. On in-distribution images that share is the false alarm
+# rate, which the threshold sets near 5%. A detection rate close to 5% on another set of images means that the detector
+# does not separate it from the in-distribution data.
 
 # %%
 try:
     import google.colab  # noqa: F401
 
-    # %pip install -q dataeval torchvision
+    # %pip install -q dataeval maite-datasets torchvision plotly
 except Exception:
     pass
 
@@ -94,16 +106,21 @@ from typing import cast
 
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.express as px
+import plotly.io as pio
+import polars as pl
 import torch
-from maite_datasets.image_classification import CIFAR10, MNIST
+from maite_datasets.image_classification import MilitaryVehicles
+from maite_datasets.object_detection import SeaDrone
+from scipy.ndimage import gaussian_filter
+from torchvision.models import ResNet18_Weights, resnet18
 
 import dataeval
 from dataeval import Embeddings
-from dataeval.data import Filter, Limit, Shuffle, View
 from dataeval.extractors import TorchExtractor
 from dataeval.shift import OODKNeighbors, OODReconstruction
 from dataeval.utils.models import AE, VAE, GMMDensityNet
-from dataeval.utils.preprocessing import rescale, resize, to_canonical_grayscale
+from dataeval.utils.preprocessing import resize, to_canonical_grayscale
 
 # Set random seeds for reproducibility
 dataeval.config.set_seed(173, all_generators=True)
@@ -116,95 +133,79 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dataeval.config.set_device(device)
 print(f"Using device: {device}")
 
+# Render the plotly figures below with the plotly JS embedded in the notebook output
+pio.renderers.default = "notebook"
 
 # %% [markdown]
 # ## Prepare the data
 #
-# You will load the MNIST dataset and split it into in-distribution (digits 0-7) and out-of-distribution (digits 8-9)
-# samples.
-
-
-# %%
-def normalize(x):
-    return x.astype(np.float32) / 255.0
-
-
-in_dist_digits = [0, 1, 2, 3, 4, 5, 6, 7]
-out_of_dist_digits = [8, 9]
-
-
-mnist_train = View(
-    MNIST("./data", image_set="train", download=True, transforms=normalize),
-    operations=[Filter(classes=in_dist_digits), Shuffle(), Limit(10000)],
-)
-mnist_test_in = View(
-    MNIST("./data", image_set="test", download=True, transforms=normalize),
-    operations=[Filter(classes=in_dist_digits), Shuffle(), Limit(1000)],
-)
-mnist_test_ood = View(
-    MNIST("./data", image_set="test", download=True, transforms=normalize),
-    operations=[Filter(classes=out_of_dist_digits), Shuffle(), Limit(1000)],
-)
-
-print(f"Training set size: {len(mnist_train)}")
-print(f"Test set size: {len(mnist_test_in)}")
-print(f"Test set size: {len(mnist_test_ood)}")
-
-# Set the input shape (MNIST images are 28x28 grayscale)
-input_shape = (1, 28, 28)
-
+# Load the train and test splits of MilitaryVehicles with `MilitaryVehicles` from `maite_datasets`. Turn each photograph
+# into a 32 by 32 grayscale image with values from 0 to 1, which keeps the models small. The dataset ships with a
+# hierarchy that groups its classes into families. Take the four classes of the family labeled Air Defense out of the
+# training data and keep their test images as the unseen family.
 
 # %%
-# Extract data and labels from prefiltered datasets
-def extract_data_labels(dataset):
-    """Extract images and labels from a dataset."""
-    data, labels = [], []
-
-    for img, label_probs, _ in dataset:
-        label = np.argmax(label_probs)
-        data.append(img)
-        labels.append(label)
-
-    return np.stack(data), np.asarray(labels)
+input_shape = (1, 32, 32)
 
 
-# Extract training and test data (already filtered for correct classes)
-train_in, train_in_labels = extract_data_labels(mnist_train)
-test_in, test_in_labels = extract_data_labels(mnist_test_in)
-test_ood, test_ood_labels = extract_data_labels(mnist_test_ood)
+def prepare(image):
+    """Turn a photograph into a 32 by 32 grayscale image with values from 0 to 1."""
+    return (resize(to_canonical_grayscale(np.asarray(image)), 32)[np.newaxis] / 255).astype(np.float32)
 
+
+def load(image_set):
+    """Load a split as prepared images and class labels."""
+    dataset = MilitaryVehicles("./data", image_set=image_set, download=True)
+    images, labels = [], []
+    for image, target, _ in dataset:
+        images.append(prepare(image))
+        labels.append(int(np.argmax(target)))
+    return np.stack(images), np.asarray(labels), dataset
+
+
+train_images, train_labels, train_data = load("train")
+test_images, test_labels, _ = load("test")
+
+held_out_names = train_data.hierarchy["vehicle"]["military"]["land vehicle"]["Air Defense"]
+held_out = [train_data.label2index[name] for name in held_out_names]
+
+train_in = train_images[~np.isin(train_labels, held_out)]
+test_in = test_images[~np.isin(test_labels, held_out)]
+unseen = test_images[np.isin(test_labels, held_out)]
+
+print(f"Held out of training: {held_out_names}")
 print(f"Training in-distribution: {train_in.shape}")
 print(f"Test in-distribution: {test_in.shape}")
-print(f"Test out-of-distribution: {test_ood.shape}")
+print(f"Test unseen family: {unseen.shape}")
+
+# %% [markdown]
+# Build the other three kinds of input. Draw 300 random in-distribution test images, add Gaussian noise to them for the
+# noisy frames, and blur them for the blurred frames. The test split is ordered by class, so a random draw keeps the
+# images from coming from a few classes. For the aerial frames, load frames from the SeaDrone dataset, which are
+# photographs from drones over open water. Load it with `lazy=True` so that it reads only the frames you ask for.
 
 # %%
-# Visualize some in-distribution and OOD samples
-fig, axes = plt.subplots(2, 8, figsize=(12, 3))
+rng = np.random.default_rng(173)
+clean = test_in[np.random.default_rng(1).choice(len(test_in), 300, replace=False)]
+noisy = np.clip(clean + rng.normal(0, 0.2, clean.shape), 0, 1).astype(np.float32)
+blurred = gaussian_filter(clean, sigma=(0, 0, 2, 2)).astype(np.float32)
 
-# Show in-distribution samples (0-7) - one of each digit
-for digit in range(8):
-    # Find the first occurrence of this digit
-    idx = (train_in_labels == digit).nonzero()[0][0]
-    axes[0, digit].imshow(train_in[idx].squeeze(), cmap="gray")
-    axes[0, digit].axis("off")
-    axes[0, digit].set_title(f"Digit {digit}")
+seadrone = SeaDrone("./data", image_set="val", download=True, lazy=True)
+aerial = np.stack([prepare(seadrone[int(i)][0]) for i in rng.choice(len(seadrone), 300, replace=False)])
 
-# Show OOD samples (8-9) - 4 of each
-for i in range(8):
-    digit = 8 if i < 4 else 9
-    idx = (test_ood_labels == digit).nonzero()[0][(i % 4) * 50]
-    axes[1, i].imshow(test_ood[idx].squeeze(), cmap="gray")
-    axes[1, i].axis("off")
-    if i % 4 == 0:
-        axes[1, i].set_title(f"Digit {digit} (OOD)", color="red")
+scenarios = {"Noisy": noisy, "Blurred": blurred, "Aerial": aerial, "Unseen family": unseen}
 
-axes_text_kwargs = {"ha": "right", "va": "center", "fontsize": 12, "fontweight": "bold"}
-axes[0, 0].text(-0.5, 0.5, "In-Dist\n(Train)", transform=axes[0, 0].transAxes, **axes_text_kwargs)
-axes[1, 0].text(-0.5, 0.5, "OOD\n(Test)", transform=axes[1, 0].transAxes, **axes_text_kwargs)
-
+# %%
+# Show six images of each kind
+rows = {"In-distribution": test_in, **scenarios}
+fig, axes = plt.subplots(len(rows), 6, figsize=(9, 8))
+for row, (title, images) in enumerate(rows.items()):
+    for col in range(6):
+        axes[row, col].imshow(images[col * 40].squeeze(), cmap="gray", vmin=0, vmax=1)
+        axes[row, col].axis("off")
+    axes[row, 0].set_title(title, loc="left", fontweight="bold")
 plt.tight_layout()
 plt.show()
-
 
 # %% [markdown]
 # ## K-nearest neighbors (KNN) for OOD detection
@@ -213,8 +214,7 @@ plt.show()
 # samples are from their nearest neighbors in the training data. Samples that are far from all training samples are
 # likely OOD.
 #
-# Use it as a baseline for OOD detection with interpretable distance-based scoring. It needs embeddings from a model,
-# and the cells below train a small CNN to produce them.
+# Use it as a baseline for OOD detection with interpretable distance-based scoring. It needs embeddings from a model.
 #
 # :::{note}
 # KNN performance depends on the quality of the embeddings you provide:
@@ -226,167 +226,57 @@ plt.show()
 # - For tabular data, use MLPs or autoencoders trained on your feature space
 # :::
 #
-# This tutorial trains a simple CNN for demonstration, but using pretrained models (for example, an ImageNet-pretrained
-# ResNet) would likely improve the results.
+# This tutorial uses a
+# [pretrained ResNet18](https://pytorch.org/vision/main/models/generated/torchvision.models.resnet18.html) from
+# Torchvision. Point a {class}`.TorchExtractor` at its penultimate `avgpool` layer. The `transforms` repeat the
+# grayscale channel three times and apply the standard resize and normalize preprocessing of the model. For other ways
+# to build embeddings, see [Create embeddings](./h2_create_embeddings.py).
+
+# %%
+weights = ResNet18_Weights.DEFAULT
+extractor = TorchExtractor(
+    resnet18(weights=weights, progress=False),
+    transforms=lambda image: weights.transforms()(image.expand(3, -1, -1)),
+    layer_name="avgpool",
+)
+
+# Get embeddings for the training data, the in-distribution test data and each scenario
+train_emb = Embeddings(train_in, extractor=extractor, batch_size=64)
+test_emb = Embeddings(test_in, extractor=extractor, batch_size=64)
+scenario_emb = {name: Embeddings(images, extractor=extractor, batch_size=64) for name, images in scenarios.items()}
+print(f"Training embeddings shape: {train_emb.shape}")
 
 
 # %%
-# Define a simple CNN for learning embeddings
-class EmbeddingNet(torch.nn.Module):
-    """Simple CNN that learns embeddings for digit classification."""
-
-    def __init__(self, embedding_dim=64):
-        super().__init__()
-        self.embedding_dim = embedding_dim
-
-        # Convolutional layers
-        self.conv_layers = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 32, kernel_size=3, padding=1),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(2),  # 28x28 -> 14x14
-            torch.nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(2),  # 14x14 -> 7x7
-        )
-
-        # Embedding layer
-        self.embedding = torch.nn.Sequential(
-            torch.nn.Flatten(),
-            torch.nn.Linear(64 * 7 * 7, 128),
-            torch.nn.ReLU(),
-            torch.nn.Linear(128, embedding_dim),
-        )
-
-        # Classification head (for training only)
-        self.classifier = torch.nn.Linear(embedding_dim, 8)  # 8 digit classes (0-7)
-
-    def forward(self, x, return_embedding=False):
-        """Forward pass. Returns embeddings if return_embedding=True, else logits."""
-        emb = self.embedding(self.conv_layers(x))
-        return emb if return_embedding else self.classifier(emb)
+def accepted(detector, data):
+    """Percent of the data that a fitted detector accepts as in-distribution."""
+    return 100 * (1 - detector.predict(data).is_ood.mean())
 
 
-# %%
-# Create and train the embedding model
-embedding_model = EmbeddingNet(embedding_dim=64).to(device)
-optimizer = torch.optim.Adam(embedding_model.parameters(), lr=0.001)
-criterion = torch.nn.CrossEntropyLoss()
-
-print("Training embedding model for digit classification...")
-print(f"Embedding dimension: {embedding_model.embedding_dim}")
-
-# Train for a few epochs
-num_epochs = 3
-batch_size = 256
-
-for epoch in range(num_epochs):
-    embedding_model.train()
-    total_loss, correct, total = 0, 0, 0
-
-    # Create batches
-    num_batches = len(train_in) // batch_size
-    for i in range(num_batches):
-        start_idx = i * batch_size
-        end_idx = start_idx + batch_size
-
-        batch_imgs = torch.as_tensor(train_in[start_idx:end_idx], device=device)
-        batch_labels = torch.as_tensor(train_in_labels[start_idx:end_idx], device=device)
-
-        # Forward pass
-        optimizer.zero_grad()
-        logits = embedding_model(batch_imgs)
-        loss = criterion(logits, batch_labels)
-
-        # Backward pass
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        _, predicted = torch.max(logits.data, 1)
-        total += batch_labels.size(0)
-        correct += (predicted == batch_labels).sum().item()
-
-    avg_loss = total_loss / num_batches
-    accuracy = 100 * correct / total
-    print(f"Epoch {epoch + 1}/{num_epochs} - Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%")
-
-print("✓ Embedding model trained!")
-
-# %%
-# Create extractor using the trained embedding model
-knn_extractor = TorchExtractor(embedding_model)
-
-# Get embeddings for all datasets
-print("Extracting embeddings...")
-train_in_emb = Embeddings(train_in, extractor=knn_extractor, batch_size=64)
-test_in_emb = Embeddings(test_in, extractor=knn_extractor, batch_size=64)
-test_ood_emb = Embeddings(test_ood, extractor=knn_extractor, batch_size=64)
-
-print(f"Training embeddings shape: {train_in_emb.shape}")
-print(f"Test in-dist embeddings shape: {test_in_emb.shape}")
-print(f"Test OOD embeddings shape: {test_ood_emb.shape}")
-
-# %%
-# Create KNN detector with learned embeddings
+# Create the KNN detector with cosine distance and fit it on the training embeddings
 ood_knn_cos = OODKNeighbors(k=10, distance_metric="cosine", threshold_perc=95.0)
-
-print("\nFitting KNN detector with learned embeddings...")
-ood_knn_cos.fit(train_in_emb)
-print("Done!")
-
-# %%
-# Get predictions with learned embeddings
-knn_cos_result_in = ood_knn_cos.predict(test_in_emb)
-knn_cos_result_ood = ood_knn_cos.predict(test_ood_emb)
-
-# Calculate detection accuracy
-in_acc_knn = 100 * (1 - knn_cos_result_in.is_ood.mean())
-ood_rate_knn = 100 * knn_cos_result_ood.is_ood.mean()
-
-print("\n--- KNN Cosine (Embeddings) Results ---")
-print(f"In-distribution correctly identified: {in_acc_knn:.1f}%")
-print(f"OOD samples detected: {ood_rate_knn:.1f}%")
-print(f"Average score (in-dist): {knn_cos_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {knn_cos_result_ood.instance_score.mean():.4f}")
+ood_knn_cos.fit(train_emb)
+print(f"KNN cosine accepts {accepted(ood_knn_cos, test_emb):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ### KNN with Euclidean distance
 #
-# Euclidean distance measures the straight-line distance between points in the embedding space. Unlike cosine
-# similarity, which only considers the angle between vectors, Euclidean distance also accounts for their magnitude. This
-# makes it better suited for embeddings where the scale of the vectors carries meaningful information.
+# Cosine distance compares the direction of two embeddings and ignores their length. Euclidean distance compares their
+# positions, so it also depends on their length. Fit a second detector with Euclidean distance on the same embeddings.
 
 # %%
-# Create KNN detector with Euclidean distance
 ood_knn_euc = OODKNeighbors(k=10, distance_metric="euclidean", threshold_perc=95.0)
-
-print("Fitting KNN (Euclidean) detector with learned embeddings...")
-ood_knn_euc.fit(train_in_emb)
-print("Done!")
-
-# %%
-# Get predictions with Euclidean distance
-knn_euc_result_in = ood_knn_euc.predict(test_in_emb)
-knn_euc_result_ood = ood_knn_euc.predict(test_ood_emb)
-
-# Calculate detection accuracy
-in_acc_knn_euc = 100 * (1 - knn_euc_result_in.is_ood.mean())
-ood_rate_knn_euc = 100 * knn_euc_result_ood.is_ood.mean()
-
-print("\n--- KNN Euclidean (Embeddings) Results ---")
-print(f"In-distribution correctly identified: {in_acc_knn_euc:.1f}%")
-print(f"OOD samples detected: {ood_rate_knn_euc:.1f}%")
-print(f"Average score (in-dist): {knn_euc_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {knn_euc_result_ood.instance_score.mean():.4f}")
+ood_knn_euc.fit(train_emb)
+print(f"KNN Euclidean accepts {accepted(ood_knn_euc, test_emb):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ## Standard autoencoder (AE) for OOD detection
 #
 # The simplest approach uses a standard autoencoder that learns to reconstruct normal (in-distribution) images. When
-# presented with OOD data, reconstruction error increases, which signals anomalous samples.
+# presented with OOD data, reconstruction error is expected to increase, which signals anomalous samples.
 #
-# Use it for fast, simple OOD detection when your distributions are well separated and you do not need probabilistic
-# interpretations.
+# Use it for fast, simple OOD detection when the OOD data is hard to reconstruct, and you do not need probabilistic
+# interpretations. Later sections show which inputs it misses.
 #
 # :::{note}
 # This tutorial uses a simple, generic AE architecture provided by DataEval for demonstration purposes. In production:
@@ -410,45 +300,12 @@ config = OODReconstruction.Config(
     threshold_perc=95.0,  # 95% of training data considered normal
 )
 
-# Initialize OOD detector
+# Initialize the OOD detector and train it on the in-distribution data
 ood_ae = OODReconstruction(ae_model, device=device, config=config)
-
-print("Training Standard Autoencoder...")
 print(f"Model type detected: {ood_ae.model_type}")
 print(f"Using GMM: {ood_ae.use_gmm}")
-
-# %%
-# Train the model on in-distribution data
 ood_ae.fit(train_in)
-
-# %%
-# Get predictions
-ae_result_in = ood_ae.predict(test_in)
-ae_result_ood = ood_ae.predict(test_ood)
-
-# Calculate detection accuracy
-in_acc_ae = 100 * (1 - ae_result_in.is_ood.mean())
-ood_rate_ae = 100 * ae_result_ood.is_ood.mean()
-
-print("\n--- Standard AE Results ---")
-print(f"In-distribution correctly identified: {in_acc_ae:.1f}%")
-print(f"OOD samples detected: {ood_rate_ae:.1f}%")
-print(f"Average score (in-dist): {ae_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {ae_result_ood.instance_score.mean():.4f}")
-
-# Validation: Check if OOD scores are higher than in-dist scores
-score_separation = ae_result_ood.instance_score.mean() - ae_result_in.instance_score.mean()
-print(f"\nScore separation (OOD - In-Dist): {score_separation:.4f}")
-if score_separation > 0:
-    print("✓ Expected: OOD samples have higher scores than in-distribution samples")
-else:
-    print("⚠ Warning: OOD scores should be higher than in-distribution scores")
-
-# Check if we're near the target threshold
-if 90 <= in_acc_ae <= 98:
-    print(f"✓ Expected: ~95% of in-distribution samples correctly identified (got {in_acc_ae:.1f}%)")
-else:
-    print(f"⚠ Note: Expected ~95% in-dist accuracy, got {in_acc_ae:.1f}%")
+print(f"AE accepts {accepted(ood_ae, test_in):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ## Variational autoencoder (VAE) for OOD detection
@@ -456,66 +313,34 @@ else:
 # VAEs learn a probabilistic latent representation, which gives a more structured latent space than a standard AE.
 #
 # Use it when you need that latent representation or when your in-distribution data has significant variance. In this
-# tutorial the plain VAE flags fewer OOD samples than the other detectors on the rotated digits and on digits 8-9. The
-# "Comparing use cases" section shows the rates.
+# tutorial the plain VAE flags the fewest inputs of the six detectors.
 
 # %%
-# Create and configure the VAE
 vae_model = VAE(input_shape=input_shape)
-
-# Initialize OOD detector (auto-detects as VAE)
 ood_vae = OODReconstruction(vae_model, device=device, config=config)
-
-print("Training Variational Autoencoder...")
 print(f"Model type detected: {ood_vae.model_type}")
 print(f"Using GMM: {ood_vae.use_gmm}")
-
-# %%
-# Train the VAE
 ood_vae.fit(train_in)
-
-# %%
-# Evaluate VAE performance
-vae_result_in = ood_vae.predict(test_in)
-vae_result_ood = ood_vae.predict(test_ood)
-
-in_acc_vae = 100 * (1 - vae_result_in.is_ood.mean())
-ood_rate_vae = 100 * vae_result_ood.is_ood.mean()
-
-print("\n--- VAE Results ---")
-print(f"In-distribution correctly identified: {in_acc_vae:.1f}%")
-print(f"OOD samples detected: {ood_rate_vae:.1f}%")
-print(f"Average score (in-dist): {vae_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {vae_result_ood.instance_score.mean():.4f}")
+print(f"VAE accepts {accepted(ood_vae, test_in):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ## Autoencoder with GMM for enhanced OOD detection
 #
-# Adding a Gaussian Mixture Model (GMM) to the latent space provides an additional signal for OOD detection. The GMM
-# models the density of the latent representations, and samples with low density are likely to be OOD. This combines
-# reconstruction error with density estimation using **sensor fusion**: both components are standardized (z-score
-# normalized) and combined with configurable weighting.
+# A Gaussian Mixture Model (GMM) density network scores each sample by how likely its latent code is under a mixture
+# fitted to the in-distribution data. The detector combines that energy with the reconstruction error.
 #
-# Use it when your in-distribution data is complex and naturally clusters into multiple groups. On the rotated digits in
-# this tutorial, the two GMM detectors flag the most OOD samples.
+# Use it when reconstruction error alone is not enough, for example when the OOD data reconstructs well but sits in an
+# unusual region of the latent space.
 #
-# :::{note}
-# The GMM fusion parameters (`gmm_weight` and `gmm_score_mode`) set how the reconstruction score and the GMM score
-# combine into the final score. The default `gmm_weight` is 0.5, which weights the two scores equally. This tutorial
-# sets it to 0.7, which favors the GMM component. Experiment with values in [0.5, 0.9] for your data.
-# :::
+# Add a `GMMDensityNet` to the AE, and set the weight of the GMM energy and how the two scores are combined in the
+# configuration.
 
 # %%
-# Create AE with GMM density network
-# The latent dimension is auto-computed by AE
 ae_model_gmm = AE(input_shape=input_shape)
 latent_dim = cast(int, ae_model_gmm.encoder.flatten[1].out_features)
-
-# Create GMM density network with 3 components
 gmm_density_net = GMMDensityNet(latent_dim=latent_dim, n_gmm=3)
 ae_model_gmm.gmm_density_net = gmm_density_net
 
-# Configure training parameters
 config_gmm = OODReconstruction.Config(
     epochs=3,
     batch_size=64,
@@ -524,352 +349,36 @@ config_gmm = OODReconstruction.Config(
     gmm_score_mode="standardized",  # Use z-score normalization for score fusion
 )
 
-# Initialize OOD detector (auto-detects GMM usage)
 ood_ae_gmm = OODReconstruction(ae_model_gmm, device=device, config=config_gmm)
-
-print("Training Autoencoder with GMM...")
 print(f"Model type detected: {ood_ae_gmm.model_type}")
 print(f"Using GMM: {ood_ae_gmm.use_gmm}")
 print(f"Latent dimension: {latent_dim}")
 print(f"Number of GMM components: {gmm_density_net.n_gmm}")
-
-# %%
-# Train the AE+GMM model
 ood_ae_gmm.fit(train_in)
-
-# %%
-# Evaluate AE+GMM performance
-ae_gmm_result_in = ood_ae_gmm.predict(test_in)
-ae_gmm_result_ood = ood_ae_gmm.predict(test_ood)
-
-in_acc_ae_gmm = 100 * (1 - ae_gmm_result_in.is_ood.mean())
-ood_rate_ae_gmm = 100 * ae_gmm_result_ood.is_ood.mean()
-
-print("\n--- AE + GMM Results ---")
-print(f"In-distribution correctly identified: {in_acc_ae_gmm:.1f}%")
-print(f"OOD samples detected: {ood_rate_ae_gmm:.1f}%")
-print(f"Average score (in-dist): {ae_gmm_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {ae_gmm_result_ood.instance_score.mean():.4f}")
+print(f"AE + GMM accepts {accepted(ood_ae_gmm, test_in):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ## VAE with GMM for OOD detection
 #
-# This detector combines the probabilistic latent space of a VAE with GMM density estimation. In this tutorial it is one
-# of the two detectors that flag the most OOD samples on the rotated digits. On digits 8-9, KNN with cosine distance
-# flags the most.
+# This combines the probabilistic encoding of a VAE with the density estimate of a GMM. Use it when you want both.
 
 # %%
-# Create VAE with GMM density network
 vae_model_gmm = VAE(input_shape=input_shape)
-vae_latent_dim = vae_model_gmm.latent_dim
+vae_model_gmm.gmm_density_net = GMMDensityNet(latent_dim=vae_model_gmm.latent_dim, n_gmm=3)
 
-# Create GMM density network
-gmm_density_net_vae = GMMDensityNet(latent_dim=vae_latent_dim, n_gmm=3)
-vae_model_gmm.gmm_density_net = gmm_density_net_vae
-
-# Initialize OOD detector
 ood_vae_gmm = OODReconstruction(vae_model_gmm, device=device, config=config_gmm)
-
-print("Training VAE with GMM...")
-print(f"Model type detected: {ood_vae_gmm.model_type}")
-print(f"Using GMM: {ood_vae_gmm.use_gmm}")
-print(f"Latent dimension: {vae_latent_dim}")
-print(f"Number of GMM components: {gmm_density_net_vae.n_gmm}")
-
-# %%
-# Train the VAE+GMM model
 ood_vae_gmm.fit(train_in)
-
-# %%
-# Evaluate VAE+GMM performance
-vae_gmm_result_in = ood_vae_gmm.predict(test_in)
-vae_gmm_result_ood = ood_vae_gmm.predict(test_ood)
-
-in_acc_vae_gmm = 100 * (1 - vae_gmm_result_in.is_ood.mean())
-ood_rate_vae_gmm = 100 * vae_gmm_result_ood.is_ood.mean()
-
-print("\n--- VAE + GMM Results ---")
-print(f"In-distribution correctly identified: {in_acc_vae_gmm:.1f}%")
-print(f"OOD samples detected: {ood_rate_vae_gmm:.1f}%")
-print(f"Average score (in-dist): {vae_gmm_result_in.instance_score.mean():.4f}")
-print(f"Average score (OOD): {vae_gmm_result_ood.instance_score.mean():.4f}")
+print(f"VAE + GMM accepts {accepted(ood_vae_gmm, test_in):.1f}% of the in-distribution test images")
 
 # %% [markdown]
 # ## Compare all methods
 #
-# Now visualize and compare the performance of all six approaches.
+# Score the in-distribution test images and the four kinds of input with each detector. The KNN detectors read
+# embeddings, and the reconstruction detectors read images. Each cell of the heatmap is the share of that set of images
+# that the detector flags as OOD.
 
 # %%
-# Summary comparison
-methods = ["KNN\nCosine", "KNN\nEuclidean", "AE", "VAE", "AE+GMM", "VAE+GMM"]
-in_dist_acc = [in_acc_knn, in_acc_knn_euc, in_acc_ae, in_acc_vae, in_acc_ae_gmm, in_acc_vae_gmm]
-ood_detect = [ood_rate_knn, ood_rate_knn_euc, ood_rate_ae, ood_rate_vae, ood_rate_ae_gmm, ood_rate_vae_gmm]
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 5))
-
-# Plot in-distribution accuracy
-colors = ["#3498db", "#2980b9", "#9b59b6", "#8e44ad", "#2ecc71", "#e74c3c"]
-bars1 = ax1.bar(methods, in_dist_acc, color=colors)
-ax1.set_ylabel("Accuracy (%)", fontsize=12)
-ax1.set_title("In-Distribution Samples Correctly Identified", fontsize=14, fontweight="bold")
-ax1.set_ylim([0, 105])
-ax1.axhline(y=95, color="gray", linestyle="--", alpha=0.5, label="Target: 95%")
-ax1.legend()
-ax1.tick_params(axis="x", rotation=0)
-text_kwargs = {"ha": "center", "va": "bottom", "fontsize": 9, "fontweight": "bold"}
-for bar in bars1:
-    height = bar.get_height()
-    ax1.text(bar.get_x() + bar.get_width() / 2.0, height, f"{height:.1f}%", **text_kwargs)
-
-# Plot OOD detection rate
-bars2 = ax2.bar(methods, ood_detect, color=colors)
-ax2.set_ylabel("Detection Rate (%)", fontsize=12)
-ax2.set_title("Out-of-Distribution Samples Detected", fontsize=14, fontweight="bold")
-ax2.set_ylim([0, 105])
-ax2.tick_params(axis="x", rotation=0)
-for bar in bars2:
-    height = bar.get_height()
-    ax2.text(bar.get_x() + bar.get_width() / 2.0, height, f"{height:.1f}%", **text_kwargs)
-
-plt.tight_layout()
-plt.show()
-
-# %% [markdown]
-# ### Key observations
-#
-# The thresholds accept about 95% of in-distribution samples. The cell prints the range of the in-distribution rates and
-# the OOD detection rates, highest first.
-
-# %%
-print(f"In-distribution samples accepted: {min(in_dist_acc):.1f}% to {max(in_dist_acc):.1f}% (target 95%)")
-print("OOD samples detected, highest first:")
-for name, rate in sorted(zip(methods, ood_detect, strict=True), key=lambda pair: pair[1], reverse=True):
-    print(f"  {name.replace(chr(10), ' '):15} {rate:.1f}%")
-
-# %% [markdown]
-# Digits 8 and 9 share features with 0-7, so no detector flags more than half of them. The two distance metrics for KNN
-# differ by more than ten points here, and the plain VAE detects the fewest.
-
-# %%
-# Visualize OOD score distributions
-fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-results = [
-    (knn_cos_result_in, knn_cos_result_ood, "KNN (Cosine)"),
-    (ae_result_in, ae_result_ood, "AE"),
-    (vae_result_in, vae_result_ood, "VAE"),
-    (knn_euc_result_in, knn_euc_result_ood, "KNN (Euclidean)"),
-    (ae_gmm_result_in, ae_gmm_result_ood, "AE + GMM"),
-    (vae_gmm_result_in, vae_gmm_result_ood, "VAE + GMM"),
-]
-
-for idx, result in enumerate(results):
-    row, col = idx // 3, idx % 3
-    ax = axes[row, col]
-
-    result_in, result_ood, title = result
-
-    # Plot histograms
-    ax.hist(result_in.instance_score, bins=50, alpha=0.6, label="In-Distribution", color="blue")
-    ax.hist(result_ood.instance_score, bins=50, alpha=0.6, label="Out-of-Distribution", color="red")
-
-    ax.set_xlabel("OOD Score", fontsize=11)
-    ax.set_ylabel("Frequency", fontsize=11)
-    ax.set_title(title, fontsize=13, fontweight="bold")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
-
-plt.tight_layout()
-plt.show()
-
-
-# %% [markdown]
-# ### Interpreting score distributions
-#
-# Look at how far apart the blue (in-distribution) and red (OOD) histograms sit. Clear separation means the detector
-# tells the two apart, and overlap means it cannot. The printed average scores show that every detector scores the OOD
-# samples higher than the in-distribution samples on average. The overlap is large here because digits 8 and 9 share
-# features with the training digits.
-
-# %% [markdown]
-# ## Visualize reconstructions
-#
-# Examine how reconstruction-based models reconstruct in-distribution and out-of-distribution samples. Good OOD
-# detection should show clear degradation in reconstruction quality for OOD samples.
-#
-# Note: KNN does not use reconstruction, so this section focuses on the autoencoder-based methods.
-
-
-# %%
-# Helper function to get reconstructions
-def get_reconstructions(model, data, device):
-    """Get reconstructions from a model."""
-    model.model.to(device)
-    model.model.eval()
-    with torch.no_grad():
-        data_tensor = torch.from_numpy(data).float().to(device)
-        output = model.model(data_tensor)
-        reconstruction = output[0] if isinstance(output, tuple) else output
-        return reconstruction.cpu().numpy()
-
-
-# Get samples: 1 in-dist, 1 OOD stacked as rows
-n_samples = 2
-originals = np.concatenate([test_in[:n_samples], test_ood[:n_samples]], axis=0)  # (4, 1, 28, 28)
-
-# Get reconstructions for all samples
-recon_ae = get_reconstructions(ood_ae, originals, device)  # (4, 1, 28, 28)
-recon_vae_gmm = get_reconstructions(ood_vae_gmm, originals, device)  # (4, 1, 28, 28)
-
-# Stack columns: Original, AE, VAE -> shape (4, 3, 1, 28, 28)
-recon_grid = np.stack([originals, recon_ae, recon_vae_gmm], axis=1)
-
-# %%
-# Visualize reconstructions: rows = samples, columns = Original/AE/VAE
-fig, axes = plt.subplots(4, 3, figsize=(6, 8))
-
-# Column titles
-col_titles = ["Original", "AE", "VAE+GMM"]
-for j, title in enumerate(col_titles):
-    axes[0, j].set_title(title, fontsize=12, fontweight="bold")
-
-# Row labels
-row_labels = ["In-Dist", "In-Dist", "OOD", "OOD"]
-
-# Plot each cell using recon_grid[row, col]
-for i, label in enumerate(row_labels):
-    # Add row label
-    color = "darkgreen" if "In-Dist" in label else "darkred"
-    axes[i, 0].text(
-        -0.3,
-        0.5,
-        label,
-        transform=axes[i, 0].transAxes,
-        ha="right",
-        va="center",
-        fontsize=11,
-        fontweight="bold",
-        color=color,
-    )
-
-    for j in range(3):
-        axes[i, j].imshow(recon_grid[i, j].squeeze(), cmap="gray")
-        axes[i, j].axis("off")
-
-plt.tight_layout()
-plt.show()
-
-# %% [markdown]
-# ### Understanding reconstructions
-#
-# What to observe:
-#
-# - The columns show the original image, the AE reconstruction and the VAE+GMM reconstruction.
-# - Rows 1-2 are in-distribution samples (digits 5 and 4).
-# - Rows 3-4 are out-of-distribution samples (digit 8).
-#
-# Expected reconstruction behavior:
-#
-# - In-distribution samples: the model has learned these patterns, so you expect good reconstruction and low error.
-# - OOD samples: the model has not seen these patterns, so you expect worse reconstruction and high error.
-#
-# Note: The degree of degradation depends on the similarity between the in-distribution and OOD data:
-#
-# - Digits 8 and 9 share some features with 0-7 (curves, circles).
-# - So reconstructions may still look reasonable but will have higher error.
-# - More distinct OOD data (for example, letters instead of digits) would show clearer degradation.
-
-# %% [markdown]
-# ## Comparing use cases - when does each method excel?
-#
-# :::{note}
-# The results reflect limited training and generic models.
-# :::
-#
-# This comparison uses:
-#
-# - Only 3 epochs for AE/VAE training and KNN embedding model training (production typically needs 10-50+ epochs)
-# - A small sample size: 10K training, 3K test samples
-# - Generic model architectures: simple CNNs not optimized for MNIST
-# - A fast demonstration, prioritized over optimal performance
-#
-# This means:
-#
-# - The results show what happens with minimal training and generic models, which is useful for quick prototypes
-# - Model architecture matters: custom architectures designed for your data type (images, time series, tabular) will
-#   perform significantly better
-# - With proper training and tuning and domain-specific architectures, the performance rankings may change significantly
-# - Use these results as a starting point, not definitive guidance
-#
-# :::{note}
-# The AE, VAE, and GMM methods use models you provide. Performance heavily depends on:
-#
-# - Choosing appropriate architectures for your data type and complexity
-# - Proper hyperparameter tuning (latent dimensions, layer sizes, activation functions)
-# - Sufficient training epochs and data
-# - Appropriate loss functions and regularization
-# :::
-#
-# The simple models used here serve as examples. Real applications should use architectures targeted to the specific
-# scenario.
-#
-# Test each method on different OOD scenarios to see its strengths and weaknesses in this limited-training setting.
-#
-# You create three OOD scenarios with increasing difficulty:
-#
-# 1. Easy OOD: CIFAR10 natural images (converted to grayscale 28x28), which are completely different from digits
-# 1. Medium OOD: rotated digits, which are the same objects in a different orientation
-# 1. Hard OOD: digits 8-9 have features similar to the training data (the current scenario)
-
-# %%
-# Create different OOD scenarios
-
-# Scenario 1: Easy OOD - CIFAR10 (completely different domain: natural images vs digits)
-# Load CIFAR10 and convert to match MNIST format
-cifar_dataset = CIFAR10("./data", image_set="test", download=True)
-easy_ood_list = []
-for i in range(500):
-    img = cifar_dataset[i][0]
-    img_gray = resize(to_canonical_grayscale(rescale(img, 8)), 28)[np.newaxis, :]
-    easy_ood_list.append(normalize(img_gray))
-easy_ood = np.stack(easy_ood_list)
-
-# Scenario 2: Medium OOD - Rotated digits (same domain, different transformation)
-medium_ood = np.rot90(test_in[:500], k=1, axes=(2, 3)).copy()
-
-# Scenario 3: Hard OOD - Digits 8-9 (already created as test_ood_subset)
-hard_ood = test_ood
-
-# Get embeddings for all OOD scenarios (reuse the same extractor)
-easy_ood_emb = Embeddings(easy_ood, extractor=knn_extractor, batch_size=64)
-medium_ood_emb = Embeddings(medium_ood, extractor=knn_extractor, batch_size=64)
-hard_ood_emb = Embeddings(hard_ood, extractor=knn_extractor, batch_size=64)
-
-print("Created three OOD scenarios:")
-print(f"1. Easy (CIFAR10 → grayscale): {easy_ood.shape}")
-print(f"2. Medium (Rotated digits): {medium_ood.shape}")
-print(f"3. Hard (Digits 8-9): {hard_ood.shape}")
-
-# %%
-# Visualize the different OOD scenarios
-fig, axes = plt.subplots(3, 5, figsize=(12, 7))
-
-ood_by_scenario = [easy_ood, medium_ood, hard_ood]
-ood_title = [("Easy OOD (CIFAR10)", "red"), ("Medium OOD (Rotated)", "orange"), ("Hard OOD (Digits 8-9)", "darkred")]
-
-# Easy OOD - CIFAR10 (grayscale)
-for i in range(5):
-    for j in range(3):
-        if i == 0:
-            axes[j, 0].set_title(ood_title[j][0], fontweight="bold", color=ood_title[j][1])
-        axes[j, i].imshow(ood_by_scenario[j][i * 20].squeeze(), cmap="gray")
-        axes[j, i].axis("off")
-
-plt.tight_layout()
-plt.show()
-
-# %%
-# Evaluate all models on all three OOD scenarios
-models = {
+detectors = {
     "KNN Cosine": ood_knn_cos,
     "KNN Euclidean": ood_knn_euc,
     "AE": ood_ae,
@@ -877,102 +386,218 @@ models = {
     "AE+GMM": ood_ae_gmm,
     "VAE+GMM": ood_vae_gmm,
 }
-
-scenarios = {
-    "Easy (CIFAR10)": (easy_ood, easy_ood_emb),
-    "Medium (Rotated)": (medium_ood, medium_ood_emb),
-    "Hard (Digits 8-9)": (hard_ood, hard_ood_emb),
+inputs = {
+    "In-distribution": (test_in, test_emb),
+    **{name: (images, scenario_emb[name]) for name, images in scenarios.items()},
 }
 
-# Store results
-results_matrix = {}
+results = {
+    name: {kind: detector.predict(emb if name.startswith("KNN") else images) for kind, (images, emb) in inputs.items()}
+    for name, detector in detectors.items()
+}
+rates = pl.DataFrame({
+    "Detector": list(results),
+    **{kind: [100 * result[kind].is_ood.mean() for result in results.values()] for kind in inputs},
+})
 
-for model_name, model in models.items():
-    results_matrix[model_name] = {}
-    for scenario_name, (ood_data, ood_data_emb) in scenarios.items():
-        # Use appropriate data format
-        data_to_use = ood_data_emb if model_name.startswith("KNN") else ood_data
+(
+    px
+    .imshow(
+        rates.drop("Detector").to_numpy(),
+        x=rates.columns[1:],
+        y=rates["Detector"].to_list(),
+        zmin=0,
+        zmax=100,
+        text_auto=True,
+        color_continuous_scale="Blues",
+        aspect="auto",
+    )
+    .update_traces(texttemplate="%{z:.0f}%")
+    .update_coloraxes(colorbar_title="Flagged (%)")
+)
 
-        result = model.predict(data_to_use)
-        detection_rate = 100 * result.is_ood.mean()
-        results_matrix[model_name][scenario_name] = detection_rate
+# %% [markdown]
+# ### Key observations
+#
+# The in-distribution column is the false alarm rate, and every detector holds it near the 5% that the threshold sets.
+# The other columns show which kind of input each detector catches:
+#
+# - Noisy frames: the AE flags nearly all of them, and the two GMM variants flag most. KNN with cosine distance flags
+#   nearly all of them too. The plain VAE and KNN with Euclidean distance flag almost none.
+# - Blurred frames and aerial frames: KNN with cosine distance flags nearly all of them. None of the reconstruction
+#   detectors flags a meaningful share, and neither does KNN with Euclidean distance.
+# - The unseen family: no detector flags more than a small share. The rates stay close to the false alarm rate, so none
+#   of the six separates the family labeled Air Defense from the vehicles that they were trained on.
+#
+# The cosine and Euclidean detectors read the same embeddings and differ by about 90 points on the aerial frames.
+# The next cell shows one difference between the embeddings: the embeddings of the noisy, blurred and aerial frames are
+# shorter than those of the in-distribution images. Cosine distance ignores length, and Euclidean distance does not.
 
 # %%
-# Create heatmap visualization
-fig, ax = plt.subplots(figsize=(10, 6))
+lengths = {"In-distribution": test_emb, **scenario_emb}
+for kind, emb in lengths.items():
+    print(f"{kind:16} mean embedding length: {np.linalg.norm(np.asarray(emb), axis=1).mean():.1f}")
 
-model_names = list(results_matrix.keys())
-scenario_names = list(scenarios.keys())
+# %% [markdown]
+# ### Interpreting score distributions
+#
+# A detection rate hides how the scores of a detector compare. Plot the scores that each detector gives the
+# in-distribution test images and the aerial frames. For a detector that works, the aerial scores sit to the right of
+# the in-distribution scores. KNN with cosine distance shows that. For the reconstruction detectors, the aerial scores
+# sit to the left. They do not flag the aerial frames because they score them as more familiar than the vehicle
+# photographs.
 
-# Create matrix for heatmap
-data = np.array([[results_matrix[model][scenario] for scenario in scenario_names] for model in model_names])
+# %%
+scores = pl.concat([
+    pl.DataFrame({
+        "Detector": [name] * len(result[kind].instance_score),
+        "Images": [kind] * len(result[kind].instance_score),
+        "Score": result[kind].instance_score,
+    })
+    for name, result in results.items()
+    for kind in ("In-distribution", "Aerial")
+])
 
-im = ax.imshow(data, cmap="viridis", aspect="auto", vmin=0, vmax=100)
+(
+    px
+    .histogram(
+        scores,
+        x="Score",
+        color="Images",
+        facet_col="Detector",
+        facet_col_wrap=3,
+        barmode="overlay",
+        opacity=0.6,
+        nbins=40,
+        histnorm="probability",
+        height=550,
+    )
+    .for_each_trace(lambda trace: trace.update(bingroup=trace.xaxis))  # bin each detector on its own scale
+    .update_xaxes(matches=None)
+    .update_yaxes(matches=None)
+    .for_each_annotation(lambda annotation: annotation.update(text=annotation.text.split("=")[-1]))
+)
 
-# Set ticks and labels
-ax.set_xticks(np.arange(len(scenario_names)))
-ax.set_yticks(np.arange(len(model_names)))
-ax.set_xticklabels(scenario_names)
-ax.set_yticklabels(model_names)
+# %% [markdown]
+# ## Visualize reconstructions
+#
+# Examine how the AE reconstructs images of each kind. A reconstruction detector works when the reconstruction error
+# is higher for OOD images than for in-distribution images.
+#
+# Note: KNN does not use reconstruction, so this section covers the autoencoder.
 
-# Rotate the tick labels for better readability
-plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
-# Add text annotations
-for i in range(len(model_names)):
-    for j in range(len(scenario_names)):
-        text = ax.text(j, i, f"{data[i, j]:.1f}%", ha="center", va="center", color="black", fontweight="bold")
+# %%
+def reconstruct(detector, images):
+    """Get reconstructions from the model of a reconstruction detector."""
+    detector.model.to(device)
+    detector.model.eval()
+    with torch.no_grad():
+        output = detector.model(torch.from_numpy(images).float().to(device))
+        return (output[0] if isinstance(output, tuple) else output).cpu().numpy()
 
-ax.set_title("OOD Detection Rate by Model and Scenario", fontsize=14, fontweight="bold", pad=20)
-fig.colorbar(im, ax=ax, label="Detection Rate (%)")
 
+shown = {"In-distribution": clean, "Noisy": noisy, "Blurred": blurred, "Aerial": aerial}
+errors = {}
+fig, axes = plt.subplots(len(shown), 2, figsize=(4, 8))
+for row, (kind, images) in enumerate(shown.items()):
+    reconstructions = reconstruct(ood_ae, images)
+    errors[kind] = float(np.mean((images - reconstructions) ** 2))
+    for col, image in enumerate([images[0], reconstructions[0]]):
+        axes[row, col].imshow(image.squeeze(), cmap="gray", vmin=0, vmax=1)
+        axes[row, col].axis("off")
+    axes[row, 0].set_title(kind, loc="left", fontweight="bold")
+    axes[row, 1].set_title(f"mean error {errors[kind]:.4f}")
 plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ### What the results show
+# ### Understanding reconstructions
 #
-# The table lists the share of each OOD scenario that each detector flags.
-
-# %%
-print(f"{'':15}" + "".join(f"{name:>20}" for name in scenario_names))
-for model_name, rates in results_matrix.items():
-    print(f"{model_name:15}" + "".join(f"{rates[name]:>19.1f}%" for name in scenario_names))
+# The columns show an original image and its AE reconstruction, and the title of each reconstruction gives the mean
+# error over 300 images of that kind:
+#
+# - The AE reconstructs the vehicle photographs with a small error.
+# - It cannot reproduce the noise, so the noisy frames have about three times that error, and the detector flags them.
+# - It reconstructs the blurred frames and the aerial frames with about a tenth of that error. Both have little fine
+#   detail, so they are easier to reconstruct than the photographs that the AE trained on.
+#
+# Reconstruction error measures how hard an image is to compress, and it does not measure how unfamiliar an image is.
+# That is why a reconstruction detector catches noise, and why it can score a different kind of image as more familiar
+# than the training data.
 
 # %% [markdown]
-# - Detection falls as the OOD data gets closer to the training data: every detector flags more of the CIFAR10 images
-#   than of the digits 8-9, and every detector flags more than 80% of the CIFAR10 images.
-# - On the rotated digits, the two detectors with a GMM head flag the most and the plain VAE flags the fewest.
-# - On digits 8-9, KNN with cosine distance flags the most and the plain VAE flags the fewest.
+# ## What the results show
 #
-# These rates come from three epochs of training, 10,000 training samples and generic architectures. With more training,
-# more data or architectures built for the data, the rates and their order would change.
+# These rates come from three epochs of training, about 6,800 training images and generic architectures. With more
+# training, more data or architectures built for the data, the rates and their order would change. The reconstruction
+# detectors are the most sensitive: the rates of the GMM variants on the noisy frames change by several points between
+# seeds and devices. The KNN rates change little, because the embedding model is pretrained.
+#
+# Match the detector to the change you expect:
+#
+# - Use a reconstruction detector for faults that add detail, such as sensor noise. It misses faults that remove detail.
+# - Use distance on good pretrained embeddings for a change of sensor, platform or image quality, and use cosine
+#   distance first.
+# - Do not rely on any of the six for a new vehicle of a known kind. Detecting it needs an approach that models the
+#   classes, which the embeddings and reconstructions here do not.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert all(abs(rate - 95) < 2.5 for rate in in_dist_acc)
-assert max(ood_detect) < 50
-assert abs(ood_detect[0] - ood_detect[1]) > 10
-assert ood_detect[3] == min(ood_detect)
-assert all(r_in.instance_score.mean() < r_ood.instance_score.mean() for r_in, r_ood, _ in results)
+# The data
+assert train_in.shape == (6846, 1, 32, 32)
+assert test_in.shape == (1338, 1, 32, 32)
+assert unseen.shape == (283, 1, 32, 32)
+assert held_out_names == ["30N6E", "Iskander", "Pantsir-S1", "Rs-24"]
+assert len(set(train_labels[~np.isin(train_labels, held_out)])) == 20
+assert all(len(images) == 300 for images in (noisy, blurred, aerial))
 
-easy, medium, hard = ({model: rates[scenario] for model, rates in results_matrix.items()} for scenario in scenarios)
-assert all(easy[model] > hard[model] for model in results_matrix)
-assert all(rate > 80 for rate in easy.values())
-assert set(sorted(medium, key=lambda model: medium[model], reverse=True)[:2]) == {"AE+GMM", "VAE+GMM"}
-assert min(medium, key=lambda model: medium[model]) == "VAE"
-assert max(hard, key=lambda model: hard[model]) == "KNN Cosine"
-assert min(hard, key=lambda model: hard[model]) == "VAE"
+# The false alarm rate stays near the 5% that the threshold sets
+in_dist = {name: result["In-distribution"].is_ood.mean() for name, result in results.items()}
+assert all(0.03 < rate < 0.10 for rate in in_dist.values())
+
+# The detection rates the text describes
+flagged = {name: {kind: 100 * result[kind].is_ood.mean() for kind in inputs} for name, result in results.items()}
+assert flagged["AE"]["Noisy"] > 85
+assert flagged["AE+GMM"]["Noisy"] > 70
+assert flagged["VAE+GMM"]["Noisy"] > 70
+assert flagged["KNN Cosine"]["Noisy"] > 85
+assert flagged["VAE"]["Noisy"] < 15
+assert flagged["KNN Euclidean"]["Noisy"] < 15
+assert flagged["KNN Cosine"]["Blurred"] > 90
+assert flagged["KNN Cosine"]["Aerial"] > 90
+assert all(flagged[name][kind] < 10 for name in ("AE", "VAE", "AE+GMM", "VAE+GMM") for kind in ("Blurred", "Aerial"))
+assert all(flagged["KNN Euclidean"][kind] < 15 for kind in ("Blurred", "Aerial"))
+assert all(flagged[name]["Unseen family"] < 20 for name in detectors)
+assert flagged["KNN Cosine"]["Aerial"] - flagged["KNN Euclidean"]["Aerial"] > 80
+
+# The OOD embeddings are shorter than the in-distribution embeddings
+mean_length = {kind: np.linalg.norm(np.asarray(emb), axis=1).mean() for kind, emb in lengths.items()}
+assert all(mean_length["In-distribution"] > 1.2 * mean_length[kind] for kind in ("Noisy", "Blurred", "Aerial"))
+
+# The reconstruction detectors score the aerial frames as more familiar than the in-distribution images
+mean_score = {name: {kind: result[kind].instance_score.mean() for kind in inputs} for name, result in results.items()}
+assert all(
+    mean_score[name]["Aerial"] < mean_score[name]["In-distribution"] for name in ("AE", "VAE", "AE+GMM", "VAE+GMM")
+)
+assert mean_score["KNN Cosine"]["Aerial"] > mean_score["KNN Cosine"]["In-distribution"]
+
+# The AE reconstruction errors
+assert errors["Noisy"] > 2.5 * errors["In-distribution"]
+assert all(errors[kind] < 0.15 * errors["In-distribution"] for kind in ("Blurred", "Aerial"))
 
 # %% [markdown]
 # ## Conclusion
 #
-# You fit six out-of-distribution detectors on MNIST digits 0-7: {class}`.OODKNeighbors` with cosine and with Euclidean
-# distance, and {class}`.OODReconstruction` with an autoencoder, a variational autoencoder, and each of those with a
-# Gaussian mixture head. You then scored digits 8-9 and two easier scenarios with each.
+# You fit six out-of-distribution detectors on MilitaryVehicles photographs: {class}`.OODKNeighbors` with cosine and
+# with Euclidean distance on pretrained embeddings, and {class}`.OODReconstruction` with an autoencoder, a variational
+# autoencoder, and each of those with a Gaussian mixture head. You then scored four kinds of input that the detectors
+# never saw. Reconstruction caught noise and nothing that has less detail than the training photographs, cosine
+# distance caught every change of sensor or platform, and none of the six caught a new family of vehicles.
 #
 # The detection rates above belong to this data and to three epochs of training. How each detector behaves on yours
-# depends on its embeddings or architecture, so run the comparison on a sample of your own data.
+# depends on its embeddings or architecture, so run the comparison on a sample of your own data, with the kinds of
+# change you expect.
 # [Out-of-distribution detection](../concepts/DistributionShift.md#out-of-distribution-detection) describes the methods,
 # and [Create embeddings](./h2_create_embeddings.py) shows how to build the embeddings that the KNN detectors
 # need.
@@ -1000,6 +625,5 @@ assert min(hard, key=lambda model: hard[model]) == "VAE"
 # - Train the models for more epochs and compare the rates
 # - Try different `gmm_weight` and `n_gmm` values
 # - Design custom architectures for your specific data type, and not generic examples
-# - Test different OOD scenarios on your own data, with varying difficulty levels
+# - Test the kinds of change you expect on your own data, such as a new sensor, a degraded sensor or a new class
 # - Tune `threshold_perc` for your false positive tolerance
-# - Use pretrained models instead of training from scratch

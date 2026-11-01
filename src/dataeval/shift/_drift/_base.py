@@ -102,6 +102,9 @@ class DriftOutput(DictOutput, Generic[TDetails]):
         Populated when the detector's ``extractor`` is a
         :class:`~dataeval.protocols.NamedFeatureExtractor`, such as
         :class:`~dataeval.Metadata`; empty otherwise.
+    baseline : Sequence[float]
+        Metric value of each reference chunk, from which the thresholds are
+        derived. Populated in chunked mode and empty otherwise.
     """
 
     drifted: bool
@@ -110,6 +113,11 @@ class DriftOutput(DictOutput, Generic[TDetails]):
     metric_name: str
     details: TDetails
     feature_names: Sequence[str] = ()
+    baseline: Sequence[float] = ()
+
+    @property
+    def plot_type(self) -> Literal["drift"]:
+        return "drift"
 
 
 @dataclass(frozen=True, repr=False)
@@ -700,6 +708,7 @@ class ChunkedDrift(Generic[TDetails]):
             distance=distance,
             metric_name=self._detector._metric_name,
             feature_names=self._detector._feature_names,
+            baseline=tuple(float(v) for v in self._baseline_values),
             details=df,
         )
 
