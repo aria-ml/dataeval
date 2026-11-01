@@ -1,5 +1,27 @@
 # DataEval Change Log
 
+## v1.2.0-rc2
+
+🌟 **Feature Release**
+
+- `a741cce85` - [feat] Flag collapsed classes in the Coverage per-class table with is_clustered, is_one_dimensional and has_near_duplicates, set by new dispersion_factor, isotropy_factor and near_duplicate_threshold parameters
+
+👾 **Fixes**
+
+- `008e46bec` - [fix] Decide Wasserstein drift on the mean ratio, corrected for sample sizes
+- `b0d1dd004` - [fix] Count Coverage near_duplicate_fraction per image against a typical class, so copies score the same on CPU and GPU and a clump that is most of its class is flagged
+
+📝 **Miscellaneous**
+
+- `fef5dbfb6` - [docs] Move the tutorials and how-tos to mission-relevant datasets
+- `f7b484f3a` - [devops] Run typecheck on merge requests that change the noxfile
+- `28f6bdc9f` - [devops] Raise the Node heap limit for pyright in the type session
+- `f7ef4845c` - [test] Fix doc structure tests for new how-to style rule
+- `ebd8d67ff` - [docs] Remove the prefix in how to titles
+- `58dbbcf79` - [docs] Add a New in v1.2 page for teams choosing what to integrate, and mark Outliers as taking a tracking dataset
+- `0d2f870d8` - [docs] Complete the v1.2 experimental lists, known limits and video inputs, and keep the result of Metadata.aggregate in the examples
+- `88100d92c` - [devops] Attach only the wheel and sdist to the GitHub release, not the .gitignore uv writes into dist
+
 ## v1.2.0-rc1
 
 🌟 **Feature Release**
