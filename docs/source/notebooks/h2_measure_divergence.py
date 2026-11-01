@@ -23,8 +23,8 @@
 # Use {func}`.divergence_fnn` or {func}`.divergence_mst` when you want to know how far apart two datasets are, for
 # example to measure [operational drift](../concepts/DistributionShift.md#drift-detection).
 #
-# You need `dataeval`, `maite-datasets` and a set of image embeddings for each dataset. This guide builds them from the
-# pixels of MNIST images.
+# You need `dataeval`, `maite-datasets`, `torchvision` and a set of image embeddings for each dataset. This guide builds
+# them from MilitaryVehicles photographs.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -32,91 +32,145 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval maite-datasets torchvision
 except Exception:
     pass
 
 # %%
+from collections.abc import Callable
+
 import numpy as np
-from maite_datasets.image_classification import MNIST
+from maite_datasets.image_classification import MilitaryVehicles
+from torchvision.models import ResNet18_Weights, resnet18
 
 from dataeval import Embeddings
-from dataeval.core import divergence_fnn
-from dataeval.data import Limit, View
-from dataeval.extractors import FlattenExtractor
+from dataeval.core import divergence_fnn, divergence_mst
+from dataeval.data import Limit, Shuffle, View
+from dataeval.extractors import TorchExtractor
 
 # %% [markdown]
 # ## Load the data
 #
-# Load the MNIST data and create the training dataset. For the purposes of this example, you will use subsets of the
-# training (4000) data.
+# Load the MilitaryVehicles train and test splits. You use 1,600 training images, as two samples of 800, and 800 test
+# images. Both splits are stored class by class, so shuffle before you limit.
 #
-# The embeddings here are the flattened pixels of each image, made by a {class}`.FlattenExtractor`. Flattened pixels are
-# a baseline, because distances between raw pixels follow brightness and alignment more than content. They work in this
-# example because MNIST images are small and share one shape. For photographs, use an extractor that wraps a model, as
-# described in [Create embeddings](./h2_create_embeddings.py).
+# The embeddings are the features of a pre-trained ResNet18, one 512-dimensional vector per image, made as in
+# [Create embeddings](./h2_create_embeddings.py). Raw pixels would mostly follow brightness and alignment, and
+# brightness is the change you test for below.
 
 # %%
-# Load in the training mnist dataset and use the first 4000
-train_ds = MNIST(root="./data/", image_set="train", download=True)
-train_view = View(train_ds, Limit(4000))
+SAMPLE = 800
 
-# Create the extractor. It holds no state, so one instance serves every dataset below
-extractor = FlattenExtractor()
+train_ds = MilitaryVehicles("./data", image_set="train", download=True, lazy=True)
+test_ds = MilitaryVehicles("./data", image_set="test", download=True, lazy=True)
 
-# Extract the embeddings of the 4000 images
-embeddings = np.asarray(Embeddings(train_view, extractor=extractor, batch_size=64))
+weights = ResNet18_Weights.DEFAULT
+extractor = TorchExtractor(
+    resnet18(weights=weights, progress=False), transforms=weights.transforms(), layer_name="avgpool"
+)
+
+
+def embed(dataset: MilitaryVehicles, size: int) -> np.ndarray:
+    """Embed a random sample of the dataset. The extractor holds no state, so one instance serves every dataset."""
+    return np.asarray(Embeddings(View(dataset, [Shuffle(seed=0), Limit(size)]), extractor=extractor, batch_size=64))
+
+
+train_embeddings = embed(train_ds, 2 * SAMPLE)
+test_embeddings = embed(test_ds, SAMPLE)
 
 # %% [markdown]
 # ## Calculate the initial divergence
 #
-# Calculate the divergence using nearest neighbor disagreements between the first 2000 images and the second 2000
-# images from this sample.
+# Calculate the divergence using nearest neighbor disagreements between the first 800 training images and the second
+# 800.
 
 # %%
-data_a = embeddings[:2000]
-data_b = embeddings[2000:]
+data_a = train_embeddings[:SAMPLE]
+data_b = train_embeddings[SAMPLE:]
 
 # %%
 div = divergence_fnn(data_a, data_b)
 print(div)
 
 # %% [markdown]
-# The two halves are samples of the same dataset, so this value is the reference for the next comparison. It is above 0.
-# The nearest neighbor estimator can overestimate divergence when the samples are sparse relative to the dimensionality,
-# as 2000 samples of 784 pixels are. HP divergence has no significance threshold, so
+# The two halves are samples of the same dataset, so this value is a reference, and it is above 0. A single value is one
+# draw, so split the same 1,600 embeddings at random several more times to see how far two samples of one dataset drift
+# apart by chance. HP divergence has no significance threshold, so
 # [read a divergence against a reference](../concepts/Divergence.md#limitations) like this one.
 
-# %% [markdown]
-# ## Load the corrupted data
-#
-# Load a corrupted MNIST dataset.
-
 # %%
-corrupted_ds = MNIST(root="./data", image_set="train", corruption="translate", download=True)
-corrupted_view = View(corrupted_ds, Limit(2000))
+reference = []
+for seed in range(8):
+    order = np.random.default_rng(seed).permutation(len(train_embeddings))
+    reference.append(divergence_fnn(train_embeddings[order[:SAMPLE]], train_embeddings[order[SAMPLE:]])["divergence"])
 
-# Reuse the extractor from above
-corrupted_emb = np.asarray(Embeddings(corrupted_view, extractor=extractor, batch_size=64))
+print(f"Two samples of the training set, 8 splits: mean {np.mean(reference):.3f}, largest {max(reference):.3f}")
 
 # %% [markdown]
-# ## Calculate the corrupted divergence
+# Two samples of one dataset reach about 0.05 by chance, so a divergence is a shift only when it sits clearly above
+# that.
+
+# %% [markdown]
+# ## Compare train and test
 #
-# Calculate the divergence between this corrupted dataset and the original images.
+# Calculate the divergence between the training images and the test images.
 
 # %%
-div = divergence_fnn(data_a, corrupted_emb)
-print(div)
+train_test = divergence_fnn(data_a, test_embeddings)["divergence"]
+print(f"Train against test: {train_test:.3f}")
+
+
+# %% [markdown]
+# The test images are as close to the training images as two training samples are to each other. The two splits have
+# different class mixes, as [Measure label independence](./h2_measure_label_independence.py) shows. Divergence compares
+# where the images sit in embedding space and not how many each class contributes, so it does not see that difference.
+
+# %% [markdown]
+# ## Load the dimmed data
+#
+# Operational data is rarely collected in the conditions of the training data. Simulate low light by dimming the test
+# photographs. A dataset takes a transform as an argument, so each dimmed copy is the test split with every pixel scaled
+# by a factor. The transform must take one argument, the image. Calculate the divergence between the training
+# images and each dimmed copy, with both estimators.
+
+
+# %%
+def dim(factor: float) -> Callable[[np.ndarray], np.ndarray]:
+    """Return a transform that scales every pixel by the factor."""
+    return lambda image: (image * factor).astype(np.uint8)
+
+
+dimmed = {}
+for factor in (0.9, 0.7, 0.5):
+    dim_ds = MilitaryVehicles("./data", image_set="test", download=True, lazy=True, transforms=dim(factor))
+    dim_embeddings = embed(dim_ds, SAMPLE)
+    dimmed[factor] = {
+        "fnn": divergence_fnn(data_a, dim_embeddings)["divergence"],
+        "mst": divergence_mst(data_a, dim_embeddings)["divergence"],
+    }
+    print(f"Test images at {factor:.0%} brightness: fnn {dimmed[factor]['fnn']:.3f}, mst {dimmed[factor]['mst']:.3f}")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert embeddings.shape == (4000, 784)
-assert corrupted_emb.shape == (2000, 784)
-assert div["divergence"] > 0.95
+assert train_embeddings.shape == (2 * SAMPLE, 512)
+assert test_embeddings.shape == (SAMPLE, 512)
+assert max(reference) < 0.08  # "about 0.05"
+assert train_test <= max(reference) + 0.02  # "as close as two training samples"
+assert abs(dimmed[0.9]["fnn"] - max(reference)) < 0.03  # "close to the largest reference value"
+assert abs(dimmed[0.7]["fnn"] - 0.18) < 0.02
+assert abs(dimmed[0.5]["fnn"] - 0.38) < 0.02
+assert dimmed[0.7]["fnn"] > 3 * max(reference)
+assert dimmed[0.9]["fnn"] < dimmed[0.7]["fnn"] < dimmed[0.5]["fnn"] < 0.5  # "far from 1"
+assert all(abs(v["fnn"] - v["mst"]) < 0.02 for v in dimmed.values())  # "the estimators agree"
+assert (
+    0.45 < np.asarray(dim_ds[0][0]).mean() / np.asarray(test_ds[0][0]).mean() < 0.55
+)  # the dimming reaches the images
 
 # %% [markdown]
-# The comparison shows that the translated MNIST images differ from the original images far more than two samples of the
-# original images differ from each other.
+# The divergence grows as the images get darker. At 90% brightness it is about 0.05, close to the largest value that two
+# training samples reach, so at this sample size a 10% dimming is not clearly a shift. At 70% it is about 0.18 and at
+# 50% about 0.38, well above the reference. Even half brightness is far from 1, so do not read the scale as proportional
+# to how much the images changed. The two estimators agree to within 0.02.
 
 # %% [markdown]
 # ## Next steps

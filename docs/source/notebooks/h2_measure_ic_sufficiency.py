@@ -39,7 +39,6 @@ except Exception:
     pass
 
 # %%
-import os
 from collections.abc import Sequence
 from typing import Any, cast
 
@@ -48,17 +47,17 @@ import numpy as np
 import plotly.io as pio
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
 from IPython.display import display
-from maite_datasets.image_classification import MNIST
+from maite_datasets.image_classification import MilitaryVehicles
 from numpy.typing import NDArray
 from torch.utils.data import DataLoader, Subset
 from torch.utils.data import Dataset as TorchDataset
+from torchvision.models import ResNet18_Weights, resnet18
 
-from dataeval import config
-from dataeval.data import Limit, View
+from dataeval import Embeddings, Metadata, config
+from dataeval.extractors import TorchExtractor
 from dataeval.performance import Sufficiency
 from dataeval.protocols import Dataset, DatumMetadata
 
@@ -71,73 +70,77 @@ config.set_seed(0, all_generators=True)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 config.set_device(device=device)
 
-# Additional reproducibility and printing options
-np.set_printoptions(formatter={"float": lambda x: f"{x:0.4f}"})
-torch.set_float32_matmul_precision("high")
-torch._dynamo.config.suppress_errors = True
-torch.use_deterministic_algorithms(True)
-os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-
-# Use plotly to render plots
+# Use plotly to render plots, with the notebook renderer so the JS is embedded
 dep.set_default_backend("plotly")
-
-# Use the notebook renderer so JS is embedded
 pio.renderers.default = "notebook"
 
 # %% [markdown]
 # ## Load the data and create the model
 #
-# Before you calculate the sufficiency of a dataset, load the dataset and define the model architecture. The following
-# steps walk through both.
+# Before you calculate the sufficiency of a dataset, load the dataset and define the model architecture. You use the
+# MilitaryVehicles `train` and `test` splits, 7,823 and 1,621 photographs of 24 vehicle types.
 #
-# ### Loading MNIST data
-#
-# Load the MNIST data and split it into training and test datasets. For this notebook, you use subsets of the training
-# (2500) and test (500) data.
+# The model is a linear layer on the features of a frozen, pre-trained ResNet18, made as in
+# [Create embeddings](./h2_create_embeddings.py). Each of the many training runs then takes a fraction of a second.
 
 # %%
-# Configure the dataset transforms
+train_ds = MilitaryVehicles("./data", image_set="train", download=True, lazy=True)
+test_ds = MilitaryVehicles("./data", image_set="test", download=True, lazy=True)
 
-transforms = [
-    lambda x: x / 255.0,  # scale to [0, 1]
-    lambda x: x.astype(np.float32),  # convert to float32
-]
-
-# Download the mnist dataset and apply the transforms and subset the data
-train_ds = View(MNIST("./data", image_set="train", transforms=transforms, download=True), operations=[Limit(2500)])
-test_ds = View(MNIST("./data", image_set="test", transforms=transforms, download=True), operations=[Limit(500)])
-
+weights = ResNet18_Weights.DEFAULT
+extractor = TorchExtractor(
+    resnet18(weights=weights, progress=False), transforms=weights.transforms(), layer_name="avgpool"
+)
+train_embeddings = np.asarray(Embeddings(train_ds, extractor=extractor, batch_size=64))
+test_embeddings = np.asarray(Embeddings(test_ds, extractor=extractor, batch_size=64))
+train_labels = Metadata(train_ds).class_labels
+test_labels = Metadata(test_ds).class_labels
 
 # %% [markdown]
-# ### Creating a PyTorch model
-#
-# Next, define the network architecture that the sufficiency calculation trains and then evaluates throughout.
-
+# A test photograph that has a near-copy in the training set measures memory and not generalization, so remove it. Here
+# a near-copy is a test image whose cosine similarity to a training image is at least 0.95. Then standardize the
+# features with the training statistics.
 
 # %%
-# Define our network architecture
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(6400, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = torch.flatten(x, 1)  # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+NUM_CLASSES = len(train_ds.metadata["index2label"])
 
 
-# Compile the model (cast sets the type to Net as compile returns an Unknown)
-model: Net = cast(Net, torch.compile(Net().to(device)))
+def unit(x: np.ndarray) -> np.ndarray:
+    """Scale each row to unit length."""
+    return x / np.linalg.norm(x, axis=1, keepdims=True)
 
+
+has_copy = (unit(test_embeddings) @ unit(train_embeddings).T).max(axis=1) >= 0.95
+print(f"{has_copy.sum()} of {len(has_copy)} test images have a near-copy in the training set")
+
+mean, std = train_embeddings.mean(axis=0), train_embeddings.std(axis=0) + 1e-6
+train_features = ((train_embeddings - mean) / std).astype(np.float32)
+test_features = ((test_embeddings - mean) / std).astype(np.float32)[~has_copy]
+test_labels = test_labels[~has_copy]
+
+
+class EmbeddingsDataset:
+    """Features and one-hot labels as a dataset of (input, target, metadata) items."""
+
+    def __init__(self, features: NDArray[np.float32], labels: NDArray[np.intp]) -> None:
+        self.features = features
+        self.labels = labels
+
+    def __len__(self) -> int:
+        return len(self.features)
+
+    def __getitem__(self, index: int) -> DatumType:
+        target = np.zeros(NUM_CLASSES, dtype=np.float32)
+        target[self.labels[index]] = 1.0
+        return self.features[index], target, DatumMetadata(id=index)
+
+
+# The evaluation set, and a random sample of 2,000 training images to build the learning curve from
+evaluation_set = EmbeddingsDataset(test_features, test_labels)
+sample = np.random.default_rng(0).permutation(len(train_features))[:2000]
+sample_set = EmbeddingsDataset(train_features[sample], train_labels[sample])
+
+model = nn.Linear(train_features.shape[1], NUM_CLASSES).to(device)
 
 # %% [markdown]
 # ## Define the strategies
@@ -155,71 +158,53 @@ model: Net = cast(Net, torch.compile(Net().to(device)))
 
 
 # %%
-class MNISTTrainingStrategy:
+class TrainingStrategy:
     def train(self, model: nn.Module, dataset: Dataset[DatumType], indices: Sequence[int]):
-        # Defined only for this testing scenario
         criterion = torch.nn.CrossEntropyLoss().to(device)
-        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-        epochs = 10
+        optimizer = optim.Adam(model.parameters(), lr=1e-2, weight_decay=1e-2)
 
         # Define the dataloader for training
-        dataloader = DataLoader(Subset(cast(TorchDataset, dataset), indices), batch_size=8)
+        dataloader = DataLoader(Subset(cast(TorchDataset, dataset), indices), batch_size=128, shuffle=True)
 
-        for _epoch in range(epochs):
+        for _epoch in range(30):
             for batch in dataloader:
-                # Load data/images to device
+                # Load features and one-hot encoded targets to device
                 X = torch.Tensor(batch[0]).to(device)
-                # Load one-hot encoded targets/labels to device
                 y = torch.argmax(torch.asarray(batch[1], dtype=torch.int).to(device), dim=1)
-                # Zero out gradients
                 optimizer.zero_grad()
-                # Forward propagation
-                outputs = model(X)
-                # Compute loss
-                loss = criterion(outputs, y)
-                # Back prop
-                loss.backward()
-                # Update weights/parameters
+                criterion(model(X), y).backward()
                 optimizer.step()
 
 
 # %% [markdown]
 # ### Evaluation strategy
+#
+# Report the accuracy and the balanced accuracy, the mean of the per-class recalls, since the classes range from 119 to
+# 424 photographs.
 
 
 # %%
-class MNISTEvaluationStrategy:
+class EvaluationStrategy:
     def evaluate(self, model: nn.Module, dataset: Dataset[DatumType]) -> dict[str, float]:
         # Metrics of interest
         metrics = {
-            "Accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=10).to(device),
-            "AUROC": torchmetrics.AUROC(task="multiclass", num_classes=10).to(device),
-            "TPR at 0.5 Fixed FPR": torchmetrics.ROC(task="multiclass", average="macro", num_classes=10).to(device),
+            "Accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=NUM_CLASSES).to(device),
+            "Balanced accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=NUM_CLASSES, average="macro").to(
+                device
+            ),
         }
-        result = {}
         # Set model layers into evaluation mode
         model.eval()
-        dataloader = DataLoader(cast(TorchDataset, dataset), batch_size=8)
+        dataloader = DataLoader(cast(TorchDataset, dataset), batch_size=128)
         # Tell PyTorch to not track gradients, greatly speeds up processing
         with torch.no_grad():
             for batch in dataloader:
-                # Load data/images to device
                 X = torch.Tensor(batch[0]).to(device)
-                # Load one-hot encoded targets/labels to device
                 y = torch.argmax(torch.asarray(batch[1], dtype=torch.int).to(device), dim=1)
                 preds = model(X)
                 for metric in metrics.values():
                     metric.update(preds, y)
-            # Compute ROC curve
-            false_positive_rate, true_positive_rate, _ = metrics["TPR at 0.5 Fixed FPR"].compute()
-            # determine interval to examine
-            desired_rate = 0.5
-            closest_desired_index = torch.argmin(torch.abs(false_positive_rate - desired_rate)).item()
-            # return corresponding tpr value
-            result["TPR at 0.5 Fixed FPR"] = true_positive_rate[closest_desired_index].cpu()
-            result["Accuracy"] = metrics["Accuracy"].compute().cpu()
-            result["AUROC"] = metrics["AUROC"].compute().cpu()
-        return result
+        return {name: float(metric.compute().cpu()) for name, metric in metrics.items()}
 
 
 # %% [markdown]
@@ -249,9 +234,12 @@ def reset_model(model: nn.Module) -> nn.Module:
 # Do not forget to initialize your strategy classes!
 
 # %%
-mnist_config = Sufficiency.Config(
-    training_strategy=MNISTTrainingStrategy(),
-    evaluation_strategy=MNISTEvaluationStrategy(),
+training_strategy = TrainingStrategy()
+evaluation_strategy = EvaluationStrategy()
+
+config_ = Sufficiency.Config(
+    training_strategy=training_strategy,
+    evaluation_strategy=evaluation_strategy,
     reset_strategy=reset_model,
     runs=5,
     substeps=10,
@@ -267,23 +255,20 @@ mnist_config = Sufficiency.Config(
 # Instantiate sufficiency metric
 suff = Sufficiency(
     model=model,
-    config=mnist_config,
+    config=config_,
 )
 
 # %% [markdown]
-# Now evaluate the metric to train the models and produce the learning curve.
+# Now evaluate the metric to train the models and produce the learning curve. Each run draws random training indices
+# with replacement, so the class order of the dataset does not matter.
 
 # %%
 # Train & test model
-output = suff.evaluate(train_ds, test_ds)
+output = suff.evaluate(sample_set, evaluation_set)
 
 # %%
 # Print out sufficiency output in a table format
 output.to_dataframe()
-
-# %%
-# Print out projected output values
-output.project([1000, 2500, 5000])
 
 # %%
 # Plot the output using dataeval-plots library
@@ -291,58 +276,89 @@ for plot in dep.plot(output, backend="plotly"):
     display(plot)
 
 # %% [markdown]
-# Using these learning curves, you can project performance under much larger datasets (with the same models).
+# The curve rises quickly and flattens. Using it, you can project performance under larger datasets with the same model,
+# and check the projection against a model you train on all 7,823 images.
+
+# %%
+projection = output.project([4000, len(train_features), 20000])
+display(projection)
+
+# %%
+full_set = EmbeddingsDataset(train_features, train_labels)
+rng = np.random.default_rng(1)
+
+measured = []
+for _run in range(5):
+    run_model = reset_model(model)
+    training_strategy.train(run_model, full_set, rng.integers(0, len(full_set), size=len(full_set)).tolist())
+    measured.append(evaluation_strategy.evaluate(run_model, evaluation_set)["Accuracy"])
+
+print(f"Projected accuracy at {len(full_set)} images: {projection['Accuracy'][1]:.3f}")
+print(
+    f"Measured accuracy at {len(full_set)} images: {np.mean(measured):.3f} (range {min(measured):.3f} to {max(measured):.3f})"
+)
+
+# %% [markdown]
+# The curve built on 2,000 images projects the accuracy at 7,823 images to within a point of what the model reaches,
+# well inside the spread between runs. That check reaches about four times past the data in the curve. The projections
+# beyond it are further extrapolations, so treat them as orders of magnitude.
 
 # %% [markdown]
 # ## Predict sample requirements
 #
 # You can also predict the amount of training samples required to achieve specific performance thresholds.
 #
-# Suppose you want to see how many samples are needed to hit 90%, 93%, and 99% accuracy, area under the receiver
-# operating characteristic, and true positive rate at a fixed false positive rate of 0.5.
+# Suppose you want to see how many samples are needed to hit 40%, 45% and 50% accuracy and balanced accuracy.
 
 # %%
 # Initialize the array of desired thresholds to apply to all metrics
-output.inv_project([0.90, 0.93, 0.99])
+needed = output.inv_project([0.40, 0.45, 0.50])
+display(needed)
 
 # %% [markdown]
-# With a value of "-1" samples, the projection shows that given the current model, hitting an accuracy of 99% is
-# improbable.
+# Each further five points of accuracy takes about four times as many images: 40% needs about 12,000, 45% about 45,000
+# and 50% about 190,000. More photographs of this kind raise the accuracy of this model slowly. A better model, such as
+# a fine-tuned backbone, changes the curve, and the same evaluation shows whether it does.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-# Verify the learning curve: five runs over ten steps up to the 2,500 training images, and the model learns
-metrics = {"Accuracy", "AUROC", "TPR at 0.5 Fixed FPR"}
+# Verify the learning curve: five runs over ten steps up to the 2,000 sampled training images, and the model learns
+metrics = {"Accuracy", "Balanced accuracy"}
 curve = output.to_dataframe()
 assert set(curve.columns) == {"step", *metrics}
 assert curve.height == 10
-assert curve["step"][-1] == len(train_ds) == 2500
+assert curve["step"][-1] == len(sample_set) == 2000
 assert {name: measure.shape for name, measure in output.measures.items()} == dict.fromkeys(metrics, (5, 10))
-assert curve["Accuracy"][-1] > curve["Accuracy"][0]
-assert curve["Accuracy"][-1] > 0.85
+assert curve["Accuracy"][-1] > 2 * curve["Accuracy"][0]
+assert abs(int(has_copy.sum()) - 167) <= 5  # the text removes the near-copies
+assert len(evaluation_set) == len(test_ds) - int(has_copy.sum())
 
-# Verify the projections: valid values that do not fall as the dataset grows
-projected = output.project([1000, 2500, 5000])
-assert projected["step"].to_list() == [1000, 2500, 5000]
+# Verify the projections: valid values that do not fall as the dataset grows, and that match the measurement
 for metric in metrics:
-    values = projected[metric].to_list()
+    values = projection[metric].to_list()
     assert min(values) >= 0
     assert max(values) <= 1
     assert values == sorted(values)
+assert projection["step"].to_list() == [4000, 7823, 20000]
+gap = abs(projection["Accuracy"][1] - np.mean(measured))
+assert gap < 0.01  # "within a point"
+assert gap < max(measured) - min(measured)  # "inside the spread between runs"
 
-# Verify that 99% accuracy is out of reach for this model while 90% is not
-needed = output.inv_project([0.90, 0.93, 0.99])
-assert needed["target"].to_list() == [0.90, 0.93, 0.99]
-assert needed["Accuracy"][2] == -1
-assert needed["Accuracy"][0] > 0
-assert needed["TPR at 0.5 Fixed FPR"][0] > 0
+# Verify the sample requirements: each five points costs several times more data
+assert needed["target"].to_list() == [0.40, 0.45, 0.50]
+first, second, third = needed["Accuracy"].to_list()
+assert 10_000 < first < 14_000  # "about 12,000"
+assert 38_000 < second < 52_000  # "about 45,000"
+assert 150_000 < third < 230_000  # "about 190,000"
+assert 3 < second / first < 5  # "about four times"
+assert 3 < third / second < 5
 
 # %% [markdown]
 # ## Next steps
 #
 # - [Performance limits](../concepts/PerformanceLimits.md) — Understand sufficiency curves and diminishing returns in
 #   dataset scaling.
-# - [Determine image classification feasibility](./h2_measure_ic_feasibility.py) — Measure Bayes Error Rate to
-#   evaluate classification task difficulty.
-# - [Detect undersampled data subsets](./h2_detect_undersampling.py) — Identify sparse or underrepresented
-#   regions in dataset feature space.
+# - [Assess whether a classification requirement is reachable](./tt_assess_ic_feasibility.py) — Check a requirement
+#   against the evidence in your images before you collect more data.
+# - [Identify gaps in a labeled dataset](./tt_identify_dataset_gaps.py) — Find sparse or underrepresented classes and
+#   regions in the feature space.

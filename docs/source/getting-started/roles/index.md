@@ -79,7 +79,7 @@ to ensure that the dataset is free of duplicates and errors. They follow this up
 with an analysis of the dataset for [bias or correlations](../../notebooks/tt_identify_bias.py).
 They then [assess the data space](../../notebooks/tt_assess_data_space.py)
 for coverage and completeness. Next they assess whether the required performance
-as currently constituted for the project is [feasible](../../notebooks/h2_measure_ic_feasibility.py).
+as currently constituted for the project is [feasible](../../notebooks/tt_assess_ic_feasibility.py).
 After running this final assessment, they generate a report for the manager which
 shows that the required performance is feasible, but the dataset has severe
 class imbalance and there is a lack of data in a nighttime environment.

@@ -292,23 +292,32 @@ uncertain the model is:
 $$H(p) = -\sum_{i=1}^k p_i \log p_i$$
 
 Low entropy means the model is confident; high entropy means it is not. If the
-entropy distribution of incoming data is significantly higher than that of the
-reference set, as detected by applying a univariate test (such as KS) or a
+entropy distribution of incoming data differs from that of the reference set, as
+detected by applying a univariate test (such as KS) or a
 {term}`Wasserstein-distance<Wasserstein Distance>` test (see
 [below](#wasserstein-based-drift-detection-driftwasserstein)) to the entropy
-scores, the model is encountering data in its uncertainty regions, which
-directly predicts performance degradation.
+scores, the model is behaving differently on the new data. Higher entropy often
+goes with a loss of accuracy, but the entropy shift does not measure the loss.
+In [Detect drift with prediction
+uncertainty](../notebooks/tt_detect_drift_with_uncertainty.py), accuracy and
+median entropy followed one trend across moderate degradation, and for heavy
+degradation the entropy stopped rising while the accuracy kept falling.
 
-For object detectors, {class}`.ClasswiseUncertaintyExtractor` groups detections
-by their predicted class so uncertainty can be tracked per class rather than
-only in aggregate, revealing which classes a shift most affects.
+{class}`.ClasswiseUncertaintyExtractor` groups predictions by their predicted
+class (one prediction for each image of a classifier, and one for each detection
+of an object detector) so uncertainty can be tracked per class rather than only
+in aggregate, revealing which classes a shift most affects or where the images
+of an unseen class go.
 
-This approach has a specific, important advantage: it is insensitive to
-irrelevant shift. A lighting change that modifies pixel values but does not move
-the model's predictions into uncertain territory will not trigger an alert.
-Feature-based detectors would flag it. The trade-off is that uncertainty-based
-detection requires a trained classifier and will miss shift that the model
-confidently misclassifies: the model remains certain, but wrong.
+This approach answers a different question from a feature-based detector. A
+feature-based detector reports that the inputs changed. An uncertainty monitor
+reports that the confidence of the model changed. That can happen for a change
+that costs no accuracy: in the tutorial, a change in the mix of vehicle families
+that did not lower the accuracy raised alarms on most batches, and a plain test
+on the length of the embeddings was more sensitive to image degradation than the
+entropy monitor. Use the two together. The trade-off is that uncertainty-based
+detection requires a trained classifier, and a monitor built on an overconfident
+classifier can be blind to a shift that a better calibrated classifier reveals.
 
 ### Wasserstein-based drift detection (`DriftWasserstein`)
 
@@ -327,9 +336,11 @@ by this baseline, and drift is flagged when the ratio exceeds `ratio_threshold`
 
 $$\text{drift} \iff \max_j \frac{W_j(\text{train}, \text{test})}{W_j(\text{train}, \text{val})} > \tau$$
 
-Anchoring the decision to train-vs-validation variation makes the detector
-robust to benign sampling noise: it alarms only when incoming data is
-meaningfully more different from training than validation already was. Because
+Anchoring the decision to train-vs-validation variation scales the decision to
+the variation between two samples of the same data. The baseline is a single
+comparison, so it is itself noisy: the ratio for a batch from the reference
+distribution varies around 1 and can pass the default threshold. Check the false
+alarm rate of your threshold on held-out batches. Because
 the Wasserstein distance is sensitive to how far probability mass moves (not
 just whether distributions differ), it is well suited to low-dimensional
 features such as the {term}`prediction uncertainty<Prediction Uncertainty>`
@@ -577,8 +588,10 @@ For choosing among drift detectors: start with a univariate test (KS as a
 baseline) on pre-computed embedding dimensions or image statistics for
 computational efficiency. Add MMD or the domain classifier when embedding-space
 correlations are important or when univariate tests fail to detect known drift.
-Add uncertainty-based detection when you have a deployed classifier and want to
-monitor specifically for performance-degrading shift.
+Add uncertainty-based detection when you have a deployed classifier and want a
+label-free signal of how its confidence changes, next to a feature-based
+detector. Check what the monitor flags against degraded labeled images before
+you rely on it.
 
 OOD detection is most valuable at two points: during post-training data
 ingestion (to flag anomalous samples before they reach a model) and during
@@ -626,10 +639,15 @@ Univariate tests are independent per feature and cannot detect shift that
 manifests only in feature correlations. Multivariate tests address this but at
 higher computational cost and with reduced interpretability.
 
-Uncertainty-based detection is blind to shift that the model confidently
-mishandles. It detects uncertain failure modes, not confident wrong failure
-modes. The latter require performance monitoring with ground truth labels, which
-is a separate capability.
+Uncertainty-based detection can miss shift that the model confidently
+mishandles. When the confident errors leave the distribution of entropy
+unchanged, nothing moves. When they change it, in either direction, a test can
+still raise an alarm, but only once the shift is large. In the tutorial, a
+family of vehicles that the classifier never saw was filed under a known family
+with lower entropy. The monitor flagged about a third of the batches when half
+of each batch came from that family, and nearly all of them only when the whole
+batch did. Detecting confident wrong failure modes reliably requires performance
+monitoring with ground truth labels, which is a separate capability.
 
 Reconstruction-based OOD detection requires training a model on reference data.
 If the reference distribution changes substantially over time, the model must be
@@ -671,7 +689,8 @@ high-dimensional embeddings.
 - [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
   end-to-end walkthrough of drift detection on operational data
 - [Detect drift with prediction uncertainty](../notebooks/tt_detect_drift_with_uncertainty.py) —
-  monitoring a deployed detector's own uncertainty with `DriftWasserstein`
+  monitoring a classifier's own uncertainty with a KS test, and checking what the
+  monitor can and cannot see
 - [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —
   comparison of reconstruction and distance-based OOD detection methods
 

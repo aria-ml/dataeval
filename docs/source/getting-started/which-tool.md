@@ -65,7 +65,7 @@ before any bias analysis.
 
 Use {class}`.Balance` to measure class frequency imbalance.
 See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md) and the
-[detecting undersampling how-to guide](../notebooks/h2_detect_undersampling.py).
+[identify dataset gaps tutorial](../notebooks/tt_identify_dataset_gaps.py).
 
 ### Are certain attribute groups underrepresented in my dataset?
 

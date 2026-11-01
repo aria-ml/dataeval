@@ -40,7 +40,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from IPython.display import display
-from maite_datasets.image_classification import MNIST
+from maite_datasets.image_classification import MilitaryVehicles
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
@@ -53,46 +53,29 @@ set_max_processes(4)
 # %% [markdown]
 # ## Load the data
 #
-# Load the MNIST data and create the dataset.
-#
-# The MNIST dataset contains 70,000 images, 60,000 in the train set and 10,000 in the test set. This demonstration uses
-# only the test set.
+# Load the MilitaryVehicles train split, 7,823 photographs of 24 types of ground vehicle, and read the class of each
+# image.
 
 # %%
-# Load in the mnist dataset
-testing_dataset = MNIST(root="./data/", image_set="test", download=True)
+train_ds = MilitaryVehicles("./data", image_set="train", download=True, lazy=True)
+index2label = train_ds.metadata["index2label"]
 
 # Get the labels
-labels = Metadata(testing_dataset).class_labels
-
-# %% [markdown]
-# The MNIST dataset does not contain any exact duplicates, so you adjust the dataset to include some.
-
-# %% tags=["hide-input"]
-# Creating some indices to duplicate
-print("Exact duplicates")
-duplicates = {}
-for i in [1, 2, 5, 9]:
-    matching_indices = np.where(labels == i)[0]
-    print(f"\t{i} - ({matching_indices[23]}, {matching_indices[78]})")
-    duplicates[int(matching_indices[78])] = int(matching_indices[23])
-
-# %%
-# Create a subset with the identified duplicate indices swapped
-indices_with_duplicates = [duplicates.get(i, i) for i in range(len(testing_dataset))]
-duplicates_ds = View(testing_dataset, Indices(indices_with_duplicates))
+labels = Metadata(train_ds).class_labels
 
 # %% [markdown]
 # ## Find the duplicates
 #
-# Ask the `Duplicates` class to find the duplicates. There are only 4 exact duplicates.
+# Ask the `Duplicates` class to find the duplicates. You do not need to plant any: the dataset holds its own. See
+# [Clean a dataset](./tt_clean_dataset.py) for how to inspect the groups before you remove anything.
 
 # %%
-# Initialize the Duplicates class to begin to identify duplicate images.
-identifyDuplicates = Duplicates()
+# Initialize the Duplicates class to begin to identify duplicate images. A hash radius of 0 counts two images as
+# duplicates only when their hashes are identical.
+identifyDuplicates = Duplicates(hash_radius=0)
 
 # Evaluate the data
-results = identifyDuplicates.evaluate(duplicates_ds)
+results = identifyDuplicates.evaluate(train_ds)
 
 # %% [markdown]
 # The results can be viewed as a DataFrame with exact and near groups enumerated.
@@ -101,52 +84,87 @@ results = identifyDuplicates.evaluate(duplicates_ds)
 display(results)
 
 # %% [markdown]
-# The `Duplicates` class found all 4 exact duplicates out of the 10,000 samples.
-#
-# It also found several sets of images that are very closely related to each other. With hand written digits, you would
-# expect it to find some images that are nearly identical.
+# Each exact group is one photograph that appears more than once with identical pixels, and each near group holds
+# photographs whose perceptual hashes match. Check what labels the images in each exact group carry.
+
+# %%
+different = sum(len({labels[i] for i in group}) > 1 for group in results.exact)
+first_group = results.exact[0]
+print(f"{len(results.exact)} exact groups and {len(results.near)} near groups in {len(train_ds):,} images")
+print(f"Exact groups whose images carry different labels: {different} of {len(results.exact)}")
+print(f"The first exact group, images {first_group}, is filed under {[index2label[labels[i]] for i in first_group]}")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert results.exact
-assert len(results.exact) == len(duplicates)
-for k, v in duplicates.items():
-    assert [v, k] in results.exact
+assert len(train_ds) == 7823
+assert (len(results.exact), len(results.near)) == (67, 38)
+assert different == len(results.exact)  # the text says every exact group disagrees on the label
+assert first_group == [478, 6118]
+assert [index2label[labels[i]] for i in first_group] == ["BM-30", "T-64"]
+assert all(
+    np.array_equal(np.asarray(train_ds[group[0]][0]), np.asarray(train_ds[i][0]))
+    for group in results.exact
+    for i in group
+)  # identical pixels
 
+# %% [markdown]
+# Every exact group holds identical pixels filed under different vehicles, so the same photograph teaches the model two
+# answers. `Duplicates` finds the copies. It cannot tell which label is right, and that decision is yours.
 
 # %% [markdown]
 # ## Remove the duplicates
 #
 # `deduplicate()` turns the result into a plan of what to remove. Its arguments state the policy: which kinds of
 # duplicate to collapse, and which member of each set to keep. By default it collapses exact duplicates and keeps
-# the first member of each set.
+# the first member of each set. Near duplicates are a judgment about how similar is too similar, so you add them with
+# `dup_types=["exact", "near"]` once you have looked at them.
 #
-# Pass the plan to `Indices` with `exclude=True`. Build the view on `duplicates_ds`, the dataset the result was
+# Pass the plan to `Indices` with `exclude=True`. Build the view on `train_ds`, the dataset the result was
 # computed on, because the plan names positions in that dataset.
 
 # %%
 plan = results.deduplicate()
-deduplicated_ds = View(duplicates_ds, Indices(plan, exclude=True))
+deduplicated_ds = View(train_ds, Indices(plan, exclude=True))
 print(plan)
-print(f"{len(duplicates_ds)} items before, {len(deduplicated_ds)} after")
+print(f"{len(train_ds)} items before, {len(deduplicated_ds)} after")
+
+# %% [markdown]
+# The plan removes 72 images from 67 groups because five groups hold three copies. Here the choice of survivor decides
+# the label. Compare `keep="first"`, the default, with `keep="last"` on the first group.
+
+# %%
+kept = {
+    keep: set(View(train_ds, Indices(results.deduplicate(keep=keep), exclude=True)).resolve_indices())
+    for keep in ("first", "last")
+}
+for keep, survivors in kept.items():
+    print(f'keep="{keep}" keeps', [index2label[labels[i]] for i in first_group if i in survivors])
+
+# %% [markdown]
+# The two policies keep different labels for the same photograph, and neither knows which is correct. Pass
+# `exclude_groups` the `group_id` of any group you want to leave alone and settle by hand, or correct the labels first
+# and then apply the plan.
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert len(plan) == len(duplicates)
-assert len(deduplicated_ds) == len(duplicates_ds) - len(duplicates)
+assert sum(len(group) for group in results.exact) - len(results.exact) == len(plan) == 72
+assert len(deduplicated_ds) == len(train_ds) - len(plan) == 7751
+assert [index2label[labels[i]] for i in first_group if i in kept["first"]] == ["BM-30"]
+assert [index2label[labels[i]] for i in first_group if i in kept["last"]] == ["T-64"]
 
 # %% [markdown]
 # ## Find annotation duplicates
 #
-# MNIST has no object detection targets, so everything above compared pixels only. When a dataset does carry targets
-# (boxes and labels), `Duplicates` also digests the annotation itself, which is on by default and needs no argument. Two
-# accessors narrow the result to the annotation-driven relations:
+# MilitaryVehicles has no object detection targets, so everything above compared pixels only. When a dataset does carry
+# targets (boxes and labels), `Duplicates` also digests the annotation itself, which is on by default and needs no
+# argument. Two accessors narrow the result to the annotation-driven relations:
 #
 # - `divergent()`: items whose annotation was checked and found to disagree, meaning one collect labeled two different
 #   ways.
 # - `augmented()`: items sharing one annotation over different pixels, the signature of a synthetic copy.
 #
-# Build a tiny object detection dataset with four items to see both. Items 0 and 1 have identical pixels and two
+# Real detection datasets rarely hold a clean pair of each kind, so this guide builds a tiny object detection dataset
+# with four items to see both. Items 0 and 1 have identical pixels and two
 # different boxes, a divergent pair. Items 2 and 3 have the same box over two independently sampled images, an augmented
 # pair.
 

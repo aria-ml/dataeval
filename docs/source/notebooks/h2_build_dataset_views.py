@@ -24,7 +24,7 @@
 # - only certain classes, a balanced distribution or a capped size
 # - a reproducible shuffle or labels rewritten into a shared vocabulary
 #
-# This guide uses MNIST; any {class}`~dataeval.protocols.AnnotatedDataset` works.
+# This guide uses MilitaryVehicles; any {class}`~dataeval.protocols.AnnotatedDataset` works.
 
 # %% tags=["remove_cell"]
 # Google Colab Only
@@ -38,8 +38,9 @@ except Exception:
 
 # %%
 import numpy as np
-from maite_datasets.image_classification import MNIST
+from maite_datasets.image_classification import MilitaryVehicles
 
+from dataeval import Metadata
 from dataeval.config import set_seed
 from dataeval.data import Filter, Limit, Operation, Relabel, Shuffle, View
 
@@ -48,12 +49,19 @@ set_seed(0)  # For reproducibility
 # %% [markdown]
 # ## Create a view
 #
-# You use the MNIST test split (10,000 handwritten digits).
+# You use the MilitaryVehicles test split, 1,621 photographs of 24 vehicle types. `lazy=True` reads each image only when
+# you access it, and `MilitaryVehicles.hierarchy` groups the types into seven families such as `Tank` and `BMP`.
 
 # %%
-mnist = MNIST("./data", image_set="test", download=True)
-print("source dataset size:", len(mnist))
-print("source vocabulary:", mnist.metadata.get("index2label"))
+vehicles = MilitaryVehicles("./data", image_set="test", download=True, lazy=True)
+index2label = vehicles.metadata["index2label"]
+class_index = {name: index for index, name in index2label.items()}
+families = MilitaryVehicles.hierarchy["vehicle"]["military"]["land vehicle"]  # family -> its vehicle types
+labels = Metadata(vehicles).class_labels  # the class of each image, to see what a view kept
+
+print("source dataset size:", len(vehicles))
+print("source vocabulary:", index2label)
+print("families:", {family: len(types) for family, types in families.items()})
 
 # %% [markdown]
 # A {class}`.View` takes a dataset and a list of operations. It behaves like a dataset:
@@ -61,16 +69,19 @@ print("source vocabulary:", mnist.metadata.get("index2label"))
 # untouched.
 
 # %%
-view = View(mnist, operations=[Filter(classes=[0, 1]), Limit(500)])
+tank_classes = [class_index[name] for name in families["Tank"]]
+view = View(vehicles, operations=[Filter(classes=tank_classes), Limit(200)])
 
 print("view size:", len(view))
-print("source is unchanged:", len(mnist))
+print("source is unchanged:", len(vehicles))
 print("first 10 source indices behind the view:", view.resolve_indices()[:10])
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert len(view) == 500
-assert len(mnist) == 10000
+assert len(view) == 200
+assert len(vehicles) == 1621
+assert len(index2label) == 24
+assert {family: len(types) for family, types in families.items()}["Tank"] == 6
 
 # %% [markdown]
 # The built-in operations:
@@ -92,29 +103,35 @@ assert len(mnist) == 10000
 # The same two operations in opposite orders answer different questions.
 
 # %%
-limit_then_filter = View(mnist, operations=[Limit(500), Filter(classes=[0, 1])])
-filter_then_limit = View(mnist, operations=[Filter(classes=[0, 1]), Limit(500)])
+limit_then_filter = View(vehicles, operations=[Limit(200), Filter(classes=tank_classes)])
+filter_then_limit = View(vehicles, operations=[Filter(classes=tank_classes), Limit(200)])
 
-print("Limit(500) -> Filter(classes=[0, 1]):", len(limit_then_filter), "(0s and 1s *within* the first 500)")
-print("Filter(classes=[0, 1]) -> Limit(500):", len(filter_then_limit), "(the first 500 0s and 1s)")
+print("Limit(200) -> Filter(Tank):", len(limit_then_filter), "(tanks *within* the first 200 images)")
+print("Filter(Tank) -> Limit(200):", len(filter_then_limit), "(the first 200 tanks)")
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert len(limit_then_filter) < len(filter_then_limit) == 500
+assert np.all(np.diff(labels) >= 0)  # the split is stored class by class
+assert len(limit_then_filter) == 0
+assert len(filter_then_limit) == 200
 
 # %% [markdown]
-# Because each operation applies to the current selection, an operation can appear more than
-# once. This pipeline takes a reproducible random sample from a specific window of the
-# dataset, which a single pass could not express.
+# The first view is empty, and it raised no error. MilitaryVehicles stores each split class by class, so the first 200
+# images belong to the first few classes and none is a tank. `Limit` is a sample only when the order carries no
+# meaning, so put {class}`.Shuffle` before it, and a seed makes the sample reproducible.
 
 # %%
-windowed = View(mnist, operations=[Limit(2000), Shuffle(seed=0), Limit(10)])
-print("10 random items drawn from the first 2,000:", windowed.resolve_indices())
+first_500 = View(vehicles, operations=[Limit(500)])
+sample_500 = View(vehicles, operations=[Shuffle(seed=0), Limit(500)])
+
+print("classes in Limit(500):", len(set(labels[first_500.resolve_indices()])), "of", len(index2label))
+print("classes in Shuffle -> Limit(500):", len(set(labels[sample_500.resolve_indices()])), "of", len(index2label))
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert len(windowed) == 10
-assert all(i < 2000 for i in windowed.resolve_indices())
+assert len(set(labels[first_500.resolve_indices()])) == 8
+assert len(set(labels[sample_500.resolve_indices()])) == 24
+assert len(sample_500) == 500
 
 # %% [markdown]
 # ### Operations see the result of earlier operations
@@ -123,40 +140,40 @@ assert all(i < 2000 for i in windowed.resolve_indices())
 # filter placed after a relabeling step matches against the new vocabulary, not the
 # original one.
 #
-# Here you collapse the ten digits into `even`/`odd` with {class}`.Relabel`, then filter on the
-# relabeled classes.
+# Here you collapse the 24 vehicle types into their seven families with {class}`.Relabel`, then filter on class `1`.
 
 # %%
-digit_names = mnist.metadata.get("index2label", {})
-EVEN_ODD = ("even", "odd")
-parity = {name: (EVEN_ODD[digit % 2]) for digit, name in digit_names.items()}
+family_names = tuple(families)
+family_of = {vehicle_type: family for family, types in families.items() for vehicle_type in types}
 
 
-def source_digits(v: View) -> list[int]:
-    """The original MNIST digits sitting behind a view's items."""
-    return sorted({int(np.argmax(mnist[i][1])) for i in v.resolve_indices()})
+def source_types(v: View) -> list[str]:
+    """The original vehicle types sitting behind a view's items."""
+    return sorted({index2label[int(labels[i])] for i in v.resolve_indices()})
 
 
-relabel_first = View(mnist, operations=[Relabel(parity, EVEN_ODD), Filter(classes=[0])])
-filter_first = View(mnist, operations=[Filter(classes=[0]), Relabel(parity, EVEN_ODD)])
+relabel_first = View(vehicles, operations=[Relabel(family_of, family_names), Filter(classes=[1])])
+filter_first = View(vehicles, operations=[Filter(classes=[1]), Relabel(family_of, family_names)])
 
 print("vocabulary after Relabel:", relabel_first.metadata.get("index2label"))
 print()
-print("Relabel -> Filter(classes=[0]):", len(relabel_first), "images, source digits", source_digits(relabel_first))
-print("Filter(classes=[0]) -> Relabel:", len(filter_first), "images, source digits", source_digits(filter_first))
+print("Relabel -> Filter(classes=[1]):", len(relabel_first), "images, source types", source_types(relabel_first))
+print("Filter(classes=[1]) -> Relabel:", len(filter_first), "images, source types", source_types(filter_first))
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert "index2label" in relabel_first.metadata
-assert relabel_first.metadata["index2label"] == {0: "even", 1: "odd"}
-assert source_digits(relabel_first) == [0, 2, 4, 6, 8]
-assert source_digits(filter_first) == [0]
-assert len(relabel_first) > len(filter_first)
+assert relabel_first.metadata.get("index2label") == dict(enumerate(family_names))
+assert family_names[1] == "BMP"
+assert index2label[1] == "30N6E"
+assert source_types(relabel_first) == ["BMP-1", "BMP-2", "BMP-T15"]
+assert source_types(filter_first) == ["30N6E"]
+assert (len(relabel_first), len(filter_first)) == (176, 21)
+assert int(np.argmax(filter_first[0][1])) == family_names.index("Air Defense")  # relabeled to its family
 
 # %% [markdown]
-# With `Relabel` first, class `0` means the new vocabulary's `even`, so every even digit
-# is kept. With `Filter` first, class `0` still means the source digit `zero`, so only zeros
-# survive.
+# With `Relabel` first, class `1` means the new vocabulary's `BMP`, so all three BMP types are kept. With `Filter`
+# first, class `1` still means the source type `30N6E`, so only its 21 images survive, and `Relabel` then files them
+# under their family, `Air Defense`.
 
 # %% [markdown]
 # ## Write your own Operation
@@ -187,31 +204,36 @@ class KeepEvery(Operation):
         view.selection = view.selection[:: self.n]
 
 
-class Invert(Operation):
-    """Content: invert pixel intensities. Registers a transform, reads no data here."""
+class Dim(Operation):
+    """Content: darken every image by a factor, as in dusk imagery. Registers a transform, reads no data here."""
+
+    def __init__(self, factor: float) -> None:
+        self.factor = factor
 
     def apply(self, view: View) -> None:
-        view.map(lambda datum: (255 - np.asarray(datum[0]), datum[1], datum[2]))
+        view.map(lambda datum: ((np.asarray(datum[0]) * self.factor).astype(np.uint8), datum[1], datum[2]))
 
 
-custom = View(mnist, operations=[Limit(100), KeepEvery(10), Invert()])
+custom = View(vehicles, operations=[Shuffle(seed=0), Limit(100), KeepEvery(10), Dim(0.5)])
+first = custom.resolve_indices()[0]
 
 print("custom view size:", len(custom))
 print("source indices:", custom.resolve_indices())
 print(
-    "a background pixel — source:",
-    int(np.asarray(mnist[0][0])[0, 0, 0]),
+    "mean pixel value of the first item, source:",
+    round(float(np.asarray(vehicles[first][0]).mean()), 1),
     "view:",
-    int(np.asarray(custom[0][0])[0, 0, 0]),
+    round(float(np.asarray(custom[0][0]).mean()), 1),
 )
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-assert custom.resolve_indices() == list(range(0, 100, 10))
-assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
+assert custom.resolve_indices() == View(vehicles, [Shuffle(seed=0), Limit(100)]).resolve_indices()[::10]
+assert len(custom) == 10
+assert np.array_equal(np.asarray(custom[0][0]), (np.asarray(vehicles[first][0]) * 0.5).astype(np.uint8))
 
 # %% [markdown]
-# `Invert` never touched the data while building the view. It only registered a
+# `Dim` never touched the data while building the view. It only registered a
 # transform, which runs when an item is read. Operations that filter must read the data to
 # decide what to keep, so they scan once at construction. Pure transforms stay free until
 # access.
@@ -223,7 +245,7 @@ assert np.array_equal(np.asarray(custom[0][0]), 255 - np.asarray(mnist[0][0]))
 # metadata alongside derived datasets.
 
 # %%
-nested = View(View(mnist, [Filter(classes=[0, 1])]), [Limit(25)])
+nested = View(View(vehicles, [Filter(classes=tank_classes)]), [Limit(25)])
 
 print("operations, innermost first:", nested.operation_groups)
 print("original dataset:", type(nested.root).__name__)
@@ -232,7 +254,7 @@ print("source indices behind the first 5 items:", nested.resolve_indices()[:5])
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 assert len(nested.operation_groups) == 2
-assert nested.root is mnist
+assert nested.root is vehicles
 
 # %% [markdown]
 # ## Next steps

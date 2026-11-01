@@ -810,10 +810,8 @@ threat to the established performance bounds.
 
 - [Identify duplicates](../notebooks/h2_deduplicate.py)
 - [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
-- [Determine image classification feasibility](../notebooks/h2_measure_ic_feasibility.py)
 - [Measure dataset sufficiency for image classification](../notebooks/h2_measure_ic_sufficiency.py)
 - [Measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
-- [Detect undersampled data subsets](../notebooks/h2_detect_undersampling.py)
 
 ### Tutorials
 
@@ -823,6 +821,10 @@ threat to the established performance bounds.
   acting on balance and diversity findings
 - [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
   coverage gaps and embedding-space decisions
+- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py) —
+  choosing a fix for each coverage gap
+- [Assess whether a classification requirement is reachable](../notebooks/tt_assess_ic_feasibility.py) —
+  responding to a feasibility determination
 - [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
   responding to drift detection
 - [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —

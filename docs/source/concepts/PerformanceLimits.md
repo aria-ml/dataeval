@@ -674,7 +674,6 @@ distribution mismatch between train and test, the projection will be optimistic.
 
 ### How-to guides
 
-- [Determine image classification feasibility](../notebooks/h2_measure_ic_feasibility.py)
 - [Measure dataset sufficiency for image classification](../notebooks/h2_measure_ic_sufficiency.py)
 - [Create embeddings](../notebooks/h2_create_embeddings.py)
 

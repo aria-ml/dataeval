@@ -67,7 +67,6 @@ datasets for machine learning.
 ../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_find_conditional_outliers.py
 ../notebooks/h2_trace_findings_to_source.py
-../notebooks/h2_detect_undersampling.py
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_measure_channel_groups.py
@@ -145,9 +144,6 @@ datasets for machine learning.
   - Retrieve the image, frame, track or detection a finding's
     {class}`.SourceIndex` names
   - [![Open In Colab][colab-badge]][trace-colab]
-- - [](../notebooks/h2_detect_undersampling.py)
-  - Detect undersampled subsets of datasets
-  - [![Open In Colab][colab-badge]][cov-colab]
 
 :::
 
@@ -212,7 +208,6 @@ datasets for machine learning.
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_add_intrinsic_factors.ipynb
 [ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_control_factor_binning.ipynb
 [sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_sync_and_cache_metadata.ipynb
-[cov-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_detect_undersampling.ipynb
 [wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_wrap_dataframe_dataset.ipynb
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_metadata_from_dataframe.ipynb
 [view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_build_dataset_views.ipynb
@@ -225,13 +220,13 @@ datasets for machine learning.
 
 ## Model development
 
-These guides cover tasks related to assessing data feasibility and sufficiency
-for model training.
+This guide covers how much data a model needs to meet its performance
+requirements. To check first whether a requirement is reachable at all, work
+through the [feasibility tutorial](../notebooks/tt_assess_ic_feasibility.py).
 
 ```{toctree}
 :hidden:
 
-../notebooks/h2_measure_ic_feasibility.py
 ../notebooks/h2_measure_ic_sufficiency.py
 ```
 
@@ -239,10 +234,6 @@ for model training.
 :widths: 30 50 20
 :header-rows: 0
 
-- - [](../notebooks/h2_measure_ic_feasibility.py)
-  - Estimate the {term}`Bayes Error Rate (BER)` with {func}`.ber_mst` and check a classification
-    requirement against it
-  - [![Open In Colab][colab-badge]][ber-colab]
 - - [](../notebooks/h2_measure_ic_sufficiency.py)
   - Determine the amount of data needed to meet
     image classification performance requirements
@@ -250,7 +241,6 @@ for model training.
 
 :::
 
-[ber-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_ic_feasibility.ipynb
 [suff-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0-rc1/notebooks/h2_measure_ic_sufficiency.ipynb
 
 ## Monitoring

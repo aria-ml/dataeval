@@ -3,6 +3,5 @@
 *.{cmd,[cC][mM][dD]} text eol=crlf
 *.{bat,[bB][aA][tT]} text eol=crlf
 *.npz binary
-docs/source/notebooks/models/ae binary
 *.db binary
 docs/** linguist-documentation
