@@ -296,6 +296,10 @@ def verify(session: nox.Session) -> None:
 @session(uv_groups=["type"], uv_extras=with_onnx(["cpu", "opencv", "ontology"]))
 def type(session: nox.Session) -> None:  # noqa: A001
     """Run type checks and verify external types. Specify version using `nox -P {version} -e type`."""
+    # pyright runs on node, whose default heap is 1.8 GB on the 3200 MiB CI runner. The type cache for this repository
+    # outgrows that on some runs, and the job dies with "JavaScript heap out of memory" (exit 250). 2176 MB leaves 1 GiB
+    # of the pod for node itself and the rest of the job.
+    session.env["NODE_OPTIONS"] = "--max-old-space-size=2176"
     session.run("pyright", "--stats")
     # NFR-3: public type completeness must stay above 90%. pyright exits 1 when it reports any diagnostic, so the
     # score is read from the JSON report rather than from the exit code.
