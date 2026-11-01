@@ -10,7 +10,7 @@ from pydantic import PositiveInt
 from dataeval.performance._aggregator import ResultAggregator
 from dataeval.performance._output import SufficiencyOutput
 from dataeval.performance.schedules import GeometricSchedule, ManualSchedule
-from dataeval.protocols import Dataset, EvaluationSchedule, EvaluationStrategy, TrainingStrategy
+from dataeval.protocols import Dataset, EvaluationSchedule, EvaluationStrategy, ProgressCallback, TrainingStrategy
 from dataeval.types import Evaluator, EvaluatorConfig, set_metadata
 
 DEFAULT_SUFFICIENCY_RUNS = 1
@@ -241,6 +241,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
         train_dataset: Dataset[T],
         test_dataset: Dataset[T],
         length: int,
+        progress_callback: ProgressCallback | None = None,
     ) -> None:
         """
         Execute a single training run across all evaluation steps.
@@ -262,6 +263,8 @@ class Sufficiency(Evaluator, Generic[T, M]):
             Test/validation dataset
         length : int
             Length of the training dataset
+        progress_callback : ProgressCallback or None, default None
+            Called after each evaluation with the count of evaluations done across all runs
         """
         # Step 1: Create randomized indices for this run
         indices = np.random.randint(0, length, size=length)
@@ -270,7 +273,9 @@ class Sufficiency(Evaluator, Generic[T, M]):
         model = self.reset_strategy(self.model)
 
         # Step 3: Train and evaluate at each step (temporal coupling explicit)
-        for step_index, dataset_size in enumerate(steps):
+        sizes = list(steps)
+        n_steps = len(sizes)
+        for step_index, dataset_size in enumerate(sizes):
             # Train on subset
             self.training_strategy.train(model, train_dataset, indices[: int(dataset_size)].tolist())
 
@@ -281,12 +286,28 @@ class Sufficiency(Evaluator, Generic[T, M]):
             for metric_name, metric_value in metrics.items():
                 aggregator.add_result(run=run_index, step=step_index, metric_name=metric_name, value=metric_value)
 
+            if progress_callback is not None:
+                progress_callback(
+                    run_index * n_steps + step_index + 1,
+                    total=self.runs * n_steps,
+                    desc="Sufficiency",
+                    extra_info={
+                        "run": run_index,
+                        "runs": self.runs,
+                        "step": step_index,
+                        "steps": n_steps,
+                        "size": int(dataset_size),
+                        "metrics": dict(metrics),
+                    },
+                )
+
     @set_metadata(state=["runs", "substeps"])
     def evaluate(
         self,
         train_dataset: Dataset[T],
         test_dataset: Dataset[T],
         schedule: EvaluationSchedule | int | Iterable[int] | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> SufficiencyOutput:
         """
         Train and evaluate model across multiple dataset sizes.
@@ -309,11 +330,28 @@ class Sufficiency(Evaluator, Generic[T, M]):
             Specify this to collect metrics over a specific set of dataset lengths.
             If `None`, evaluates at each step calculated by
             :func:`np.geomspace <numpy.geomspace>` over the length of the dataset
+        progress_callback : ProgressCallback or None, default None
+            Called after each evaluation, so a caller can report progress, keep partial results or stop the
+            analysis. See Notes.
 
         Returns
         -------
         SufficiencyOutput
             Contains steps, measures, averaged_measures, and params
+
+        Notes
+        -----
+        **Progress.** ``progress_callback`` is called once per (run, step) after that step's metrics are stored, with
+        ``step`` the number of evaluations done across all runs (1 to ``total``), ``total`` the number of evaluations
+        in the analysis (``runs`` times the number of steps), ``desc="Sufficiency"``, and an ``extra_info`` mapping of:
+
+        - ``run``, ``runs``: the 0-based index of the run and the number of runs
+        - ``step``, ``steps``: the 0-based index of the evaluation step and the number of steps in each run
+        - ``size``: the training set size of this step
+        - ``metrics``: the metrics the evaluation strategy returned for this step. Treat it as read-only.
+
+        **Stopping.** An exception raised by the callback propagates out of ``evaluate`` unchanged and no output is
+        returned. The callback has seen the metrics of every step that completed, so it can keep them.
 
         Examples
         --------
@@ -343,6 +381,15 @@ class Sufficiency(Evaluator, Generic[T, M]):
         ...     def get_steps(self, dataset_length):
         ...         return np.arange(0, 101, 20)
         >>> output = sufficiency.evaluate(train_dataset, test_dataset, schedule=LinearSchedule())
+
+        Report progress after each evaluation
+
+        >>> def report(step, *, total=None, desc=None, extra_info=None):
+        ...     print(f"{step}/{total}: trained on {extra_info['size']} items")
+        >>> output = sufficiency.evaluate(train_dataset, test_dataset, schedule=[10, 50, 100], progress_callback=report)
+        1/3: trained on 10 items
+        2/3: trained on 50 items
+        3/3: trained on 100 items
         """
         # Validate datasets
         length = validate_dataset_len(train_dataset)
@@ -363,6 +410,7 @@ class Sufficiency(Evaluator, Generic[T, M]):
                 train_dataset=train_dataset,
                 test_dataset=test_dataset,
                 length=length,
+                progress_callback=progress_callback,
             )
 
         # Create output
