@@ -323,7 +323,7 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
     Returns
     -------
     NDArray
-        Sample size or -1 if unachievable for each data point
+        Sample size, rounded up to a whole number, or -1 if unachievable for each data point
     """
     with np.errstate(invalid="ignore"):
         n_i = ((y_i - x[2]) / x[0]) ** (-1 / x[1])
@@ -342,7 +342,9 @@ def f_inv_out(y_i: NDArray[Any], x: NDArray[Any]) -> NDArray[np.int64]:
                 " with asymptote of " + str(1 - x[2]),
             )
         n_i[unachievable_targets] = -1
-    return np.asarray(n_i, dtype=np.int64)
+    # Round up, so the curve has reached the target at the size returned. Rounding to nine places first keeps
+    # floating-point noise just above a whole number from adding one.
+    return np.asarray(np.ceil(np.round(n_i, 9)), dtype=np.int64)
 
 
 def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np.int64]:
@@ -360,8 +362,7 @@ def inv_project_steps(params: NDArray[Any], targets: NDArray[Any]) -> NDArray[np
     NDArray
         Samples required or -1 if unachievable for each target value
     """
-    steps = f_inv_out(1 - np.array(targets), params)
-    return np.ceil(steps)
+    return f_inv_out(1 - np.array(targets), params)
 
 
 def linear_initialization(metric: NDArray[Any], sizes: NDArray[Any], bounds: Constraints) -> NDArray[np.float64]:

@@ -300,7 +300,7 @@ class TestSufficiencyInverseProject:
         npt.assert_array_equal(needed_data, target_needed_data)
 
     def test_f_inv_out(self):
-        """Tests that f_inv_out exactly inverts f_out."""
+        """Tests that f_inv_out inverts f_out, rounded up to a whole sample size."""
         n_i = np.array([1.234])
         x = np.array([1.1, 2.2, 3.3])
         # Predict y from n_i evaluated on curve defined by x
@@ -308,8 +308,20 @@ class TestSufficiencyInverseProject:
         # Feed y into inverse function to get the original n_i back out
         n_i_recovered = f_inv_out(y, x)
 
-        # Convert to uint32 for step sizes
-        npt.assert_equal(np.uint32(n_i[0]), n_i_recovered[0])
+        npt.assert_equal(np.int64(np.ceil(n_i[0])), n_i_recovered[0])
+
+    def test_inv_project_steps_reaches_the_target(self):
+        """The size returned is the first whole size at which the curve reaches the target."""
+        # An exact power law, accuracy = 1 - 0.9 * n**-0.35. Truncating the inverse returned 73, 167, 532 and 3859 for
+        # these targets, and the curve at each of those sizes was just under its target.
+        params = np.array([0.9, 0.35, 0.0])
+        targets = np.array([0.80, 0.85, 0.90, 0.95])
+
+        sizes = inv_project_steps(params, targets)
+
+        npt.assert_array_equal(sizes, [74, 168, 533, 3860])
+        assert np.all(project_steps(params, sizes) >= targets)
+        assert np.all(project_steps(params, sizes - 1) < targets)
 
     def test_inv_project_steps(self):
         """Verifies that inv_project_steps is the inverse of project_steps."""
@@ -349,7 +361,8 @@ class TestSufficiencyInverseProject:
             result = data.inv_project(desired_accuracies)
             needed_data = result["Accuracy"].to_numpy()
         assert "Number of samples could not be determined for target(s): [0.99] with asymptote of 0.9369" in caplog.text
-        target_needed_data = np.array([925, 6649, -1])
+        # sizes are rounded up: the curve is 925.x and 6649.x at these targets
+        target_needed_data = np.array([926, 6650, -1])
         npt.assert_array_equal(needed_data, target_needed_data)
 
         # all target accuracies unachievable, 0.9368 returns value greater than int64
