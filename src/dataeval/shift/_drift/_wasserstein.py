@@ -29,30 +29,51 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
     Detects distributional changes by comparing the Wasserstein distance between
     training and operational data against a baseline distance computed from training
-    and validation data. Drift is flagged when the ratio of operational distance to
-    baseline distance exceeds a threshold.
+    and validation data. Drift is flagged when the mean ratio of operational distance
+    to baseline distance over the features, corrected for sample sizes, exceeds a
+    threshold.
 
     Unlike hypothesis-test-based detectors, this detector requires two reference
     datasets to be provided at fit time: a training set and an in-distribution
-    validation set. The train/validation Wasserstein distance serves as a calibrated
-    baseline for what "no drift" looks like. At predict time, the train/operational
-    Wasserstein distance is divided by this baseline; ratios substantially above 1.0
-    indicate drift.
+    validation set. The per-feature train/validation Wasserstein distance is the
+    baseline for what "no drift" looks like. It comes from one train/validation
+    comparison, so it is itself a noisy estimate. At predict time, the per-feature
+    train/operational distance is divided by this baseline and corrected for the
+    sample sizes (see Notes), and the ratios are averaged over the features. A mean
+    ratio near 1.0 means the operational data differs from training about as much as
+    the validation data did; drift is declared when it exceeds ``ratio_threshold``.
 
-    For multivariate data (e.g. model embeddings), the test is applied independently
-    to each feature. A feature is considered drifted when its individual distance
-    ratio exceeds the threshold. Overall drift is declared when any feature drifts.
+    Each feature's ratio is also reported, with a per-feature flag in
+    ``feature_drift`` of :class:`~dataeval.shift.DriftWasserstein.Stats`. A single
+    feature's ratio is noisy, so the flags say where to look and not whether drift
+    happened.
 
     Uses a fit/predict lifecycle: construct with hyperparameters, call :meth:`fit`
     with training and validation data, then call :meth:`predict` with test data.
-    Use :meth:`chunked` to create a chunked wrapper for time-series monitoring.
+    Use :meth:`chunked` to create a chunked wrapper for time-series monitoring. In
+    chunked mode only the default :class:`~dataeval.utils.thresholds.ConstantThreshold`
+    is calibrated. The baseline chunks are subsets of the training reference, so
+    their distance to it, and their mean ratio, is smaller than that of operational
+    chunks from the same distribution (in a simulation with chunks of a quarter of
+    the reference, median 0.87 against 1.12). A threshold derived from the spread of
+    the baseline chunks, such as ``"zscore"``, then alarms on clean chunks: on 6% to
+    100% of them in that simulation, more as the chunks grow relative to the
+    reference.
+
+    .. versionchanged:: 1.2
+        Drift is decided on the mean ratio over the features, corrected for the
+        sizes of the training, validation and operational data. It was decided when
+        any single feature's ratio exceeded the threshold, which raised a false
+        alarm on nearly every clean batch with many features.
 
     Parameters
     ----------
     ratio_threshold : float, default 1.4
-        Distance ratio above which drift is declared, per feature.
-        A value of 1.4 means operational distances more than 40% larger than
-        the train/validation baseline are flagged as drift.
+        Mean distance ratio over the features, corrected for sample sizes, above
+        which drift is declared. A value of 1.4 means operational distances on
+        average more than 40% larger than the train/validation baseline are flagged
+        as drift. Lower it for more sensitivity, after you measure the false alarm
+        rate on held-out batches from the reference distribution.
     n_features : int or None, default None
         Number of features to analyze. When None, automatically inferred from
         the flattened shape of the first data sample.
@@ -73,6 +94,39 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
     --------
     :class:`~dataeval.shift.DriftWasserstein.Stats` : Per-prediction statistics returned in
         :attr:`~dataeval.shift.DriftOutput.details`.
+    :class:`~dataeval.shift.DriftUnivariate` : The calibrated KS test, for 1 to 4 features.
+
+    Notes
+    -----
+    The expected Wasserstein distance between two samples of one distribution
+    scales with ``sqrt(1/n_a + 1/n_b)``. Each ratio with a nonzero baseline is
+    therefore divided by ``sqrt((1/n_ref + 1/n_op) / (1/n_fit + 1/n_val))``, where
+    ``n_ref`` is the size of the training reference at predict time (an
+    ``update_strategy`` can change it), ``n_op`` the size of the operational data,
+    and ``n_fit`` and ``n_val`` the sizes of the training and validation data at
+    :meth:`fit`. Without the correction, a validation set larger than the
+    operational batch raises the ratio of clean data above the threshold, and a
+    smaller one hides drift.
+
+    Measured false alarm rates at the default threshold, on data from the reference
+    distribution:
+
+    - about 0% to 3% from 16 independent continuous features of finite variance;
+    - 5% to 19% when the features are correlated;
+    - roughly 15% to 35% with 1 to 4 features, where the single baseline is noisy.
+      Use :class:`~dataeval.shift.DriftUnivariate`, the calibrated KS test, there.
+
+    The detector is unusable on constant or discrete features and on features with
+    infinite-variance tails. Drop constant and discrete features before you use it.
+    A feature that is constant in both reference samples has a baseline of 0. Its
+    ratio is 1.0 when the operational distance is also 0 and infinite otherwise, so
+    any change in it declares drift.
+
+    The mean ratio does not see shifts confined to a few of many features. A shift
+    in 1 of 512 features, even of 5 standard deviations, was not detected, and a 2
+    standard deviation shift in 2 of 64 features was detected in 66% to 92% of
+    trials, depending on the sample sizes. Lower ``ratio_threshold`` for
+    more sensitivity, and measure the false alarm rate on held-out batches first.
 
     Example
     -------
@@ -110,14 +164,33 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         Attributes
         ----------
         ratio : float
-            Mean distance ratio across all features. Values substantially above
-            1.0 indicate drift; values near 1.0 indicate no drift.
+            Mean of ``feature_ratios`` over the features, the statistic drift is
+            decided on: drift is declared when it exceeds ``ratio_threshold``. The
+            same value as :attr:`~dataeval.shift.DriftOutput.distance`. Values near
+            1.0 mean the operational data differs from training about as much as
+            the validation data did.
         feature_drift : NDArray[bool]
-            Boolean array indicating which features show drift.
+            Whether each feature's ratio exceeds ``ratio_threshold``, a diagnostic
+            of where to look. A single feature's ratio is noisy: on data from the
+            reference distribution it exceeds the default threshold in roughly 15%
+            to 35% of trials, so with many features some flags are expected by
+            chance. Drift is decided on ``ratio``, so
+            :attr:`~dataeval.shift.DriftOutput.drifted` does not equal
+            ``feature_drift.any()``.
             Shape matches the number of features in the input data.
+
+            .. versionchanged:: 1.2
+                No longer decides drift.
         feature_ratios : NDArray[np.float32]
-            Distance ratio for each feature (operational / baseline).
+            Distance ratio for each feature: the operational distance divided by
+            the baseline distance and by the sample-size correction described in
+            the class Notes. It equals ``distances / baseline_distances`` only when
+            the sample sizes match. A feature with a baseline of 0 has a ratio of
+            1.0 when its operational distance is also 0, and ``inf`` otherwise.
             Shape matches the number of features in the input data.
+
+            .. versionchanged:: 1.2
+                Corrected for sample sizes.
         distances : NDArray[np.float32]
             Wasserstein distances between training and operational data,
             one per feature. Shape matches the number of features.
@@ -134,7 +207,13 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         Attributes
         ----------
         ratio_threshold : float, default 1.4
-            Distance ratio above which drift is declared, per feature.
+            Mean distance ratio over the features, corrected for sample sizes,
+            above which drift is declared. The ratio's baseline comes from one
+            train/validation comparison. At the default, measured false alarm
+            rates are about 0% to 3% from 16 independent continuous features,
+            5% to 19% with correlated features and roughly 15% to 35% with 1 to 4
+            features. Shifts confined to a few of many features are not detected
+            (see the Notes of :class:`~dataeval.shift.DriftWasserstein`).
         n_features : int or None, default None
             Number of features to analyze.
         update_strategy : UpdateStrategy or None, default None
@@ -184,6 +263,8 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         # Populated during fit(); stored as encoded float32 arrays
         self._validation_data: NDArray[np.float32] | None = None
         self._baseline_distances: NDArray[np.float32] | None = None
+        # 1/n_fit + 1/n_val, the sample-size term of the baseline distance; set in fit()
+        self._baseline_size_term = 0.0
 
     @property
     def n_features(self) -> int:
@@ -274,7 +355,14 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Encodes both datasets, stores the training set as the reference for
         subsequent drift comparisons, and computes the per-feature Wasserstein
-        distance between training and validation data as the drift baseline.
+        distance between training and validation data as the drift baseline. The
+        baseline is one train/validation comparison, so it is itself noisy. The
+        sizes of both datasets are recorded for the sample-size correction of the
+        ratios (see the Notes of :class:`~dataeval.shift.DriftWasserstein`).
+
+        Drop constant and discrete features first. A feature that is constant in
+        both datasets has a baseline of 0 and gives an infinite ratio, and so
+        declares drift, whenever the operational data differs in it.
 
         Parameters
         ----------
@@ -285,7 +373,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
             array-like or an :class:`~dataeval.Embeddings`.
         validation_data : Any, default None
             Validation dataset drawn from the same distribution as
-            ``reference_data``. Used to calibrate the baseline distance. Must be
+            ``reference_data``. Sets the baseline distance. Must be
             compatible with ``reference_data`` (same feature dimensionality after
             encoding) and accepts the same range of inputs. Required despite the
             ``None`` default.
@@ -306,6 +394,7 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         # Compute and cache per-feature baseline distances (train vs val)
         self._baseline_distances = self._wasserstein_distances(self.reference_data, self._validation_data)
+        self._baseline_size_term = 1 / len(self.reference_data) + 1 / len(self._validation_data)
         self._fitted = True
         return self
 
@@ -337,27 +426,22 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
     def _compute_ratios(
         self,
         distances: NDArray[np.float32],
+        n_operational: int,
     ) -> NDArray[np.float32]:
-        """Compute per-feature distance ratios, guarding against zero baselines.
+        """Compute per-feature distance ratios, corrected for sample sizes.
 
-        When a baseline distance is zero (train and val are identical for that
-        feature), the ratio is set to 1.0 if the operational distance is also
-        zero, and ``inf`` otherwise.
-
-        Parameters
-        ----------
-        distances : NDArray[np.float32]
-            Operational distances, shape ``(n_features,)``.
-
-        Returns
-        -------
-        NDArray[np.float32]
-            Distance ratios, shape ``(n_features,)``.
+        A ratio with a nonzero baseline is divided by
+        ``sqrt((1/n_ref + 1/n_operational) / (1/n_fit + 1/n_val))``, with ``n_ref`` the
+        current reference size (the update strategy can cap it; the mixin's ``n`` counts
+        every batch seen). A zero baseline (train and val identical for that feature) is
+        left uncorrected: the ratio is 1.0 if the operational distance is also zero, and
+        ``inf`` otherwise. Correcting it too would turn the 1.0 of a constant feature into
+        ``1/c`` and shift the mean ratio.
         """
         baseline = self.baseline_distances
-        zero_mask = baseline == 0.0
+        c = np.sqrt((1 / len(self.reference_data) + 1 / n_operational) / self._baseline_size_term)
         with np.errstate(divide="ignore", invalid="ignore"):
-            ratios = np.where(zero_mask, np.where(distances == 0.0, 1.0, np.inf), distances / baseline)
+            ratios = np.where(baseline == 0.0, np.where(distances == 0.0, 1.0, np.inf), distances / (baseline * c))
         return ratios.astype(np.float32)
 
     def score(self, data: Any) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
@@ -365,7 +449,14 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Encodes ``data``, computes the per-feature Wasserstein distance between
         the training reference and ``data``, then divides by the baseline
-        train/validation distances.
+        train/validation distances and by the sample-size correction described in
+        the Notes of :class:`~dataeval.shift.DriftWasserstein`. A feature with a
+        baseline of 0 gets a ratio of 1.0 when its distance is also 0, and ``inf``
+        otherwise. The ratios therefore equal ``distances / baseline_distances``
+        only when the sample sizes match.
+
+        .. versionchanged:: 1.2
+            The ratios are corrected for sample sizes.
 
         Parameters
         ----------
@@ -384,13 +475,13 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
         """
         x_np = self._encode(data)
         distances = self._wasserstein_distances(self.reference_data, x_np)
-        ratios = self._compute_ratios(distances)
+        ratios = self._compute_ratios(distances, len(x_np))
         return ratios, distances
 
     def _compute_chunk_metric(self, chunk_data: NDArray[np.float32]) -> float:
-        """Compute mean distance ratio: chunk vs training reference."""
+        """Compute mean distance ratio, corrected for the chunk size: chunk vs training reference."""
         distances = self._wasserstein_distances(self.reference_data, chunk_data)
-        ratios = self._compute_ratios(distances)
+        ratios = self._compute_ratios(distances, len(chunk_data))
         return float(np.mean(ratios))
 
     def _compute_chunk_baselines(
@@ -401,18 +492,9 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Rather than comparing chunks against each other (as in the univariate
         case), each chunk is compared against the training reference, mirroring
-        the predict-time behavior. This means the chunked baseline reflects the
-        expected ratio distribution for in-distribution data.
-
-        Parameters
-        ----------
-        chunks : list[NDArray[np.float32]]
-            Reference data split into chunks (derived from training data).
-
-        Returns
-        -------
-        NDArray[np.float32]
-            Mean distance ratio per chunk.
+        the predict-time behavior. The chunks are subsets of that reference, so
+        their ratios run below those of clean operational chunks, and only the
+        default constant threshold is calibrated (see the class docstring).
         """
         return np.array([self._compute_chunk_metric(c) for c in chunks], dtype=np.float32)
 
@@ -425,8 +507,29 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         Computes per-feature Wasserstein distances between the training
         reference and ``data``, divides by the train/validation baseline
-        distances, and flags drift when any feature ratio exceeds
-        :attr:`ratio_threshold`.
+        distances and corrects for the sample sizes, then flags drift when the
+        mean ratio over the features exceeds :attr:`ratio_threshold`. The
+        baseline is one train/validation comparison.
+
+        At the default threshold, measured false alarm rates on data from the
+        reference distribution are about 0% to 3% from 16 independent continuous
+        features of finite variance, 5% to 19% with correlated features and
+        roughly 15% to 35% with 1 to 4 features (use
+        :class:`~dataeval.shift.DriftUnivariate`, the calibrated KS test, there).
+        The detector is unusable on constant or discrete features and on
+        infinite-variance tails. Shifts confined to a few of many features are
+        not detected: a shift in 1 of 512 features was missed, and a 2 standard
+        deviation shift in 2 of 64 features was detected in 66% to 92% of trials.
+        Lower :attr:`ratio_threshold` for more sensitivity, and measure the false
+        alarm rate on held-out batches first.
+
+        The per-feature flags in the returned ``feature_drift`` say where to
+        look. They do not decide drift, so ``drifted`` can be False while some
+        flags are True.
+
+        .. versionchanged:: 1.2
+            Drift is decided on the mean ratio, corrected for sample sizes, and
+            not when any single feature's ratio exceeds the threshold.
 
         Parameters
         ----------
@@ -445,17 +548,18 @@ class DriftWasserstein(DriftAdaptiveMixin, ChunkableMixin, BaseDrift[_DriftWasse
 
         ratios, distances = self.score(data)
 
+        # The flags only show where to look: one feature's ratio is too noisy to decide drift on
         feature_drift = (ratios > self.ratio_threshold).astype(np.bool_)
-        drift_pred = bool(feature_drift.any())
+        ratio = float(np.mean(ratios))
 
         result = DriftOutput(
-            drifted=drift_pred,
+            drifted=ratio > self.ratio_threshold,
             threshold=self.ratio_threshold,
-            distance=float(np.mean(ratios)),
+            distance=ratio,
             metric_name=self._metric_name,
             feature_names=self._feature_names,
             details=_DriftWassersteinStats(
-                ratio=float(np.mean(ratios)),
+                ratio=ratio,
                 feature_drift=feature_drift,
                 feature_ratios=ratios,
                 distances=distances,
