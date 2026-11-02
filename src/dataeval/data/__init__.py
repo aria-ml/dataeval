@@ -16,6 +16,7 @@ __all__ = [
     "FrameCandidate",
     "FrameIndices",
     "FrameInput",
+    "FrameMetadata",
     "FrameRate",
     "FrameSelector",
     "FrameVerdict",
@@ -58,7 +59,7 @@ from dataeval.data._classfilter import ClassFilter
 from dataeval.data._crop import Crop
 from dataeval.data._crops import DetectionCrops
 from dataeval.data._filter import Filter
-from dataeval.data._frames import SelectionReport, SequenceFrames
+from dataeval.data._frames import FrameMetadata, SelectionReport, SequenceFrames
 from dataeval.data._indices import Indices
 from dataeval.data._label_selectors import BestPerTrack, HasLabels, TrackEvents
 from dataeval.data._limit import Limit
