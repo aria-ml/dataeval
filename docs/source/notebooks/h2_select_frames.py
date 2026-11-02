@@ -39,7 +39,7 @@ except Exception:
 
 # %%
 from collections.abc import Iterator
-from typing import Any, NamedTuple, cast
+from typing import NamedTuple, cast
 
 import numpy as np
 
@@ -166,7 +166,7 @@ for name, frames in selections.items():
 
 # %%
 frames = selections["Representative"]
-represented = [dict(meta)["frames_represented"] for _, _, meta in frames.stream()]
+represented = [meta["frames_represented"] for _, _, meta in frames.stream()]
 sources = frames.source_indices
 for address, weight in zip(sources[:6], represented[:6], strict=False):
     print(f"video {address.item}, frame {address.key:>2} stands for {weight:>4.0f} frames")
@@ -179,7 +179,7 @@ print(f"\nview position 3 is {kept!r}")
 
 
 def weights(frames: SequenceFrames) -> list[float]:
-    return [cast(dict[str, Any], meta)["frames_represented"] for _, _, meta in frames.stream()]
+    return [meta["frames_represented"] for _, _, meta in frames.stream()]
 
 
 for name, frames in selections.items():

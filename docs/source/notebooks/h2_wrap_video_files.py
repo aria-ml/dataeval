@@ -226,12 +226,12 @@ assert len(first) == N_FRAMES
 assert [f.frame_index for f in first] == [f.frame_index for f in second] == list(range(N_FRAMES))
 assert first[1].time_s > first[0].time_s
 assert first[1].pts > first[0].pts
-held = FileStream.open_files
+assert FileStream.open_files == 0, "Outliers or SourceLocator left a file open"
 walk = iter(FileStream(paths[0]))
 next(walk)
-assert FileStream.open_files == held + 1
+assert FileStream.open_files == 1
 walk.close()
-assert FileStream.open_files == held
+assert FileStream.open_files == 0
 assert metadata.dropped_factors == {}
 assert metadata.rows_at("sequence")["codec_name"].to_list() == ["mpeg4"] * 3
 assert broken.dropped_factors == {"frame_rate": ["invalid_known_factor"]}

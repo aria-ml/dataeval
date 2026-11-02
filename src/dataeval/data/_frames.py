@@ -2,10 +2,10 @@
 
 __all__ = []
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple, NotRequired, cast
 
 import numpy as np
 import polars as pl
@@ -69,6 +69,52 @@ A selector naming one of these in :attr:`~dataeval.data.FrameVerdict.factors` is
 than silently overwritten -- the same rule the metadata structurers apply to a dataset key that
 collides with a derived one.
 """
+
+
+class FrameMetadata(DatumMetadata):
+    """The datum metadata of one frame of a :class:`~dataeval.data.SequenceFrames` view.
+
+    A plain ``dict`` at runtime. Anything a selector put in
+    :attr:`~dataeval.data.FrameVerdict.factors` sits beside these keys and is not declared here,
+    so a type checker reads it only through a ``cast``.
+
+    Attributes
+    ----------
+    id : int
+        The frame's position in this view.
+    source_id : int | str
+        The sequence datum's own ``id``, so a flagged frame resolves to the right video after the
+        source has been filtered or reordered.
+    sequence : int
+        The sequence's index in the source dataset.
+    frame : int
+        The frame's own ``frame_index`` in the source video.
+    frames_represented : float
+        How many source frames this one stands for.
+    sequence_position : float
+        Position within the sequence, normalized to ``[0, 1]``.
+    sequence_n_frames : int
+        How many frames the source sequence holds.
+    time_s : float, optional
+        The frame's own time in seconds, where it declares one.
+    pts : int, optional
+        The frame's own presentation timestamp, where it declares one.
+    seconds_represented : float, optional
+        Where timings allow, the span of the timeline from this kept frame to the next, the first
+        starting at the sequence's first timestamp and the last running to its final one. A span of
+        the timeline, not a mass: it does not leave out the time an excluded frame covers.
+    """
+
+    source_id: int | str
+    sequence: int
+    frame: int
+    frames_represented: float
+    sequence_position: float
+    sequence_n_frames: int
+    time_s: NotRequired[float]
+    pts: NotRequired[int]
+    seconds_represented: NotRequired[float]
+
 
 _Selected = tuple[
     int, Any, SingleFrameObjectTrackingTarget, float | None, int | None, Mapping[str, Any], float | None, bool
@@ -260,23 +306,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     stream already spent, by an earlier walk of this view or by another reader such as
     :class:`~dataeval.Metadata`, raises an error naming that contract.
 
-    Each frame's metadata is a plain ``dict`` conforming to
-    :obj:`~dataeval.protocols.DatumMetadata`, carrying:
-
-    - ``id`` (*int*) -- the frame's position in this view.
-    - ``source_id`` (*int | str*) -- the sequence datum's own ``id``, so a flagged frame resolves
-      to the right video after the source has been filtered or reordered.
-    - ``sequence`` (*int*) -- the sequence's index in the source dataset.
-    - ``frame`` (*int*) -- the frame's own ``frame_index`` in the source video.
-    - ``time_s``, ``pts`` -- the frame's own timings, where it declares them.
-    - ``frames_represented`` (*float*) -- how many source frames this one stands for.
-    - ``seconds_represented`` (*float*) -- where timings allow, the span of the timeline from this
-      kept frame to the next, the first starting at the sequence's first timestamp and the last
-      running to its final one. A span of the timeline, not a mass: it does not leave out the
-      time an excluded frame covers.
-    - ``sequence_position`` (*float*) -- position within the sequence, normalized to ``[0, 1]``.
-    - ``sequence_n_frames`` (*int*) -- how many frames the source sequence holds.
-    - anything a selector put in :attr:`~dataeval.data.FrameVerdict.factors`.
+    Each frame's metadata is a :class:`~dataeval.data.FrameMetadata`: its position in the view, the
+    video and frame it came from, the frame's timings where it declares them, how many source
+    frames it stands for, and anything a selector put in :attr:`~dataeval.data.FrameVerdict.factors`.
 
     Because this presents object detection, ``Metadata(SequenceFrames(ds))`` structures as
     ``unit`` = frame and ``instance`` = detection, so every one of those keys is a ``unit``-level
@@ -373,7 +405,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         self._metadata = inherited_metadata(dataset, "frames")
 
         self._cursor_sequence: int | None = None
-        self._cursor: Iterator[Any] | None = None
+        self._cursor: Generator[Any, None, None] | None = None
         self._cursor_position: int = -1
         self._cursor_frame: Any = None
         self._cursor_target: Any = None
@@ -430,19 +462,21 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             return sum(len(positions) for positions in self._planned)
         return len(self._realize())
 
-    def __getitem__(self, index: int) -> ObjectDetectionDatum:
+    def __getitem__(self, index: int) -> tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]:
         """Return one frame as an object-detection datum."""
         entries = self._realize()
         index = checked_index(index, len(entries), "SequenceFrames", "frame(s)")
         entry = entries[index]
         frame, target = self._seek(entry["sequence"], entry["position"])
+        if index + 1 == len(entries) or entries[index + 1]["sequence"] != entry["sequence"]:
+            self._release()
         pixels = normalize_image_shape(as_numpy(frame.pixels))
-        return pixels, target, cast(DatumMetadata, {**entry["metadata"], "id": index})
+        return pixels, target, cast(FrameMetadata, {**entry["metadata"], "id": index})
 
-    def __iter__(self) -> Iterator[ObjectDetectionDatum]:
+    def __iter__(self) -> Iterator[tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]]:
         """Iterate frames in order, decoding each sequence once."""
         for position, (pixels, target, metadata) in enumerate(self.stream()):
-            yield pixels, target, cast(DatumMetadata, {**metadata, "id": position})
+            yield pixels, target, cast(FrameMetadata, {**metadata, "id": position})
 
     def __repr__(self) -> str:
         return f"SequenceFrames(dataset={self._dataset!r}, selector={self._selector!r})"
@@ -474,7 +508,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     # Streaming
     # ------------------------------------------------------------------
 
-    def stream(self) -> Iterator[tuple[NDArray[Any], SingleFrameObjectTrackingTarget, DatumMetadata]]:
+    def stream(self) -> Iterator[tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]]:
         """Decode every selected frame of every sequence, once, in order.
 
         The primary interface. Splitting it with :func:`itertools.tee` gives
@@ -483,7 +517,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
         Yields
         ------
-        tuple[NDArray, SingleFrameObjectTrackingTarget, DatumMetadata]
+        tuple[NDArray, SingleFrameObjectTrackingTarget, FrameMetadata]
             One selected frame's pixels in ``(C, H, W)``, its detections, and its metadata.
             ``id`` counts frames across the whole view.
         """
@@ -491,7 +525,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         for info in self._sequences:
             for entry, frame, target in self._walk(info):
                 pixels = normalize_image_shape(as_numpy(frame.pixels))
-                yield pixels, target, cast(DatumMetadata, {**entry["metadata"], "id": position})
+                yield pixels, target, cast(FrameMetadata, {**entry["metadata"], "id": position})
                 position += 1
 
     @staticmethod
@@ -878,7 +912,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             self._detection_offsets[sequence] = np.concatenate(([0], np.cumsum(counts, dtype=np.intp)))
         return self._detection_offsets[sequence]
 
-    def _frames_of(self, info: SequenceInfo) -> Iterator[tuple[int, Any, SingleFrameObjectTrackingTarget]]:  # noqa: C901
+    def _frames_of(self, info: SequenceInfo) -> Generator[tuple[int, Any, SingleFrameObjectTrackingTarget], None, None]:  # noqa: C901
         """Pair each decoded frame of one sequence with its target, in order.
 
         A frame count that disagrees with the target count is a dataset defect and is raised
@@ -1258,7 +1292,7 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         """
         if self._cursor_sequence == sequence and self._cursor_position == position:
             return self._cursor_frame, cast(SingleFrameObjectTrackingTarget, self._cursor_target)
-        if self._cursor_sequence != sequence or self._cursor_position > position:
+        if self._cursor is None or self._cursor_sequence != sequence or self._cursor_position > position:
             self._restart(sequence)
 
         cursor = cast(Iterator[Any], self._cursor)
@@ -1278,11 +1312,23 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 "A VideoStream is not indexable; use stream() for in-order reads.",
                 sequence,
             )
+        self._release()
         self._cursor = self._frames_of(self._sequences[sequence])
         self._cursor_sequence = sequence
         self._cursor_position = -1
         self._cursor_frame = None
         self._cursor_target = None
+
+    def _release(self) -> None:
+        """Close the cursor's walk, keeping the frame it rests on so re-reading that frame stays free.
+
+        The walk is a generator of this view, so the two hold each other: dropped without closing,
+        it keeps the source stream, for a video file an open file, until the garbage collector
+        breaks the cycle.
+        """
+        if self._cursor is not None:
+            self._cursor.close()
+            self._cursor = None
 
 
 def frame_numbers_at(

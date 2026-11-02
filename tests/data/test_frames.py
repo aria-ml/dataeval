@@ -4,7 +4,7 @@ import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, replace
 from itertools import islice
-from typing import Any, cast
+from typing import Any, assert_type, cast
 
 import numpy as np
 import pytest
@@ -17,6 +17,7 @@ from dataeval.data import (
     FrameCandidate,
     FrameIndices,
     FrameInput,
+    FrameMetadata,
     FrameRate,
     FrameSelector,
     FrameVerdict,
@@ -101,18 +102,23 @@ class _CountingStream:
 
     def __iter__(self) -> Iterator[_FakeFrame]:
         self._counter["iterations"] += 1
-        for i in range(self._n + self._extra):
-            self._counter["frames"] += 1
-            yield _FakeFrame(
-                i if self._numbering is None else self._numbering(i),
-                self._shape,
-                (i / 30.0) if self._timed else None,
-                (i * 1001) if self._timed else None,
-                self._counter,
-                # Frames before `still_until` are pixel-identical, so a sequence can hold a static
-                # stretch followed by one where every frame differs.
-                value=0 if self._still_until is not None and i < self._still_until else i,
-            )
+        # Counts walks begun and not yet ended, as a file a video stream opens stays open.
+        self._counter["open"] = self._counter.get("open", 0) + 1
+        try:
+            for i in range(self._n + self._extra):
+                self._counter["frames"] += 1
+                yield _FakeFrame(
+                    i if self._numbering is None else self._numbering(i),
+                    self._shape,
+                    (i / 30.0) if self._timed else None,
+                    (i * 1001) if self._timed else None,
+                    self._counter,
+                    # Frames before `still_until` are pixel-identical, so a sequence can hold a static
+                    # stretch followed by one where every frame differs.
+                    value=0 if self._still_until is not None and i < self._still_until else i,
+                )
+        finally:
+            self._counter["open"] -= 1
 
 
 class _FakeDataset:
@@ -355,6 +361,26 @@ class TestConstruction:
         assert frames.metadata["id"] == "videos-frames"
         assert cast(dict, frames.metadata)["index2label"] == {0: "thing"}
 
+    def test_frame_metadata_is_typed_without_a_cast(self):
+        """Every path to a frame gives a FrameMetadata, so its keys read with their types."""
+        dataset, _ = make_dataset((3,))
+        frames = SequenceFrames(dataset)
+        by_index = frames[2][2]
+        by_iteration = next(iter(frames))[2]
+        by_stream = next(frames.stream())[2]
+        assert_type(by_index, FrameMetadata)
+        assert_type(by_iteration, FrameMetadata)
+        assert_type(by_stream, FrameMetadata)
+        assert_type(by_index["frames_represented"], float)
+        assert (by_index["id"], by_index["frame"], by_index["frames_represented"]) == (2, 2, 1.0)
+        assert (by_iteration["id"], by_stream["id"]) == (0, 0)
+        assert by_index.get("time_s") == pytest.approx(2 / 30.0)
+
+    def test_every_frame_metadata_key_is_reserved_from_selectors(self):
+        from dataeval.data._frames import RESERVED_FACTORS
+
+        assert FrameMetadata.__required_keys__ | FrameMetadata.__optional_keys__ <= RESERVED_FACTORS
+
     def test_a_dataset_without_metadata_gives_its_view_a_default_id_and_no_labels(self):
         dataset, _ = make_dataset((3,))
 
@@ -416,6 +442,20 @@ class TestDecodeAccounting:
         emitted = emit(SequenceFrames(dataset, Stride(3)))
         assert len(emitted) == 3
         assert counters[0]["pixels"] == 3
+
+    @pytest.mark.parametrize("selector", [None, Stride(4), _FirstTwo()], ids=["all", "stride", "first-two"])
+    def test_reading_every_frame_by_index_leaves_no_stream_open(self, selector):
+        """The view releases a sequence's stream after the last frame it presents from it.
+
+        Held, the stream of a video file keeps the file open for as long as the view lives.
+        """
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset) if selector is None else SequenceFrames(dataset, selector)
+        for index in range(len(frames)):
+            frames[index]
+        assert [counter["open"] for counter in counters] == [0, 0]
+        assert frames[len(frames) - 1][2]["id"] == len(frames) - 1, "re-reading the last frame decodes nothing"
+        assert [counter["open"] for counter in counters] == [0, 0]
 
 
 @pytest.mark.required
