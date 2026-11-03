@@ -8,9 +8,11 @@ Cut a release from the branch you are standing on.
     python scripts/release.py prerelease a    # -a0 alpha snapshot
     python scripts/release.py --dry-run       # print what would happen, touch nothing
 
-Updates CHANGELOG.md and the notebook links in the docs indexes, commits, and tags.
-It never pushes: review the commit, then `git push --follow-tags` to publish. Pushing
-the tag is what triggers PyPI publication and the docs build.
+Updates CHANGELOG.md and the notebook links in the docs indexes, commits, and tags. A
+release replaces its prereleases' changelog sections with one section of everything
+since the last full release. It never pushes: review the commit, then
+`git push --follow-tags` to publish. Pushing the tag is what triggers PyPI publication
+and the docs build.
 
 Needs nothing but git and a Python interpreter - no credentials, no GitLab API.
 """
@@ -114,11 +116,13 @@ def parse_version(tag: str) -> tuple[int, int, int, int, int]:
     return (int(major), int(minor), int(patch), kind_rank, int(number or 0))
 
 
-def latest_tag(series: str | None = None) -> str | None:
-    """Highest version tag reachable from HEAD, optionally limited to a `vN.N` series."""
+def latest_tag(series: str | None = None, final: bool = False) -> str | None:
+    """Highest version tag reachable from HEAD, optionally limited to a `vN.N` series or to full releases."""
     tags = [t for t in git("tag", "--merged", "HEAD").splitlines() if is_version_tag(t)]
     if series is not None:
         tags = [t for t in tags if t.startswith(f"{series}.")]
+    if final:
+        tags = [t for t in tags if "-" not in t]
     return max(tags, key=parse_version, default=None)
 
 
@@ -191,14 +195,16 @@ def render_section(version: str, entries: dict[str, list[tuple[str, str]]]) -> s
     return "\n".join(lines)
 
 
-def update_changelog(section: str) -> None:
+def update_changelog(version: str, section: str) -> None:
     text = CHANGELOG_FILE.read_text()
     # Splice in front of the newest version heading rather than at a fixed line number, so
     # a change to the file's preamble cannot silently shear off the top of the changelog.
     index = text.find("\n## v")
     if index < 0:
         fail(f"{CHANGELOG_FILE.name} has no '## v...' heading to insert before")
-    CHANGELOG_FILE.write_text(f"# DataEval Change Log\n\n{section}\n\n{text[index + 1 :]}")
+    # A release's section already lists its prereleases' entries, so their sections go.
+    history = re.sub(rf"^## {re.escape(version)}-.*?(?=^## v|\Z)", "", text[index + 1 :], flags=re.M | re.S)
+    CHANGELOG_FILE.write_text(f"# DataEval Change Log\n\n{section}\n\n{history}")
 
 
 def update_doc_indexes(version: str) -> list[Path]:
@@ -290,6 +296,10 @@ def main() -> None:
     # collision there would leave a release commit behind with no tag on it.
     if git_ok("rev-parse", "-q", "--verify", f"refs/tags/{version}") is not None:
         fail(f"tag {version} already exists - fetch tags and check what has been released")
+    # Finalizing a prerelease: the release lists everything since the last full release,
+    # regrouped by category, rather than only what changed since its last candidate.
+    if current and "-" in current and "-" not in version:
+        entries = collect_entries(latest_tag(series, final=True))
     section = render_section(version, entries)
 
     print(f"{branch}: {current or 'no tag'} -> {version}\n\n{section}\n")
@@ -298,7 +308,7 @@ def main() -> None:
         print("--dry-run: nothing written.")
         return
 
-    update_changelog(section)
+    update_changelog(version, section)
     changed = update_doc_indexes(version)
 
     label = "Prerelease" if args.bump == "prerelease" else "Release"
