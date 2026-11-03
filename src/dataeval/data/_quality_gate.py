@@ -45,7 +45,7 @@ def _reads_one_number(stat: str, calculator: tuple[type[Any], ImageStats]) -> bo
     from dataeval.core._image_stats import _collect_calculator_stats
 
     try:
-        stats, _, _ = _collect_calculator_stats([calculator], _PROBE, None)
+        stats, _, _, _ = _collect_calculator_stats([calculator], _PROBE, None)
     except RuntimeError:
         _logger.debug("QualityGate: %r could not be read off the probe image; it is unsupported.", stat, exc_info=True)
         return False
@@ -184,7 +184,7 @@ class QualityGate(FrameSelector):
         """Return one frame's value, as ``image_stats`` reports it for that frame."""
         from dataeval.core._image_stats import _collect_calculator_stats
 
-        stats, _, _ = _collect_calculator_stats([self._calculator], pixels, None)
+        stats, _, _, _ = _collect_calculator_stats([self._calculator], pixels, None)
         value = stats[0][self.stat][0]
         # image_stats reports a floating statistic as float32, so a bound read off its output meets
         # a frame's own reading exactly only when that reading is rounded the same way.

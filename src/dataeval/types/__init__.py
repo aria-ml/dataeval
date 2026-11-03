@@ -34,6 +34,7 @@ __all__ = [
     "KnownFactor",
     "LevelSpec",
     "MappingOutput",
+    "MeasurementSpec",
     "MetadataJson",
     "ModelInfo",
     "OntologyConcept",
@@ -87,6 +88,7 @@ from dataeval.types._factors import (
 )
 from dataeval.types._index import SourceIndex
 from dataeval.types._known_factors import KNOWN_FACTORS, KnownFactor
+from dataeval.types._measurement import MeasurementSpec
 from dataeval.types._ontology import AlignmentRelation, Correspondence, OntologyConcept
 from dataeval.types._output import (
     BaseCollectionMixin,

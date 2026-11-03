@@ -5958,6 +5958,12 @@ class Metadata(Array, FeatureExtractor):
             ``track_stats`` uses). Its bookkeeping keys (``object_count``,
             ``invalid_box_count``, ``image_count``) describe the run rather than the
             images and are ignored.
+
+            Its ``measurement_specs`` and ``details`` are ignored too, and stay on the
+            producer's result: a status or a support count is not a factor to bin. To
+            analyze one, pass it as a factor yourself, with the result's
+            ``source_index``: ``add_factors({"status": result["details"]["status"]},
+            source_index=result["source_index"])``.
         level : str or None, default None
             Level at which to store the factors — one of :attr:`levels`. Required
             unless `source_index` is given: those are the two supported ways to say
