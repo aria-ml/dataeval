@@ -82,7 +82,7 @@ def test_changelog_splice_keeps_history():
         changelog = Path(tmp) / "CHANGELOG.md"
         changelog.write_text(original)
         release.CHANGELOG_FILE = changelog
-        release.update_changelog("v1.2.0", render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}))
+        release.update_changelog("v1.2.0", render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}), {})
         result = changelog.read_text()
 
     assert result.startswith("# DataEval Change Log\n\n## v1.2.0\n"), result
@@ -91,7 +91,7 @@ def test_changelog_splice_keeps_history():
     assert "- `aaaaaaaa` - [fix] Old" in result
 
 
-def test_release_folds_its_prereleases():
+def test_release_folds_prereleases_and_pulls_in_patches():
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp)
 
@@ -114,6 +114,9 @@ def test_release_folds_its_prereleases():
         run("tag", "-a", "v1.1.0", "-m", "v1.1.0")
         release.REPO, release.CHANGELOG_FILE, release.DOC_INDEX_FILES = repo, repo / "CHANGELOG.md", ()
 
+        run("switch", "-q", "-c", "release/v1.1")
+        cut("[fix] Backport")  # v1.1.1, whose section only release/v1.1 has
+        run("switch", "-q", "main")
         cut("[fix] Repair", "prerelease")
         cut("[feat] Add", "prerelease")
         assert "## v1.2.0-rc0" in (repo / "CHANGELOG.md").read_text()  # a candidate keeps the ones before it
@@ -125,7 +128,22 @@ def test_release_folds_its_prereleases():
     feature, fix, misc = (result.index(s) for s in ("[feat] Add", "[fix] Repair", "[misc] Tidy"))
     assert result.startswith("# DataEval Change Log\n\n## v1.2.0\n"), result
     assert feature < fix < misc, result
-    assert "[misc] Tidy\n\n## v1.1.0\n\n- `aaaaaaaa` - [fix] Old\n" in result, result
+    # the patch's section comes from its tag and sits in version order, below the release
+    assert result.index("## v1.2.0\n") < result.index("## v1.1.1\n") < result.index("## v1.1.0\n"), result
+    assert "[misc] Tidy\n\n## v1.1.1\n" in result, result
+    assert "[fix] Backport\n\n## v1.1.0\n\n- `aaaaaaaa` - [fix] Old\n" in result, result
+    assert result.count("[fix] Backport") == 1, result
+
+
+def test_changelog_with_an_unknown_heading_is_refused():
+    # rewriting the changelog section by section would otherwise drop or merge these lines
+    for text in ("# Log\n\n## Unreleased\n\n- x\n", "# Log\n\n## v1.1.0\n\n- x\n\n## v1.1.0\n\n- y\n"):
+        try:
+            release.changelog_sections(text, "CHANGELOG.md")
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError(f"should refuse {text!r}")
 
 
 def test_kind_pairs_only_with_prerelease():

@@ -10,7 +10,9 @@ Cut a release from the branch you are standing on.
 
 Updates CHANGELOG.md and the notebook links in the docs indexes, commits, and tags. A
 release replaces its prereleases' changelog sections with one section of everything
-since the last full release. It never pushes: review the commit, then
+since the last full release, and the sections of releases cut on other branches, such
+as patches from a release branch, are copied in from their tags in version order.
+It never pushes: review the commit, then
 `git push --follow-tags` to publish. Pushing the tag is what triggers PyPI publication
 and the docs build.
 
@@ -195,16 +197,52 @@ def render_section(version: str, entries: dict[str, list[tuple[str, str]]]) -> s
     return "\n".join(lines)
 
 
-def update_changelog(version: str, section: str) -> None:
-    text = CHANGELOG_FILE.read_text()
-    # Splice in front of the newest version heading rather than at a fixed line number, so
-    # a change to the file's preamble cannot silently shear off the top of the changelog.
-    index = text.find("\n## v")
-    if index < 0:
+def changelog_sections(text: str, source: str) -> dict[str, str]:
+    """Split a changelog into its `## vX.Y.Z` sections, by version, keeping every line of each.
+
+    Everything before the first section heading is the preamble and is not returned. A
+    heading that is not one unique version stops the release rather than losing its lines.
+    """
+    index = text.find("\n## ")
+    sections: dict[str, str] = {}
+    for block in re.split(r"^(?=## )", text[index + 1 :] if index >= 0 else "", flags=re.M):
+        if not block:
+            continue
+        version = block.split("\n", 1)[0].removeprefix("## ").strip()
+        if not is_version_tag(version) or version in sections:
+            fail(f"{source} has a '## {version}' section that is not one unique version - fix it by hand")
+        sections[version] = block.rstrip()
+    return sections
+
+
+def branch_sections(version: str) -> dict[str, str]:
+    """Sections of the releases cut on other branches that CHANGELOG.md lacks, by version.
+
+    A patch release is cut on its release branch, so its section reaches only that branch's
+    changelog. Each comes from the changelog at its own tag; later releases are left out.
+    """
+    present = changelog_sections(CHANGELOG_FILE.read_text(), CHANGELOG_FILE.name)
+    sections = {}
+    for tag in git("tag", "--no-merged", "HEAD").splitlines():
+        if not is_version_tag(tag) or "-" in tag or tag in present or parse_version(tag) > parse_version(version):
+            continue
+        section = changelog_sections(git_ok("show", f"{tag}:CHANGELOG.md") or "", f"CHANGELOG.md at {tag}").get(tag)
+        if section is None:
+            print(f"warning: CHANGELOG.md at {tag} has no '## {tag}' section - it stays out of the changelog")
+            continue
+        sections[tag] = section
+    return sections
+
+
+def update_changelog(version: str, section: str, pulled: dict[str, str]) -> None:
+    sections = changelog_sections(CHANGELOG_FILE.read_text(), CHANGELOG_FILE.name)
+    if not sections:
         fail(f"{CHANGELOG_FILE.name} has no '## v...' heading to insert before")
     # A release's section already lists its prereleases' entries, so their sections go.
-    history = re.sub(rf"^## {re.escape(version)}-.*?(?=^## v|\Z)", "", text[index + 1 :], flags=re.M | re.S)
-    CHANGELOG_FILE.write_text(f"# DataEval Change Log\n\n{section}\n\n{history}")
+    sections = {v: s for v, s in sections.items() if not v.startswith(f"{version}-")}
+    sections |= pulled | {version: section}
+    ordered = sorted(sections, key=parse_version, reverse=True)
+    CHANGELOG_FILE.write_text("# DataEval Change Log\n\n" + "\n\n".join(sections[v] for v in ordered) + "\n")
 
 
 def update_doc_indexes(version: str) -> list[Path]:
@@ -301,14 +339,17 @@ def main() -> None:
     if current and "-" in current and "-" not in version:
         entries = collect_entries(latest_tag(series, final=True))
     section = render_section(version, entries)
+    pulled = branch_sections(version)
 
     print(f"{branch}: {current or 'no tag'} -> {version}\n\n{section}\n")
+    if pulled:
+        print(f"Also adds the sections of {', '.join(pulled)}, released from other branches.\n")
 
     if args.dry_run:
         print("--dry-run: nothing written.")
         return
 
-    update_changelog(version, section)
+    update_changelog(version, section, pulled)
     changed = update_doc_indexes(version)
 
     label = "Prerelease" if args.bump == "prerelease" else "Release"

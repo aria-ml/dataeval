@@ -121,6 +121,10 @@ git push --follow-tags origin main    # publish
 The branch decides the bump: `main` gives a minor release, `release/vX.Y` a patch. `release.py major` forces a
 major bump, and `release.py prerelease [a|rc]` cuts a prerelease. Nothing is published until the tag is pushed.
 
+A patch release writes its changelog section on its release branch only. The next release cut from `main` copies that
+section in from the patch's tag, so the changelog on `main` lists every published version, newest first. A fix that
+shipped in a patch and again in the next minor release appears in both sections, in each one's own words.
+
 ### What the tag triggers
 
 1. **GitLab tag pipeline** runs the `docs` job, and `push-docs-cache.sh` pushes the notebooks and Jupyter cache to
