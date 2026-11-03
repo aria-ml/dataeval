@@ -1,55 +1,13 @@
 # DataEval Change Log
 
-## v1.2.0-rc2
+## v1.2.0
 
 🌟 **Feature Release**
 
+- `b1895dd5d` - [feat] Report Sufficiency progress through a callback called after each evaluation
 - `a741cce85` - [feat] Flag collapsed classes in the Coverage per-class table with is_clustered, is_one_dimensional and has_near_duplicates, set by new dispersion_factor, isotropy_factor and near_duplicate_threshold parameters
-
-👾 **Fixes**
-
-- `008e46bec` - [fix] Decide Wasserstein drift on the mean ratio, corrected for sample sizes
-- `b0d1dd004` - [fix] Count Coverage near_duplicate_fraction per image against a typical class, so copies score the same on CPU and GPU and a clump that is most of its class is flagged
-
-📝 **Miscellaneous**
-
-- `fef5dbfb6` - [docs] Move the tutorials and how-tos to mission-relevant datasets
-- `f7b484f3a` - [devops] Run typecheck on merge requests that change the noxfile
-- `28f6bdc9f` - [devops] Raise the Node heap limit for pyright in the type session
-- `f7ef4845c` - [test] Fix doc structure tests for new how-to style rule
-- `ebd8d67ff` - [docs] Remove the prefix in how to titles
-- `58dbbcf79` - [docs] Add a New in v1.2 page for teams choosing what to integrate, and mark Outliers as taking a tracking dataset
-- `0d2f870d8` - [docs] Complete the v1.2 experimental lists, known limits and video inputs, and keep the result of Metadata.aggregate in the examples
-- `88100d92c` - [devops] Attach only the wheel and sdist to the GitHub release, not the .gitignore uv writes into dist
-
-## v1.2.0-rc1
-
-🌟 **Feature Release**
-
 - `407694c2a` - [feat] Let VideoTorchExtractor embed MAITE video streams
 - `d6dd84a11` - [feat] Widen the evaluator dataset types with ImageDataset and VideoDataset, and measure videos that carry no tracking targets or metadata
-
-👾 **Fixes**
-
-- `f890a1913` - [fix] Split on the raw values of a grouping factor so every video is its own group at any size
-- `4ab7a26d1` - [fix] Refuse a split that leaves a partition empty and name groups in split errors
-- `b7497dbe9` - [fix] Accept a tracking dataset in the type of Outliers.evaluate and return results keyed by source address
-
-📝 **Miscellaneous**
-
-- `eeafefb3e` - [docs] Point the zero-numerator reference at PubMed instead of the unreachable McGill PDF
-- `0e16a63d3` - [docs] Mark the SharpnessMeasure protocol experimental with the PERSISTENCE maps
-- `9d66a9dd3` - [docs] State the PERSISTENCE evidence as findings and tighten the prose of the new video how-tos and migration notes
-- `266544e79` - [test] Check the video workflow end to end and register its verification evidence
-- `ce4261787` - [docs] Define the frame and target tuples in the video notebooks instead of requiring maite-datasets
-- `f7cc814aa` - [docs] Add a how-to that selects frames from a video dataset for image tools with Stride, EvenlySpaced and Representative
-- `71cd62977` - [docs] Add a how-to that wraps on-disk video and tracking annotations as a MOT dataset with PyAV and serves its named factors
-- `aa424bda4` - [devops] Publish to PyPI with PEP 740 attestations through the PyPI publish action
-
-## v1.2.0-rc0
-
-🌟 **Feature Release**
-
 - `a0544e490` - [feat] Evaluate Outliers on a tracking dataset in video terms
 - `32a8996ec` - [feat] Export the experimental DriftKnownDomains detector from dataeval.shift
 - `844314206` - [feat] Add VideoStats PERSISTENCE: per-video maps of what is fixed to the camera and of local blur
@@ -130,6 +88,13 @@
 
 👾 **Fixes**
 
+- `6fc15a284` - [fix] Close a SequenceFrames video stream after its last frame is read, and type each frame's metadata as FrameMetadata
+- `ca5f9d843` - [fix] Round up the sample size inv_project returns, so the fitted curve has reached the target there
+- `008e46bec` - [fix] Decide Wasserstein drift on the mean ratio, corrected for sample sizes
+- `b0d1dd004` - [fix] Count Coverage near_duplicate_fraction per image against a typical class, so copies score the same on CPU and GPU and a clump that is most of its class is flagged
+- `f890a1913` - [fix] Split on the raw values of a grouping factor so every video is its own group at any size
+- `4ab7a26d1` - [fix] Refuse a split that leaves a partition empty and name groups in split errors
+- `b7497dbe9` - [fix] Accept a tracking dataset in the type of Outliers.evaluate and return results keyed by source address
 - `faa46a007` - [fix] Key ego_stats frame rows by each frame's own number so they attach to the Metadata rows of a selected or offset video
 - `8de951b85` - [fix] Fix ClassBalance failing on a tracking dataset with KeyError and the stock image extractors returning a row of objects for a video stream
 - `449f1a130` - [fix] Fix the naive coverage radius overflow on wide embeddings and the unclear errors from image statistics on tracking datasets and from Prioritize
@@ -194,6 +159,24 @@
 
 📝 **Miscellaneous**
 
+- `27e39e157` - [devops] Copy release-branch changelog sections into main's changelog in version order
+- `ee73ff7d3` - [devops] Fold a version's prerelease changelog sections into its release
+- `fef5dbfb6` - [docs] Move the tutorials and how-tos to mission-relevant datasets
+- `f7b484f3a` - [devops] Run typecheck on merge requests that change the noxfile
+- `28f6bdc9f` - [devops] Raise the Node heap limit for pyright in the type session
+- `f7ef4845c` - [test] Fix doc structure tests for new how-to style rule
+- `ebd8d67ff` - [docs] Remove the prefix in how to titles
+- `58dbbcf79` - [docs] Add a New in v1.2 page for teams choosing what to integrate, and mark Outliers as taking a tracking dataset
+- `0d2f870d8` - [docs] Complete the v1.2 experimental lists, known limits and video inputs, and keep the result of Metadata.aggregate in the examples
+- `88100d92c` - [devops] Attach only the wheel and sdist to the GitHub release, not the .gitignore uv writes into dist
+- `eeafefb3e` - [docs] Point the zero-numerator reference at PubMed instead of the unreachable McGill PDF
+- `0e16a63d3` - [docs] Mark the SharpnessMeasure protocol experimental with the PERSISTENCE maps
+- `9d66a9dd3` - [docs] State the PERSISTENCE evidence as findings and tighten the prose of the new video how-tos and migration notes
+- `266544e79` - [test] Check the video workflow end to end and register its verification evidence
+- `ce4261787` - [docs] Define the frame and target tuples in the video notebooks instead of requiring maite-datasets
+- `f7cc814aa` - [docs] Add a how-to that selects frames from a video dataset for image tools with Stride, EvenlySpaced and Representative
+- `71cd62977` - [docs] Add a how-to that wraps on-disk video and tracking annotations as a MOT dataset with PyAV and serves its named factors
+- `aa424bda4` - [devops] Publish to PyPI with PEP 740 attestations through the PyPI publish action
 - `ab4a87c7c` - [devops] Install the graphviz neato layout plugin for the docs build
 - `7a04812de` - [docs] Add Outliers on tracking datasets, DriftKnownDomains and the persistence limits to the roadmap and v1.2 migration guide
 - `81e84e575` - [devsecops] Quiet test output for doctest and min deps
@@ -339,6 +322,92 @@
 - `759e5ef3f` - [devsecops] Switch to uv-support branch for components
 - `4a131be2d` - [devsecops] Remove poetry from supported package managers
 - `24e5fc5f6` - [devsecops] Simplify release branching strategy
+
+## v1.1.5
+
+👾 **Fixes**
+
+- `69a02b872` - [fix] Return a full-image box with its width and height the right way round for a missing box on a non-square image
+- `75d6eebc7` - [fix] Cap xdist workers at the CPUs the container may use
+- `d4401a423` - [fix] Re-baseline the DriftKNeighbors time budget for the 2-CPU k8s medium runner
+- `a547110e4` - [fix] Read xdist workers from TEST_WORKERS, 2 on the medium CI runner
+- `81d336f03` - [fix] Mark the project dir as a git safe.directory on the k8s runners
+- `875f69bd3` - [fix] Report the right dataset_index and item_index for every dataset of a per_target multi-dataset Outliers evaluate
+- `5e14e2c4c` - [fix] Match parametrized tests by their bare reference when reading verification evidence
+
+📝 **Miscellaneous**
+
+- `35239014d` - [misc] Run verify on k8s-medium-cpu
+- `d65f8d252` - [misc] Run typecheck on k8s-medium-cpu
+- `470007001` - [misc] Move CI jobs to k8s runners, medium for test, conda, doctest and deps
+- `d9b793951` - [misc] Report a verification test case with skipped steps as skipped, not passed
+- `e37778168` - [misc] Cite the real CI job names in the verification registry and check them in tests
+- `6d72c237c` - [misc] Generate requirements, test cases, and VCRM from a step-based verification registry
+
+## v1.1.4
+
+🛠️ **Improvements and Enhancements**
+
+- `e84e31cf` - [impr] Run BoVW on threads so set_max_processes speeds it up
+
+📝 **Miscellaneous**
+
+- `6c0246f5` - [docs] Note the containerization exemption and point to DataEval-Flow
+- `499dc67a` - [devsecops] Remove container export
+
+## v1.1.3
+
+🛠️ **Improvements and Enhancements**
+
+- `9712b8a2` - [impr] Publish main-<variant> from the branch and point latest at the newest release
+- `7a76618d` - [impr] Publish only :latest from main and version tags from releases
+
+👾 **Fixes**
+
+- `635b4186` - [fix] Spell the Harbor robot name inline so GitLab cannot expand it
+- `3a5cbd97` - [fix] Rebuild the dataeval wheel so images carry the resolved version
+- `03d7eb17` - [fix] Generate Dockerfiles without depending on git tag history
+- `f386f763` - [fix] Restore publish verification rules and keep main from overwriting them
+
+📝 **Miscellaneous**
+
+- `343999ab` - [devsecops] Ship the SBOM inside the image alongside the scan report
+- `86d768de` - [devsecops] Ship the vulnerability scan report inside the published image
+- `1fc925e5` - [docs] Point the cosign link at a URL sigstore still serves
+- `18ed12c9` - [docs] Document the two container tags that are actually published
+- `abc82f28` - [devsecops] Add containerization infrastructure
+
+## v1.1.2
+
+👾 **Fixes**
+
+- `897db8b6` - [fix] Update docstrings for litert extras
+- `5f04dfc4` - [fix] Fail loudly on incorrect params and typing improvements
+
+📝 **Miscellaneous**
+
+- `690bc1a7` - [misc] Update verification tests
+- `f45bfae8` - [docs] Align markdown table columns to satisfy MD060
+- `4da241f1` - [docs] Port BRANCHING.md release-doc fixes to release/v1.1
+- `09c0dc80` - [devsecops] Workaround SAST path ignore list
+- `22c818de` - [devops] Publish releases from version tags instead of pipeline variables
+
+## v1.1.1
+
+👾 **Fixes**
+
+- `2a4c7476` - [fix] Read direct pushes to the release branch when cutting a patch release
+- `a36422a9` - [fix] MaskedTarget is not properly wrapping MAITE targets
+- `d0a715cc` - [fix] Read a threshold spec written as lists, as JSON and YAML deliver it
+- `1bbd3327` - [fix] Attach track_stats to Metadata without silent column splits or phantom tracks
+- `2693f1ca` - [fix] Accept integer feature matrices in the ranking core
+- `a2ceabda` - [fix] Conform detection scores to the target vocabulary in Relabel
+- `02bacb78` - [fix] Allow merge_datasets to accept packed collections of datasets
+
+📝 **Miscellaneous**
+
+- `0ff0fbf3` - [misc] Mirror MAITE protocols to enable stable isinstance checks
+- `ea90429e` - [type] Adjust ThresholdLike protocol
 
 ## v1.1.0
 
@@ -542,6 +611,60 @@
 - `32868f79` - [devsecops] Bump CUDA version support to match pytorch
 - `3e6e7be6` - [devsecops] Specify explicit channel in conda environment.yml
 
+## v1.0.6
+
+👾 **Fixes**
+- `02a7b1c7` - [patch] Small perf fix and documentation updates
+
+    - [deps] Bump onnx and tornado deps for security
+    - [perf] Switch to internal nearest neighbor computation for critical value radii
+    - [docs] Address documentation inconsistencies
+    - [devsecops] Ensure security jobs run on protected refs
+
+## v1.0.5
+
+👾 **Fixes**
+- `3ba42852` - [devsecops] Update ruff rules and bump poetry dependencies
+
+    - Address ruff rule differences in PDG
+    - Bump dependencies specifically for poetry.lock
+    - Enable compliance pipelines in release branches
+
+## v1.0.4
+
+👾 **Fixes**
+- `241406a2` - Fix image stats and metadata issues
+
+    - fixed `Metadata.include` with a string interpreted as a sequence of chars
+    - fixed `Metadata.add_factors` improperly dropping previous factors
+    - fixed support for image vs target level factors in `Metadata`
+    - fixed bias (`balance`, `diversity`) functions indexing into `index2label` incorrectly
+    - fixed image hashing for images normalized to 0-1 pixel values
+    - fixed `get_bitdepth `numerator sign bug
+    - added parameter to `compute_stats` to skip normalizing images for stats
+    - rename `dataset_index` column to `dataset_indices` column for `MultiDuplicatesOutput`
+
+## v1.0.3
+
+👾 **Fixes**
+- `b7d3c6e6` - [fix] Metadata index2label regression in datasets with unobserved classes
+
+## v1.0.2
+
+👾 **Fixes**
+- `ced0ba79` - Patch v1.0.2
+
+    - [test] Add edge case tests for Metadata
+    - [docs] Bump maite-datasets dependency to v0.0.12
+    - [docs] Adjust compute_stats docstring
+    - [impr] Ensure Metadata index2label handling is robust
+    - [dsop] Update Changelog.md generation and patch job triggers
+
+## v1.0.1
+
+👾 **Fixes**
+- `e79d1036` - [fix] Bump version and update pyproject.toml authors and development status
+
 ## v1.0.0
 
 🚀 **Major Release**
@@ -686,6 +809,11 @@
 - `d85115d5` - Relax typing for core functionality and standardize parameter naming
 - `e48b90f8` - Add BRANCHING.md file for branching strategy
 - `52d0346f` - Add grouped tables for the Algorithm summary
+
+## v0.93.1
+
+👾 **Fixes**
+- `73757ec3` - [hotfix] Preserve memmap on `as_numpy` and `to_numpy` conversion
 
 ## v0.93.0
 
