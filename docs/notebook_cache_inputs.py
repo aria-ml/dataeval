@@ -27,7 +27,7 @@ INPUT_PATHS = (
     "docs/notebook_cache_inputs.py",
     "docs/check_notebook_cache.py",
     "docs/source/conf.py",
-    "docs/source/data.py",
+    "docs/datasets.toml",
     "docs/source/notebooks/jupytext.toml",
     "docs/source/notebooks/models",
 )

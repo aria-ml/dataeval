@@ -27,19 +27,20 @@ docs:
       fi
       # nox must use the cache we just checked, without fetching it again.
       export DOCS_CACHE_RESTORED=1
-    # Harbor cache of the notebook datasets, kept outside the docs build: the build
-    # downloads whatever is missing, so a miss or a Harbor failure only costs time.
-    # Restore before the build, and only when a notebook is about to execute (the
-    # check exits non-zero if so); store after it, if the restore missed.
+    # Harbor cache of the notebook datasets (jatic/aria/ci `docs-datasets`), kept outside
+    # the docs build: the build downloads whatever is missing, so a miss or a Harbor
+    # failure only costs time. Restored from docs/datasets.toml, and only when a notebook
+    # is about to execute (the check exits non-zero if so). A miss is downloaded and
+    # stored by the restore itself, so nothing is pushed after the build.
+    - !reference [.aria_docs_datasets, script]
     - |
       if [ -n "$DOCS_CLEAN" ] || ! uv run --no-project --with jupytext --with nbformat python docs/check_notebook_cache.py >/dev/null 2>&1; then
-        bash docs/harbor-datasets-cache.sh pull
+        aria_docs_datasets
       fi
     - uvx nox -P "$DOCS_PYTHON_VERSION" -e docs $DOCS_CLEAN
     # Stamp only after a successful build; the manifest travels with the cache
     # to docs-artifacts/<ref>, including when a later build falls back to main.
     - uv run --no-project python docs/notebook_cache_inputs.py record
-    - bash docs/harbor-datasets-cache.sh push
     - bash docs/push-docs-cache.sh
   after_script:
     # The Kubernetes cache helper can run as a different uid. Hugging Face tree
@@ -56,14 +57,13 @@ docs:
           - uv.lock
       paths:
         - $UV_CACHE_DIR
-    # Notebook datasets downloaded during the docs build. Notebooks (and
-    # docs/source/data.py) execute with their working dir set to
-    # docs/source/notebooks, so datasets land in docs/source/notebooks/data.
-    # Dedicated key so other jobs don't clobber it; keyed on data.py so adding
-    # or changing a dataset invalidates the cache.
+    # Notebook datasets downloaded during the docs build. Notebooks execute with
+    # their working dir set to docs/source/notebooks, so datasets land in
+    # docs/source/notebooks/data. Dedicated key so other jobs don't clobber it;
+    # keyed on docs/datasets.toml so adding or changing a dataset invalidates the cache.
     - key:
         files:
-          - docs/source/data.py
+          - docs/datasets.toml
         prefix: docs-datasets
       paths:
         - docs/source/notebooks/data

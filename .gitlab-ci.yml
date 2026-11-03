@@ -4,3 +4,4 @@ include:
   - local: '.gitlab/ci/docs.yml'
   - local: '.gitlab/ci/release.yml'
   - local: '.gitlab/ci/security.yml'
+  - component: gitlab.jatic.net/jatic/aria/ci/docs-datasets@0.12.0
