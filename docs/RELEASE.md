@@ -143,6 +143,9 @@ Versions order as `1.0.0a0 < 1.0.0rc0 < 1.0.0`, so repeated `prerelease a` runs 
 `prerelease` run promotes to `-rc0` on the same base version. Going the other way (an `a` after an `rc`) is refused,
 since it would publish a version that sorts before one already on PyPI.
 
+Each prerelease adds a changelog section with the changes since the tag before it. The release replaces those
+sections with one section that lists everything since the last full release, grouped by category.
+
 pip and uv skip prereleases unless the specifier asks for them, so a downstream pin reads:
 
 ```toml

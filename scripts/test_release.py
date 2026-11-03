@@ -6,6 +6,9 @@ Run directly: `python scripts/test_release.py`. Deliberately not a pytest suite 
 pyproject restricts testpaths to `tests`, and this needs to run anywhere git does.
 """
 
+import contextlib
+import io
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -79,13 +82,50 @@ def test_changelog_splice_keeps_history():
         changelog = Path(tmp) / "CHANGELOG.md"
         changelog.write_text(original)
         release.CHANGELOG_FILE = changelog
-        release.update_changelog(render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}))
+        release.update_changelog("v1.2.0", render_section("v1.2.0", {"fix": [("bbbbbbbb", "[fix] New")]}))
         result = changelog.read_text()
 
     assert result.startswith("# DataEval Change Log\n\n## v1.2.0\n"), result
     # the previous release survives intact, one blank line below the new section
     assert "- `bbbbbbbb` - [fix] New\n\n## v1.1.0\n" in result, result
     assert "- `aaaaaaaa` - [fix] Old" in result
+
+
+def test_release_folds_its_prereleases():
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+
+        def run(*args: str) -> None:
+            subprocess.run(["git", "-C", tmp, *args], check=True, capture_output=True)
+
+        def cut(subject: str, *argv: str) -> None:
+            run("commit", "-q", "--allow-empty", "-m", subject)
+            sys.argv = ["release.py", *argv]
+            with contextlib.redirect_stdout(io.StringIO()):
+                release.main()
+
+        run("init", "-q", "-b", "main")
+        config = {"user.name": "t", "user.email": "t@t", "commit.gpgsign": "false", "tag.gpgsign": "false"}
+        for key, value in config.items():
+            run("config", key, value)
+        (repo / "CHANGELOG.md").write_text("# DataEval Change Log\n\n## v1.1.0\n\n- `aaaaaaaa` - [fix] Old\n")
+        run("add", ".")
+        run("commit", "-q", "-m", "Release v1.1.0")
+        run("tag", "-a", "v1.1.0", "-m", "v1.1.0")
+        release.REPO, release.CHANGELOG_FILE, release.DOC_INDEX_FILES = repo, repo / "CHANGELOG.md", ()
+
+        cut("[fix] Repair", "prerelease")
+        cut("[feat] Add", "prerelease")
+        assert "## v1.2.0-rc0" in (repo / "CHANGELOG.md").read_text()  # a candidate keeps the ones before it
+        cut("[misc] Tidy")
+        result = (repo / "CHANGELOG.md").read_text()
+
+    assert "-rc" not in result, result
+    # one section, everything since v1.1.0, regrouped by category
+    feature, fix, misc = (result.index(s) for s in ("[feat] Add", "[fix] Repair", "[misc] Tidy"))
+    assert result.startswith("# DataEval Change Log\n\n## v1.2.0\n"), result
+    assert feature < fix < misc, result
+    assert "[misc] Tidy\n\n## v1.1.0\n\n- `aaaaaaaa` - [fix] Old\n" in result, result
 
 
 def test_kind_pairs_only_with_prerelease():
