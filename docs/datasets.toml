@@ -1,0 +1,27 @@
+# Datasets the docs notebooks download, in one place.
+#
+# The docs CI job restores them from the Harbor dataset cache before a build that has to
+# execute notebooks (jatic/aria/ci `docs-datasets`), one artifact per dataset. Each tag
+# hashes the locked maite-datasets version, the loader and its arguments, so a dataset
+# listed here with the same arguments as in another ARiA repository shares its artifact.
+# Add a dataset here when a notebook starts using a new one. The notebooks still call the
+# loaders with `download=True` themselves, which finds the files already on disk and
+# downloads nothing.
+#
+# Only raw downloads belong here. The `as_datamaite=True` exports are derived, and the
+# notebooks regenerate them. Every key but `loader` is passed to the loader as a keyword
+# argument; notebooks read the datasets from `docs/source/notebooks/data`.
+
+package = "maite-datasets[hf]"
+
+[[dataset]]
+loader = "maite_datasets.image_classification.MilitaryVehicles"
+image_set = "train"
+
+[[dataset]]
+loader = "maite_datasets.image_classification.MilitaryVehicles"
+image_set = "test"
+
+[[dataset]]
+loader = "maite_datasets.object_detection.SeaDrone"
+image_set = "val"
