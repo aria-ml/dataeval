@@ -141,6 +141,7 @@ class DatumResult:
 
     source_indices: list[SourceIndex]
     stats: dict[str, list[Any]]
+    details: dict[str, list[Any]]
 
 
 @dataclass(frozen=True)
@@ -218,7 +219,7 @@ def _collect_calculator_stats(
     value_range: ValueRange | None = None,
     view: ViewKind = ViewKind.WHOLE,
     bands: tuple[int, ...] | None = None,
-) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
+) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
 
@@ -242,13 +243,15 @@ def _collect_calculator_stats(
 
     Returns
     -------
-    tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]
-        A tuple of (stats_list, empty_values_map, warnings) where:
+    tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]
+        A tuple of (stats_list, details_list, empty_values_map, warnings) where:
         - stats_list: List of computed stats from each calculator
-        - empty_values_map: Mapping of stat names to their empty values (defaults to np.nan)
+        - details_list: The details of each calculator that reports any, named as its stats are
+        - empty_values_map: Mapping of stat and detail names to their empty values (defaults to np.nan)
         - warnings: List of warning messages from calculators
     """
     stats_list = []
+    details_list: list[dict[str, list[Any]]] = []
     empty_values_map: dict[str, Any] = {}
     warnings: list[str] = []
     processor = CalculatorCache(
@@ -263,13 +266,17 @@ def _collect_calculator_stats(
         calculator = calculator_cls(datum, processor)
         computed = calculator.compute(flags, view)
         stats_list.append({f"{prefix}{name}": values for name, values in computed.items()})
+        # Only a calculator that reports details adds an entry: an empty one would leave
+        # `_reconcile_stats` nothing to read a row length from.
+        if details := calculator.details(flags, view):
+            details_list.append({f"{prefix}{name}": values for name, values in details.items()})
         # Collect empty values from this calculator
         empty_values_map.update({f"{prefix}{name}": value for name, value in calculator.get_empty_values().items()})
         # Collect warnings from this calculator
         if hasattr(calculator, "warnings"):
             warnings.extend(calculator.warnings)
         del calculator
-    return stats_list, empty_values_map, warnings
+    return stats_list, details_list, empty_values_map, warnings
 
 
 def _band_ranges(
@@ -311,7 +318,7 @@ def _collect_band_stats(
     exclude: NDArray[np.bool_] | None,
     prefix: str,
     view: ViewKind = ViewKind.BAND,
-) -> tuple[list[dict[str, list[Any]]], dict[str, Any], list[str]]:
+) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """Run one named band group as its own view of the datum.
 
     The same calculators over the same region, reading a slice of the channel axis
@@ -365,20 +372,21 @@ def _get_items(
 
 
 def _pad_missing_stats(results: list["DatumResult"], empty_values_map: dict[str, Any]) -> None:
-    """Give every row in a datum an entry for every stat name any of its rows carries.
+    """Give every row in a datum an entry for every stat and detail name any of its rows carries.
 
     Rows within one datum no longer all carry the same statistics: background values
     exist on the item-level row and nowhere else. The aggregation downstream appends
     each row's values to one array per name, so a name missing from a row would shorten
     that name's array and silently misalign it against the source index. Filling the
     gaps with each stat's empty value keeps every array one-to-one with the rows.
+    Details are flattened the same way, so they are padded the same way.
     """
-    names = {name for result in results for name in result.stats}
-    for result in results:
-        entries = len(result.source_indices)
-        for name in names:
-            if name not in result.stats:
-                result.stats[name] = [empty_values_map.get(name, np.nan)] * entries
+    for columns in ([result.stats for result in results], [result.details for result in results]):
+        names = {name for row in columns for name in row}
+        for result, row in zip(results, columns, strict=True):
+            entries = len(result.source_indices)
+            for name in names - row.keys():
+                row[name] = [empty_values_map.get(name, np.nan)] * entries
 
 
 def _compute_batch(  # noqa: C901
@@ -500,12 +508,13 @@ def _compute_batch(  # noqa: C901
                 warnings_list.append(f"{source}: Bounding box {box} for datum shape {datum.shape} is invalid")
 
         calculator_stats: list[dict[str, list[Any]]] = []
+        calculator_details: list[dict[str, list[Any]]] = []
         empty_values_map: dict[str, Any] = {}
         calc_warnings: list[str] = []
 
         # Collect stats from all calculators
         if unmasked:
-            stats, empties, warns = _collect_calculator_stats(
+            stats, details, empties, warns = _collect_calculator_stats(
                 calculators,
                 datum,
                 box,
@@ -513,6 +522,7 @@ def _compute_batch(  # noqa: C901
                 value_range=value_range,
             )
             calculator_stats.extend(stats)
+            calculator_details.extend(details)
             empty_values_map.update(empties)
             calc_warnings.extend(warns)
 
@@ -522,7 +532,7 @@ def _compute_batch(  # noqa: C901
             # be emitted from, and a caller adding channels= to a pipeline reading
             # `brightness` must not lose it.
             for name, band in band_plans.items():
-                stats, empties, warns = _collect_band_stats(
+                stats, details, empties, warns = _collect_band_stats(
                     band.calculators,
                     datum,
                     band.indices,
@@ -534,6 +544,7 @@ def _compute_batch(  # noqa: C901
                     prefix="",
                 )
                 calculator_stats.extend(stats)
+                calculator_details.extend(details)
                 empty_values_map.update(empties)
                 calc_warnings.extend(warns)
 
@@ -541,7 +552,7 @@ def _compute_batch(  # noqa: C901
         # into the same reconciliation as the unmasked pass, so both land on one row with
         # a single channel layout resolved across the two.
         if background and exclude is not None:
-            stats, empties, warns = _collect_calculator_stats(
+            stats, details, empties, warns = _collect_calculator_stats(
                 background_calculators,
                 datum,
                 box,
@@ -552,6 +563,7 @@ def _compute_batch(  # noqa: C901
                 view=ViewKind.MASK,
             )
             calculator_stats.extend(stats)
+            calculator_details.extend(details)
             empty_values_map.update(empties)
             calc_warnings.extend(warns)
             # Emitted whatever was requested, because every other background value is
@@ -569,7 +581,7 @@ def _compute_batch(  # noqa: C901
             for name, band in band_plans.items():
                 if not band.background_calculators:
                     continue
-                stats, empties, warns = _collect_band_stats(
+                stats, details, empties, warns = _collect_band_stats(
                     band.background_calculators,
                     datum,
                     band.indices,
@@ -582,6 +594,7 @@ def _compute_batch(  # noqa: C901
                     view=ViewKind.MASK | ViewKind.BAND,
                 )
                 calculator_stats.extend(stats)
+                calculator_details.extend(details)
                 empty_values_map.update(empties)
                 calc_warnings.extend(warns)
 
@@ -592,11 +605,12 @@ def _compute_batch(  # noqa: C901
 
         # Gather every calculator's output for this row onto one row
         reconciled_stats = _reconcile_stats(calculator_stats)
+        reconciled_details = _reconcile_stats(calculator_details)
         datum_empty_values.update(empty_values_map)
 
         source = [SourceIndex(i, i_b if box is not None else None)]
 
-        results.append(DatumResult(source_indices=source, stats=reconciled_stats))
+        results.append(DatumResult(source_indices=source, stats=reconciled_stats, details=reconciled_details))
 
     # Background statistics exist on the item-level row alone, so the box rows need
     # placeholders for them before the rows are flattened into per-name arrays.
@@ -776,8 +790,14 @@ def _enumerate_datum(
 def _sort(
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
-) -> tuple[list[SourceIndex], dict[str, NDArray[Any]]]:
+    aggregated_details: dict[str, list[Any]],
+) -> tuple[list[SourceIndex], dict[str, NDArray[Any]], dict[str, NDArray[Any]]]:
     """Sort results by (item_index, box_index) with None < 0 and convert to numpy arrays.
+
+    Details take the same permutation as the statistics, so they stay aligned with the
+    source index, but not the float32 cast. They carry identifiers, counts and statuses,
+    and float32 holds an integer exactly only up to 2**24. Integer details are widened to
+    int64 rather than left at the platform default, which is int32 on Windows under NumPy 1.
 
     No level term: every address ``image_stats`` emits leaves the level unstated, since
     it measures a datum and a box without knowing whether the datum is an image or a
@@ -806,13 +826,19 @@ def _sort(
             np_array = np_array.astype(np.float32)
         sorted_aggregated_stats[stat_name] = np_array
 
-    return sorted_source_indices, sorted_aggregated_stats
+    sorted_details: dict[str, NDArray[Any]] = {}
+    for name, values in aggregated_details.items():
+        np_array = np.array([values[i] for i in sort_indices])
+        sorted_details[name] = np_array.astype(np.int64) if np_array.dtype.kind == "i" else np_array
+
+    return sorted_source_indices, sorted_aggregated_stats, sorted_details
 
 
 def _aggregate_batch(
     result: DatumBatchResult,
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
+    aggregated_details: dict[str, list[Any]],
     object_count: dict[int, int],
     invalid_box_count: dict[int, int],
     warning_list: list[str],
@@ -822,6 +848,8 @@ def _aggregate_batch(
         source_indices.extend(r.source_indices)
         for stat_name, stat_values in r.stats.items():
             aggregated_stats.setdefault(stat_name, []).extend(stat_values)
+        for name, values in r.details.items():
+            aggregated_details.setdefault(name, []).extend(values)
 
     if result.results and result.results[0].source_indices:
         img_idx = result.results[0].source_indices[0].item
@@ -1145,6 +1173,7 @@ def image_stats(  # noqa: C901
 
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
+    aggregated_details: dict[str, list[Any]] = {}
     object_count: dict[int, int] = {}
     invalid_box_count: dict[int, int] = {}
     image_count: int = 0
@@ -1379,7 +1408,15 @@ def image_stats(  # noqa: C901
             ),
             _enumerate_datum(images, boxes),
         ):
-            _aggregate_batch(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
+            _aggregate_batch(
+                result,
+                source_indices,
+                aggregated_stats,
+                aggregated_details,
+                object_count,
+                invalid_box_count,
+                warning_list,
+            )
             image_count += 1
 
             if progress_callback:
@@ -1394,7 +1431,11 @@ def image_stats(  # noqa: C901
         _logger.warning("%s — indices: %s", msg, ", ".join(indices))
 
     _logger.debug("Sorting %d source indices and %d stats", len(source_indices), len(aggregated_stats))
-    sorted_source_indices, sorted_aggregated_stats = _sort(source_indices, aggregated_stats)
+    sorted_source_indices, sorted_aggregated_stats, sorted_details = _sort(
+        source_indices,
+        aggregated_stats,
+        aggregated_details,
+    )
 
     total_boxes = sum(object_count.values())
     total_invalid = sum(invalid_box_count.values())
@@ -1406,10 +1447,15 @@ def image_stats(  # noqa: C901
         len(sorted_aggregated_stats),
     )
 
-    return StatsResult(
+    result = StatsResult(
         source_index=sorted_source_indices,
         object_count=[object_count.get(i, 0) for i in range(image_count)],
         invalid_box_count=[invalid_box_count.get(i, 0) for i in range(image_count)],
         image_count=image_count,
         stats=sorted_aggregated_stats,
     )
+    # Only where a calculator reported some, so a call that measures nothing new returns
+    # exactly the keys it always has.
+    if sorted_details:
+        result["details"] = sorted_details
+    return result

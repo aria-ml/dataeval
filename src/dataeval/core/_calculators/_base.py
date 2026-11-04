@@ -212,3 +212,30 @@ class Calculator(ABC, Generic[TFlag]):
                 stats[handler.name] = handler.compute()
 
         return stats
+
+    def details(self, flags: TFlag, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:  # noqa: ARG002
+        """
+        Return per-row facts about how the statistics for `flags` were measured.
+
+        Called after :meth:`compute` on the same instance, so it can read what computing
+        cached. Shaped like :meth:`compute`'s output, one single-element list per name, and
+        kept beside the statistics rather than among them, so a status or a support count never
+        becomes a factor. A calculator returns the same names on every row it measures, and
+        :meth:`get_empty_values` supplies a detail's value on rows it does not measure, as it
+        does for a statistic. Identifier details are int64, with -1 for none.
+
+        Empty by default. Only a calculator with something to report overrides it.
+
+        Parameters
+        ----------
+        flags : Flag
+            The flags :meth:`compute` was given.
+        view : ViewKind, default ViewKind.WHOLE
+            The view :meth:`compute` was given.
+
+        Returns
+        -------
+        dict[str, list[Any]]
+            Detail names mapped to one-element lists of values.
+        """
+        return {}

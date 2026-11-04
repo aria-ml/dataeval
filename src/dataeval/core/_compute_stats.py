@@ -5,13 +5,14 @@ from enum import Flag
 from typing import Any, Generic, NotRequired
 
 import numpy as np
+from numpy.typing import NDArray
 from typing_extensions import TypedDict, TypeVar
 
 from dataeval._experimental import deprecated
 from dataeval.core._calculators._base import Calculator
 from dataeval.flags import ImageStats
 from dataeval.protocols import ArrayLike, ImageDataset, ProgressCallback
-from dataeval.types import Aggregator, SourceIndex, StatsMap
+from dataeval.types import Aggregator, MeasurementSpec, SourceIndex, StatsMap
 from dataeval.utils.preprocessing import (
     BoxLike,
     ChannelGroupLike,
@@ -70,11 +71,27 @@ class FactorResult(TypedDict, Generic[TFactors]):
         Factors whose integer values are category codes, such as class ids. :meth:`~dataeval.Metadata.add_factors`
         records each as a declared vocabulary, as ``factor_levels=`` would, so consumers treat the column as
         categorical. A vocabulary the caller already declared for the name is kept.
+    measurement_specs : Mapping[str, MeasurementSpec], optional
+        How each factor was measured, keyed by factor name: the method, its units and region,
+        and the settings it ran with. Two results are comparable only where these agree.
+        Absent where a producer records none.
+
+        .. versionadded:: 1.3
+    details : Mapping[str, NDArray], optional
+        Per-row facts about how each value came to be, such as a status, a support count, or
+        the target index of a counterpart box. One value per row, aligned with ``stats``.
+        These are not factors: :meth:`~dataeval.Metadata.add_factors` ignores them, so a
+        reason code never becomes a column to bin. Identifiers are int64, with -1 for none.
+        Absent where a producer reports none.
+
+        .. versionadded:: 1.3
     """
 
     stats: TFactors
     aggregations: NotRequired[tuple[Aggregator, ...]]
     categorical: NotRequired[tuple[str, ...]]
+    measurement_specs: NotRequired[Mapping[str, MeasurementSpec]]
+    details: NotRequired[Mapping[str, NDArray[Any]]]
 
 
 class AddressedResult(FactorResult[TFactors]):
