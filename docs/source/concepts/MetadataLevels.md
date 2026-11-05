@@ -1094,6 +1094,8 @@ level question.
 
 ### How-to guides
 
+- [Filter a dataset by metadata factors](../notebooks/h2_filter_by_metadata.py) — keeping the images and detections
+  that match a predicate over factors.
 - [Keep metadata in sync with its dataset and cache it](../notebooks/h2_sync_and_cache_metadata.py) —
   realigning filtered metadata with its dataset, and saving it so it is built
   once.

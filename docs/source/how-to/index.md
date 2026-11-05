@@ -59,6 +59,7 @@ datasets for machine learning.
 ../notebooks/h2_select_frames.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_build_dataset_views.py
+../notebooks/h2_filter_by_metadata.py
 ../notebooks/h2_create_embeddings.py
 ../notebooks/h2_embed_detection_crops.py
 ../notebooks/h2_place_transforms.py
@@ -105,6 +106,10 @@ datasets for machine learning.
   - Filter, balance, reorder, and relabel a dataset by composing
     a {class}`.View` from {class}`.Operation` steps
   - [![Open In Colab][colab-badge]][view-colab]
+- - [](../notebooks/h2_filter_by_metadata.py)
+  - Keep the images and detections that match a predicate over metadata
+    factors, written as SQL or a polars expression, with {class}`.Filter`
+  - [![Open In Colab][colab-badge]][fbm-colab]
 - - [](../notebooks/h2_create_embeddings.py)
   - Create image embeddings with PyTorch, ONNX or a model-free extractor
   - [![Open In Colab][colab-badge]][onx-colab]
@@ -211,6 +216,7 @@ datasets for machine learning.
 [wdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_wrap_dataframe_dataset.ipynb
 [mdf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_metadata_from_dataframe.ipynb
 [view-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_build_dataset_views.ipynb
+[fbm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_filter_by_metadata.ipynb
 [xfrm-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_place_transforms.ipynb
 [onto-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_reconcile_labels_ontology.ipynb
 [algn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_align_label_spaces.ipynb
