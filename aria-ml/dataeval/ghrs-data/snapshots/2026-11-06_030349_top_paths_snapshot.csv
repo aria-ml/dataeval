@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/aria-ml/dataeval,46,31
+/aria-ml/dataeval/actions/workflows/publish.yml,9,1
+/aria-ml/dataeval/actions,5,2
+/aria-ml/dataeval/blob/main/CONTRIBUTING.md,4,2
+/aria-ml/dataeval/blob/main/docs/source/_static/images/DataEval_ImageText.png,2,2
+/aria-ml/dataeval/blob/v0.56.0/docs/reference/detectors/ood.md,2,2
+/aria-ml/dataeval/actions/workflows/dependabot/update-graph,2,1
+/aria-ml/dataeval/blob/main/ROADMAP.md,2,1
+/aria-ml/dataeval/releases,2,1
+/aria-ml/dataeval/actions/runs/40775387218,1,1
