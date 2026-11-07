@@ -636,6 +636,10 @@ def doctest_unified_fixtures(doctest_namespace: dict[str, Any]) -> None:  # noqa
     # A tracking Metadata of four videos with one glitched frame, for the sequence-neighbor examples.
     doctest_namespace["video_metadata"] = _video_metadata()
 
+    # Two tracking-video splits, for the cross-split examples that run on video.
+    doctest_namespace["train_videos"] = _DoctestVideos()
+    doctest_namespace["test_videos"] = _DoctestVideos()
+
     # -------------------------------------------------------------------------
     # Train/test splits
     # -------------------------------------------------------------------------

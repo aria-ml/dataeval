@@ -4210,6 +4210,14 @@ class Duplicates(Evaluator):
     >>> detector = Duplicates(extractor=FlattenExtractor(), cluster_sensitivity=1.0)
     >>> result = detector.evaluate(train_ds)
 
+    Checking whether a test split of videos leaks from the training split. ``levels="sequence"``
+    reports which videos duplicate which and pays for no frame-level grouping, and the radius
+    resolves to ``6`` for video by itself, so nothing else needs setting:
+
+    >>> leakage = Duplicates().evaluate(train_videos, test_videos, levels="sequence")
+    >>> leakage.hash_radius, sorted(leakage.levels)
+    (6, ['sequence'])
+
     Using configuration:
 
     >>> config = Duplicates.Config(
