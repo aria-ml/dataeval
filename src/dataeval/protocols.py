@@ -961,6 +961,37 @@ class FeatureExtractor(Protocol):
     >>> extractor = MetadataExtractor()
     >>> isinstance(extractor, FeatureExtractor)
     True
+
+    Wrapping a scikit-learn transformer as a feature extractor. Fit the transformer once on a reference set
+    before you use the extractor, so that every batch is projected into the same space:
+
+    >>> import numpy as np
+    >>> from sklearn.decomposition import PCA
+    >>> from dataeval import Embeddings
+    >>>
+    >>> class PCAExtractor:
+    ...     def __init__(self, n_components: int) -> None:
+    ...         self.pca = PCA(n_components=n_components, random_state=0)
+    ...
+    ...     # fit is not part of the FeatureExtractor protocol, which requires only __call__.
+    ...     # An extractor can add a fit method when its features depend on a reference set.
+    ...     def fit(self, images: Any) -> "PCAExtractor":
+    ...         self.pca.fit(np.reshape(images, (len(images), -1)))
+    ...         return self
+    ...
+    ...     def __call__(self, data: Any, /) -> Array:
+    ...         return self.pca.transform(np.reshape(data, (len(data), -1)))
+    >>>
+    >>> extractor = PCAExtractor(n_components=8).fit(images)
+    >>> isinstance(extractor, FeatureExtractor)
+    True
+
+    The extractor returns one row for each image it is given, so it can go into
+    :class:`~dataeval.Embeddings`:
+
+    >>> embeddings = Embeddings(train_dataset, extractor=extractor, batch_size=16)
+    >>> np.asarray(embeddings).shape
+    (40, 8)
     """
 
     def __call__(self, data: Any, /) -> Array:
