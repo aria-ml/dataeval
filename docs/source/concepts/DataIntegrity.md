@@ -247,7 +247,12 @@ their hash values falls below a configurable threshold. Groups detected by
 multiple methods carry higher confidence. When both basic and D4 hashes are
 computed, the `orientation` column in the duplicates DataFrame is automatically
 set to `"same"` (detected by basic hashes) or `"rotated"` (detected only by D4
-hashes), letting practitioners distinguish the two cases.
+hashes), letting practitioners distinguish the two cases. Video relations follow
+the same rule: a whole-video match, a shared segment or a shared track found only
+under a D4 hash is `"rotated"`, so a video re-uploaded a quarter turn on is
+reported as related to the original. Redundancy within one video is read from
+the basic hashes only, because consecutive frames of a video are not rotations of
+each other.
 
 **Cluster-based detection** is an optional third mode that operates in
 embedding space rather than pixel space. When a {mod}`feature extractor <.extractors>`

@@ -3,7 +3,7 @@
 __all__ = []
 
 import warnings
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from itertools import combinations, groupby
 from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
 
@@ -331,6 +331,17 @@ def _get_orientation(methods: frozenset[str]) -> Literal["rotated", "same"]:
     if has_d4 and not has_basic:
         return "rotated"
     return "same"
+
+
+def _orientation_of(method: str, available_stats: set[str]) -> Literal["rotated", "same"] | None:
+    """Orientation of a relation read from one hash, or None when the run cannot tell.
+
+    Both a plain and a rotation-invariant hash have to have been computed. Otherwise "same" would
+    only mean nothing was compared against a turned copy.
+    """
+    if available_stats & _BASIC_HASH_METHODS and available_stats & _D4_HASH_METHODS:
+        return _get_orientation(frozenset({method}))
+    return None
 
 
 def _merge_near_groups(  # noqa: C901
@@ -928,7 +939,12 @@ def _build_duplicates_dataframe(  # noqa: C901
         if measured_content:
             # The content axis an annotation digest is comparable to: a sequence digest covers the
             # same span a sequence's annotation digest does, and a frame digest does not.
-            exact = [group for group, _ in sequence_exact or []] if frame_map is not None else list(item_exact or [])
+            # A turned copy is not the same pixels, so a rotation-invariant group is no content match.
+            exact = (
+                [group for group, method in sequence_exact or [] if method not in _D4_HASH_METHODS]
+                if frame_map is not None
+                else list(item_exact or [])
+            )
             content_groups = [set(_datum_keys(group, frame_map, dataset_steps)) for group in exact]
 
     for indices, method in sequence_exact or []:
@@ -941,7 +957,7 @@ def _build_duplicates_dataframe(  # noqa: C901
                 names["sequence"],
                 "exact",
                 [method],
-                None,
+                _orientation_of(method, available_stats),
                 dataset_steps,
                 frame_map,
                 differs_on=differs,
@@ -960,7 +976,7 @@ def _build_duplicates_dataframe(  # noqa: C901
                 names["track"],
                 "exact",
                 [method],
-                None,
+                _orientation_of(method, available_stats),
                 dataset_steps,
                 frame_map,
                 track_ids=track_ids,
@@ -980,7 +996,7 @@ def _build_duplicates_dataframe(  # noqa: C901
                     level,
                     "segment",
                     [match.method],
-                    None,
+                    _orientation_of(match.method, available_stats),
                     dataset_steps,
                     frame_map,
                     spans=(
@@ -1009,7 +1025,7 @@ def _build_duplicates_dataframe(  # noqa: C901
                 names["sequence"],
                 "aligned",
                 [match.method],
-                None,
+                _orientation_of(match.method, available_stats),
                 dataset_steps,
                 frame_map,
                 spans=(
@@ -1350,6 +1366,32 @@ The D4 variants are deliberately absent: consecutive frames of one video are not
 another, so their invariance buys nothing here and costs eight times as much.
 """
 
+_ROTATED_METHODS = ("phash_d4", "dhash_d4")
+"""Rotation-invariant hashes a relation *between* videos is also read from, in preference order.
+
+Matching one video against another is a different question from redundancy within one: a copy
+re-uploaded a quarter turn on is the same video. The invariant hash matches an unturned copy too,
+so :func:`_unmatched` keeps only what the plain pass did not already relate.
+"""
+
+
+def _pair(match: SegmentMatch | AlignmentMatch) -> set[Any]:
+    """Name the two runs a match relates, which is what says whether another pass already found them."""
+    return {(match.query, match.candidate, match.tracks if isinstance(match, SegmentMatch) else None)}
+
+
+def _unmatched(rotated: Sequence[_T], plain: Sequence[Any], members: Callable[[Any], set[Any]]) -> list[_T]:
+    """Keep what the rotation-invariant pass found that the plain pass had not.
+
+    A relation is already reported when everything it names sits inside one the plain pass found.
+    Those are the unturned copies, which stay as the plain pass gave them -- orientation ``same``.
+
+    ponytail: decided per group or pair, so a pair holding one unturned and one turned stretch
+    reports only the unturned one. Split per stretch if such pairs matter.
+    """
+    reported = [members(found) for found in plain]
+    return [found for found in rotated if not any(members(found) <= seen for seen in reported)]
+
 
 def _run_keys(
     items: NDArray[np.intp],
@@ -1379,7 +1421,7 @@ class _HashedRuns(NamedTuple):
     Attributes
     ----------
     method : str
-        The hash the relations are read from, the first of :data:`_REDUNDANCY_METHODS` present.
+        The hash the relations are read from, the first of the candidates asked for that is present.
     digests : list[str]
         Each row's hex digest, in walk order -- which within a run is temporal order.
     items : NDArray[np.intp]
@@ -1410,14 +1452,16 @@ def _sequence_frames(
     source_index: Sequence[SourceIndex],
     frame_map: NDArray[np.intp],
     dataset_steps: Sequence[int] | None,
+    methods: Sequence[str] = _REDUNDANCY_METHODS,
 ) -> _HashedRuns | None:
     """Gather the frame rows every sequence-level relation starts from, or None if there are none.
 
     The shared prologue of redundancy, whole-sequence matching and segment matching: which measured
     rows are whole frames, which sequence each belongs to, and their digests packed for comparison.
     Shared rather than repeated, so one call does not pack the whole dataset three times over.
+    ``methods`` are the hashes to read from, in preference order.
     """
-    method = next((name for name in _REDUNDANCY_METHODS if name in stats), None)
+    method = next((name for name in methods if name in stats), None)
     if method is None:
         return None
     positions = np.array([i for i, index in enumerate(source_index) if index.key is None], dtype=np.intp)
@@ -1581,6 +1625,7 @@ def _find_sequence_duplicates(
     source_index: Sequence[SourceIndex],
     frame_map: NDArray[np.intp] | None,
     dataset_steps: Sequence[int] | None = None,
+    methods: Sequence[str] = _REDUNDANCY_METHODS,
 ) -> MethodGroups:
     """Group sequences holding the same frames in the same order.
 
@@ -1593,7 +1638,9 @@ def _find_sequence_duplicates(
     to the same empty digest, so such sequences all fingerprint alike -- and calling them copies of
     one another is a claim about frames there was no data for.
     """
-    gathered = _sequence_frames(stats, source_index, frame_map, dataset_steps) if frame_map is not None else None
+    gathered = (
+        _sequence_frames(stats, source_index, frame_map, dataset_steps, methods) if frame_map is not None else None
+    )
     if gathered is None:
         return []
 
@@ -1861,6 +1908,7 @@ def _find_shared_stretches(
     frame_map: NDArray[np.intp] | None,
     policy: _SegmentPolicy,
     dataset_steps: Sequence[int] | None = None,
+    methods: Sequence[str] = _REDUNDANCY_METHODS,
 ) -> _SharedStretches:
     """Find the stretches over which two sequences run together, and how much of each they cover.
 
@@ -1870,7 +1918,9 @@ def _find_shared_stretches(
         If the segment policy is out of range. See :func:`_checked_segment_policy`.
     """
     _checked_segment_policy(policy)
-    gathered = _sequence_frames(stats, source_index, frame_map, dataset_steps) if frame_map is not None else None
+    gathered = (
+        _sequence_frames(stats, source_index, frame_map, dataset_steps, methods) if frame_map is not None else None
+    )
     if gathered is None or frame_map is None:
         return _SharedStretches([], [])
     return _shared_stretches(gathered, frame_map, policy)
@@ -1921,6 +1971,7 @@ def _track_runs(
     frame_map: NDArray[np.intp],
     track_map: NDArray[np.intp],
     dataset_steps: Sequence[int] | None,
+    methods: Sequence[str] = _REDUNDANCY_METHODS,
 ) -> _TrackRuns | None:
     """Gather each track's detection crops, in frame order, or None if there are no tracks.
 
@@ -1930,7 +1981,7 @@ def _track_runs(
     region, and the rule the tracking structurer already applies when it builds track-level
     metadata.
     """
-    method = next((name for name in _REDUNDANCY_METHODS if name in stats), None)
+    method = next((name for name in methods if name in stats), None)
     if method is None or not len(track_map):
         return None
     positions, ids = _detection_tracks(source_index, track_map)
@@ -1995,6 +2046,7 @@ def _find_track_relations(
     track_map: NDArray[np.intp] | None,
     policy: _SegmentPolicy,
     dataset_steps: Sequence[int] | None = None,
+    methods: Sequence[str] = _REDUNDANCY_METHODS,
 ) -> _TrackRelations:
     """Find every track-level relation, or nothing where there are no tracked detections.
 
@@ -2003,7 +2055,7 @@ def _find_track_relations(
     """
     if frame_map is None or track_map is None:
         return _TrackRelations([], [])
-    tracks = _track_runs(stats, source_index, frame_map, track_map, dataset_steps)
+    tracks = _track_runs(stats, source_index, frame_map, track_map, dataset_steps, methods)
     if tracks is None:
         return _TrackRelations([], [])
     return _TrackRelations(_find_track_duplicates(tracks), _find_track_stretches(tracks, frame_map, policy))
@@ -2178,6 +2230,58 @@ class _Relations(NamedTuple):
         return cls([], [], [], [], [], [], [], _SharedStretches([], []), _TrackRelations([], []))
 
 
+def _sequence_level(
+    stats: StatsMap,
+    source_index: Sequence[SourceIndex],
+    frame_map: NDArray[np.intp] | None,
+    policy: _SegmentPolicy,
+    dataset_steps: Sequence[int] | None,
+) -> tuple[MethodGroups, _SharedStretches]:
+    """Find whole-video and shared-stretch relations, and the turned copies a D4 hash adds to them.
+
+    The rotation-invariant pass runs only when such a hash was measured, and redundancy is not
+    repeated under it: a video's own consecutive frames are not rotations of one another.
+    """
+    exact = _find_sequence_duplicates(stats, source_index, frame_map, dataset_steps)
+    stretches = _find_shared_stretches(stats, source_index, frame_map, policy, dataset_steps)
+    if not any(method in stats for method in _ROTATED_METHODS):
+        return exact, stretches
+    turned_exact = _find_sequence_duplicates(stats, source_index, frame_map, dataset_steps, _ROTATED_METHODS)
+    turned = _find_shared_stretches(stats, source_index, frame_map, policy, dataset_steps, _ROTATED_METHODS)
+    related = [*stretches.segments, *stretches.alignments]
+    return (
+        [*exact, *_unmatched(turned_exact, exact, lambda found: set(found[0]))],
+        _SharedStretches(
+            [*stretches.segments, *_unmatched(turned.segments, related, _pair)],
+            [*stretches.alignments, *_unmatched(turned.alignments, related, _pair)],
+        ),
+    )
+
+
+def _track_level(
+    stats: StatsMap,
+    source_index: Sequence[SourceIndex],
+    frame_map: NDArray[np.intp] | None,
+    track_map: NDArray[np.intp] | None,
+    policy: _SegmentPolicy,
+    dataset_steps: Sequence[int] | None,
+) -> _TrackRelations:
+    """Find track relations, and the turned copies a D4 hash adds to them. See :func:`_sequence_level`."""
+    tracks = _find_track_relations(stats, source_index, frame_map, track_map, policy, dataset_steps)
+    if not any(method in stats for method in _ROTATED_METHODS):
+        return tracks
+    turned = _find_track_relations(stats, source_index, frame_map, track_map, policy, dataset_steps, _ROTATED_METHODS)
+
+    def members(group: TrackGroup) -> set[Any]:
+        # A track is named by its frame and its id together: two tracks can start on one frame.
+        return set(zip(group[0], group[2], strict=True))
+
+    return _TrackRelations(
+        [*tracks.exact, *_unmatched(turned.exact, tracks.exact, members)],
+        [*tracks.segments, *_unmatched(turned.segments, tracks.segments, _pair)],
+    )
+
+
 def _find_relations(
     stats: StatsMap,
     source_index: Sequence[SourceIndex],
@@ -2213,17 +2317,15 @@ def _find_relations(
             redundant=_find_redundant_runs(stats, source_index, frame_map, policy.redundancy_radius, dataset_steps)
         )
     if "sequence" in levels:
-        found = found._replace(
-            sequence_exact=_find_sequence_duplicates(stats, source_index, frame_map, dataset_steps),
-            stretches=_find_shared_stretches(stats, source_index, frame_map, policy.segment, dataset_steps),
-        )
+        sequence_exact, stretches = _sequence_level(stats, source_index, frame_map, policy.segment, dataset_steps)
+        found = found._replace(sequence_exact=sequence_exact, stretches=stretches)
     else:
         # Still checked, because a nonsense policy passed alongside a `levels` that happens to
         # exclude segments would otherwise be accepted in silence.
         _checked_segment_policy(policy.segment)
     if "track" in levels:
         found = found._replace(
-            tracks=_find_track_relations(stats, source_index, frame_map, track_map, policy.track, dataset_steps)
+            tracks=_track_level(stats, source_index, frame_map, track_map, policy.track, dataset_steps)
         )
     # An annotation digest describes a whole item, or a whole sequence. A pass answering at
     # neither level is handed none to group. `evaluate` does not even read them. Doing so costs
@@ -2879,7 +2981,8 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
       groups exist, positionally aligned with item_indices)
     - methods: list[str] - Detection method names (e.g., ``["phash", "dhash"]``)
     - orientation: str | None - ``"same"``, ``"rotated"``, or None (only present
-      when both basic and D4 hashes were computed)
+      when both basic and D4 hashes were computed). A video relation is ``"rotated"``
+      when only the D4 hashes relate the two; redundancy is always read from the basic hashes
     - dataset_indices: list[int] - Dataset indices for cross-dataset results (only
       present for multi-dataset output, positionally aligned with item_indices)
 
@@ -3914,7 +4017,8 @@ class Duplicates(Evaluator):
     - **Hash-based near (phash)**: DCT-based perceptual hashing for compression/resize detection.
     - **Hash-based near (dhash)**: Gradient hash for brightness-invariant detection.
     - **Multidirectional hashing (phash_d4, dhash_d4)**: Rotation/flip-invariant variants that
-      detect duplicates regardless of orientation.
+      detect duplicates regardless of orientation. For video they also relate a rotated copy of a
+      sequence, a segment or a track to the original.
     - **Cluster-based**: Uses neural network embeddings to find semantic duplicates.
 
     The multiple perceptual hash methods (phash, dhash) are complementary

@@ -1921,13 +1921,17 @@ class TestSegmentPolicyValidation:
         assert "too large a problem" in caplog.text
 
 
-def make_tracked_dataset(sequences, shape=(3, 24, 32), timed=True) -> Any:
+def make_tracked_dataset(sequences, shape=(3, 24, 32), timed=True, rotated=()) -> Any:
     """A tracking dataset whose detections have distinguishable crops.
 
     Each sequence is a list of frames; each frame is a list of ``(track_id, fill)``. Detection *j*
     of a frame owns vertical strip *j* of the image and its strip is painted with that detection's
     fill, so a track's crops hash its own fills over time and two tracks in one frame are told
     apart -- which flat frames, whose every crop is the same color, cannot do.
+
+    A ``fill`` may instead be a ``(channels, height, strip)`` array, painted as given -- the way to
+    give perceptual hashes something to tell crops apart by, which a ramp does not. The sequences
+    indexed by ``rotated`` are turned a quarter turn, boxes with them, so the frame must be square.
     """
     from dataclasses import dataclass
 
@@ -1963,12 +1967,20 @@ def make_tracked_dataset(sequences, shape=(3, 24, 32), timed=True) -> Any:
             image = np.zeros(shape, dtype=np.uint8)
             boxes = []
             for slot, (_, fill) in enumerate(frame):
-                assert 0 <= fill < 256, f"fixture fill {fill} exceeds uint8"
                 left, right = slot * strip, (slot + 1) * strip
-                # A ramp inside the strip, so a crop's hash depends on its own content: a flat
-                # patch has a degenerate perceptual hash and every flat patch shares it.
-                image[:, :, left:right] = (fill + np.arange(strip, dtype=np.int64)[None, :] % 64).astype(np.uint8)
+                if isinstance(fill, np.ndarray):
+                    image[:, :, left:right] = fill
+                else:
+                    assert 0 <= fill < 256, f"fixture fill {fill} exceeds uint8"
+                    # A ramp inside the strip, so a crop's hash depends on its own content: a flat
+                    # patch has a degenerate perceptual hash and every flat patch shares it.
+                    image[:, :, left:right] = (fill + np.arange(strip, dtype=np.int64)[None, :] % 64).astype(np.uint8)
                 boxes.append([float(left), 0.0, float(right), float(height)])
+            if index in rotated:
+                assert height == width, "a quarter turn needs a square frame"
+                # Counterclockwise: columns [left, right) land on rows [width - right, width - left).
+                image = np.ascontiguousarray(np.rot90(image, axes=(1, 2)))
+                boxes = [[0.0, width - x2, float(height), width - x1] for x1, _, x2, _ in boxes]
             pixels.append(image)
             targets.append(
                 _FrameTarget(
@@ -2112,6 +2124,129 @@ class TestTrackDuplicates:
         assert by_sequence.shape[0] == 1
         assert by_sequence.row(0, named=True)["group_count"] > 0
         assert result.aggregate_by_group().shape[0] == result.data().shape[0]
+
+
+def _noise(seed: int, count: int, size: int = 32) -> list[np.ndarray]:
+    """Frames of seeded noise, which no two perceptual hashes confuse the way they do flat fills."""
+    rng = np.random.default_rng(seed)
+    return [rng.integers(0, 256, (3, size, size), dtype=np.uint8) for _ in range(count)]
+
+
+def _turned(frames: list[np.ndarray]) -> list[np.ndarray]:
+    """The same frames a quarter turn on, which is what a D4 hash is invariant to and a plain one is not."""
+    return [np.ascontiguousarray(np.rot90(frame, axes=(1, 2))) for frame in frames]
+
+
+_BASIC_AND_D4 = ImageStats.HASH_DUPLICATES_BASIC | ImageStats.HASH_DUPLICATES_D4
+
+
+@pytest.mark.required
+class TestRotatedCopies:
+    """A video re-uploaded rotated is still the same video, and the row says it was turned."""
+
+    def _rows(self, dataset, level: str, dup_type: str, **kwargs) -> pl.DataFrame:
+        kwargs.setdefault("min_segment_frames", 5)
+        kwargs.setdefault("min_track_frames", 5)
+        result = Duplicates(flags=kwargs.pop("flags", _BASIC_AND_D4), **kwargs).evaluate(
+            dataset, per_target=level == "track"
+        )
+        return result.data().filter((pl.col("level") == level) & (pl.col("dup_type") == dup_type))
+
+    def test_the_frame_level_scan_already_sees_the_rotation(self):
+        """The precondition: the hashes exist and agree, so what follows is about what reads them."""
+        source = _noise(0, 12)
+        rows = self._rows(make_tracking_dataset([source, _turned(source)]), "unit", "near")
+        assert rows.shape[0] > 0
+        assert set(rows["orientation"].to_list()) == {"rotated"}
+
+    def test_a_rotated_copy_is_an_exact_sequence_match_marked_rotated(self):
+        source = _noise(0, 20)
+        rows = self._rows(make_tracking_dataset([source, _turned(source)]), "sequence", "exact")
+        assert rows.shape[0] == 1
+        row = rows.row(0, named=True)
+        assert row["item_indices"] == [0, 1]
+        assert row["orientation"] == "rotated"
+        assert all(method.endswith("_d4") for method in row["methods"])
+
+    def test_an_unrotated_copy_is_reported_once_and_marked_same(self):
+        """The rotation-invariant hash matches an unturned copy too, and must not say it a second time."""
+        source = _noise(0, 20)
+        rows = self._rows(make_tracking_dataset([source, [frame.copy() for frame in source]]), "sequence", "exact")
+        assert rows["orientation"].to_list() == ["same"]
+        assert not any(method.endswith("_d4") for method in rows.row(0, named=True)["methods"])
+
+    def test_a_rotated_clip_is_a_rotated_segment(self):
+        source = _noise(1, 40)
+        rows = self._rows(make_tracking_dataset([source, _turned(source[10:30])]), "sequence", "segment")
+        assert rows.shape[0] == 1
+        row = rows.row(0, named=True)
+        assert row["orientation"] == "rotated"
+        assert row["span_start"] == [10, 0]
+        assert row["span_end"] == [29, 19]
+        assert row["containment"] == pytest.approx([20 / 40, 1.0])
+
+    def test_an_unrotated_clip_is_one_segment_marked_same(self):
+        source = _noise(1, 40)
+        clip = [frame.copy() for frame in source[10:30]]
+        rows = self._rows(make_tracking_dataset([source, clip]), "sequence", "segment")
+        assert rows["orientation"].to_list() == ["same"]
+
+    def test_a_rotated_half_speed_copy_is_a_rotated_alignment(self):
+        source = _noise(2, 20)
+        held = [frame for frame in _turned(source) for _ in (0, 1)]
+        rows = self._rows(make_tracking_dataset([source, held]), "sequence", "aligned", verify_alignment=0)
+        assert rows.shape[0] == 1
+        assert rows.row(0, named=True)["orientation"] == "rotated"
+
+    def test_a_rotated_track_is_an_exact_track_duplicate_marked_rotated(self):
+        patterns = [pattern for pattern in _noise(3, 8)]
+        sequences = [[[(0, pattern)] for pattern in patterns], [[(7, pattern)] for pattern in patterns]]
+        rows = self._rows(make_tracked_dataset(sequences, shape=(3, 32, 32), rotated={1}), "track", "exact")
+        assert rows.shape[0] == 1
+        row = rows.row(0, named=True)
+        assert row["track_indices"] == [0, 7]
+        assert row["orientation"] == "rotated"
+
+    def test_a_rotated_track_shares_a_rotated_stretch(self):
+        patterns = [pattern for pattern in _noise(3, 12)]
+        sequences = [[[(0, pattern)] for pattern in patterns], [[(7, pattern)] for pattern in patterns[3:10]]]
+        rows = self._rows(make_tracked_dataset(sequences, shape=(3, 32, 32), rotated={1}), "track", "segment")
+        assert rows.shape[0] == 1
+        assert rows.row(0, named=True)["orientation"] == "rotated"
+
+    def test_redundancy_stays_on_the_plain_hashes(self):
+        """Consecutive frames of one video are not rotations of each other, so no D4 digest reads them."""
+        held = [frame for frame in _noise(4, 6) for _ in range(4)]
+        rows = self._rows(make_tracking_dataset([held]), "unit", "redundant")
+        assert rows.shape[0] > 0
+        assert not any(method.endswith("_d4") for methods in rows["methods"].to_list() for method in methods)
+        assert set(rows["orientation"].to_list()) == {None}
+
+    def test_a_rotated_copy_with_the_same_annotation_still_differs_in_content(self):
+        """The augmented-copy check compares pixels, and a turned frame is not the same pixels."""
+        source = _noise(0, 20)
+        result = Duplicates(flags=_BASIC_AND_D4).evaluate(make_tracking_dataset([source, _turned(source)]))
+        annotation = result.data().filter(pl.col("dup_type") == "annotation")
+        assert annotation.shape[0] == 1
+        assert annotation.row(0, named=True)["differs_on"] == ["content"]
+
+    def test_nothing_changes_without_the_rotation_invariant_hashes(self):
+        """No D4 hash, no D4 matching: the rows are the ones a plain run has always produced."""
+        source = _noise(0, 20)
+        dataset = make_tracking_dataset([source, _turned(source)])
+        result = Duplicates(flags=ImageStats.HASH_DUPLICATES_BASIC).evaluate(dataset)
+        assert "orientation" not in result.data().columns
+        # The annotation row stays: the two videos are annotated alike. It is the content relations that are absent.
+        content = result.data().filter(
+            (pl.col("level") == "sequence") & pl.col("dup_type").is_in(["exact", "segment", "aligned"])
+        )
+        assert content.shape[0] == 0
+
+    def test_a_rotated_relation_survives_a_redetection(self):
+        source = _noise(0, 20)
+        result = Duplicates(flags=_BASIC_AND_D4).evaluate(make_tracking_dataset([source, _turned(source)]))
+        rows = result.with_radius(4).data().filter((pl.col("level") == "sequence") & (pl.col("dup_type") == "exact"))
+        assert rows["orientation"].to_list() == ["rotated"]
 
 
 def _segments(*spans: tuple[int, int, int, int, int, float]) -> Any:
