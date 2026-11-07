@@ -34,6 +34,29 @@ Rules (review):
 - Name the class or function your code calls, with a role (for example `` {class}`.Coverage` ``), and not "the
   coverage tool".
 
+## Write for your readers
+
+Readers come from three backgrounds. Every page has to work for all three, whatever its kind.
+
+| Reader | Understands | Wants |
+| ------ | ----------- | ----- |
+| Data scientist | The concepts, and nothing about DataEval's implementation | To check that DataEval's interpretation of a concept matches their own, and to learn how to call the tools on their own data |
+| Student | The basics of machine learning, and is new to the concepts in the documentation | To learn the concepts, and perhaps to apply them in their own studies |
+| Policymaker | What they want to do, with no hands-on experience of coding or machine learning | To be convinced that DataEval is worth adding to their processes, and to learn which tools help them most |
+
+These are reader backgrounds. They are not the personas in the metadata lines of a tutorial, although the names
+overlap.
+
+A reader may land on any page, from a search about a topic or from knowing DataEval and looking for a page directly.
+No page is completely standalone, and every page should be understandable by a reader who has not read the rest.
+
+Rules (review):
+
+- Name the prior read when a page is best understood after another page. Do it at the start of the page. As an
+  alternative, make the introduction say that the page is a spinoff of the other page.
+- In a how-to, put the prior read in the lead, where it counts toward the 120 words. In a tutorial, list it under
+  `What you will need`.
+
 ## Write the prose
 
 Narrative text is written to the reader in the second person and kept plain. This applies to notebooks, concept pages
@@ -92,6 +115,19 @@ marks the first mention of a term that the page defines.
 - Do not describe a library behavior in a docstring or page without running it. A docstring once said that batch size
   never changes embeddings, and a test showed that it changes their last digits.
 - Do not describe future work as if it were a feature ("to follow", "planned").
+
+### Length and repetition
+
+A reader who is learning something new is helped by repetition. Repeat the name of a thing and not the argument.
+
+Rules (review):
+
+- Write the full term wherever a short form could be read two ways. In a section about measuring performance, write
+  "performance metrics" each time and not "metrics".
+- Say each point once, as the table in the What to avoid section requires. Repeating a name does not mean repeating a
+  claim.
+- Balance the length. A page that is too long gets skimmed. A page that is too concise leaves the reader feeling that
+  something is missing. In both cases the reader leaves without understanding the concept.
 
 ### Line length and Markdown
 
@@ -170,6 +206,37 @@ Keep a how-to short (review):
 
 `tests/test_notebook_structure.py` fails on a lead over 120 words, on more than five steps and on a boilerplate or
 teaching heading, and warns on more than 600 words of prose. Review checks the rest.
+
+## Structure a concept page
+
+A concept page explains the motivation, the theory and the validity of a tool. No test reads it, so a reviewer holds it
+to the rules below.
+
+Explain a concept neutrally, clearly and directly. Get the reader up to speed on the topic quickly, and give the
+context they need to follow it. Neutral means no sales language. A policymaker is convinced by what a tool claims, the
+scope that claim holds in and its limits, stated plainly.
+
+Answer these questions in this order (review):
+
+1. What is this page about, at a high level?
+2. Why does the reader care?
+3. How does it work, conceptually and in theory?
+4. How does DataEval use these concepts?
+5. When should the reader use it?
+6. How does the reader interpret the results?
+
+The questions are not fixed headings. Give each section a heading that follows the heading rules. A page written before
+this guide may order its sections differently. Bring it into line when you edit it.
+
+Focus (review):
+
+- A concept page focuses on the mathematics and the theory. A tutorial or a how-to focuses on the implementation and on
+  how to interpret the results.
+- Go further into the implementation and the interpretation on a concept page when DataEval's implementation is
+  complicated, and a reader needs more than one example to learn how to read the results.
+
+End a concept page with `Related concept pages`, then `See this in practice` (with `How-to guides` and `Tutorials`
+lists), then `References`, when they apply.
 
 ## Write headings
 
@@ -385,11 +452,6 @@ you re-wrap a paragraph by script, stop at fence lines, or the script joins them
 - A rename changes the published address. The documentation has no redirects.
 - Check the open merge requests for new links to the old name before you merge the rename.
 
-### Concept page structure
-
-End a concept page with `Related concept pages`, then `See this in practice` (with `How-to guides` and `Tutorials`
-lists), then `References`, when they apply.
-
 ## Write docstrings
 
 - Use numpydoc. Write full blocks (Parameters, Returns, Raises, Notes, Example) on every public member, including
@@ -419,7 +481,8 @@ A single run of the documentation tests with `--no-cov` exits non-zero even when
 
 What is not automated today: how plain and directive a sentence is, whether bold marks a first mention, what a heading
 or a Next steps description says, the choice of Next steps links, the `See this in practice` lists of the concept
-pages, the voice of the concept and getting-started pages and the 600-word limit (it warns). A reviewer checks them.
+pages, the voice of the concept and getting-started pages, the order of the questions a concept page answers, whether a
+page names its prior read, whether a term is written in full and the 600-word limit (it warns). A reviewer checks them.
 
 A notebook that needs more memory than your machine has cannot execute in your local docs build. Run its cells one at
 a time instead, and rely on the CI docs job for the full run. Say in the merge request what you could and could not
