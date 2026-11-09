@@ -83,6 +83,13 @@ Anything larger than a small change starts with a design that the maintainer app
 - Check every claim about the current code against the code, and cite the file and line.
 - Have a fresh reader review the design before planning. Bring the questions only the maintainer can answer to the
   maintainer in one message.
+- Before any work starts, run two agents against the design, each with its own brief. Give them the design and the
+  docs it touches, and keep your own verdict out of the brief.
+  - One challenges the design on simplicity and usability: whether a simpler shape serves the same users, and whether
+    each flag, option, column and concept earns its place.
+  - The other challenges the documentation the design plans: whether it is excessive, whether each piece sits at the
+    right level, and whether each level fits its audience: how-to, tutorial, docstring and concept page, as
+    [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) describes them. Concise and not over-explaining is a strength.
 - Write the plan to `specs/` as well, as tasks that each carry their own tests.
 
 ### Build
