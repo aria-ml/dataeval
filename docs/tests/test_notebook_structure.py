@@ -30,9 +30,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.infrastructure
-
-NOTEBOOK_DIR = Path(__file__).resolve().parent.parent / "docs" / "source" / "notebooks"
+NOTEBOOK_DIR = Path(__file__).resolve().parents[2] / "docs" / "source" / "notebooks"
 
 MAX_LEAD_WORDS = 120
 MAX_STEPS = 5

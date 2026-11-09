@@ -47,9 +47,7 @@ import pytest
 
 import dataeval
 
-pytestmark = pytest.mark.infrastructure
-
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 # Both role spellings that appear in these sources: reST ``:class:`X``` in ``src/``
 # docstrings and ``.rst`` pages, MyST ``{class}`X``` in the ``.md`` guides and notebooks.

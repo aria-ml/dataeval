@@ -20,9 +20,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.infrastructure
-
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / "docs" / "source"
 
 # The role names the cross-reference test checks, in their reST spelling.

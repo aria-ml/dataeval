@@ -69,11 +69,11 @@ Every task is a nox session — `uvx --with nox-uv nox -l` lists them. The commo
 uv run nox -s test      # unit tests with coverage
 uv run nox -s lint      # ruff, codespell, typos
 uv run nox -s type      # pyright and type-completeness
-uv run nox -s doctest   # docstring examples
+uv run nox -s doctest   # docstring examples and docs/tests
 uv run nox -s docs      # build the documentation
 ```
 
-`test` is the comprehensive lane: it runs everything, including the `ffmpeg`-marked
+`test` is the comprehensive lane: it runs everything under `tests/`, including the `ffmpeg`-marked
 integration tests that work against generated video content. `deps` is the opposite
 end — the minimum supported Python with the lowest declared dependencies and no
 optional extras — and it is what guarantees the unit tests carry coverage on their
@@ -84,7 +84,8 @@ stays out of that lane:
 pytestmark = pytest.mark.ffmpeg
 ```
 
-Run or skip that set directly with `pytest -m ffmpeg` and `pytest -m 'not ffmpeg'`.
+Run or skip that set directly with `pytest -m ffmpeg` and `pytest -m 'not ffmpeg'`. The documentation tests live in
+`docs/tests` and run only in `doctest`, so a documentation change gets them without the whole suite.
 
 Once `.venv` exists, `uv run nox ...` is the convenient form for everything except
 `dev` itself; `uvx --with nox-uv nox ...` works from anywhere and needs no project

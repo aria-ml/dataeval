@@ -19,9 +19,7 @@ import pytest
 
 from dataeval.quality import DuplicatesOutput
 
-pytestmark = pytest.mark.infrastructure
-
-QUICKSTART = Path(__file__).resolve().parent.parent / "docs" / "source" / "getting-started" / "quickstart.md"
+QUICKSTART = Path(__file__).resolve().parents[2] / "docs" / "source" / "getting-started" / "quickstart.md"
 FENCE = re.compile(r"^```python\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
 BLOCKS = FENCE.findall(QUICKSTART.read_text())

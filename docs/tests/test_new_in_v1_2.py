@@ -13,9 +13,7 @@ import pytest
 from dataeval.types import SourceIndex
 from tests.quality.test_duplicates import make_tracking_dataset
 
-pytestmark = pytest.mark.infrastructure
-
-PAGE = Path(__file__).resolve().parent.parent / "docs" / "source" / "getting-started" / "new-in-v1.2.md"
+PAGE = Path(__file__).resolve().parents[2] / "docs" / "source" / "getting-started" / "new-in-v1.2.md"
 FENCE = re.compile(r"^```python\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
 

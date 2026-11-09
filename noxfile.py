@@ -331,8 +331,8 @@ def lint(session: nox.Session) -> None:
 
 @session(uv_groups=["test-onnx"], uv_extras=with_onnx(["cpu", "opencv"]))
 def doctest(session: nox.Session) -> None:
-    """Run docstring tests."""
-    target = session.posargs if session.posargs else ["src/dataeval"]
+    """Run docstring examples and the documentation tests in docs/tests."""
+    target = session.posargs if session.posargs else ["src/dataeval", "docs/tests"]
     session.run(
         "pytest",
         "-q",

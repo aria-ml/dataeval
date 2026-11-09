@@ -87,10 +87,10 @@ guide may not follow it yet. Bring a page into line when you edit its prose.
 
 The only em dash allowed is the separator in a Next steps entry (see the Next steps section).
 
-`tests/test_notebook_structure.py` fails on an em dash outside a Next steps entry, a contraction, "we", "us" and "our",
-"corpus", and "simply", "genuinely", "quietly", "exactly" and "on your behalf", in the Markdown cells of a notebook. It
-skips code spans, roles, link targets, math and fenced code. Review checks the rest, and checks the concept and
-getting-started pages, which the test does not read.
+`docs/tests/test_notebook_structure.py` fails on an em dash outside a Next steps entry, a contraction, "we", "us" and
+"our", "corpus", and "simply", "genuinely", "quietly", "exactly" and "on your behalf", in the Markdown cells of a
+notebook. It skips code spans, roles, link targets, math and fenced code. Review checks the rest, and checks the concept
+and getting-started pages, which the test does not read.
 
 ### Emphasis
 
@@ -101,7 +101,7 @@ for a list-item label, a heading or stress. Use `*` for emphasis markup and neve
 These rules cover the cells of a table too. Do not bold a row label, and do not put an em dash in a cell. Write a column
 heading in sentence case, with a capital on the first word only.
 
-`tests/test_notebook_structure.py` fails on italics, on a bold label that starts a list item or a paragraph
+`docs/tests/test_notebook_structure.py` fails on italics, on a bold label that starts a list item or a paragraph
 (`**Label:** text`), on a bold row label in a table and on a column heading in title case. Review checks that bold
 marks the first mention of a term that the page defines.
 
@@ -133,9 +133,9 @@ Rules (review):
 
 - Wrap Markdown at 120 columns. Tables are exempt (`.markdownlint-cli2.yaml`).
 - Wrap the Markdown cells of a notebook at 120 columns, counting the `#` and the space that start each line. `ruff`
-  ignores line length in `docs/source/notebooks`, so `tests/test_notebook_structure.py` checks it. It skips a table row,
-  the three metadata lines of a tutorial, which stay on one line each, and a line that is one unbreakable token, such
-  as a long URL.
+  ignores line length in `docs/source/notebooks`, so `docs/tests/test_notebook_structure.py` checks it. It skips a table
+  row, the three metadata lines of a tutorial, which stay on one line each, and a line that is one unbreakable token,
+  such as a long URL.
 - Run `uv run nox -s lint` before you push. It runs `ruff`, `codespell` and `typos`.
 
 ## Structure a tutorial
@@ -169,7 +169,7 @@ Relevant personas: [Data Engineer](../getting-started/roles/data_engineer.md)
 ```
 
 List one or more personas, separated by commas. Base the estimate on how long the notebook takes to execute in the
-docs build and on tutorials of similar length. `tests/test_notebook_structure.py` checks the opening, the metadata
+docs build and on tutorials of similar length. `docs/tests/test_notebook_structure.py` checks the opening, the metadata
 lines and the order of the sections.
 
 ## Structure a how-to
@@ -204,7 +204,7 @@ Keep a how-to short (review):
 - A how-to that needs more than the budget because it carries two tasks or several alternative paths is two how-tos. A
   how-to that has to teach a concept to be useful is a tutorial.
 
-`tests/test_notebook_structure.py` fails on a lead over 120 words, on more than five steps and on a boilerplate or
+`docs/tests/test_notebook_structure.py` fails on a lead over 120 words, on more than five steps and on a boilerplate or
 teaching heading, and warns on more than 600 words of prose. Review checks the rest.
 
 ## Structure a concept page
@@ -257,7 +257,7 @@ titles, the sidebar titles and captions of a toctree, and card titles.
 When you refer to a section in prose, name it: `see the "Measure your own factors" section`. Do not refer to it by
 number.
 
-`tests/test_notebook_structure.py` checks the case, numbering, plain-text, title and template-heading rules. Review
+`docs/tests/test_notebook_structure.py` checks the case, numbering, plain-text, title and template-heading rules. Review
 checks that each heading names what the reader does.
 
 ## Write the Next steps section
@@ -269,8 +269,8 @@ documentation prose:
 - [Embeddings](../concepts/Embeddings.md) — Learn what embeddings represent and how they are used across DataEval.
 ```
 
-`tests/test_notebook_structure.py` checks the entry form, the first two rules below and the link text. Review checks the
-rest.
+`docs/tests/test_notebook_structure.py` checks the entry form, the first two rules below and the link text. Review
+checks the rest.
 
 Rules:
 
@@ -404,8 +404,8 @@ Write roles in the MyST spelling in Markdown, and in the reST spelling in docstr
 | Markdown pages and notebook cells | MyST | `` {class}`.Coverage` ``, `` {func}`.cluster` ``, `` {meth}`.Metadata.agg` ``, and the same form for `attr`, `mod`, `term` and `doc` |
 | Docstrings | reST | `` :class:`~dataeval.scope.Coverage` `` |
 
-`tests/test_doc_markup.py` fails when a reST role appears in Markdown, because Sphinx renders it as literal text.
-`tests/test_doc_cross_references.py` resolves every role target against the public API. A role that points at a
+`docs/tests/test_doc_markup.py` fails when a reST role appears in Markdown, because Sphinx renders it as literal text.
+`docs/tests/test_doc_cross_references.py` resolves every role target against the public API. A role that points at a
 private member fails it, so write a private name as plain code, such as `_bin`.
 
 ### Links
@@ -413,8 +413,8 @@ private member fails it, so write a private name as plain code, such as `_bin`.
 - Link to a notebook by its source path: `./h2_create_embeddings.py` from another notebook and
   `../notebooks/h2_create_embeddings.py` from a concept page. Never link to the `.html` or `.ipynb` file.
 - Use the exact title of the target page as the link text, or the heading that an anchor names. When you retitle a page,
-  search for the old title and update every link that repeats it. `tests/test_notebook_structure.py` checks the links
-  in Next steps.
+  search for the old title and update every link that repeats it. `docs/tests/test_notebook_structure.py` checks the
+  links in Next steps.
 - Heading anchors are generated to depth 4, and the docs build fails on a missing anchor. Prefer a link to a page over
   a link to a section of a notebook. Links from outside the documentation to a section cannot be checked, and they
   break when you rename the heading.
@@ -427,7 +427,7 @@ private member fails it, so write a private name as plain code, such as `_bin`.
   directive that uses four.
 - Use `:::{note}` or a backtick fence for admonitions.
 
-`tests/test_doc_markup.py` checks that every fence closes the block it opened and that no code block is empty. When
+`docs/tests/test_doc_markup.py` checks that every fence closes the block it opened and that no code block is empty. When
 you re-wrap a paragraph by script, stop at fence lines, or the script joins them into the text.
 
 ## Register, rename or remove a notebook
@@ -468,16 +468,13 @@ Run the checks that apply before you open a merge request.
 | Command | What it checks |
 | ------- | -------------- |
 | `uv run nox -s lint` | `ruff`, `codespell` (American spelling) and `typos` |
-| `uv run nox -s test -- tests/test_doc_markup.py tests/test_doc_cross_references.py tests/test_deprecated_docs.py tests/test_quickstart.py tests/test_notebook_structure.py --cov-fail-under=0` | reST roles in Markdown, fence closing, role targets, deprecated documentation, the quickstart code, and the headings, template sections, Next steps, voice, emphasis and line width of the notebooks |
-| `uv run nox -s type` | `pyright` over `src`, `tests`, `verification` and `docs/source/notebooks`. Run it after you change a code cell in a notebook or a test, because it checks them too |
+| `uv run nox -s doctest -- docs/tests` | The documentation tests: reST roles in Markdown, fence closing, role targets, deprecated documentation, cited sources, the quickstart and "New in" code, the notebook cache inputs, and the headings, template sections, Next steps, voice, emphasis and line width of the notebooks |
+| `uv run nox -s type` | `pyright` over `src`, `tests`, `verification`, `docs/tests` and `docs/source/notebooks`. Run it after you change a code cell in a notebook or a test, because it checks them too |
 | `npx --yes markdownlint-cli2 '*.md' 'docs/**/*.md' '#node_modules'` | The Markdown rules that CI enforces, such as 120 columns, one blank line between blocks and no repeated heading in a page. Run it after every change to a `.md` file. It needs Node, and `npx` fetches the tool on first use |
 | `uv run nox -s docs` | Converts the notebooks, executes the ones whose code cells changed, runs their assertions and builds the site with `--fail-on-warning`, which catches broken links, anchors and toctree entries |
 | `uv run nox -s docs -- skip` | The same build without executing notebooks, for a change to prose only |
 | `uv run nox -e docs -- clean` | Clears the notebook cache and re-executes everything, for a library change that could alter outputs |
-| `uv run nox -s doctest` | The examples in docstrings |
-
-A single run of the documentation tests with `--no-cov` exits non-zero even when every test passes, so use
-`--cov-fail-under=0` as shown.
+| `uv run nox -s doctest` | The examples in docstrings, and the documentation tests |
 
 What is not automated today: how plain and directive a sentence is, whether bold marks a first mention, what a heading
 or a Next steps description says, the choice of Next steps links, the `See this in practice` lists of the concept

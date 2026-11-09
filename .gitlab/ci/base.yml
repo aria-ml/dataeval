@@ -148,8 +148,9 @@ stages:
           - uv.lock
 
 # The type check reads everything [tool.pyright] includes in pyproject.toml: the library, the tests,
-# verification and the notebooks. Only .py files are listed for the last two, since the notebooks'
-# .ipynb files are not committed and pyright reads nothing else there. The type session itself is in noxfile.py.
+# verification, the documentation tests and the notebooks. Only .py files are listed for the last three, since the
+# notebooks' .ipynb files are not committed and pyright reads nothing else there. The type session itself is in
+# noxfile.py.
 .rules_main_mr_types:
   rules:
     - if: $PUBLISH_VERIFICATION
@@ -165,6 +166,7 @@ stages:
           - src/**/*
           - tests/**/*
           - verification/**/*.py
+          - docs/tests/**/*.py
           - docs/source/notebooks/**/*.py
           - pyproject.toml
           - noxfile.py

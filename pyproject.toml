@@ -268,7 +268,7 @@ torch = { pip = true }  # PyTorch is no longer maintained on conda-forge
 xxhash = { skip = true, packages = "python-xxhash>=3.4" }
 
 [tool.pyright]
-include = ["src", "tests", "verification", "docs/source/notebooks"]
+include = ["src", "tests", "verification", "docs/tests", "docs/source/notebooks"]
 exclude = [
   "**/__pycache__",
   "**/node_modules",
@@ -281,6 +281,7 @@ reportMissingImports = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 filterwarnings = [
   "ignore:The default value of hash_radius will change:FutureWarning",
 ]
@@ -296,7 +297,7 @@ markers = [
   "cuda: marks tests that require cuda",
   "ffmpeg: marks integration tests that run against ffmpeg-generated video fixtures",
   "performance: marks verification tests that time workloads or measure memory",
-  "infrastructure: marks tests of the documentation and repository tooling, which need the source checkout and git",
+  "infrastructure: marks tests of the repository tooling, which need the source checkout and git",
 ]
 
 [tool.coverage.run]

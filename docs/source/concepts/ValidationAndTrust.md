@@ -1177,7 +1177,7 @@ The suite contains three kinds of evidence, and they are not equally strong:
   satisfied by returning `[0, 1]`. Divergence is checked at its 0 and 1
   endpoints, and the null-model baselines against their closed forms.
 
-A separate test (`tests/test_references.py`) pins the set of symbols that must
+A separate test (`docs/tests/test_references.py`) pins the set of symbols that must
 cite their sources, so citation coverage cannot regress.
 
 What the suite does not do is reproduce published benchmark results on
@@ -1217,7 +1217,7 @@ Two mechanisms make stability observable rather than a matter of trust:
   {class}`~dataeval.exceptions.ExperimentalWarning` at runtime and are marked in
   their docstrings: you cannot use one without being told.
 - Deprecated symbols raise {class}`~dataeval.exceptions.DeprecatedWarning` when
-  used, and a dedicated CI test (`tests/test_deprecated_docs.py`) fails the build
+  used, and a dedicated CI test (`docs/tests/test_deprecated_docs.py`) fails the build
   if any deprecated public object lacks a `.. deprecated::` directive in its
   docstring. A deprecated symbol cannot ship silently. The symbols deprecated in
   v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2. Deprecated
@@ -1317,7 +1317,7 @@ DataEval's evidentiary record, not a research frontier.
 1. Most public symbols carry no literature citation in their docstring. A
    minority of public functions and classes have a `References` section, though
    the count has grown substantially. `REQUIRES_REFERENCES` in
-   `tests/test_references.py` is the current list and the source of truth for
+   `docs/tests/test_references.py` is the current list and the source of truth for
    it; the test pins that set so it cannot regress, and adding a symbol to the
    list is how the number goes up. For everything else the citation lives on a
    concept page or nowhere. Where an entry above cites a concept page rather

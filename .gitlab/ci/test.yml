@@ -69,7 +69,7 @@ conda:
     - .rules_main_mr_code
   script:
     # No opencv or ffmpeg in this environment; see the `deps` session in noxfile.py. The image has no git, and the
-    # documentation and repository tooling tests need the source checkout and git, so only the library tests run.
+    # repository tooling tests need the source checkout and git, so only the library tests run.
     - pytest -q -m 'not (optional or ffmpeg or infrastructure)'
 
 verify:

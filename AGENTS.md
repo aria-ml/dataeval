@@ -126,7 +126,8 @@ Run the sessions CI runs, one at a time. Several at once can run out of memory.
   fails if public type completeness falls to 90% or below. A clean `pyright src` is not enough.
 - `nox -s deps` runs the unit tests on the oldest Python with the lowest direct dependencies, such as polars 1.0.0.
 - `nox -s lint` runs ruff, codespell and typos. It also reformats files, so check `git status` afterwards.
-- `nox -s doctest` runs the docstring examples.
+- `nox -s doctest` runs the docstring examples and the documentation tests in `docs/tests`. `nox -s test` does not
+  run those.
 - `nox -s check` confirms the lock file and the exported requirement files match `pyproject.toml`.
 - `nox -s docs` builds the documentation. Run it when you change a notebook.
 - `npx markdownlint-cli2 '*.md' 'docs/**/*.md'` lints the Markdown, which `nox -s lint` does not.
@@ -228,8 +229,8 @@ sprints, which are GitLab iterations.
 
 ## Documentation and style
 
-[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) is the rulebook, and `tests/test_notebook_structure.py` enforces part of it.
-The practices below are the ones agents most often get wrong.
+[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) is the rulebook, and `docs/tests/test_notebook_structure.py` enforces part of
+it. The practices below are the ones agents most often get wrong.
 
 - A how-to (`h2_*`) is a short recipe for one task. A tutorial (`tt_*`) teaches, with visuals. Drop a how-to that a
   tutorial already covers, unless it shows something the tutorial does not. Link to concepts rather than explaining
