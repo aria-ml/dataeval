@@ -141,7 +141,7 @@ def _bounds_frame(bounds: Sequence[Bound], determinations: Sequence[Decision]) -
         {
             **{k: v for k, v in vars(b).items() if k not in _PRIVATE},
             "assumptions": list(b.assumptions),
-            "is_determining": (b.source, b.quantity) in determinations[b.requirement].deciding,
+            "is_determining": (b.source, b.quantity) in determinations[b.requirement].determining,
         }
         for b in bounds
     ]

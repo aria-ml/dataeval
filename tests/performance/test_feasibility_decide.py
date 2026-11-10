@@ -204,7 +204,7 @@ class TestFeasibilityDecide:
         d = _decide(_spec(), [_envelope(0.85), _witness_bound(0.9)])
         assert (d.determination, d.limitation) == ("unresolved", "conflict")
         assert (d.witness, d.witness_source, d.envelope, d.envelope_scope) == (0.9, "user_model", 0.85, "full_input")
-        assert d.deciding == {("user_model", "accuracy"), ("replicas", "accuracy")}
+        assert d.determining == {("user_model", "accuracy"), ("replicas", "accuracy")}
         assert (d.suggested_minimum, d.minimum_source, d.minimum_quantity) == (None, None, None)
 
     def test_rule_2_demonstrated_feasible(self):
@@ -212,14 +212,14 @@ class TestFeasibilityDecide:
         d = _decide(_spec(), bounds)
         assert d.determination == "demonstrated_feasible"
         assert (d.witness, d.witness_source) == (0.8, "user_model")
-        assert d.deciding == {("user_model", "accuracy")}
+        assert d.determining == {("user_model", "accuracy")}
         assert (d.limitation, d.suggested_minimum) == (None, None)
 
     def test_rule_3_infeasible(self):
         d = _decide(_spec(), [_witness_bound(0.6), _envelope(0.7, mean=0.65)])
         assert d.determination == "infeasible_under_recorded_assumptions"
         assert (d.envelope, d.envelope_scope) == (0.7, "full_input")
-        assert d.deciding == {("replicas", "accuracy")}
+        assert d.determining == {("replicas", "accuracy")}
         assert (d.limitation, d.suggested_minimum) == (None, None)
 
     def test_rule_4_not_ruled_out(self):
@@ -232,7 +232,7 @@ class TestFeasibilityDecide:
         d = _decide(_spec(), bounds)
         assert d.determination == "not_ruled_out"
         assert (d.envelope, d.witness) == (0.9, 0.5)
-        assert d.deciding == {("local_panels", "accuracy")}
+        assert d.determining == {("local_panels", "accuracy")}
         assert d.limitation == "weak_witness"  # replicas informative, witness weak
         assert _decide(_spec(), [_panel(0.9, "full_input"), _witness_bound(0.5)]).limitation == "weak_witness"
 
@@ -249,7 +249,7 @@ class TestFeasibilityDecide:
         d = _decide(_spec(), bounds)
         assert d.determination == "unresolved"
         assert d.limitation == "weak_witness"  # replica bounds exist
-        assert d.deciding == {("replicas", "accuracy"), ("user_model", "accuracy")}
+        assert d.determining == {("replicas", "accuracy"), ("user_model", "accuracy")}
 
     def test_a_witness_alone_is_demonstrated_or_has_no_envelope(self):
         for value, expected in ((0.9, ("demonstrated_feasible", None)), (0.5, ("unresolved", "no_envelope"))):
@@ -283,7 +283,7 @@ class TestFeasibilityDecide:
         d = _decide(_spec(), [_panel(0.5), _panel(0.6, "fixed_representation")])
         assert d.determination == "unresolved"
         assert d.envelope is None
-        assert d.deciding == frozenset()
+        assert d.determining == frozenset()
         # The same envelope decides at its own scope, and a broader envelope decides a narrower requirement.
         spec = _spec("partition_restricted")
         assert _decide(spec, [_panel(0.5)]).determination.startswith("infeasible")
@@ -386,7 +386,7 @@ class TestRecallDecide:
     def test_a_deciding_recall_witness_is_certified_by_its_false_positive_bound(self):
         d = _decide(R90_F05, _witness(recall_lb=0.95, fpr_ub=0.03))
         assert d.determination == "demonstrated_feasible"
-        assert d.deciding == {("user_model", "recall"), ("user_model", "false_positive_rate")}
+        assert d.determining == {("user_model", "recall"), ("user_model", "false_positive_rate")}
 
     def test_two_limits_for_one_class_are_decided_independently(self):
         bounds = _witness_for([R90_F05, R90_F10], recall_lb=0.92, fpr_ub=0.07)
