@@ -78,6 +78,7 @@ witness would demonstrate the upper threshold in 345/346. Runtime about 20 s for
 
 import math
 from collections.abc import Callable
+from dataclasses import replace
 from functools import cache, partial
 from typing import Any
 
@@ -255,7 +256,7 @@ def _call(
     """One source's call at the claim's alpha; every item is audited unless told otherwise."""
     fit = np.empty(0, dtype=np.intp) if fit is None else fit
     audit = np.arange(len(y)) if audit is None else audit
-    return fc._Call(make_units(y, groups=groups, n_classes=n_classes), x, audit, fit, alpha, max_len, {})
+    return fc._Call(make_units(y, groups=groups, n_classes=n_classes), x, audit, fit, alpha, max_len, ())
 
 
 def _value(bound: fc._Bound) -> float:
@@ -265,7 +266,9 @@ def _value(bound: fc._Bound) -> float:
 
 
 def _recall(threshold: float, f0: float = F0, class_name: str = "0") -> TargetSpec:
-    return TargetSpec("IC", "recall", threshold, class_name=class_name, max_false_positive_rate=f0)
+    return TargetSpec(
+        task="IC", metric="recall", threshold=threshold, class_name=class_name, max_false_positive_rate=f0
+    )
 
 
 def _np_rule(x: NDArray[np.float64]) -> NDArray[np.intp]:
@@ -308,7 +311,7 @@ def _replica_ceiling(seed: int, spec: TargetSpec) -> float:
 def _bayes_witness(seed: int) -> tuple[float, dict[str, Any]]:
     """The production witness path on the Bayes scorer (the posterior: class 0 when x1 > 0), 2,000 items audited."""
     x, y, post, _ = _gauss2(2_000, seed)
-    bound = fc._Scores(_call(y, x), post[:0], post).bound(TargetSpec("IC", "accuracy", 0.5))
+    bound = fc._Scores(_call(y, x), post[:0], post).bound(TargetSpec(task="IC", metric="accuracy", threshold=0.5))
     assert bound[1] is not None
     return _value(bound), bound[1]
 
@@ -338,7 +341,7 @@ def _c3_margin(seed: int) -> float:
 
 
 def _ap_ceiling_margin(seed: int) -> float:
-    ap = TargetSpec("IC", "ap", 0.5, class_name="0", ap_functional="population_ap_integral")
+    ap = TargetSpec(task="IC", metric="ap", threshold=0.5, class_name="0", ap_functional="population_ap_integral")
     return _value(_c3(seed)[0].bound(ap)) - CELL_AP
 
 
@@ -408,7 +411,11 @@ def _video_witness(seed: int, aggregation: Any) -> float:
     rng = np.random.default_rng(seed)
     x, y, post, seq, _ = make_sequences(GAUSS2, VIDEO_SEQUENCES, max_len=VIDEO_MAX_LEN, rng=rng)
     call = _call(y, x, groups=seq, max_len=VIDEO_MAX_LEN)
-    return _value(fc._Scores(call, post[:0], post).bound(TargetSpec("IC", "accuracy", 0.5, aggregation=aggregation)))
+    return _value(
+        fc._Scores(call, post[:0], post).bound(
+            TargetSpec(task="IC", metric="accuracy", threshold=0.5, aggregation=aggregation)
+        )
+    )
 
 
 def _ap_witness_margin(seed: int) -> float:
@@ -435,7 +442,10 @@ def _determinations(seed: int) -> dict[float, str]:
     replicas = dict(enumerate(draw_labels(post[:300], 2, rng)))
     dataset: Any = MockICDataset(y.tolist(), {0: "a", 1: "b"})
     out = Feasibility(seed=seed).evaluate(
-        dataset, target=[TargetSpec("IC", "accuracy", t) for t in TARGETS], embeddings=x, replicas=replicas
+        dataset,
+        target=[TargetSpec(task="IC", metric="accuracy", threshold=t) for t in TARGETS],
+        embeddings=x,
+        replicas=replicas,
     )
     return dict(out.determinations.select("threshold", "determination").iter_rows())
 
@@ -446,16 +456,18 @@ def _recall_determinations(seed: int) -> list[str]:
     and the uncertified top class (recall Phi(1), false-positive rate Phi(-1) > F0), on one ledger.
     """
     x, y, post, rng = _gauss2(2_000, seed)
-    call = _call(y, x, alpha=ALPHA / 6)  # 3 sources x 2 targets, each claim an equal share as allocate splits a call
     specs = [_recall(r0) for r0 in RECALL_TARGETS]
-    evidence = fc._replica(call, specs, dict(enumerate(draw_labels(post, 2, rng))))
-    for name, decisions in (("np_rule", _np_rule(x)), ("top_class", post.argmax(axis=1))):
-        evidence[name] = fc._user(call, specs, decisions, None)[fc._USER]
-    return [decide(spec, evidence, call.units.population).determination for spec in specs]
+    # 3 sources x 2 targets, each claim an equal share as allocate splits a call
+    call = replace(_call(y, x, alpha=ALPHA / 6), requirements=tuple(specs))
+    bounds = fc._replica(call, specs, dict(enumerate(draw_labels(post, 2, rng))))
+    # two decision witnesses, filed under two sources so each keeps its own false-positive bound
+    for source, decisions in (("user_model", _np_rule(x)), ("linear_probe", post.argmax(axis=1))):
+        bounds += [replace(b, source=source) for b in fc._user(call, specs, decisions)]
+    return [decide(spec, i, bounds).determination for i, spec in enumerate(specs)]
 
 
 def test_replica_accuracy_ceiling_covers_its_consensus_target():
-    accuracy = TargetSpec("IC", "accuracy", 0.5)
+    accuracy = TargetSpec(task="IC", metric="accuracy", threshold=0.5)
     _accept(
         _covered(lambda seed: _replica_ceiling(seed, accuracy) - REPLICA_TARGET),
         "replica accuracy ceiling >= 1 - E[p(1-p)]",

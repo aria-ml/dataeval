@@ -111,7 +111,7 @@ These APIs are experimental and may change or be removed without a deprecation c
 
 - {class}`.Parity` and {func}`.parity`
 - {func}`.uap`
-- {class}`.Feasibility`, its evidence and target types, and the functions it builds on
+- {class}`.Feasibility`, its input types, and the functions it builds on
 - {class}`.DriftKnownDomains`
 - {meth}`.Relabel.fold_scores`
 - `VideoStats.PERSISTENCE` and the {class}`.SharpnessMeasure` protocol

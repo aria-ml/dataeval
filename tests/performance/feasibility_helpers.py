@@ -1,13 +1,39 @@
 """Synthetic classification populations with known posteriors (isotropic Gaussians, sigma 1), and a Units builder."""
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
+from dataeval.performance._feasibility_target import TargetSpec
 from dataeval.performance._feasibility_units import Units
 
 F = NDArray[np.float64]
+_KEY = re.compile(r"(?P<metric>[^:/|]*)(?::(?P<cls>[^/|]+))?(?:/(?P<scope>[^|]*))?(?:\|(?P<agg>.*))?", re.DOTALL)
+
+
+def targets(thresholds: Mapping[str, float]) -> list[TargetSpec]:
+    """
+    Classification requirements from a test shorthand: ``"metric[:class][/scope][|aggregation]": threshold``.
+
+    The shorthand exists for tests only; the evaluator takes ``TargetSpec`` objects. ``"ap"`` is macro AP.
+    """
+    specs = []
+    for key, threshold in thresholds.items():
+        m = _KEY.fullmatch(key)
+        assert m is not None, key
+        specs.append(
+            TargetSpec(
+                metric=m["metric"],  # type: ignore[arg-type]
+                threshold=threshold,
+                class_name=m["cls"],
+                scope=(m["scope"] or "full_input"),  # type: ignore[arg-type]
+                aggregation=m["agg"],  # type: ignore[arg-type]
+            )
+        )
+    return specs
 
 
 @dataclass(frozen=True)
@@ -92,7 +118,7 @@ def make_units(
         n_classes=int(y.max()) + 1 if n_classes is None else n_classes,
         item_ids=np.arange(n),
         n_excluded=0,
-        population="items of synthetic",
+        population="items",
         class_names=class_names,
         grouped=bool(len(codes)) and int(np.bincount(codes).max()) > 1,
     )

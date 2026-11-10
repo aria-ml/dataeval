@@ -399,7 +399,9 @@ class Relabel(Operation):
         >>> relabel = Relabel(type_to_category, target=categories)  # doctest: +SKIP
         >>> view = View(dataset, [relabel])  # doctest: +SKIP
         >>> scores = model.predict_proba(embeddings)  # (len(dataset), n_types)  # doctest: +SKIP
-        >>> spec = TargetSpec("IC", "recall", 0.6, class_name="Tank", max_false_positive_rate=0.05)  # doctest: +SKIP
+        >>> spec = TargetSpec(
+        ...     metric="recall", threshold=0.6, class_name="Tank", max_false_positive_rate=0.05
+        ... )  # doctest: +SKIP
         >>> result = Feasibility().evaluate(  # doctest: +SKIP
         ...     view, target=[spec], predictions=relabel.fold_scores(scores, view=view)
         ... )

@@ -1,471 +1,327 @@
-"""Ordered decision procedure for feasibility targets and the recommendation behind non-final determinations."""
+"""Ordered decision procedure for feasibility requirements: the determination, its limitation and suggested minimum."""
 
 __all__ = []
 
 import math
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
-from typing import Any, Literal, NamedTuple, cast
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Literal, NamedTuple, cast
 
 from dataeval.core._concentration import units_to_cross
-from dataeval.performance._feasibility_evidence import Endpoint, Evidence, SamplingPlan, stats_key
+from dataeval.performance._feasibility_evidence import Bound, Method, Quantity, Source
 from dataeval.performance._feasibility_target import Scope, TargetSpec
 
 Determination = Literal[
-    "evidence_conflict",
     "demonstrated_feasible",
     "infeasible_under_recorded_assumptions",
     "not_ruled_out",
     "unresolved",
 ]
-LimitingFactor = Literal[
-    "sampling_width", "no_replicas", "scope_restricted", "no_witness", "missing_bound", "labels_conditioned", "conflict"
+Limitation = Literal[
+    "conflict",
+    "no_envelope",
+    "scope_restricted",
+    "missing_bound",
+    "envelope_unavailable",
+    "no_eligible_witness",
+    "within_radius",
+    "weak_witness",
 ]
 
 _FINAL = ("demonstrated_feasible", "infeasible_under_recorded_assumptions")
-# full_input ⊃ fixed_representation ⊃ partition_restricted: a ceiling decides at its scope and every narrower one.
+# full_input ⊃ fixed_representation ⊃ partition_restricted: an envelope decides at its scope and every narrower one.
 _RANK = {"partition_restricted": 0, "fixed_representation": 1, "full_input": 2}
-# A witness's model class from provenance["reads"] (unknown: full_input); it is eligible at that scope and broader.
-_READS_SCOPE = {"partition": "partition_restricted", "representation": "fixed_representation"}
-_WANTED_WITNESS = {
-    "full_input": "a frozen model's predictions",
-    "fixed_representation": "predictions from a frozen model reading only the given representation "
-    "(provenance reads='representation')",
-    "partition_restricted": "predictions from a model giving one answer per cell (provenance reads='partition')",
-}
-_DECLARED_BOUNDS = ("max_sequence_length", "target_count_bound")  # task assumptions an endpoint can be missing
+_BUILTIN: tuple[Source, ...] = ("knn", "linear_probe")
 
 
 @dataclass(frozen=True)
 class Decision:
     """
-    The determination for one target, the endpoints behind it and the recommendation for a non-final one.
+    The determination for one requirement, what limits a non-final one, and the bounds that made it.
 
-    ``ceiling`` is the smallest available ceiling at the judged scope or broader, ``witness`` the largest available
-    eligible witness (for recall, certified at the false-positive limit) and ``witness_source`` its evidence id; for a
-    conflict, both are the conflicting pair.
-    ``evidence_ids`` lists every evidence item with an endpoint for the target on the population, deciding ones first.
+    ``envelope`` is the smallest available envelope at the judged scope or broader, ``witness`` the largest available
+    eligible witness (for recall, certified at the false-positive limit) and ``witness_source`` its source; for a
+    conflict, both are the conflicting pair. ``suggested_minimum`` is the independent units at which the bound named by
+    ``minimum_source`` and ``minimum_quantity`` would cross the requirement if the observed rates held: a projection.
+    ``deciding`` names the bounds the determination rests on, as ``(source, quantity)`` of its requirement.
     """
 
     determination: Determination
-    ceiling: float | None
-    ceiling_scope: Scope | None
+    limitation: Limitation | None
+    envelope: float | None
+    envelope_scope: Scope | None
     witness: float | None
-    witness_source: str | None
-    reason: str
-    limiting_factor: LimitingFactor | None
-    recommendation: str | None
+    witness_source: Source | None
     suggested_minimum: int | None
-    evidence_ids: tuple[str, ...]
-
-
-class _Item(NamedTuple):
-    eid: str
-    ev: Evidence
-    ep: Endpoint
-
-    @property
-    def value(self) -> float:
-        return math.nan if self.ep.value is None else self.ep.value  # callers read available endpoints only
-
-    @property
-    def name(self) -> str:
-        return f"{self.ev.kind} {self.eid!r} ({self.ev.information_scope})"
+    minimum_source: Source | None
+    minimum_quantity: Quantity | None
+    deciding: frozenset[tuple[Source, Quantity]]
 
 
 class _Pool(NamedTuple):
-    items: list[_Item]  # every endpoint for the target on the population, in evidence order
-    ceilings: list[_Item]  # at the judged scope or broader
-    narrower: list[_Item]  # ceilings narrower than the judged scope: evidence only, never decide
-    witnesses: list[_Item]  # eligible for the judged scope and certified (recall: within the false-positive limit)
-    ceiling: _Item | None  # smallest available eligible ceiling
-    witness: _Item | None  # largest available eligible, certified witness
+    items: list[Bound]  # every bound on the requirement's metric, in table order
+    envelopes: list[Bound]  # at the judged scope or broader
+    narrower: list[Bound]  # envelopes narrower than the judged scope: evidence only, never decide
+    witnesses: list[Bound]  # eligible for the judged scope and certified (recall: within the false-positive limit)
+    false_positives: dict[Source, Bound]  # each witness's false-positive bound, for a recall requirement
+    envelope: Bound | None  # smallest available eligible envelope
+    witness: Bound | None  # largest available eligible, certified witness
 
 
-def _witness_eligible(ev: Evidence, scope: Scope) -> bool:
-    reads = "representation" if ev.kind.startswith("builtin_witness") else ev.provenance.get("reads", "full_input")
-    return _RANK[_READS_SCOPE.get(reads, "full_input")] <= _RANK[scope]
+def _eligible(b: Bound, scope: Scope) -> bool:
+    """
+    Return whether a witness is eligible at ``scope``.
 
-
-def _false_positives(item: _Item) -> Endpoint | None:
-    """Return the false-positive endpoint the same evidence gives for the same target, if any."""
-    return next(
-        (e for e in item.ev.endpoints if e.target_spec == item.ep.target_spec and e.quantity == "false_positive_rate"),
-        None,
-    )
+    A built-in witness reads only the representation, so it is eligible at ``fixed_representation`` and broader. A
+    user witness may read the whole input, so it is eligible at ``full_input`` only.
+    """
+    reads: Scope = "fixed_representation" if b.source in _BUILTIN else "full_input"
+    return _RANK[reads] <= _RANK[scope]
 
 
 def _limit(spec: TargetSpec) -> float:
-    return cast(float, spec.max_false_positive_rate)  # a recall target always sets its limit
+    return cast(float, spec.max_false_positive_rate)  # a recall requirement always sets its limit
 
 
-def _certified(item: _Item, spec: TargetSpec) -> bool:
+def _certified(b: Bound, spec: TargetSpec, fp: dict[Source, Bound]) -> bool:
     """Whether a witness counts for ``spec``: for recall, only when its own false-positive bound is within the limit."""
     if spec.metric != "recall":
         return True
-    fp = _false_positives(item)
-    return fp is not None and fp.value is not None and fp.value <= _limit(spec)
+    f = fp.get(b.source)
+    return f is not None and f.bound is not None and f.bound <= _limit(spec)
 
 
-def _tested(p: _Pool, scope: Scope) -> list[_Item]:
+def _tested(p: _Pool, scope: Scope) -> list[Bound]:
     """Every available witness eligible for ``scope``, certified or not."""
-    witnesses = (i for i in p.items if i.ev.supports == "witness" and i.ep.value is not None)
-    return [i for i in witnesses if _witness_eligible(i.ev, scope)]
+    return [b for b in p.items if b.role == "witness" and b.bound is not None and _eligible(b, scope)]
 
 
-def _observed_meets(item: _Item, spec: TargetSpec) -> bool | None:
+def _observed_meets(b: Bound, fp: Bound | None, spec: TargetSpec) -> bool | None:
     """
-    Whether a witness's recorded point estimates already meet the target; None when they are not recorded.
+    Whether a witness's recorded point estimates already meet the requirement; None when they are not recorded.
 
     Accuracy and AP must exceed the threshold; recall must reach it with the false-positive rate within the limit.
     """
-    entries, key = item.ev.details.get("endpoints", {}), item.ep.target_spec
-    pos = entries.get(key)
     if spec.metric != "recall":
-        return None if pos is None else pos["mean"] > spec.threshold
-    neg = entries.get(stats_key(key, "false_positive_rate"))
-    return None if not (pos and neg) else pos["mean"] >= spec.threshold and neg["mean"] <= _limit(spec)
+        return None if b.observed is None else b.observed > spec.threshold
+    if b.observed is None or fp is None or fp.observed is None:
+        return None
+    return b.observed >= spec.threshold and fp.observed <= _limit(spec)
 
 
-def _pool(spec: TargetSpec, evidence: Mapping[str, Evidence], population: str) -> _Pool:
-    key, rank = spec.canonical(), _RANK[spec.scope]
-    items = [
-        _Item(eid, ev, ep)
-        for eid, ev in evidence.items()
-        if ev.population == population
-        for ep in ev.endpoints
-        if ep.target_spec == key and ep.quantity == "metric"
-    ]
-    ceilings = [i for i in items if i.ev.supports == "ceiling" and _RANK[i.ev.information_scope] >= rank]
-    narrower = [i for i in items if i.ev.supports == "ceiling" and _RANK[i.ev.information_scope] < rank]
-    witnesses = [
-        i for i in items if i.ev.supports == "witness" and _witness_eligible(i.ev, spec.scope) and _certified(i, spec)
-    ]
+def _pool(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> _Pool:
+    mine = [b for b in bounds if b.requirement == requirement]
+    items = [b for b in mine if b.quantity != "false_positive_rate"]
+    fp: dict[Source, Bound] = {b.source: b for b in mine if b.quantity == "false_positive_rate"}
+    rank = _RANK[spec.scope]
+    envelopes = [b for b in items if b.role == "envelope" and _RANK[b.information_scope] >= rank]
+    narrower = [b for b in items if b.role == "envelope" and _RANK[b.information_scope] < rank]
+    witnesses = [b for b in items if b.role == "witness" and _eligible(b, spec.scope) and _certified(b, spec, fp)]
     return _Pool(
         items,
-        ceilings,
+        envelopes,
         narrower,
         witnesses,
-        min((i for i in ceilings if i.ep.value is not None), key=lambda i: i.value, default=None),
-        max((i for i in witnesses if i.ep.value is not None), key=lambda i: i.value, default=None),
+        fp,
+        min((b for b in envelopes if b.bound is not None), key=lambda b: cast(float, b.bound), default=None),
+        max((b for b in witnesses if b.bound is not None), key=lambda b: cast(float, b.bound), default=None),
     )
 
 
-def _unresolved_reason(spec: TargetSpec, p: _Pool) -> str:
-    if p.ceilings:
-        states = "; ".join(f"{i.name} {i.ep.state}" + (f": {i.ep.reason}" if i.ep.reason else "") for i in p.ceilings)
-        ceiling = f"every ceiling is unavailable or uninformative ({states})"
-    else:
-        ceiling = f"no ceiling at {spec.scope} or broader"
-    if p.narrower:
-        ceiling += f"; narrower ceilings cannot decide a {spec.scope} target ({', '.join(i.name for i in p.narrower)})"
-    if p.witness is None and _tested(p, spec.scope):  # recall only: none is certified
-        return f"{ceiling}; no eligible witness has a false-positive upper endpoint within {_limit(spec):.4g}"
-    if p.witness is None:
-        return f"{ceiling}; no witness eligible for {spec.scope}"
-    return f"{ceiling}; best eligible witness {p.witness.name} at {p.witness.value:.4g} is below {spec.threshold:.4g}"
-
-
-def decide(spec: TargetSpec, evidence: Mapping[str, Evidence], population: str) -> Decision:
+def decide(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> Decision:
     """
-    Apply the ordered rules to the endpoints for ``spec`` on ``population`` and attach the recommendation.
+    Apply the ordered rules to the bounds on requirement ``requirement`` (``spec``) and name what limits the result.
 
-    Only evidence whose ``population`` is ``population`` and endpoints whose ``target_spec`` is ``spec.canonical()``
-    count; other populations are left out of ``evidence_ids`` too. Ceilings count at the judged scope or broader
-    (``full_input`` ⊃ ``fixed_representation`` ⊃ ``partition_restricted``); narrower ones are listed in
-    ``evidence_ids`` but never decide. A witness belongs to the model class of what it reads and is eligible at that
-    scope and broader: ``provenance["reads"] == "partition"`` (one answer per cell) everywhere, built-in witnesses
-    and ``"representation"`` at ``fixed_representation`` and ``full_input``, anything else at ``full_input`` only.
-    For a recall target, a witness counts only when certified: the same evidence's false-positive upper endpoint for
-    the target is available and at or below ``max_false_positive_rate``. The false-positive endpoint itself never
-    enters a comparison. The first matching rule decides:
+    Envelopes count at the judged scope or broader (``full_input`` ⊃ ``fixed_representation`` ⊃
+    ``partition_restricted``); narrower ones are evidence and never decide. A built-in witness is eligible at
+    ``fixed_representation`` and ``full_input``, a user witness at ``full_input`` only. For a recall requirement, a
+    witness counts only when certified: its false-positive upper bound is available and at or below
+    ``max_false_positive_rate``. The false-positive bound itself never enters a comparison. The first matching rule
+    decides:
 
-    1. ``evidence_conflict`` — a (certified) witness eligible for some deciding-scope ceiling's own scope has a lower
-       endpoint above that ceiling's upper endpoint, whatever the threshold;
-    2. ``demonstrated_feasible`` — the largest witness lower endpoint is at or above the threshold;
-    3. ``infeasible_under_recorded_assumptions`` — the smallest ceiling upper endpoint is below the threshold;
-    4. ``not_ruled_out`` — an informative ceiling's upper endpoint is at or above the threshold;
+    1. ``unresolved`` with limitation ``conflict`` — a (certified) witness eligible at some deciding-scope envelope's
+       own scope has a lower bound above that envelope's upper bound, whatever the threshold: the conclusion is
+       suspended;
+    2. ``demonstrated_feasible`` — the largest witness lower bound is at or above the threshold;
+    3. ``infeasible_under_recorded_assumptions`` — the smallest envelope upper bound is below the threshold;
+    4. ``not_ruled_out`` — an informative envelope's upper bound is at or above the threshold, and no eligible witness
+       reaches it;
     5. ``unresolved`` — otherwise.
+
+    A non-final determination (and only a non-conflict one) gets a limitation, the first that matches:
+
+    1. ``no_envelope`` — no envelope of any scope exists;
+    2. ``scope_restricted`` — no envelope at the judged scope or broader, but an available narrower one. A replica
+       envelope is ``full_input``, the broadest scope, so this also means no replica bound exists;
+    3. ``missing_bound`` — an eligible envelope is unavailable because ``max_sequence_length`` was not declared;
+    4. ``envelope_unavailable`` — envelopes exist (at any scope) but every one is unavailable for lack of units or
+       panels;
+    5. ``no_eligible_witness`` — no available witness is eligible for the judged scope, certified or not (at
+       ``partition_restricted`` none can be in this release);
+    6. ``within_radius`` — a crossing exists: the deciding envelope's recorded mean is below the threshold, or the best
+       witness's above it, so the bound is on the wrong side by less than its radius. For a recall requirement, an
+       eligible witness, certified or not, whose observed recall is at or above the threshold and observed
+       false-positive rate at or below the limit, while a bound falls short;
+    7. ``weak_witness`` — otherwise: the witness is weak (for recall: its observed recall is below the threshold or its
+       observed false-positive rate above the limit).
+
+    The suggested minimum is set whenever a crossing as in rule 6 exists, whatever the limitation: ``units_to_cross``
+    at the bound's recorded mean, variance, support and delta (inverted on the observation's scale: ``1 - mean`` for an
+    envelope, which observes a loss, clipped into the support), with gap ``|mean - threshold|``. It is None when not
+    attainable: beyond ``units_to_cross``'s search, or recorded values it rejects (a ratio method, an invalid support).
+    A recall requirement counts evaluation items: the positives its recall bound needs and the negatives its
+    false-positive bound needs (the upper exact binomial bound), each converted through the estimated prevalence, the
+    larger taken; ``minimum_quantity`` names which.
     """
-    p = _pool(spec, evidence, population)
-    t, c, w = spec.threshold, p.ceiling, p.witness
-    available_ceilings = [i for i in p.ceilings if i.ep.value is not None]
-    conflicts = [
-        (wi, ci)
-        for ci in available_ceilings
-        for wi in p.items
-        if wi.ev.supports == "witness"
-        and wi.ep.value is not None
-        and _witness_eligible(wi.ev, ci.ev.information_scope)
-        and _certified(wi, spec)
-        and wi.value > ci.value
-    ]
-    informative = [i for i in available_ceilings if i.ep.state == "informative"]
-    determination: Determination
-    if conflicts:
-        w, c = max(conflicts, key=lambda pair: pair[0].value - pair[1].value)
-        determination, deciding = "evidence_conflict", (w, c)
-        reason = (
-            f"witness {w.name} lower endpoint {w.value:.4g} exceeds ceiling {c.name} upper endpoint {c.value:.4g} "
-            f"on {population!r}; the determination is suspended"
-        )
-    elif w is not None and w.value >= t:
-        determination, deciding = "demonstrated_feasible", (w,)
-        reason = f"witness {w.name} lower endpoint {w.value:.4g} is at or above the threshold {t:.4g}"
-    elif c is not None and c.value < t:
-        determination, deciding = "infeasible_under_recorded_assumptions", (c,)
-        reason = f"ceiling {c.name} upper endpoint {c.value:.4g} is below the threshold {t:.4g}"
-    elif informative:
-        c = min(informative, key=lambda i: i.value)
-        determination, deciding = "not_ruled_out", (c,)
-        reason = (
-            f"informative ceiling {c.name} upper endpoint {c.value:.4g} is at or above the threshold {t:.4g} "
-            "and no eligible witness reaches it"
-        )
-    else:
-        determination, deciding = "unresolved", tuple(i for i in (c, w) if i is not None)
-        reason = _unresolved_reason(spec, p)
-    decision = Decision(
-        determination=determination,
-        ceiling=None if c is None else c.value,
-        ceiling_scope=None if c is None else c.ev.information_scope,
-        witness=None if w is None else w.value,
-        witness_source=None if w is None else w.eid,
-        reason=reason,
-        limiting_factor=None,
-        recommendation=None,
-        suggested_minimum=None,
-        evidence_ids=tuple(dict.fromkeys(i.eid for i in (*deciding, *p.items))),
+    p = _pool(spec, requirement, bounds)
+    verdict = _verdict(spec, p)
+    limitation, minimum = verdict.limitation, None
+    if verdict.determination not in _FINAL and limitation is None:
+        crossing = _crossing(p, spec)
+        limitation = _factor(spec, p, crossing is not None)
+        if crossing is not None and crossing[1] is not None:
+            minimum = (crossing[1], crossing[0].source, crossing[2])
+    c, w = verdict.envelope, verdict.witness
+    return Decision(
+        determination=verdict.determination,
+        limitation=limitation,
+        envelope=None if c is None else c.bound,
+        envelope_scope=None if c is None else c.information_scope,
+        witness=None if w is None else w.bound,
+        witness_source=None if w is None else w.source,
+        suggested_minimum=None if minimum is None else minimum[0],
+        minimum_source=None if minimum is None else minimum[1],
+        minimum_quantity=None if minimum is None else minimum[2],
+        deciding=_deciding(spec, verdict.deciding),
     )
-    factor, text, minimum = recommend(spec, evidence, decision, population)
-    return replace(decision, limiting_factor=factor, recommendation=text, suggested_minimum=minimum)
 
 
-def _to_cross(stats: Mapping[str, Any], observed: float, gap: float, side: Literal["lower", "upper"]) -> int | None:
+class _Verdict(NamedTuple):
+    determination: Determination
+    limitation: Limitation | None  # only a conflict is known at this point
+    deciding: tuple[Bound, ...]  # the bounds the determination rests on
+    envelope: Bound | None  # what the determination quotes: for a conflict, the conflicting pair
+    witness: Bound | None
+
+
+def _conflicts(spec: TargetSpec, p: _Pool) -> list[tuple[Bound, Bound]]:
+    """Return each (witness, envelope) pair where a certified witness, eligible at the envelope's scope, exceeds it."""
+    return [
+        (wi, ci)
+        for ci in p.envelopes
+        if ci.bound is not None
+        for wi in p.items
+        if wi.role == "witness"
+        and wi.bound is not None
+        and _eligible(wi, ci.information_scope)
+        and _certified(wi, spec, p.false_positives)
+        and wi.bound > ci.bound
+    ]
+
+
+def _verdict(spec: TargetSpec, p: _Pool) -> _Verdict:
+    """Apply the five ordered rules of :func:`decide`; the first that matches decides."""
+    t, c, w = spec.threshold, p.envelope, p.witness
+    conflicts = _conflicts(spec, p)
+    if conflicts:
+        w, c = max(conflicts, key=lambda pair: cast(float, pair[0].bound) - cast(float, pair[1].bound))
+        return _Verdict("unresolved", "conflict", (w, c), c, w)
+    if w is not None and cast(float, w.bound) >= t:
+        return _Verdict("demonstrated_feasible", None, (w,), c, w)
+    if c is not None and cast(float, c.bound) < t:
+        return _Verdict("infeasible_under_recorded_assumptions", None, (c,), c, w)
+    informative = [b for b in p.envelopes if b.bound is not None and b.state == "informative"]
+    if informative:
+        c = min(informative, key=lambda b: cast(float, b.bound))
+        return _Verdict("not_ruled_out", None, (c,), c, w)
+    return _Verdict("unresolved", None, tuple(b for b in (c, w) if b is not None), c, w)
+
+
+def _deciding(spec: TargetSpec, deciding: tuple[Bound, ...]) -> frozenset[tuple[Source, Quantity]]:
+    """Name the deciding bounds as ``(source, quantity)``; a deciding recall witness brings its false-positive bound."""
+    keys: set[tuple[Source, Quantity]] = {(b.source, b.quantity) for b in deciding}
+    if spec.metric == "recall":  # the false-positive bound certifies the witness
+        keys |= {(b.source, "false_positive_rate") for b in deciding if b.role == "witness"}
+    return frozenset(keys)
+
+
+def _to_cross(b: Bound, observed: float, gap: float, side: Literal["lower", "upper"]) -> int | None:
     try:
-        observed = min(max(observed, 0.0), stats["support"])
+        observed = min(max(observed, 0.0), cast(float, b.support))
         return units_to_cross(
-            observed, stats["variance"], stats["support"], stats["delta"], gap, method=stats["method"], side=side
+            observed,
+            cast(float, b.variance),
+            cast(float, b.support),
+            cast(float, b.delta),
+            gap,
+            method=cast(Method, b.method),
+            side=side,
         )
-    except (ValueError, TypeError):  # stats it cannot invert (ratio method, an invalid support, no gap): no estimate
+    except (ValueError, TypeError):  # values it cannot invert (ratio method, an invalid support, no gap): no estimate
         return None
 
 
-def _on_plan(item: _Item, n: int | None) -> int | None:
-    """Round ``n`` up to the next size of the sampling plan that counts the endpoint's units; None beyond the plan."""
-    plan = _plan(item)
-    if n is None or plan is None:
-        return n
-    sizes = plan.sizes if isinstance(plan, SamplingPlan) else plan
-    return next((s for s in sizes if s >= n), None)
+def _units(b: Bound, gap: float) -> int | None:
+    # The recorded mean is on the metric's scale; the support is the observation's. An envelope observes a loss.
+    mean = cast(float, b.mean)
+    return _to_cross(b, 1 - mean if b.bound_type == "upper" else mean, gap, "lower")
 
 
-def _units(item: _Item, stats: Mapping[str, Any], gap: float) -> int | None:
-    # The recorded mean is on the metric's scale; the support is the observation's. A ceiling observes a loss.
-    observed = 1 - stats["mean"] if item.ep.direction == "upper" else stats["mean"]
-    return _on_plan(item, _to_cross(stats, observed, gap, "lower"))
-
-
-def _plan(item: _Item) -> Any:
-    """Return the sampling plan whose sizes count this endpoint's units: audit-split samples only, not replicas."""
-    return item.ev.details.get("sampling_plan") if item.ev.sample.startswith("audit split") else None
-
-
-def _recall_crossing(p: _Pool, spec: TargetSpec) -> tuple[_Item, int | None] | None:
+def _recall_crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Quantity] | None:
     """
-    Return the witness whose observed recall and false-positive rate already meet the target, with its images.
+    Return the witness whose observed recall and false-positive rate already meet the requirement, with its images.
 
     Among scope-eligible witnesses (certified or not) with observed recall at or above the threshold and observed
-    false-positive rate at or below the limit, the one with the largest recall lower endpoint. Each bound on the wrong
+    false-positive rate at or below the limit, the one with the largest recall lower bound. Each bound on the wrong
     side of its limit needs its own units (positives, or negatives through the upper bound); the estimated prevalence
-    from the two counts converts both to images, the larger wins, rounded up to the sampling plan. None when a needed
-    count is not attainable.
+    from the two counts converts both to images, the larger wins, and the quantity that set it is returned. None when
+    a needed count is not attainable.
     """
     r0, f0 = spec.threshold, _limit(spec)
     found = []
-    for item in _tested(p, spec.scope):
-        fp, key, entries = _false_positives(item), item.ep.target_spec, item.ev.details["endpoints"]
-        if fp is not None and fp.value is not None and _observed_meets(item, spec):
-            found.append((item, fp.value, entries[key], entries[stats_key(key, "false_positive_rate")]))
+    for b in _tested(p, spec.scope):
+        fp = p.false_positives.get(b.source)
+        if fp is not None and fp.bound is not None and _observed_meets(b, fp, spec):
+            found.append((b, fp))
     if not found:
         return None
-    item, fp_bound, pos, neg = max(found, key=lambda f: f[0].value)
-    positives = _to_cross(pos, pos["mean"], pos["mean"] - r0, "lower") if item.value < r0 else 0
-    negatives = _to_cross(neg, neg["mean"], f0 - neg["mean"], "upper") if fp_bound > f0 else 0
+    b, fp = max(found, key=lambda f: cast(float, f[0].bound))
+    pos_mean, neg_mean = cast(float, b.mean), cast(float, fp.mean)
+    positives = _to_cross(b, pos_mean, pos_mean - r0, "lower") if cast(float, b.bound) < r0 else 0
+    negatives = _to_cross(fp, neg_mean, f0 - neg_mean, "upper") if cast(float, fp.bound) > f0 else 0
     if positives is None or negatives is None:
-        return item, None
-    share = pos["n"] / (pos["n"] + neg["n"])  # the estimated prevalence: both endpoints count audit items
-    return item, _on_plan(item, max(math.ceil(positives / share), math.ceil(negatives / (1 - share))))
+        return b, None, "recall"
+    n_pos, n_neg = cast(int, b.n), cast(int, fp.n)  # both bounds count audit items
+    share = n_pos / (n_pos + n_neg)  # the estimated prevalence of the class
+    images_for_recall, images_for_fp = math.ceil(positives / share), math.ceil(negatives / (1 - share))
+    quantity: Quantity = "recall" if images_for_recall >= images_for_fp else "false_positive_rate"
+    return b, max(images_for_recall, images_for_fp), quantity
 
 
-def _crossing(p: _Pool, spec: TargetSpec) -> tuple[_Item, int | None] | None:
-    """Return the deciding ceiling or best witness whose recorded mean is already past the threshold, with its units."""
-    if spec.metric == "recall":  # a recall ceiling has no single recorded mean to project; the witness side decides
+def _crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Quantity] | None:
+    """Return the deciding envelope or best witness whose recorded mean is past the threshold, with its units."""
+    if spec.metric == "recall":  # a recall envelope has no single recorded mean to project; the witness side decides
         return _recall_crossing(p, spec)
     threshold = spec.threshold
-    for item, sign in ((p.ceiling, -1), (p.witness, 1)):
-        stats = (
-            None if item is None else item.ev.details["endpoints"].get(stats_key(item.ep.target_spec, item.ep.quantity))
-        )
-        if item is not None and stats is not None and sign * (stats["mean"] - threshold) > 0:
-            return item, _units(item, stats, abs(stats["mean"] - threshold))
+    for b, sign in ((p.envelope, -1), (p.witness, 1)):
+        if b is not None and b.mean is not None and sign * (b.mean - threshold) > 0:
+            return b, _units(b, abs(b.mean - threshold)), b.quantity
     return None
 
 
-def _names_bound(item: _Item) -> bool:
-    return any(b in (item.ep.reason or "") for b in _DECLARED_BOUNDS)
-
-
-def _factor(spec: TargetSpec, p: _Pool, crossing: bool) -> tuple[LimitingFactor, str]:  # noqa: C901
-    missing = next((i for i in p.ceilings if i.ep.value is None and _names_bound(i)), None)
-    narrower = [i for i in p.narrower if i.ep.value is not None]
-    every = [*p.ceilings, *p.narrower]
-    if not p.ceilings and narrower:
-        ids = ", ".join(i.eid for i in narrower)
-        broadest = max((i.ev.information_scope for i in narrower), key=_RANK.__getitem__)
-        return "scope_restricted", (
-            f"Only narrower ceilings bound this {spec.scope} target ({ids}). Collect repeated labels on a randomly "
-            f"sampled subset of items for a full_input ceiling, declare a justified beta/Gamma allowance, or accept "
-            f"the {broadest} claim."
-        )
+def _factor(spec: TargetSpec, p: _Pool, crossing: bool) -> Limitation:  # noqa: C901
+    """Name what limits a non-final determination: the first rule of :func:`decide`'s limitation list that matches."""
+    every = [*p.envelopes, *p.narrower]
+    if not every:
+        return "no_envelope"
+    unavailable_bound = "max_sequence_length_missing"
+    missing = next((b for b in p.envelopes if b.bound is None and b.reason == unavailable_bound), None)
+    if not p.envelopes and any(b.bound is not None for b in p.narrower):
+        return "scope_restricted"
     if missing is not None:
-        return "missing_bound", f"{missing.name} is unavailable: {missing.ep.reason}. Declare the bound."
-    if every and all(i.ep.value is None and not _names_bound(i) for i in every):
-        reasons = "; ".join(f"{i.name}: {i.ep.reason}" for i in every)
-        return "sampling_width", (
-            f"Every ceiling is unavailable for lack of units ({reasons}). Collect more independent units: enough for "
-            "the fit split to cover the partition cells and for each cell's audit units to fill panels."
-        )
-    tested = _tested(p, spec.scope)
-    if not tested and spec.scope == "partition_restricted":
-        return "no_witness", (
-            "No witness can be eligible for a partition_restricted target in this release: it would give one answer "
-            "per cell of the internal partition, which is not exposed. Only a ceiling can decide this target."
-        )
-    if not tested:
-        return "no_witness", (
-            f"No witness eligible for {spec.scope} bounds this target; supply {_WANTED_WITNESS[spec.scope]} "
-            "on held-out units."
-        )
-    if crossing:
-        return "sampling_width", ""
-    replicas = any(i.ev.kind.startswith("replica_ceiling") for i in p.items)
-    if not replicas and all(i.ev.information_scope == "partition_restricted" for i in (*p.ceilings, *p.narrower)):
-        return "no_replicas", (
-            "No ceiling broader than partition_restricted bounds this target and no replica evidence exists; collect "
-            "repeated labels on a randomly sampled subset of items."
-        )
-    return "no_witness", _weak(spec, p)
-
-
-def _weak(spec: TargetSpec, p: _Pool) -> str:
-    """Say why the eligible witnesses fall short and what to supply instead."""
-    supply = "supply a stronger model" + (" or a different frozen operating point" if spec.metric == "recall" else "")
-    supply += f": {_WANTED_WITNESS[spec.scope]} on held-out units."
-    if p.witness is None:  # recall only: every eligible witness misses the false-positive limit
-        return f"No eligible witness has a false-positive upper confidence bound within {_limit(spec):.4g}; {supply}"
-    w = p.witness
-    return f"The best eligible witness {w.name} reaches {w.value:.4g} against {spec.threshold:.4g}; {supply}"
-
-
-def recommend(
-    spec: TargetSpec, evidence: Mapping[str, Evidence], decision: Decision, population: str
-) -> tuple[LimitingFactor | None, str | None, int | None]:
-    """
-    Name the limiting factor, the evidence that addresses it, and the suggested minimum number of units.
-
-    Evidence counts as in :func:`decide`. Final determinations get ``(None, None, None)``; ``evidence_conflict`` gets
-    ``"conflict"``, a recommendation to inspect the likely causes, and no minimum. Otherwise the first match wins:
-
-    1. ``scope_restricted`` — no ceiling at the judged scope or broader, but an available narrower one;
-    2. ``missing_bound`` — an eligible ceiling is unavailable and its reason names a declared bound
-       (``max_sequence_length``, ``target_count_bound``);
-    3. ``sampling_width`` — ceilings exist (at any scope) but every one is unavailable for lack of units or panels;
-    4. ``no_witness`` — no available witness eligible for the judged scope, certified or not (at
-       ``partition_restricted`` none can be in this release);
-    5. ``sampling_width`` — the deciding ceiling's recorded mean is below the threshold, or the best witness's above
-       it: the endpoint is on the wrong side by less than its radius (also when clipped to the metric's range). For a
-       recall target, an eligible witness, certified or not, whose observed recall is at or above the threshold and
-       observed false-positive rate at or below the limit, while a bound falls short;
-    6. ``no_replicas`` — every ceiling at the judged scope, broader or narrower is ``partition_restricted`` (or there
-       is none) and no replica evidence exists;
-    7. ``no_witness`` — otherwise: the witness is weak (for recall: its observed recall is below the threshold or its
-       observed false-positive rate above the limit; a stronger model or a different frozen operating point).
-
-    When the population covers labeled items only, the recommendation ends with a note saying so; that never
-    displaces the factor, so ``labels_conditioned`` is not produced.
-
-    The suggested minimum is set whenever a crossing as in rule 5 exists, whatever the factor: ``units_to_cross`` at
-    the endpoint's ``details["endpoints"]`` entry, whose ``mean`` is the point estimate on the metric's scale (inverted
-    on the observation's scale: ``1 - mean`` for a ceiling, which observes a loss, clipped into the support), with
-    gap ``|mean - threshold|``. For an endpoint whose sample is the audit split it is rounded up to the next size of a
-    ``details["sampling_plan"]`` (a ``SamplingPlan`` or its sizes); a replica ceiling's units are not plan units, so
-    its minimum is not rounded. It is None when not attainable: beyond ``units_to_cross``'s search, beyond the plan, or
-    recorded stats it rejects (a ratio method, an invalid support). A recall target counts evaluation items: the
-    positives its recall bound needs and the negatives its false-positive bound needs (the upper exact binomial
-    bound), each converted through the estimated prevalence, the larger rounded up to the plan.
-    """
-    if decision.determination in _FINAL:
-        return None, None, None
-    if decision.determination == "evidence_conflict":
-        return (
-            "conflict",
-            (
-                f"Witness {decision.witness_source!r} exceeds a ceiling it should respect; inspect data leakage (audit "
-                "items in its training data), ungrouped duplicates or sequences, and a witness/ceiling scope mismatch "
-                "(what the witness reads against the ceiling's information scope)."
-            ),
-            None,
-        )
-    p = _pool(spec, evidence, population)
-    crossing = _crossing(p, spec)
-    factor, text = _factor(spec, p, crossing is not None)
-    # Labeled items only is a property of the population, not of the evidence: a note, never the factor.
-    conditioned = (
-        " The evidence covers labeled items only; label the excluded items to extend the result to the full dataset."
-        if "labeled items" in population
-        else ""
-    )
-    if crossing is None:
-        return factor, f"{text}{conditioned}".strip(), None
-    item, n = crossing
-    return factor, f"{text} {_crossing_note(spec, item, n)}{conditioned}".strip(), n
-
-
-def _short_bounds(item: _Item, spec: TargetSpec) -> str:
-    """Name the confidence bounds of a recall witness that fall short of the requirement; never an empty phrase."""
-    short = (
-        ("lower confidence bound on recall", item.value < spec.threshold),
-        ("upper confidence bound on false positives", not _certified(item, spec)),
-    )
-    return " and ".join(name for name, is_short in short if is_short) or "confidence bounds"
-
-
-def _crossing_note(spec: TargetSpec, item: _Item, n: int | None) -> str:
-    """Say which bound is short of the target and at what size it would cross."""
-    if spec.metric == "recall":
-        short = _short_bounds(item, spec)
-        note = (
-            f"{item.name} meets recall {spec.threshold:.4g} at a false-positive rate within {_limit(spec):.4g} on its "
-            "observed rates, not yet on its confidence bounds: "
-        )
-        more = (
-            f"its {short} would cross the requirement at about {n} audit-split units, positives and negatives "
-            "counted through the estimated prevalence, if the observed rates hold."
-            if n is not None
-            else f"no attainable sample size lets its {short} cross the requirement under the recorded method and "
-            "sampling plan."
-        )
-    else:
-        note = f"{item.name} is within its confidence radius of the threshold {spec.threshold:.4g}: "
-        more = (
-            f"the endpoint would cross it at about {n} of its independent units (audit-split units for local panels "
-            "and witnesses, units with replicas for a replica ceiling) if the observed mean and variance hold."
-            if n is not None
-            else "no attainable sample size crosses it under the recorded method and sampling plan."
-        )
-    if n is not None and _plan(item) is not None:
-        more += (
-            " Later looks spend alpha/(k(k+1)), so the endpoint at that planned size is wider and may still fall short."
-        )
-    return note + more
+        return "missing_bound"
+    if all(b.bound is None and b.reason != unavailable_bound for b in every):
+        return "envelope_unavailable"
+    if not _tested(p, spec.scope):
+        return "no_eligible_witness"
+    return "within_radius" if crossing else "weak_witness"

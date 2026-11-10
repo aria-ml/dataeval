@@ -6,13 +6,7 @@ import numpy as np
 import pytest
 
 from dataeval.data import DetectionCrops, Operation, SequenceFrames, VideoSegments, VideoStitch, View, Window
-from dataeval.performance._feasibility_units import (
-    _dataset_id,
-    audit_order,
-    resolve_replicas,
-    resolve_units,
-    split_units,
-)
+from dataeval.performance._feasibility_units import _dataset_id, resolve_replicas, resolve_units, split_units
 from tests.data.conftest import MockODDataset
 from tests.data.test_crops import _simple_dataset
 from tests.data.test_frames import make_dataset
@@ -59,9 +53,9 @@ class TestUnits:
         np.testing.assert_array_equal(units.item_indices, [0, 2, 3])
         np.testing.assert_array_equal(units.groups, [0, 1, 2])
         assert units.n_excluded == 2
-        assert units.population == "labeled items of toy"
+        assert units.population == "labeled_items"
         assert not units.grouped
-        assert resolve_units(_IC([0, 1, 2]), groups=None).population == "items of toy"
+        assert resolve_units(_IC([0, 1, 2]), groups=None).population == "items"
 
     @pytest.mark.parametrize("kind", ["view", "segments", "frames", "crops", "stitch"])
     def test_derived_views_require_groups(self, kind):
@@ -119,7 +113,7 @@ class TestUnits:
 
     def test_dataset_id_falls_back_to_type_name(self):
         assert _dataset_id(_IC([0, 1], name=None)) == "_IC"
-        assert resolve_units(_IC([0, 1], name=None), groups=None).population == "items of _IC"
+        assert resolve_units(_IC([0, 1], name=None), groups=None).population == "items"
 
     def test_n_classes_and_sparse_declared_names(self):
         sparse = resolve_units(_IC([0, 2], declare={0: "a", 2: "c"}), groups=None)
@@ -199,13 +193,3 @@ class TestSplits:
     def test_empty_side_raises(self):
         with pytest.raises(ValueError, match="empty"):
             split_units(self._units(), fit_fraction=0.99, seed=0)
-
-    def test_audit_order_keeps_groups_contiguous_and_is_seeded(self):
-        units = self._units()
-        _, audit = split_units(units, fit_fraction=0.25, seed=1)
-        order = audit_order(units, audit, 3)
-        np.testing.assert_array_equal(np.sort(order), audit)
-        g = units.groups[order]
-        assert (np.diff(g) != 0).sum() == len(set(g)) - 1  # each group is one run
-        np.testing.assert_array_equal(order, audit_order(units, audit, 3))
-        assert any(audit_order(units, audit, s).tolist() != order.tolist() for s in range(4, 12))

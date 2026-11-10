@@ -75,21 +75,23 @@
 # data, or by the complexity of the model. Before investing heavily into model development, you want to check whether or
 # not the data is a limiting factor. You first choose a set of performance targets and ask
 # {class}`~dataeval.performance.Feasibility` if each requirement is reasonable given the data. `Feasibility` answers by
-# describing each requirement as one of the following:
+# returning one **determination** for each requirement, which falls into one of the following groups:
 #
 # - **Demonstrated** (`demonstrated_feasible`): A pre-existing model (minimally tuned to your classification problem)
 #   can easily achieve your performance requirement. This model is called a "witness", and establishes a
 #   **lower confidence bound**
 # - **Ruled out** (`infeasible_under_recorded_assumptions`): Your performance requirement is above an **upper confidence
-#   bound** set based on label ambiguity.
-# - **Insufficient evidence** (`not_ruled_out` or `unresolved`): The sweet-spot for model development, your requirements
-#   lie in the "theoretically feasible and not yet achieved" window.
+#   bound**, called an **envelope**, set based on label ambiguity.
+# - **Insufficient evidence** (`not_ruled_out` or `unresolved`): No tested model has shown your requirement met, and no
+#   envelope has ruled it out. The `limitation` column of the result names what holds the determination back, such as a
+#   stronger model or repeated labels.
 #
-# An `evidence_conflict` might also occur, where the upper bound lies ~below~ the lower bound. This could indicate
-# something wrong with the witness model (e.g. leakage artificially inflating performance),
-# or an issue with the upper bound (e.g. incorrect assumptions when calculating label ambiguity). The
-# [Performance limits](../concepts/PerformanceLimits.md#feasibility-ceilings-witnesses-and-determinations)
-# concept page discusses this in more detail.
+# A conflict might also occur, where the upper bound lies below the lower bound. It is an `unresolved` determination
+# with the limitation `conflict`. This could indicate something wrong with the witness model (e.g. leakage artificially
+# inflating performance), or an issue with the upper bound (e.g. incorrect assumptions when calculating label
+# ambiguity). The [Feasibility: envelopes, witnesses and
+# determinations](../concepts/PerformanceLimits.md#feasibility-envelopes-witnesses-and-determinations) section of the
+# Performance limits concept page discusses this in more detail.
 #
 # Run `Feasibility` at two points: before model development, to learn whether a requirement is out of reach or
 # already shown reachable, and after a model exists, to check that the model meets the requirement.
@@ -112,18 +114,18 @@
 # This tutorial tests all three performance targets using the same multi-class classifier (tuned once then frozen). The
 # results that you will produce in this tutorial are summarized here:
 #
-# | Performance Target | Result | Justification |
+# | Performance target | Result | Justification |
 # | --- | --- | --- |
 # | Vehicle name is correct at least 60% of the time | Insufficient evidence | The witness model is correct about half the time, but the 60% target is not ruled out. |
 # | Vehicle category is correct at least 60% of the time | Demonstrated | The witness model is right about 70% of the time, already meeting performance goals. |
-# | Tank category has > 90% recall, < 5% false positives | Insufficient evidence | The witness model only achieves about 50% recall while meeting the false positive requirement, but 90% recall is not ruled out. |
+# | Tank category has > 90% recall, < 5% false positives | Insufficient evidence | The witness model only achieves about 50% recall, so it cannot show the target met, but 90% recall is not ruled out. |
 
 # %% [markdown]
-# ### Important Considerations
+# ### Important considerations
 #
 # #### Preventing multiple comparisons errors
 #
-# The evidence behind Feasibility's conclusions is based on statistical principals. When designing tests, practice good
+# The evidence behind Feasibility's conclusions is based on statistical principles. When designing tests, practice good
 # habits:
 #
 # - Assemble all the performance targets you plan on testing ahead of time so a cumulative 'error budget' can be
@@ -145,7 +147,8 @@
 # This encoder has not seen your data, so its embeddings are likely not as well separated in feature space
 # as your future trained model will be. Because the dataset in this tutorial only has one label per image, label
 # ambiguity is based on groupings of images whose embeddings are close in feature space.
-# This puts a limitation on the accuracy of the upper bound that is reflected in the `Feasibility` result printouts.
+# This puts a limitation on the accuracy of the upper bound that is reflected in the `limitation` column of the
+# `Feasibility` results.
 
 # %% [markdown]
 # ## Setup
@@ -215,6 +218,11 @@ print(f"Vehicle names: {len(test.index2label)}")
 # [Embeddings](../concepts/Embeddings.md) are used in multiple parts of this process - in your model, DataEval's
 # built-in models, and the upper bound calculation. You use the 768-dimensional output from ViT-B/16
 # (a `torchvision` model).
+#
+# DataEval assumes the image model was chosen without the evaluation images' labels, and the printouts below list that
+# assumption. ViT-B/16 was chosen over ResNet18 and ResNet50 by cross-validation on the training split, but an earlier,
+# exploratory comparison also scored the three models on these test images. The results below therefore illustrate the
+# procedure, and a formal check would need images nobody has looked at.
 
 # %%
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -237,7 +245,7 @@ assert test_x.shape == (1621, 768)
 # ## Remove duplicate images
 #
 # It is always good practice to remove duplicates from your datasets, especially when there is a possibility that some
-# test images are duplicates of a training image to prevent 'memomrization' from inflating your measured test
+# test images are duplicates of a training image to prevent 'memorization' from inflating your measured test
 # performance. Use DataEval's {class}`.Duplicates` class to find them.
 #
 # :::{dropdown} How the duplicates are found
@@ -286,7 +294,7 @@ assert not np.isin(test_family[keep], train_family).any()  # no family shared wi
 # %% [markdown]
 # ## Split your data
 #
-# | Dataset Split | Description | Job |
+# | Dataset split | Description | Job |
 # | --- | --- | --- |
 # | Train | About four fifths of the training split | Train your model. |
 # | Calibration | About one fifth of the training split, reserved | Choose a classification threshold for the tank class (related to the third performance target). |
@@ -334,64 +342,61 @@ feasibility = Feasibility(alpha=0.05 / 3, seed=42)  # for all three planned call
 # %% [markdown]
 # ## Check the vehicle name requirement
 #
-# The call passes the kept test images, their embeddings, your model's scores and a record of how it was built:
+# The call passes the kept test images, their embeddings, your model's scores and the requirement:
 #
+# - `target` lists the requirements. Each is a {class}`~dataeval.performance.TargetSpec`, which states a performance
+#   metric and a threshold.
+# - `embeddings` are the kept images' embeddings, in image order.
 # - `predictions` holds your model's 24 scores for each kept image, in image order. DataEval scores the model on the
 #   evaluation images only.
-# - `provenance` records how the model was built. `reads="representation"` declares that it reads only the embeddings.
-#   DataEval records these declarations as assumptions and does not verify them.
+#
+# DataEval records that your model was trained without the evaluation images and frozen before it scored them. These are
+# assumptions that the printout lists, and DataEval does not verify them.
 
 # %%
 types = View(test, [Indices(keep)])
-provenance = {
-    "reads": "representation",
-    "frozen_before_audit": True,
-    "selection": (
-        "ViT-B/16 chosen by 5-fold cross-validation on the training split; logistic regression not tuned; an earlier "
-        "exploratory comparison scored the three backbones on these test images"
-    ),
-    "preprocessing": "ViT-B/16 class-token embeddings, standardized",
-}
+type_requirement = TargetSpec(metric="accuracy", threshold=0.60)
 
-type_result = feasibility.evaluate(
-    types, target={"accuracy": 0.60}, embeddings=test_x[keep], predictions=scores[keep], provenance=provenance
-)
+type_result = feasibility.evaluate(types, target=[type_requirement], embeddings=test_x[keep], predictions=scores[keep])
 print(type_result)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-NO_GAIN = "more evaluation images would not help at the observed scores;"  # quoted below
-NEXT = "to show it, test a stronger model; to rule it out, collect repeated labels for a whole-image ceiling"
 row = type_result.determinations.row(0, named=True)
-assert (row["determination"], row["witness_source"], row["ceiling"]) == ("unresolved", "user_witness/v1", None)
+assert (row["determination"], row["limitation"], row["witness_source"]) == (
+    "unresolved",
+    "scope_restricted",
+    "user_model",
+)
 assert row["suggested_minimum"] is None
 printed = str(type_result)
-flat = " ".join(printed.split())  # Next lines wrap after their semicolons
-assert "All bounds hold together at 98.3% confidence" in printed
-assert "They assume no evaluation image was used to train or choose a model, or to set a requirement." in printed
-assert f"60% accuracy {NO_GAIN} {NEXT}" in flat
-assert "accuracy) bounds only models that give one answer per group." in printed  # the group-based ceiling note
-bounds = type_result.aggregate_by_evidence()
-yours = bounds.filter(source="your model").row(0, named=True)
+assert "joint confidence: 98.3%" in printed
+assert "model_independent_of_audit_items" in printed
+assert "class_order_matches_dataset" in printed
+yours = type_result.bounds.filter(source="user_model").row(0, named=True)
 EVALUATION = len(keep) - round(len(keep) / 2)  # Feasibility fits on half the kept images and evaluates on the rest
 assert yours["n"] == EVALUATION
 assert 730 <= EVALUATION <= 750  # "about 740"
 # A family count that moves at the cosine-0.95 boundary redraws the evaluation images; the bands cover such redraws
 assert 0.44 < yours["observed"] < 0.56  # "about half"
 assert 0.39 < row["witness"] < 0.48  # "roughly 40 to 45%"
-group_based = bounds.filter(source="group-based ceiling")["bound"].item()
-assert 0.51 < group_based < 0.60  # "about 55%"; below 60%, so it "would rule that out" at its scope
+envelope = type_result.bounds.filter(source="local_panels").row(0, named=True)
+assert envelope["information_scope"] == "partition_restricted"
+assert 0.51 < envelope["bound"] < 0.60  # "about 55%"; below 60%, so it "would rule that out" at its scope
 
 # %% [markdown]
-# The answer is "insufficient evidence" (`unresolved` in the result's `determination` column). Your witness model named
-# the vehicle correctly about half the time. Accounting for sampling, DataEval can say only that it gets at least
-# roughly 40 to 45% right on new images. Because this dataset only has one ground truth label per image, the label
-# ambiguity used to set the upper ceiling comes from grouping images of similar appearance. This group-based ceiling,
-# about 55% accuracy, speaks only for models that would give one classification per "look-alike group", so it cannot
-# firmly rule out your 60% accuracy performance target as "infeasible", but it can give a rough estimate.
+# The answer is "insufficient evidence" (`unresolved` in the result's `determination` column, with the limitation
+# `scope_restricted`). Your witness model named the vehicle correctly about half the time. Accounting for sampling,
+# DataEval can say only that it gets at least roughly 40 to 45% right on new images. Because this dataset only has one
+# ground truth label per image, the label ambiguity used to set the upper bound comes from grouping images of similar
+# appearance. This group-based envelope, about 55% accuracy, speaks only for models that would give one classification
+# per "look-alike group", so it cannot firmly rule out your 60% accuracy performance target as "infeasible", but it can
+# give a rough estimate. The printout's `envelope` column is empty for that reason, and the envelope is listed in the
+# `bounds` table.
 #
-# The "Next" section gives advice for what would provide a more concrete result. More evaluation images drawn from the
-# same population would not help. Instead, address either the lower or upper bound:
+# The `limitation` column says what would provide a more concrete result. The `suggested_minimum` is empty because more
+# evaluation images drawn from the same population would not help: the observed score is already below 60%. Instead,
+# address either the lower or upper bound:
 #
 # - Lower Bound: A stronger model that achieves 60% accuracy would demonstrate this performance target 'feasible'.
 #   Either choose a more relevant witness model to use as a baseline, or proceed with training your own model.
@@ -399,7 +404,8 @@ assert 0.51 < group_based < 0.60  # "about 55%"; below 60%, so it "would rule th
 #   multiple different human annotators assign to the same image. Collect more labels per image to provide a better
 #   estimate of the upper bound and potentially rule out the performance target as 'infeasible'.
 #
-# The "Notes" section states context and assumptions that are relevant for interpreting the results.
+# The last lines of the printout state the assumptions the bounds rest on, which are relevant for interpreting the
+# results.
 #
 # Next, you assess the other two performance targets.
 
@@ -422,8 +428,10 @@ relabel = Relabel(to_category, target=categories)
 by_category = View(test, [Indices(keep), relabel])
 category_scores = relabel.fold_scores(scores, view=by_category)  # one row per kept image, one score per category
 
+category_requirement = TargetSpec(metric="accuracy", threshold=0.60)
+
 category_result = feasibility.evaluate(
-    by_category, target={"accuracy": 0.60}, embeddings=test_x[keep], predictions=category_scores, provenance=provenance
+    by_category, target=[category_requirement], embeddings=test_x[keep], predictions=category_scores
 )
 print(category_result)
 
@@ -433,9 +441,9 @@ assert categories == ("Tank", "BMP", "BTR", "Self Propelled Artillery", "Air Def
 assert sum(to_category[name] == "Tank" for name in test.index2label.values()) == 6  # "the six tank types"
 assert category_scores.shape == (len(keep), 7)
 row = category_result.determinations.row(0, named=True)
-assert (row["determination"], row["witness_source"]) == ("demonstrated_feasible", "user_witness/v1")
+assert (row["determination"], row["limitation"], row["witness_source"]) == ("demonstrated_feasible", None, "user_model")
 assert 0.62 <= row["witness"] < 0.69  # "at least about 65%"
-yours = category_result.aggregate_by_evidence().filter(source="your model").row(0, named=True)
+yours = category_result.bounds.filter(source="user_model").row(0, named=True)
 assert yours["n"] == EVALUATION
 assert 0.65 < yours["observed"] < 0.74  # "about 70%"
 
@@ -511,9 +519,10 @@ assert 0.40 < (tank_score[is_tank] >= threshold).mean() < 0.60  # "only about ha
 # other vehicles tanks, well over the 5% limit. The chosen threshold brings the false positives down to 2.5% or just
 # under.
 #
-# Now you apply this rule to the `Feasibility` test. `predictions` takes those decisions, one category number per image,
-# and `provenance["decision_policy"]` records the decision threshold. Testing an additional threshold would need a
-# planned call of its own (and a new test set, as per best practices for statistical testing).
+# Now you apply this rule to the `Feasibility` test. `predictions` takes those decisions, one category number per image.
+# The rule is frozen before the call, because `Feasibility` has no decision threshold of its own and does not search for
+# one on the evaluation images. Testing an additional threshold would need a planned call of its own (and a new test
+# set, as per best practices for statistical testing).
 
 
 # %% tags=["hide-input"]
@@ -527,33 +536,20 @@ def decide(folded):
 tank_requirement = TargetSpec(
     task="IC", metric="recall", threshold=0.90, class_name="Tank", max_false_positive_rate=0.05
 )
-tank_provenance = provenance | {
-    "decision_policy": (
-        f"Tank (index {TANK}) when the summed Tank score is at least {threshold}, otherwise the highest-scoring "
-        "other category; the threshold is the lowest whose false-positive rate on a calibration fifth of the "
-        "training split, held out by near-duplicate family, is at most 2.5%"
-    )
-}
 
 tank_result = feasibility.evaluate(
-    by_category,
-    target=[tank_requirement],
-    embeddings=test_x[keep],
-    predictions=decide(category_scores),
-    provenance=tank_provenance,
+    by_category, target=[tank_requirement], embeddings=test_x[keep], predictions=decide(category_scores)
 )
 print(tank_result)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
 row = tank_result.determinations.row(0, named=True)
-assert row["determination"] == "unresolved"
-assert (row["ceiling"], row["suggested_minimum"]) == (None, None)
+assert (row["determination"], row["limitation"]) == ("unresolved", "scope_restricted")
+assert row["suggested_minimum"] is None
 printed = str(tank_result)
-assert "Tank: ≥90% recall, ≤5% false positives   insufficient evidence ?" in printed
-TANK_NEXT = NEXT.replace("model;", "model or a different frozen operating point;")
-assert f"Tank {NO_GAIN} {TANK_NEXT}" in " ".join(printed.split())
-yours = tank_result.aggregate_by_evidence().filter(source="your model")
+assert "recall:Tank ≥0.9 fp≤0.05" in printed
+yours = tank_result.bounds.filter(source="user_model")
 assert yours["quantity"].to_list() == ["recall", "false_positive_rate"]
 tanks, others = yours["n"].to_list()
 assert tanks + others == EVALUATION
@@ -562,17 +558,13 @@ assert 0.38 < yours["observed"][0] < 0.62  # "only about half of the tanks"
 assert 0.01 < yours["observed"][1] < 0.05  # "a few percent"
 # "close to the 5% limit": a redraw of the evaluation images can land it on either side, which the prose covers
 assert 0.03 < yours["bound"][1] < 0.08
-counted = row["witness_source"] == "user_witness/v1"
+counted = row["witness_source"] == "user_model"
 assert counted == (yours["bound"][1] <= 0.05)  # counted when false alarms are shown within the limit
-assert "FP ≤" in printed  # "shows both of the rule's numbers either way"
-assert ("(your model, not counted)" in printed) != counted  # "above 5%, it marks them 'not counted'"
-user = tank_result.evidence["user_witness/v1"]
-assert user.provenance["decision_policy"] == tank_provenance["decision_policy"]
+assert yours["is_determining"].to_list() == [counted, counted]
 # the three planned calls: one budget split three ways, the same seed and the same evaluation images
 for result in (type_result, category_result, tank_result):
-    assert result.evidence["user_witness/v1"].details["call_alpha"] == 0.05 / 3
-    assert result.evidence["user_witness/v1"].details["seed"] == 42
-    assert result.determinations["suggested_minimum"].to_list() == [None]
+    assert result.meta().state["alpha"] == 0.05 / 3
+    assert result.meta().state["resolved_seed"] == 42
 
 # %% [markdown]
 # The result shows "insufficient evidence" (`unresolved`). The new tank classification rule had a significantly lower
@@ -584,69 +576,75 @@ for result in (type_result, category_result, tank_result):
 # When running `Feasibility`, there are 3 categories of results you can expect:
 #
 # 1. The target performance is higher than the upper bound: Given your data, your requirement is not achievable.
-#    Either re-evaluate your performance goals, or (more likely) collect new, **different** data that more clearly
+#    Either re-evaluate your performance goals, or (more likely) collect new, different data that more clearly
 #    distinguishes between your classes.
 # 2. The requirement is below the lower bound: Your witness model is already able to achieve your desired
 #    performance, and you do not need to invest heavily in model training or development.
-# 3. The requirement lies between the demonstrated bounds: Your target performance is feasible, but has not yet been
-#    demonstrated by an existing model, so you can proceed with model training and development, reasonably confident
-#    that **the data is not a limiting factor** for performance.
+# 3. The requirement lies between the two bounds: No existing model has demonstrated your target performance, and the
+#    data has not ruled it out. You can proceed with model training and development, but that is not evidence that the
+#    target can be met. The `limitation` column names what evidence would settle it.
 #
 # ### Interpreting the specific recommendations provided by `Feasibility`
 #
-# - **Test a stronger model, to show a requirement met.** Only a tested model's "at least this" performance number can
+# - Test a stronger model, to show a requirement met. Only a tested model's "at least this" performance number can
 #   show a requirement met, so you can try out a more relevant model if you want to ensure that your performance target
 #   is not yet reachable using existing tools, but you might instead want to proceed with training your own model
 #   (provided that the target performance lies below the upper bound).
-# - **Collect repeated labels, to rule a requirement out.** Have several people label the same random subset of the
+# - Collect repeated labels, to rule a requirement out. Have several people label the same random subset of the
 #   images independently, and pass their labels as `replicas=`. Where the labelers disagree about one image, it implies
 #   inherent ambiguity between classes for the given data, so the disagreement sets a limit on how well any model can
 #   do. That limit is a better estimate of the upper performance bound than the group-based approach used in the absence
 #   of `replicas`.
-# - **Assert allowances, to rule a requirement out.** setting `allowances={"beta": ..., "gamma": ...}` allows DataEval
-#   to use the group-based performance ceiling as a proper upper bound. These values will be guesses. `beta` estimates
+# - Assert allowances, to rule a requirement out. Setting `allowances=Allowances(beta=..., gamma=...)` allows
+#   DataEval to use the group-based envelope as a proper upper bound. These values will be guesses. `beta` estimates
 #   how much better you expect a model to be able to do when not limited by the coarse appearance-wise groupings used to
 #   evaluate the label ambiguity bound. `gamma` estimates how much better your fully trained embeddings will be compared
 #   to the witness model's embeddings. DataEval cannot check either number, so the ruling-out holds only if your
 #   assertion does.
-# - **Ask a narrower question.** If your performance targets are unreasonable, the solution may involve re-evaluating
+# - Ask a narrower question. If your performance targets are unreasonable, the solution may involve re-evaluating
 #   the problem and assessing new performance targets. When changing the target, ensure you follow the best practices
 #   listed above.
 #
 # When a model's observed score already meets the requirement and only the allowance for sampling holds it back,
-# `suggested_minimum` is set and "Next" gives about how many evaluation images would carry its bound past the
-# requirement. `Feasibility` evaluates on half of the images you pass, so supply about twice the suggested minimum.
+# `suggested_minimum` is set, and `minimum_source` and `minimum_quantity` name the bound it projects. It gives about how
+# many evaluation images would carry that bound past the requirement. `Feasibility` evaluates on half of the images you
+# pass, so supply about twice the suggested minimum.
 
 # %% [markdown]
 # ## Inspect the evidence
 #
-# This section is optional. `aggregate_by_evidence` lists every bound of a `Feasibility` call, one row per source and
-# bound. For the tank-specific recall/false positive example, each tested model has two rows: a lower bound on the share
-# of tanks it finds (`recall`) and an upper bound on the share of other vehicles it calls tanks (`false_positive_rate`).
-# The `information_scope` column gives the kind of model each bound applies to. "Not counted" refers to a tested model
-# whose false positives are not shown within the limit.
+# This section is optional. `bounds` lists every bound of a `Feasibility` call, one row per source and quantity. For the
+# tank-specific recall/false positive example, each tested model has two rows: a lower bound on the share of tanks it
+# finds (`recall`) and an upper bound on the share of other vehicles it calls tanks (`false_positive_rate`). The
+# `information_scope` column gives the kind of model each bound applies to, and `is_determining` marks the bounds the
+# determination rests on. "Not counted" refers to a tested model whose false positives are not shown within the limit:
+# its bounds are not determining.
 
 # %%
-columns = ["source", "quantity", "bound_type", "bound", "observed", "n", "information_scope"]
-tank_result.aggregate_by_evidence().select(columns)
+columns = ["source", "quantity", "bound_type", "bound", "observed", "n", "information_scope", "is_determining"]
+tank_result.bounds.select(columns)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-by_source = {(r["source"], r["quantity"]): r for r in tank_result.aggregate_by_evidence().iter_rows(named=True)}
-assert 0.66 < by_source["built-in k-NN", "recall"]["observed"] < 0.84  # "about three quarters"
-assert 0.66 < by_source["built-in linear probe", "recall"]["observed"] < 0.84
-assert 0.24 < by_source["built-in k-NN", "false_positive_rate"]["bound"] < 0.32  # "25 to 30%", not counted
-assert 0.12 < by_source["built-in linear probe", "false_positive_rate"]["bound"] < 0.19  # "about 15%", not counted
-assert by_source["group-based ceiling", "recall"]["information_scope"] == "partition_restricted"
+by_source = {(r["source"], r["quantity"]): r for r in tank_result.bounds.iter_rows(named=True)}
+assert 0.66 < by_source["knn", "recall"]["observed"] < 0.84  # "about three quarters"
+assert 0.66 < by_source["linear_probe", "recall"]["observed"] < 0.84
+assert 0.24 < by_source["knn", "false_positive_rate"]["bound"] < 0.32  # "25 to 30%", not counted
+assert 0.12 < by_source["linear_probe", "false_positive_rate"]["bound"] < 0.19  # "about 15%", not counted
+assert not by_source["knn", "recall"]["is_determining"]  # neither built-in model is shown within the false alarm limit
+assert not by_source["linear_probe", "recall"]["is_determining"]
+assert by_source["local_panels", "recall"]["information_scope"] == "partition_restricted"
+assert by_source["local_panels", "recall"]["bound"] > 0.90  # 90% lies below it, so it is not ruled out
 
 # %% [markdown]
 # `observed` is a model's score on the `n` evaluation images. DataEval's two built-in models answer with the
 # highest-scoring category. They find about three quarters of the tanks, but their false positive rates could be as high
-# as 25 to 30% (k-NN) and about 15% (linear probe), so neither can claim the performance target reached.
+# as 25 to 30% (`knn`) and about 15% (`linear_probe`), so neither can claim the performance target reached.
 # [Feasibility evidence](../concepts/FeasibilityEvidence.md) explains how each bound is built.
 #
 # In the evidence chart, each row is one source. The dot is its score on the evaluation images and the tick its "at
-# least" number. Sources that are not counted, and the group-based ceiling, are drawn faint.
+# least" number. Sources that are not counted, and the group-based envelope (labeled "group-based ceiling" in the
+# chart), are drawn faint.
 
 # %%
 dep.plot(tank_result, plot_evidence=True)
@@ -656,27 +654,29 @@ dep.plot(tank_result, plot_evidence=True)
 #
 # Three questions were asked of `Feasibility`:
 #
-# 1. When classifying a vehicle by **name**, is my > 60% accuracy requirement feasible given this data?
-# 2. When classifying a vehicle by **category**, is my > 60% accuracy requirement feasible given this data?
-# 3. When classifying a vehicle by category and using a **stricter decision rule** for tanks, is my requirement
+# 1. When classifying a vehicle by name, is my > 60% accuracy requirement feasible given this data?
+# 2. When classifying a vehicle by category, is my > 60% accuracy requirement feasible given this data?
+# 3. When classifying a vehicle by category and using a stricter decision rule for tanks, is my requirement
 #    of > 90% recall and < 5% false positive rate feasible given this data?
 #
 # Only the second performance goal was demonstrated by the witness model, meaning the other two goals will benefit from
-# training a new, stronger model. The third performance goal was shown to lie below the upper performance bound
-# (feasible). The first performance goal, however, rests just above the reported upper bound. Because
+# training a new, stronger model. The third performance goal lies below the group-based upper bound, so that bound does
+# not rule it out. The first performance goal, however, rests just above the reported upper bound. Because
 # the upper bound was determined using the look-alike group method, you decide collect multiple label replicates per
-# image to get a better estimate of the performance ceiling before committing to training a new model.
+# image to get a better estimate of the performance envelope before committing to training a new model.
 #
 # The answers to the three questions asked of `Feasibility` hold together at 95% confidence for new images from the same
-# population, and rest on the context declared in the model `provenance`.
+# population, and rest on the assumptions that each printout lists. An earlier, exploratory comparison of image models
+# also looked at these test images, so the answers illustrate the procedure. A formal check needs images that nobody has
+# looked at.
 
 # %% [markdown]
 # ## Next steps
 #
 # - [Performance limits](../concepts/PerformanceLimits.md) — Understand the determinations, information scopes and
-#   recommendations of `Feasibility`.
-# - [Feasibility evidence](../concepts/FeasibilityEvidence.md) — Learn how each kind of evidence is built and what its
-#   details hold.
+#   limitations of `Feasibility`.
+# - [Feasibility evidence](../concepts/FeasibilityEvidence.md) — Learn how each source of bounds is built and what its
+#   columns hold.
 # - [Measure dataset sufficiency for image classification](./h2_measure_ic_sufficiency.py) — Project model
 #   performance curves as a function of dataset size.
 
@@ -689,7 +689,7 @@ dep.plot(tank_result, plot_evidence=True)
 # - Create embeddings for your images with a pretrained model, and pass them to `Feasibility.evaluate` with your
 #   dataset.
 # - Train/tune a witness model on images that `Feasibility` never sees, freeze it, and pass its class scores as
-#   `predictions=` with a `provenance` that records how you built it.
-# - Remove any duplicates between your training and evaluation images, as in the "Remove repeated images" section.
+#   `predictions=`. If your model follows the MAITE model protocol, pass it as `model=` instead.
+# - Remove any duplicates between your training and evaluation images, as in the "Remove duplicate images" section.
 # - Use evaluation images that nobody has looked at, so the stated confidence holds true.
 # - If a requirement stays undecided, follow the "Choose your next steps" section.

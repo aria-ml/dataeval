@@ -40,12 +40,12 @@ construction, so they complement each other rather than repeat each other.
 | --- | --- | --- |
 | BER (`ber_mst`, `ber_knn`) | What is the lowest error any classifier reading this embedding could reach? | Asymptotic bounds from how class labels mismatch among neighbors in the embedding space |
 | UAP | What average precision does one crop classifier reach when every bounding box is correctly localized? | The score of one classifier on the ground-truth bounding box crops |
-| {class}`.Feasibility` | Is a stated requirement ruled out, already shown reachable, or neither, and what evidence says so? | Finite-sample confidence bounds from agreement among repeated or local labels (ceilings) and from frozen models scored on held-out items (witnesses) |
+| {class}`.Feasibility` | Is a stated requirement ruled out, already shown reachable, or neither, and what evidence says so? | Finite-sample confidence bounds from agreement among repeated or local labels (envelopes) and from frozen models scored on held-out items (witnesses) |
 | {class}`.Sufficiency` | How does performance grow with the amount of training data, and how much more data would a target need? | A power law fitted to performance measured on growing subsets of the training data |
 
 BER and Feasibility both speak to whether a requirement is out of reach, but they do not share a construction. BER
 uses only the neighbor structure of the embeddings and gives asymptotic bounds, so it is a quick first read.
-Feasibility's ceilings use agreement among repeated or local labels and its determinations carry a stated
+Feasibility's envelopes use agreement among repeated or local labels and its determinations carry a stated
 confidence level and recorded assumptions, so it takes more setup and gives a claim you can defend.
 
 As a starting point, run BER on a classification dataset early, as a low-cost check. Use Feasibility when a
@@ -99,11 +99,11 @@ classifier, or a detector that uses context the crop leaves out, can score highe
 
 UAP is marked experimental and may change in future releases.
 
-### Feasibility: determinations with evidence
+### Feasibility: determinations with bounds
 
 Feasibility takes a requirement, such as "at least 90% accuracy", and compares it against two
-kinds of evidence. One kind says how high performance could possibly go on this data. This is a **ceiling**. The
-other says how high performance has already been shown to go. This is a **witness**. If the ceiling is below the
+kinds of evidence. One kind says how high performance could possibly go on this data. This is an **envelope**. The
+other says how high performance has already been shown to go. This is a **witness**. If the envelope is below the
 requirement, the requirement is out of reach under the stated assumptions. If a witness is above the requirement,
 the requirement is reachable. If neither is true, the evidence does not settle the question, and Feasibility says
 what additional evidence would. For a program, this separates "this requirement cannot be met with this data" from
@@ -111,28 +111,30 @@ what additional evidence would. For a program, this separates "this requirement 
 
 A few terms are used throughout the Feasibility sections:
 
-- **Target:** a requirement, made of a performance metric (for example accuracy) and a threshold the metric must reach.
+- **Requirement:** a performance metric (for example accuracy) and a threshold the metric must reach, given as a
+  {class}`.TargetSpec`.
 - **Audit sample:** the labeled items Feasibility sets aside to score evidence on, kept separate from the items used
   to fit anything else in the analysis. Each independent item in it is an audit unit. For video data, frames from one
   video are grouped, because they are not independent of each other.
 - **Frozen model:** a model whose training is finished before it is scored on the audit sample, so its score on those
   items is a measure of how it performs on the population the data represents.
-- **Endpoint:** the upper or lower end of a confidence bound on a performance metric.
+- **Bound:** one confidence limit on a performance metric: the upper limit of an envelope or the lower limit of a
+  witness.
 
-{class}`.Feasibility` asks, for each target (a performance metric and a threshold), whether the evidence
+{class}`.Feasibility` asks, for each requirement (a performance metric and a threshold), whether the evidence
 demonstrates that the threshold is reachable on the population the data represents, rules it out under recorded
-assumptions, or does neither. It answers with a **determination** per target and the **evidence** behind it, of two
+assumptions, or does neither. It answers with a **determination** per requirement and the **evidence** behind it, of two
 kinds:
 
-- A **ceiling** is an upper endpoint on the performance metric that any model in a stated class can reach on the data.
-- A **witness** is a lower endpoint on the performance metric that one frozen baseline model reaches on the data.
+- An **envelope** is an upper bound on the performance metric that any model in a stated class can reach on the data.
+- A **witness** is a lower bound on the performance metric that one frozen baseline model reaches on the data.
 
-Each endpoint is a finite-sample confidence bound: it is correct with high probability, not with certainty. One call
-returns several endpoints and spends a single error budget across all of them (see
+Each bound is a finite-sample confidence bound: it is correct with high probability, not with certainty. One call
+returns several bounds and spends a single error budget across all of them (see
 [One error budget per call](#one-error-budget-per-call)).
 
-Every determination of feasibility names the evidence items it rests on, and every
-evidence item names the theorems it rests on in its `basis`. The feasibility result depends on the data, the
+Every determination marks the bounds it rests on, and every bound names its source, whose theorems are listed in
+[Feasibility evidence](FeasibilityEvidence.md#the-basis-of-each-source). The feasibility result depends on the data, the
 feature representation (the embeddings behind the local panels and the built-in witnesses), the models brought and
 the evidence collected.
 
@@ -241,33 +243,34 @@ The reduction from object detection to classification removes the localization b
 classifier, so UAP shows what is achievable for correctly localized boxes rather than bounding what any detector can
 reach.
 
-### Feasibility: ceilings, witnesses and determinations
+### Feasibility: envelopes, witnesses and determinations
 
-Feasibility builds ceilings from agreement among labels and witnesses from frozen models, then applies
-five ordered rules to decide what the evidence shows about each target. The rules have five possible outcomes:
+Feasibility builds envelopes from agreement among labels and witnesses from frozen models, then applies
+five ordered rules to decide what the evidence shows about each requirement. The rules have four possible determinations:
 
-- `demonstrated_feasible`: a frozen model's lower endpoint reaches the threshold.
-- `infeasible_under_recorded_assumptions`: every available ceiling's upper endpoint falls below the threshold.
-- `not_ruled_out`: a ceiling leaves room for the threshold, but no frozen model has shown it.
+- `demonstrated_feasible`: a frozen model's lower bound reaches the threshold.
+- `infeasible_under_recorded_assumptions`: an envelope's upper bound falls below the threshold.
+- `not_ruled_out`: an envelope leaves room for the threshold, but no frozen model has shown it.
 - `unresolved`: there is not enough usable evidence to say either way.
-- `evidence_conflict`: a ceiling and a witness contradict each other, so no claim is made and the cause needs
-  inspection.
 
-For example, suppose the target is 90% accuracy. An illustrative ceiling upper endpoint of 85% means the target is
-`infeasible_under_recorded_assumptions`. A witness lower endpoint of 93% means it is `demonstrated_feasible`. A
-ceiling of 97% with a best witness lower endpoint of 80% means it is `not_ruled_out`: the data does not exclude 90%,
-but nothing has shown it either. A ceiling of 85% together with a witness of 93% cannot both hold, so the
-determination is `evidence_conflict`. The numbers are illustrative only. The subsections below give the constructions,
-and [Feasibility evidence](FeasibilityEvidence.md) gives the exact rules.
+An envelope and a witness that contradict each other are a conflict. A conflict is `unresolved` with the limitation
+`conflict`: no claim is made, and the cause needs inspection.
 
-When a target is neither demonstrated feasible nor infeasible, Feasibility names the limiting factor, such as too few
+For example, suppose the requirement is 90% accuracy. An illustrative envelope upper bound of 85% means the requirement
+is `infeasible_under_recorded_assumptions`. A witness lower bound of 93% means it is `demonstrated_feasible`. An
+envelope of 97% with a best witness lower bound of 80% means it is `not_ruled_out`: the data does not exclude 90%, but
+nothing has shown it either. An envelope of 85% together with a witness of 93% cannot both hold, so the determination is
+`unresolved` with the limitation `conflict`. The numbers are illustrative only. The subsections below give the
+constructions, and [Feasibility evidence](FeasibilityEvidence.md) gives the exact rules.
+
+When a requirement is neither demonstrated feasible nor infeasible, Feasibility names the limitation, such as too few
 independent units, no repeated labels, or no strong enough witness, and the evidence that would address it. [Acting on
 results](ActingOnResults.md#performance-limits-findings) describes what to do with these findings.
 
-#### Ceilings from consensus
+#### Envelopes from consensus
 
-Feasibility's ceilings rest on the consensus inequality of the Detection Feasibility Envelope (DFE) construction.
-A ceiling is the highest accuracy any model could reach on this data. It is set by how much labels disagree for the
+Feasibility's envelopes rest on the consensus inequality of the Detection Feasibility Envelope (DFE) construction.
+An envelope is the highest accuracy any model could reach on this data. It is set by how much labels disagree for the
 same input. If annotators label the same image "truck" 70% of the time and "SUV" 30% of the time, no model can be right
 more than 70% of the time on that image, because it is visually ambiguous.
 
@@ -275,8 +278,8 @@ more than 70% of the time on that image, because it is visually ambiguous.
 a group of $m$ labels treated as independent draws of the label for that input. The share of a panel's labels that
 disagree with its most common label measures how ambiguous the input is. Averaging this share over inputs gives an
 estimate of the lowest error any model could reach. Because the estimate comes from a sample, Feasibility
-subtracts a confidence margin from it, and one minus the result is the accuracy ceiling. Since the panel describes
-the input itself, the ceiling bounds every model that reads the input.
+subtracts a confidence margin from it, and one minus the result is the accuracy envelope. Since the panel describes
+the input itself, the envelope bounds every model that reads the input.
 
 **Local panels.** Most datasets have only one label per input, so there are no repeated labels to form a panel.
 In that case Feasibility substitutes similar images for repeated labels of one image. It groups the images into
@@ -294,36 +297,36 @@ $$E[b_m] \le 1 - \max_k P(Y = k \mid x),$$
 
 where the right side is the error of the best answer to that input (or, for local panels, to that cell).
 On average, a panel's disagreement cannot exceed the irreducible error, so it is a safe underestimate of it.
-Averaged over inputs, the mean consensus value lower-bounds the Bayes risk, so one minus a lower endpoint on it is
-an accuracy ceiling.
+Averaged over inputs, the mean consensus value lower-bounds the Bayes risk, so one minus a lower bound on it is
+an accuracy envelope.
 
 **What local panels change.** Local panels bound the best single answer per cell, not per image. A model that
-tells apart images within a cell can exceed the ceiling, so local-panel ceilings are `partition_restricted`: they
+tells apart images within a cell can exceed the envelope, so local-panel envelopes are `partition_restricted`: they
 limit models at the resolution of the cells, not every model. A cell that mixes classes the embedding fails to
-separate lowers the ceiling, so a low ceiling from local panels can reflect the partition more than the data.
+separate lowers the envelope, so a low envelope from local panels can reflect the partition more than the data.
 Repeated labels on a random sample (`replicas=`) are therefore preferable.
 
 #### Witnesses from frozen models
 
-A witness is a model fitted without the audit units and scored once on them. Its accuracy endpoint is a one-sided
+A witness is a model fitted without the audit units and scored once on them. Its accuracy bound is a one-sided
 bound on the mean of per-unit correctness. Feasibility fits built-in witnesses itself and also accepts a frozen
-model's class scores or class decisions as a witness. Where the trials are independent yes-or-no outcomes, such as
-whether a witness classified an item correctly, endpoints are exact binomial confidence bounds; elsewhere, for example
-on consensus values and on grouped video data, they use concentration inequalities.
+model's class scores or class decisions as a witness, or the model itself. Where the trials are independent yes-or-no
+outcomes, such as whether a witness classified an item correctly, bounds are exact binomial confidence bounds;
+elsewhere, for example on consensus values and on grouped video data, they use concentration inequalities.
 
 #### Recall at a false-positive limit
 
 Programs often state a requirement for one class as an operating condition: identify tanks with probability at least
-0.90 while labeling at most 5% of the other vehicles as tanks. Feasibility judges this as a recall target, which
+0.90 while labeling at most 5% of the other vehicles as tanks. Feasibility judges this as a recall requirement, which
 always carries a false-positive limit, because any recall is reachable by always predicting the class.
 
 #### One error budget per call
 
-Because each endpoint is computed from a random sample, it can be wrong. A call therefore spends one error budget,
-`alpha` (0.05 by default), across every endpoint of every target: with probability at least `1 - alpha`, every
-endpoint from the call is correct at the same time, so you can read all of the call's determinations together without
-discounting for how many targets you asked about. Each pair of a target and an evidence source is one claim, every
-claim gets an equal share of the error budget, and inside a claim the share is split again across the endpoints its
+Because each bound is computed from a random sample, it can be wrong. A call therefore spends one error budget,
+`alpha` (0.05 by default), across every bound of every requirement: with probability at least `1 - alpha`, every
+bound from the call is correct at the same time, so you can read all of the call's determinations together without
+discounting for how many requirements you asked about. Each pair of a requirement and a source is one claim, every
+claim gets an equal share of the error budget, and inside a claim the share is split again across the bounds its
 construction needs.
 This follows from a union bound. The guarantee covers one call on one fixed audit. Comparing several representations
 or models across calls, rerunning with other seeds, or growing the audit and looking again each requires dividing the
@@ -405,9 +408,9 @@ an object detector.
 
 Feasibility is for classification decisions that need a proof behind them: before model development, to learn whether
 the evidence rules a requirement out or already shows it reachable, and once a model exists, to show on held-out data
-that it meets the requirement. Without repeated labels or allowances, every ceiling Feasibility builds is
-`partition_restricted`, so a `full_input` target can be demonstrated but not ruled out; collect repeated labels on a
-random sample of the data, passed as `replicas=`, when ruling out matters.
+that it meets the requirement. Without repeated labels or allowances, every envelope Feasibility builds is
+`partition_restricted`, so a `full_input` requirement can be demonstrated but not ruled out; collect repeated labels on
+a random sample of the data, passed as `replicas=`, when ruling out matters.
 
 Sufficiency is most useful at two points: early in a program, when deciding how
 much data to collect before beginning training; and after an initial training
@@ -489,8 +492,8 @@ distribution mismatch between train and test, the projection will be optimistic.
   measured on the training set
 - [Acting on results](ActingOnResults.md) — what to do when BER is high or
   sufficiency projection falls short of the operational requirement
-- [Feasibility evidence](FeasibilityEvidence.md) — each kind of evidence behind
-  Feasibility's determinations, with its basis, details and error budget
+- [Feasibility evidence](FeasibilityEvidence.md) — each source of bounds behind
+  Feasibility's determinations, with its basis, assumptions and error budget
 
 ## See this in practice
 
@@ -537,5 +540,6 @@ distribution mismatch between train and test, the projection will be optimistic.
 8. Detection Feasibility Envelope (DFE) manuscript: the consensus inequality (replicated-consensus section), the
    disjoint within-cell panels (local-pooling section) and the operating-point inequalities for precision, recall
    and AP.  
-   (The constructions behind every Feasibility ceiling and the AP witness, cited as "DFE" in each evidence item's
-   `basis`. The post-stratified pooling of the local panels is DataEval's own, proved in `local_panel_bound`.)
+   (The constructions behind every Feasibility envelope and the AP witness, cited as "DFE" in the basis table of
+   [Feasibility evidence](FeasibilityEvidence.md#the-basis-of-each-source). The post-stratified pooling of the local
+   panels is DataEval's own, proved in `local_panel_bound`. The other sources are in the references of that page.)
