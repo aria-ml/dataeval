@@ -1244,8 +1244,8 @@ Experimental ⚠️ (API may change or be removed):
   a process. Every other {func}`.video_stats` statistic is stable.
   {class}`~dataeval.protocols.SharpnessMeasure`, the protocol a `blur_measure`
   follows, is experimental with them and raises nothing on its own.
-- The inputs and evidence of {class}`.Feasibility` ({class}`.TargetSpec`,
-  {class}`.SamplingPlan`, {class}`.Evidence` and {class}`.Endpoint`), the core
+- The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
+  {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,
   {func}`.ap_upper_envelope`, {func}`.binomial_endpoint`,
   {func}`.consensus_max`, {func}`.cost_consensus`, {func}`.cost_consensus_max`,
