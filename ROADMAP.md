@@ -233,8 +233,7 @@ Each warns with an `ExperimentalWarning`, except the `SharpnessMeasure` protocol
 
 - `Parity` and `dataeval.core.parity` (experimental since v1.1).
 - `dataeval.core.uap` (experimental since v1.1).
-- `Feasibility`, its evidence and target types (`Endpoint`, `Evidence`, `SamplingPlan`,
-  and `TargetSpec`), and the `dataeval.core` functions it builds on (AP bounds,
+- `Feasibility`, its input types (`Allowances` and `TargetSpec`), and the `dataeval.core` functions it builds on (AP bounds,
   concentration endpoints, consensus bounds, and local panels).
 - `DriftKnownDomains`.
 - `Relabel.fold_scores`.

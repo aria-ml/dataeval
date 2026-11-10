@@ -12,6 +12,7 @@ from numpy.typing import ArrayLike, NDArray
 from dataeval._metadata import Metadata
 from dataeval.data._view import View
 from dataeval.exceptions import ShapeMismatchError
+from dataeval.performance._feasibility_evidence import Population
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,7 @@ class Units:
     The labeled items of a dataset and the physical unit each belongs to.
 
     ``labels``, ``item_indices`` and ``groups`` are aligned (one entry per labeled item). ``groups`` holds
-    contiguous codes ``0..G-1``. ``population`` is the string every later module quotes verbatim.
+    contiguous codes ``0..G-1``. ``population`` is ``labeled_items`` when unlabeled items were excluded, else ``items``.
     ``class_names`` is set only when the dataset declares ``index2label`` (ordered by class index; the declared
     indices may be sparse, so use ``n_classes``, not its length, for the class count). ``n_classes`` is the largest
     declared index + 1, else the largest observed label + 1. ``item_ids`` holds one datum id per dataset item
@@ -34,7 +35,7 @@ class Units:
     n_classes: int
     item_ids: NDArray[Any]
     n_excluded: int
-    population: str
+    population: Population
     class_names: list[str] | None
     grouped: bool
 
@@ -101,7 +102,7 @@ def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
         )
     items = np.asarray(md.item_indices, dtype=np.intp)
     n_excluded = len(dataset) - len(items)
-    kind = "labeled items" if n_excluded else "items"
+    population: Population = "labeled_items" if n_excluded else "items"
     labels = np.asarray(md.class_labels, dtype=np.intp)
     class_names = _declared_class_names(dataset)
     declared = _declared_indices(dataset)
@@ -115,7 +116,7 @@ def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
         n_classes=n_classes,
         item_ids=np.asarray(unit_rows["item_id"].to_list()),
         n_excluded=n_excluded,
-        population=f"{kind} of {_dataset_id(dataset)}",
+        population=population,
         class_names=class_names,
         grouped=bool(len(codes)) and int(np.bincount(codes).max()) > 1,
     )
@@ -171,11 +172,3 @@ def split_units(units: Units, *, fit_fraction: float, seed: int) -> tuple[NDArra
     fit_groups = np.random.default_rng(seed).permutation(n_groups)[:n_fit]
     in_fit = np.isin(units.groups, fit_groups)
     return np.flatnonzero(in_fit).astype(np.intp), np.flatnonzero(~in_fit).astype(np.intp)
-
-
-def audit_order(units: Units, audit: NDArray[np.intp], seed: int) -> NDArray[np.intp]:
-    """Seeded order of the audit items: groups are permuted and expanded, so a prefix never splits a group."""
-    audit = np.asarray(audit, dtype=np.intp)
-    audit_groups = units.groups[audit]
-    order = np.random.default_rng(seed).permutation(np.unique(audit_groups))
-    return np.concatenate([audit[audit_groups == g] for g in order]) if len(audit) else audit

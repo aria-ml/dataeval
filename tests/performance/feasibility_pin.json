@@ -1,0 +1,2160 @@
+{
+ "generated_from": "9d481e2c3f7b9667d595d10c16f0293b0f2617c2",
+ "scenarios": {
+  "acc_ap_scores": {
+   "bounds": [
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8186359492849772,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.8911914969865672
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8186359492849772,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.8911914969865672
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9802472450077959
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5835752098247524
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6241835698987237
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6277533047252922
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "unresolved",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": 0.6277533047252922,
+     "witness_source": "user_model"
+    }
+   ]
+  },
+  "acc_beta": {
+   "bounds": [
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.003125,
+      "mean": 0.8286359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675109,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.8987684856187499
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.7592024524882276
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8090158330571995
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8079477776129027
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9790292212388387
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5907072497000919
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6308893532224124
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6345550852844396
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8090158330571995,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.6345550852844396,
+     "witness_source": "user_model"
+    }
+   ]
+  },
+  "acc_beta_gamma": {
+   "bounds": [
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8486359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.9211914969865671
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8486359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.9211914969865671
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9802472450077959
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5835752098247524
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6241835698987237
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6277533047252922
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": 0.9211914969865671,
+     "envelope_scope": "full_input",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "infeasible_under_recorded_assumptions",
+     "envelope": 0.9211914969865671,
+     "envelope_scope": "full_input",
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": 0.6277533047252922,
+     "witness_source": "user_model"
+    }
+   ]
+  },
+  "ap_macro_class_scores": {
+   "bounds": [
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.48709228090888085
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.49788855084400135
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5109195212170417
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5629464315416188
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5379439094610112
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5526532437847922
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.5109195212170417,
+     "witness_source": "user_model"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.5629464315416188,
+     "witness_source": "knn"
+    }
+   ]
+  },
+  "class_decisions": {
+   "bounds": [
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.003125,
+      "mean": 0.8222613962937647,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3035410905522766,
+      "variance": 0.024519099947671378
+     },
+     "value": 0.8922672631760389
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.78,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.17177177177177178
+     },
+     "value": 0.7455474359966052
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.823,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.14581681681681682
+     },
+     "value": 0.7909105839043455
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.832,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13991591591591593
+     },
+     "value": 0.8004822601769257
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9842469709625784
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6207683314547928
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.6547521020867227
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "unavailable",
+     "stats": null,
+     "value": null
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8004822601769257,
+     "witness_source": "user_model"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.6547521020867227,
+     "witness_source": "linear_probe"
+    }
+   ]
+  },
+  "conflict": {
+   "bounds": [
+    {
+     "alpha": 0.016666666666666666,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.008333333333333333,
+      "mean": 0.8297696108140226,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3036010405771,
+      "variance": 0.026812140240711674
+     },
+     "value": 0.8935494940153189
+    },
+    {
+     "alpha": 0.016666666666666666,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": {
+      "delta": 0.016666666666666666,
+      "mean": 0.906,
+      "method": "hybrid",
+      "n": 500,
+      "support": 0.33333333333333337,
+      "variance": 0.022542418169672684
+     },
+     "value": 0.929063900948794
+    },
+    {
+     "alpha": 0.016666666666666666,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.016666666666666666,
+      "mean": 1.0,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.0
+     },
+     "value": 0.9959140258388097
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "evidence_conflict",
+     "envelope": 0.929063900948794,
+     "envelope_scope": "full_input",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.9959140258388097,
+     "witness_source": "user_model"
+    }
+   ]
+  },
+  "explicit_knobs": {
+   "bounds": [
+    {
+     "alpha": 0.0125,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.8498864445966867,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 0.9127217997258191,
+      "variance": 0.02758501429196294
+     },
+     "value": 0.8958643186148374
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.832,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13991591591591593
+     },
+     "value": 0.8037747242239843
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9832014020144586
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.672355258106751
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8037747242239843,
+     "witness_source": "user_model"
+    },
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.672355258106751,
+     "witness_source": "user_model"
+    }
+   ]
+  },
+  "recall_scores": {
+   "bounds": [
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "recall",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9816666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.018012232415902142
+     },
+     "value": 0.967605677070016
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.11875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.10477941176470588
+     },
+     "value": 0.15494037316884565
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9766666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.022807895468445926
+     },
+     "value": 0.9612718886672017
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05536764705882353
+     },
+     "value": 0.08654499355925756
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9791666666666666,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.020416319154851266
+     },
+     "value": 0.9644177834115129
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05375,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05092459324155194
+     },
+     "value": 0.08062165710457621
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "recall",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9816666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.018012232415902142
+     },
+     "value": 0.967605677070016
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.11875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.10477941176470588
+     },
+     "value": 0.15494037316884565
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9766666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.022807895468445926
+     },
+     "value": 0.9612718886672017
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05536764705882353
+     },
+     "value": 0.08654499355925756
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9791666666666666,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.020416319154851266
+     },
+     "value": 0.9644177834115129
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05375,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05092459324155194
+     },
+     "value": 0.08062165710457621
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9816666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.018012232415902142
+     },
+     "value": 0.967605677070016
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.11875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.10477941176470588
+     },
+     "value": 0.15494037316884565
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9766666666666667,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.022807895468445926
+     },
+     "value": 0.9612718886672017
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05875,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05536764705882353
+     },
+     "value": 0.08654499355925756
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "lower",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.9791666666666666,
+      "method": "exact_binomial",
+      "n": 1200,
+      "support": 1.0,
+      "variance": 0.020416319154851266
+     },
+     "value": 0.9644177834115129
+    },
+    {
+     "alpha": 0.0020833333333333333,
+     "bound_type": "upper",
+     "quantity": "false_positive_rate",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.05375,
+      "method": "exact_binomial",
+      "n": 800,
+      "support": 1.0,
+      "variance": 0.05092459324155194
+     },
+     "value": 0.08062165710457621
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.967605677070016,
+     "witness_source": "knn"
+    },
+    {
+     "determination": "unresolved",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 1,
+     "suggested_minimum": 29175,
+     "witness": null,
+     "witness_source": null
+    },
+    {
+     "determination": "unresolved",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    }
+   ]
+  },
+  "replicas_equal": {
+   "bounds": [
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.8114840669856459,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3059607933372877,
+      "variance": 0.026057626222574674
+     },
+     "value": 0.8798485818997692
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": {
+      "delta": 0.008333333333333333,
+      "mean": 0.8913333333333333,
+      "method": "hybrid",
+      "n": 500,
+      "support": 0.33333333333333337,
+      "variance": 0.02446270318414608
+     },
+     "value": 0.9160104458137539
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.8114840669856459,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3059607933372877,
+      "variance": 0.026057626222574674
+     },
+     "value": 0.8798485818997692
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": {
+      "delta": 0.008333333333333333,
+      "mean": 0.8913333333333333,
+      "method": "hybrid",
+      "n": 500,
+      "support": 0.33333333333333337,
+      "variance": 0.02446270318414608
+     },
+     "value": 0.9160104458137539
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9804334620132551
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9891663412061996
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9160104458137539,
+     "envelope_scope": "full_input",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    },
+    {
+     "determination": "infeasible_under_recorded_assumptions",
+     "envelope": 0.9160104458137539,
+     "envelope_scope": "full_input",
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    },
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9891663412061996,
+     "envelope_scope": "full_input",
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    }
+   ]
+  },
+  "replicas_unequal": {
+   "bounds": [
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.8114840669856459,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3059607933372877,
+      "variance": 0.026057626222574674
+     },
+     "value": 0.8798485818997692
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": {
+      "delta": 0.008333333333333333,
+      "mean": 0.8888333333333334,
+      "method": "hoeffding",
+      "n": 500,
+      "support": 0.5,
+      "variance": 0.02654227900244934
+     },
+     "value": 0.9234291847565244
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9776124024004021
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9899914640362523
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    },
+    {
+     "alpha": 0.008333333333333333,
+     "bound_type": "upper",
+     "quantity": "recall",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "uninformative",
+     "stats": null,
+     "value": 1.0
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9234291847565244,
+     "envelope_scope": "full_input",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    },
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9899914640362523,
+     "envelope_scope": "full_input",
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    },
+    {
+     "determination": "unresolved",
+     "envelope": 1.0,
+     "envelope_scope": "full_input",
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    }
+   ]
+  },
+  "scopes": {
+   "bounds": [
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8286359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.9011914969865671
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8286359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.9011914969865671
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0020833333333333333,
+      "mean": 0.8286359492849771,
+      "method": "hoeffding",
+      "n": 1000,
+      "support": 1.3058997333675113,
+      "variance": 0.023574940523394133
+     },
+     "value": 0.9011914969865671
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.793,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.16431531531531532
+     },
+     "value": 0.757267093459187
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 2,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.84,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.13453453453453454
+     },
+     "value": 0.8072268994245646
+    },
+    {
+     "alpha": 0.004166666666666667,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 2,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.004166666666666667,
+      "mean": 0.839,
+      "method": "exact_binomial",
+      "n": 1000,
+      "support": 1.0,
+      "variance": 0.1352142142142142
+     },
+     "value": 0.8061552715469431
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "demonstrated_feasible",
+     "envelope": 0.9011914969865671,
+     "envelope_scope": "fixed_representation",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "infeasible_under_recorded_assumptions",
+     "envelope": 0.9011914969865671,
+     "envelope_scope": "fixed_representation",
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.8072268994245646,
+     "witness_source": "linear_probe"
+    },
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9011914969865671,
+     "envelope_scope": "fixed_representation",
+     "requirement": 2,
+     "suggested_minimum": null,
+     "witness": null,
+     "witness_source": null
+    }
+   ]
+  },
+  "video_beta_gamma": {
+   "bounds": [
+    {
+     "alpha": 0.0125,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.7711904761904762,
+      "method": "hoeffding",
+      "n": 300,
+      "support": 1.327250929206483,
+      "variance": 0.019532467532467533
+     },
+     "value": 0.8932587696756548
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.7700674603174603,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.06511209339458564
+     },
+     "value": 0.6780966876481513
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.8077261904761904,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.055710612140619904
+     },
+     "value": 0.7164255934818924
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.8054761904761905,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.05826649110034203
+     },
+     "value": 0.7135054178068815
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "unresolved",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": 14035,
+     "witness": 0.7164255934818924,
+     "witness_source": "linear_probe"
+    }
+   ]
+  },
+  "video_frame_pooled": {
+   "bounds": [
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9140430900380604
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.46834021851803387
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5119542844146091
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.5157468118838766
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "upper",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "replicas",
+     "state": "informative",
+     "stats": null,
+     "value": 0.9847167065849105
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": null,
+     "value": 0.134970948575666
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": null,
+     "value": 0.13273459855324896
+    },
+    {
+     "alpha": 0.00625,
+     "bound_type": "lower",
+     "quantity": "ap",
+     "requirement": 1,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": null,
+     "value": 0.1348853007147272
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9140430900380604,
+     "envelope_scope": "full_input",
+     "requirement": 0,
+     "suggested_minimum": null,
+     "witness": 0.5157468118838766,
+     "witness_source": "user_model"
+    },
+    {
+     "determination": "not_ruled_out",
+     "envelope": 0.9847167065849105,
+     "envelope_scope": "full_input",
+     "requirement": 1,
+     "suggested_minimum": null,
+     "witness": 0.134970948575666,
+     "witness_source": "knn"
+    }
+   ]
+  },
+  "video_sequence_mean": {
+   "bounds": [
+    {
+     "alpha": 0.0125,
+     "bound_type": "upper",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "partition_restricted",
+     "source": "local_panels",
+     "state": "informative",
+     "stats": {
+      "delta": 0.00625,
+      "mean": 0.7899222222222222,
+      "method": "hoeffding",
+      "n": 300,
+      "support": 1.327036582555848,
+      "variance": 0.026792207792207794
+     },
+     "value": 0.9119708020803228
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "knn",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.7690992063492063,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.0717266286178165
+     },
+     "value": 0.6771284336798973
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "fixed_representation",
+     "source": "linear_probe",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.8164444444444444,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.06057098655887475
+     },
+     "value": 0.7244736717751354
+    },
+    {
+     "alpha": 0.0125,
+     "bound_type": "lower",
+     "quantity": "accuracy",
+     "requirement": 0,
+     "scope": "full_input",
+     "source": "user_model",
+     "state": "informative",
+     "stats": {
+      "delta": 0.0125,
+      "mean": 0.8293611111111111,
+      "method": "hybrid",
+      "n": 300,
+      "support": 1.0,
+      "variance": 0.05471565742889501
+     },
+     "value": 0.7384756933308467
+    }
+   ],
+   "determinations": [
+    {
+     "determination": "unresolved",
+     "envelope": null,
+     "envelope_scope": null,
+     "requirement": 0,
+     "suggested_minimum": 1511,
+     "witness": 0.7384756933308467,
+     "witness_source": "user_model"
+    }
+   ]
+  }
+ },
+ "versions": {
+  "numpy": "2.4.6",
+  "polars": "2.0.0",
+  "scikit-learn": "1.9.0"
+ }
+}

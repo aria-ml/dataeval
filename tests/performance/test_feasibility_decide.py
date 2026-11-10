@@ -1,97 +1,120 @@
+"""Tests for the ordered decision rules, the limitation of a non-final determination and the suggested minimum."""
+
 import math
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
 from dataeval._experimental import quiet_experimental
 from dataeval.core import units_to_cross
-from dataeval.performance._feasibility_decide import _pool, _short_bounds, decide
-from dataeval.performance._feasibility_evidence import Endpoint, Evidence, SamplingPlan, stats_key
+from dataeval.performance._feasibility_decide import Limitation, _pool, decide
+from dataeval.performance._feasibility_evidence import Bound, Quantity, Role, Source
 from dataeval.performance._feasibility_target import Scope, TargetSpec
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
-P = "items of d"
-
 
 def _spec(scope: Scope = "full_input") -> TargetSpec:
-    return TargetSpec("IC", "accuracy", 0.8, scope=scope)
+    return TargetSpec(task="IC", metric="accuracy", threshold=0.8, scope=scope)
 
 
-def _ev(
-    supports: Any,
+def _b(
+    role: Role,
     value: float | None,
     *,
     scope: Scope = "full_input",
-    kind: str | None = None,
-    population: str = P,
-    reads: str | None = None,
+    source: Source | None = None,
+    requirement: int = 0,
     state: Any = "informative",
     mean: float | None = None,
-    reason: str | None = None,
-    plan: Any = None,
-    spec: TargetSpec | None = None,
+    reason: Any = None,
     support: float = 1.0,
     variance: float = 0.04,
-    method: str = "hybrid",
-) -> Evidence:
-    """One-endpoint evidence; the recorded mean defaults to the endpoint value (no crossing)."""
-    key = (spec or _spec()).canonical()
-    stats = None
-    if value is not None:
-        mean = value if mean is None else mean
-        stats = {"mean": mean, "variance": variance, "n": 100, "support": support, "delta": 0.01, "method": method}
-    details: dict[str, Any] = {"endpoints": {key: stats}}
-    if plan is not None:
-        details["sampling_plan"] = plan
-    kind = kind or ("replica_ceiling/v1" if supports == "ceiling" else "user_witness/v1")
-    return Evidence(
-        kind=kind,
-        supports=supports,
-        basis="test basis",
-        population=population,
-        sample="100 items with replicas" if kind.startswith("replica") else "audit split",
+    method: Any = "hybrid",
+    quantity: Quantity = "accuracy",
+) -> Bound:
+    """One accuracy bound; the recorded mean defaults to the bound's value (no crossing)."""
+    source = source or ("replicas" if role == "envelope" else "user_model")
+    mean = value if mean is None else mean
+    if value is None:
+        state, mean, reason = "unavailable", None, reason or "too_few_units"
+    elif state != "informative":
+        reason = reason or ("bound_at_maximum" if role == "envelope" else "bound_at_minimum")
+    has = value is not None
+    return Bound(
+        requirement=requirement,
+        source=source,
+        role=role,
+        quantity=quantity,
+        bound_type="upper" if role == "envelope" else "lower",
         information_scope=scope,
-        unit="item",
-        provenance={} if reads is None else {"reads": reads},
-        endpoints=(
-            Endpoint(
-                key,
-                value,
-                "upper" if supports == "ceiling" else "lower",
-                0.01,
-                "unavailable" if value is None else state,
-                reason,
-            ),
-        ),
-        details=details,
+        population="items",
+        sample="replica_items" if source == "replicas" else "audit_split",
+        unit="image",
+        state=state,
+        reason=reason,
+        bound=value,
+        observed=mean if role == "witness" else None,
+        n=100 if has else None,
+        variance=variance if has else None,
+        radius=None,
+        method=method if has else None,
+        alpha=0.01,
+        assumptions=(),
+        mean=mean,
+        support=support if has else None,
+        delta=0.01 if has else None,
     )
 
 
-def _panel(value: float, scope: Scope = "partition_restricted", spec: TargetSpec | None = None) -> Evidence:
-    return _ev("ceiling", value, scope=scope, kind="local_panel_ceiling/v1", spec=spec)
+def _envelope(value: float | None, **kw: Any) -> Bound:
+    return _b("envelope", value, **kw)
 
 
-def _decide(spec: TargetSpec, evidence: dict[str, Evidence], population: str = P):
-    return decide(spec, evidence, population)
+def _witness_bound(value: float | None, **kw: Any) -> Bound:
+    return _b("witness", value, **kw)
+
+
+def _panel(value: float | None, scope: Scope = "partition_restricted", **kw: Any) -> Bound:
+    return _b("envelope", value, scope=scope, source="local_panels", **kw)
+
+
+def _decide(spec: TargetSpec, bounds: Sequence[Bound], requirement: int = 0):
+    return decide(spec, requirement, bounds)
 
 
 with quiet_experimental():  # at import, outside the module's warning filter
-    R90_F05 = TargetSpec("IC", "recall", 0.9, class_name="Tank", max_false_positive_rate=0.05)
-    R90_F10 = TargetSpec("IC", "recall", 0.9, class_name="Tank", max_false_positive_rate=0.10)
+    R90_F05 = TargetSpec(task="IC", metric="recall", threshold=0.9, class_name="Tank", max_false_positive_rate=0.05)
+    R90_F10 = TargetSpec(task="IC", metric="recall", threshold=0.9, class_name="Tank", max_false_positive_rate=0.10)
 HALF = 0.005  # recall and its false-positive limit share one claim's alpha
 
 
-def _rate_stats(mean: float, n: int) -> dict[str, Any]:
-    return {
-        "mean": mean,
-        "variance": mean * (1 - mean),
-        "n": n,
-        "support": 1.0,
-        "delta": HALF,
-        "method": "exact_binomial",
-    }
+def _rate(source: Source, quantity: Quantity, bound: float, mean: float, n: int, requirement: int) -> Bound:
+    return Bound(
+        requirement=requirement,
+        source=source,
+        role="witness",
+        quantity=quantity,
+        bound_type="lower" if quantity == "recall" else "upper",
+        information_scope="full_input",
+        population="items",
+        sample="audit_split",
+        unit="image",
+        state="informative",
+        reason=None,
+        bound=bound,
+        observed=mean,
+        n=n,
+        variance=mean * (1 - mean),
+        radius=None,
+        method="exact_binomial",
+        alpha=HALF,
+        assumptions=(),
+        mean=mean,
+        support=1.0,
+        delta=HALF,
+    )
 
 
 def _witness_for(
@@ -103,364 +126,319 @@ def _witness_for(
     fpr_mean: float | None = None,
     n_pos: int = 200,
     n_neg: int = 800,
-    plan: Any = None,
-) -> Evidence:
-    """A user witness with a recall lower and a false-positive upper endpoint per spec; means default to the bounds."""
-    endpoints, stats = [], {}
-    for spec in specs:
-        key = spec.canonical()
-        endpoints += [
-            Endpoint(key, recall_lb, "lower", HALF, "informative"),
-            Endpoint(key, fpr_ub, "upper", HALF, "informative", quantity="false_positive_rate"),
+    source: Source = "user_model",
+) -> list[Bound]:
+    """A witness with a recall lower and a false-positive upper bound per spec; means default to the bounds."""
+    out: list[Bound] = []
+    for r in range(len(specs)):
+        recall = recall_lb if recall_mean is None else recall_mean
+        fp = fpr_ub if fpr_mean is None else fpr_mean
+        out += [
+            _rate(source, "recall", recall_lb, recall, n_pos, r),
+            _rate(source, "false_positive_rate", fpr_ub, fp, n_neg, r),
         ]
-        stats[key] = _rate_stats(recall_lb if recall_mean is None else recall_mean, n_pos)
-        stats[stats_key(key, "false_positive_rate")] = _rate_stats(fpr_ub if fpr_mean is None else fpr_mean, n_neg)
-    details: dict[str, Any] = {"endpoints": stats} | ({} if plan is None else {"sampling_plan": plan})
-    return Evidence(
-        kind="user_witness/v1",
-        supports="witness",
-        basis="test basis",
-        population=P,
-        sample="audit split",
-        information_scope="full_input",
-        unit="item",
-        provenance={},
-        endpoints=tuple(endpoints),
-        details=details,
-    )
+    return out
 
 
-def _witness(**kwargs: Any) -> Evidence:
+def _witness(**kwargs: Any) -> list[Bound]:
     return _witness_for([R90_F05], **kwargs)
 
 
-def _ceiling(u_r: float) -> Evidence:
-    """A full_input (replica) recall ceiling at U_r."""
-    return _ev("ceiling", u_r, spec=R90_F05)
+def _ceiling(u_r: float, **kw: Any) -> Bound:
+    """A full_input (replica) recall envelope at U_r."""
+    return _envelope(u_r, quantity="recall", **kw)
+
+
+# One case per limitation member: (name, spec, bounds, expected determination, expected limitation)
+def _limitation_cases() -> list[tuple[str, TargetSpec, list[Bound], str, str]]:
+    fixed, part = _spec("fixed_representation"), _spec("partition_restricted")
+    return [
+        ("conflict", _spec(), [_envelope(0.85), _witness_bound(0.9)], "unresolved", "conflict"),
+        ("no_envelope", _spec(), [_witness_bound(0.5)], "unresolved", "no_envelope"),
+        ("scope_restricted", _spec(), [_panel(0.6), _witness_bound(0.5)], "unresolved", "scope_restricted"),
+        (
+            "missing_bound",
+            _spec(),
+            [_envelope(None, reason="max_sequence_length_missing")],
+            "unresolved",
+            "missing_bound",
+        ),
+        (
+            "envelope_unavailable",
+            part,
+            [_panel(None, reason="no_complete_panel"), _witness_bound(0.5, scope="full_input")],
+            "unresolved",
+            "envelope_unavailable",
+        ),
+        (
+            "no_eligible_witness",
+            fixed,
+            [_envelope(0.9, scope="full_input"), _witness_bound(0.9)],
+            "not_ruled_out",
+            "no_eligible_witness",
+        ),
+        ("within_radius", _spec(), [_envelope(0.85, mean=0.75), _witness_bound(0.5)], "not_ruled_out", "within_radius"),
+        ("weak_witness", _spec(), [_envelope(0.9), _witness_bound(0.5)], "not_ruled_out", "weak_witness"),
+    ]
 
 
 @pytest.mark.required
 class TestFeasibilityDecide:
-    def test_pool_and_crossing_ignore_false_positive_endpoints(self):
-        key = _spec().canonical()
-        fpr_key = stats_key(key, "false_positive_rate")
-        w = _ev("witness", 0.6)
-        stats = w.details["endpoints"][key]
-        fp_rate = Endpoint(key, 0.9, "upper", 0.01, "informative", quantity="false_positive_rate")
-        w = Evidence(**{
-            **{f: getattr(w, f) for f in w.__dataclass_fields__},
-            "endpoints": (*w.endpoints, fp_rate),
-            "details": {"endpoints": {key: stats, fpr_key: {**stats, "mean": 0.9}}},
-        })
-        pool = _pool(_spec(), {"w": w}, P)
-        assert [i.ep.quantity for i in pool.items] == ["metric"]
-        assert pool.witness is not None
-        assert pool.witness.value == 0.6
+    @pytest.mark.parametrize("member", get_args(Limitation))  # the cases are built in the test, not at collection
+    def test_each_limitation_member_is_produced(self, member):
+        _, spec, bounds, determination, limitation = next(c for c in _limitation_cases() if c[4] == member)
+        d = _decide(spec, bounds)
+        assert (d.determination, d.limitation) == (determination, limitation)
 
-    def test_rule_1_conflict_overrides_feasible(self):
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85), "w": _ev("witness", 0.9)})
-        assert d.determination == "evidence_conflict"
-        assert (d.witness, d.witness_source, d.ceiling, d.ceiling_scope) == (0.9, "w", 0.85, "full_input")
-        assert d.evidence_ids == ("w", "c")
-        assert "user_witness/v1" in d.reason
-        assert "replica_ceiling/v1" in d.reason
+    def test_every_limitation_member_has_a_case(self):
+        assert {case[4] for case in _limitation_cases()} == set(get_args(Limitation))
+
+    def test_pool_and_crossing_ignore_false_positive_bounds(self):
+        fp_rate = _rate("user_model", "false_positive_rate", 0.9, 0.9, 100, 0)
+        pool = _pool(_spec(), 0, [_witness_bound(0.6), fp_rate])
+        assert [b.quantity for b in pool.items] == ["accuracy"]
+        assert pool.witness is not None
+        assert pool.witness.bound == 0.6
+
+    def test_rule_1_conflict_is_unresolved_with_limitation_conflict(self):
+        d = _decide(_spec(), [_envelope(0.85), _witness_bound(0.9)])
+        assert (d.determination, d.limitation) == ("unresolved", "conflict")
+        assert (d.witness, d.witness_source, d.envelope, d.envelope_scope) == (0.9, "user_model", 0.85, "full_input")
+        assert d.deciding == {("user_model", "accuracy"), ("replicas", "accuracy")}
+        assert (d.suggested_minimum, d.minimum_source, d.minimum_quantity) == (None, None, None)
 
     def test_rule_2_demonstrated_feasible(self):
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.95), "w": _ev("witness", 0.8), "w2": _ev("witness", 0.6)})
+        bounds = [_envelope(0.95), _witness_bound(0.8), _witness_bound(0.6, source="knn")]
+        d = _decide(_spec(), bounds)
         assert d.determination == "demonstrated_feasible"
-        assert (d.witness, d.witness_source) == (0.8, "w")
-        assert d.evidence_ids[0] == "w"
-        assert set(d.evidence_ids) == {"c", "w", "w2"}
-        assert (d.limiting_factor, d.recommendation, d.suggested_minimum) == (None, None, None)
+        assert (d.witness, d.witness_source) == (0.8, "user_model")
+        assert d.deciding == {("user_model", "accuracy")}
+        assert (d.limitation, d.suggested_minimum) == (None, None)
 
     def test_rule_3_infeasible(self):
-        d = _decide(_spec(), {"w": _ev("witness", 0.6), "c": _ev("ceiling", 0.7, mean=0.65)})
+        d = _decide(_spec(), [_witness_bound(0.6), _envelope(0.7, mean=0.65)])
         assert d.determination == "infeasible_under_recorded_assumptions"
-        assert (d.ceiling, d.ceiling_scope) == (0.7, "full_input")
-        assert d.evidence_ids == ("c", "w")
-        assert (d.limiting_factor, d.recommendation, d.suggested_minimum) == (None, None, None)
+        assert (d.envelope, d.envelope_scope) == (0.7, "full_input")
+        assert d.deciding == {("replicas", "accuracy")}
+        assert (d.limitation, d.suggested_minimum) == (None, None)
 
     def test_rule_4_not_ruled_out(self):
-        other = TargetSpec("IC", "accuracy", 0.5, scope="fixed_representation")
-        d = _decide(
-            _spec(),
-            {
-                "c": _ev("ceiling", 0.95),
-                "c2": _panel(0.9, "full_input"),
-                "w": _ev("witness", 0.5),
-                "x": _ev("ceiling", 0.1, spec=other),  # another target: ignored
-            },
-        )
+        bounds = [
+            _envelope(0.95),
+            _panel(0.9, "full_input"),
+            _witness_bound(0.5),
+            _envelope(0.1, requirement=1),  # another requirement: ignored
+        ]
+        d = _decide(_spec(), bounds)
         assert d.determination == "not_ruled_out"
-        assert (d.ceiling, d.witness) == (0.9, 0.5)
-        assert d.evidence_ids[0] == "c2"
-        assert "x" not in d.evidence_ids
-        assert d.limiting_factor == "no_witness"  # replicas informative, witness weak
-        d = _decide(_spec(), {"c2": _panel(0.9, "full_input"), "w": _ev("witness", 0.5)})
-        assert d.limiting_factor == "no_witness"  # an informative full_input local panel: a stronger witness helps
+        assert (d.envelope, d.witness) == (0.9, 0.5)
+        assert d.deciding == {("local_panels", "accuracy")}
+        assert d.limitation == "weak_witness"  # replicas informative, witness weak
+        assert _decide(_spec(), [_panel(0.9, "full_input"), _witness_bound(0.5)]).limitation == "weak_witness"
 
-    def test_ceiling_at_threshold_is_not_ruled_out(self):
-        assert _decide(_spec(), {"c": _ev("ceiling", 0.8)}).determination == "not_ruled_out"
+    def test_envelope_at_threshold_is_not_ruled_out(self):
+        assert _decide(_spec(), [_envelope(0.8)]).determination == "not_ruled_out"
 
-    def test_full_input_ceiling_decides_fixed_representation(self):
+    def test_full_input_envelope_decides_fixed_representation(self):
         spec = _spec("fixed_representation")
-        d = _decide(spec, {"c": _ev("ceiling", 0.7, spec=spec)})
-        assert (d.determination, d.ceiling_scope) == ("infeasible_under_recorded_assumptions", "full_input")
+        d = _decide(spec, [_envelope(0.7)])
+        assert (d.determination, d.envelope_scope) == ("infeasible_under_recorded_assumptions", "full_input")
 
     def test_rule_5_unresolved_when_only_uninformative(self):
-        d = _decide(
-            _spec(), {"c": _ev("ceiling", 1.0, state="uninformative"), "w": _ev("witness", 0.0, state="uninformative")}
-        )
+        bounds = [_envelope(1.0, state="uninformative"), _witness_bound(0.0, state="uninformative")]
+        d = _decide(_spec(), bounds)
         assert d.determination == "unresolved"
-        assert "uninformative" in d.reason
-        assert d.limiting_factor == "no_witness"  # replica evidence exists
+        assert d.limitation == "weak_witness"  # replica bounds exist
+        assert d.deciding == {("replicas", "accuracy"), ("user_model", "accuracy")}
 
-    def test_no_replicas_when_only_partition_ceilings(self):
-        spec = _spec("partition_restricted")
-        d = _decide(spec, {"p": _panel(0.9, spec=spec), "w": _ev("witness", 0.5, spec=spec, reads="partition")})
-        assert (d.determination, d.limiting_factor) == ("not_ruled_out", "no_replicas")
-        assert "repeated labels" in (d.recommendation or "")
-        d = _decide(_spec(), {"w": _ev("witness", 0.5)})  # no ceiling at all, as for frame_pooled without replicas
-        assert d.limiting_factor == "no_replicas"
-        assert (d.recommendation or "").startswith("No ceiling broader than partition_restricted bounds this target")
-
-    def test_witness_equal_to_ceiling_is_not_a_conflict(self):
-        assert (
-            _decide(_spec(), {"c": _ev("ceiling", 0.85), "w": _ev("witness", 0.85)}).determination
-            == "demonstrated_feasible"
+    def test_a_witness_alone_is_demonstrated_or_has_no_envelope(self):
+        for value, expected in ((0.9, ("demonstrated_feasible", None)), (0.5, ("unresolved", "no_envelope"))):
+            d = _decide(_spec(), [_witness_bound(value)])
+            assert (d.determination, d.limitation) == expected
+        # only an envelope can bound what is unreachable
+        assert _decide(_spec(), [_witness_bound(0.5)]).determination not in (
+            "not_ruled_out",
+            "infeasible_under_recorded_assumptions",
         )
 
-    def test_conflict_is_pairwise_by_ceiling_scope(self):
+    def test_witness_equal_to_envelope_is_not_a_conflict(self):
+        assert _decide(_spec(), [_envelope(0.85), _witness_bound(0.85)]).determination == "demonstrated_feasible"
+
+    def test_conflict_is_pairwise_by_envelope_scope(self):
         spec = _spec("fixed_representation")
-        user = _ev("witness", 0.9, spec=spec, reads="full_input")
-        d = _decide(spec, {"c": _ev("ceiling", 0.7, spec=spec), "w": user})
-        assert (d.determination, d.witness_source) == ("evidence_conflict", "w")
-        # A full-image model is not in a fixed_representation ceiling's class: no conflict, the ceiling decides.
-        d = _decide(spec, {"c": _ev("ceiling", 0.7, spec=spec, scope="fixed_representation"), "w": user})
+        user = _witness_bound(0.9)
+        d = _decide(spec, [_envelope(0.7), user])
+        assert (d.determination, d.limitation, d.witness_source) == ("unresolved", "conflict", "user_model")
+        # A full-image model is not in a fixed_representation envelope's class: no conflict, the envelope decides.
+        d = _decide(spec, [_envelope(0.7, scope="fixed_representation"), user])
         assert d.determination == "infeasible_under_recorded_assumptions"
 
     def test_rules_2_and_3_imply_rule_1(self):
         for w in (0.8, 0.9, 1.0):
             for c in (0.0, 0.5, 0.79):
-                assert (
-                    _decide(_spec(), {"c": _ev("ceiling", c), "w": _ev("witness", w)}).determination
-                    == "evidence_conflict"
-                )
+                d = _decide(_spec(), [_envelope(c), _witness_bound(w)])
+                assert (d.determination, d.limitation) == ("unresolved", "conflict")
 
-    def test_narrower_ceiling_never_decides(self):
-        d = _decide(_spec(), {"p": _panel(0.5), "q": _panel(0.6, "fixed_representation")})
+    def test_narrower_envelope_never_decides(self):
+        d = _decide(_spec(), [_panel(0.5), _panel(0.6, "fixed_representation")])
         assert d.determination == "unresolved"
-        assert d.ceiling is None
-        assert set(d.evidence_ids) == {"p", "q"}
-        # The same ceiling decides at its own scope, and a broader ceiling decides a narrower target.
+        assert d.envelope is None
+        assert d.deciding == frozenset()
+        # The same envelope decides at its own scope, and a broader envelope decides a narrower requirement.
         spec = _spec("partition_restricted")
-        assert _decide(spec, {"p": _panel(0.5, spec=spec)}).determination.startswith("infeasible")
-        assert _decide(spec, {"c": _ev("ceiling", 0.7, spec=spec)}).determination.startswith("infeasible")
+        assert _decide(spec, [_panel(0.5)]).determination.startswith("infeasible")
+        assert _decide(spec, [_envelope(0.7)]).determination.startswith("infeasible")
 
     def test_full_image_model_cannot_demonstrate_fixed_representation(self):
         spec = _spec("fixed_representation")
-        user = _ev("witness", 0.9, spec=spec)
-        d = _decide(spec, {"w": user})
-        assert d.determination == "unresolved"
-        assert d.witness is None
-        assert d.evidence_ids == ("w",)
-        assert d.limiting_factor == "no_witness"
-        assert _decide(spec, {"w": _ev("witness", 0.9, spec=spec, reads="full_input")}).witness is None
-        rep = _ev("witness", 0.9, spec=spec, reads="representation")
-        assert _decide(spec, {"w": rep}).determination == "demonstrated_feasible"
-        builtin = _ev("witness", 0.9, spec=spec, kind="builtin_witness/v1")
-        assert _decide(spec, {"w": builtin}).determination == "demonstrated_feasible"
+        d = _decide(spec, [_envelope(0.9), _witness_bound(0.9)])
+        assert (d.determination, d.limitation, d.witness) == ("not_ruled_out", "no_eligible_witness", None)
+        builtin = _witness_bound(0.9, source="knn", scope="fixed_representation")  # reads only the representation
+        assert _decide(spec, [builtin]).determination == "demonstrated_feasible"
 
-    def test_partition_restricted_admits_only_partition_witnesses(self):
+    def test_partition_restricted_admits_no_witness(self):
         spec = _spec("partition_restricted")
-        builtin = _ev("witness", 0.9, spec=spec, kind="builtin_witness/v1")
-        d = _decide(spec, {"w": builtin})
-        assert (d.determination, d.limiting_factor) == ("unresolved", "no_witness")
-        assert "Only a ceiling can decide" in (d.recommendation or "")  # evaluate rejects reads="partition"
-        assert _decide(spec, {"w": _ev("witness", 0.9, spec=spec)}).determination == "unresolved"
-        part = _ev("witness", 0.9, spec=spec, reads="partition")
-        assert _decide(spec, {"w": part}).determination == "demonstrated_feasible"
-        part = _ev("witness", 0.9, reads="partition")
-        assert (
-            _decide(_spec(), {"w": part}).determination == "demonstrated_feasible"
-        )  # a partition model reads the input
-        rep = _spec("fixed_representation")
-        part = _ev("witness", 0.9, spec=rep, reads="partition")
-        assert _decide(rep, {"w": part}).determination == "demonstrated_feasible"  # it reads only the representation
-
-    def test_population_mismatch_is_not_compared(self):
-        evidence = {"c": _ev("ceiling", 0.7, population="items of e"), "w": _ev("witness", 0.9)}
-        d = _decide(_spec(), evidence, "items of d")
-        assert (d.determination, d.ceiling, d.evidence_ids) == ("demonstrated_feasible", None, ("w",))
-        d = _decide(_spec(), evidence, "items of e")
-        assert (d.determination, d.witness, d.evidence_ids) == ("infeasible_under_recorded_assumptions", None, ("c",))
-
-    def test_recommendation_names_replicas_when_scope_restricted(self):
-        d = _decide(_spec(), {"p": _panel(0.6), "w": _ev("witness", 0.5)})
-        assert d.limiting_factor == "scope_restricted"
-        assert "repeated labels" in (d.recommendation or "")
-        assert "partition_restricted" in (d.recommendation or "")
-        assert "(p)." in (d.recommendation or "")  # the evidence id, once
-        assert "local_panel_ceiling" not in (d.recommendation or "")
+        for source in ("knn", "user_model"):
+            d = _decide(spec, [_panel(0.9), _witness_bound(0.9, source=source)])
+            assert (d.determination, d.limitation, d.witness) == ("not_ruled_out", "no_eligible_witness", None)
 
     @pytest.mark.parametrize("scope", ["full_input", "partition_restricted"], ids=["narrower", "judged"])
-    def test_sampling_width_when_every_ceiling_lacks_units(self, scope):
+    def test_envelope_unavailable_when_every_envelope_lacks_units(self, scope):
         spec = _spec(scope)
-        reason = "no partition cell holds 5 audit units, so no panel is complete"
-        starved = _ev(
-            "ceiling", None, scope="partition_restricted", kind="local_panel_ceiling/v1", reason=reason, spec=spec
-        )
-        d = _decide(spec, {"p": starved, "w": _ev("witness", 0.5, spec=spec)})
-        assert (d.determination, d.limiting_factor) == ("unresolved", "sampling_width")
-        assert reason in (d.recommendation or "")
-        assert d.suggested_minimum is None
+        starved = _panel(None, reason="no_complete_panel")
+        d = _decide(spec, [starved, _witness_bound(0.5)])
+        assert (d.determination, d.limitation, d.suggested_minimum) == ("unresolved", "envelope_unavailable", None)
 
     def test_missing_bound_names_the_bound(self):
-        c = _ev("ceiling", None, reason="max_sequence_length is not declared")
-        d = _decide(_spec(), {"c": c, "w": _ev("witness", 0.5)})
-        assert d.determination == "unresolved"
-        assert d.limiting_factor == "missing_bound"
-        assert "max_sequence_length" in (d.recommendation or "")
+        c = _envelope(None, reason="max_sequence_length_missing")
+        d = _decide(_spec(), [c, _witness_bound(0.5)])
+        assert (d.determination, d.limitation) == ("unresolved", "missing_bound")
 
-    def test_no_witness_when_none_exists(self):
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.9)})
-        assert (d.determination, d.limiting_factor) == ("not_ruled_out", "no_witness")
+    def test_no_eligible_witness_when_none_exists(self):
+        d = _decide(_spec(), [_envelope(0.9)])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "no_eligible_witness")
 
-    def test_labeled_items_only_adds_a_note_and_keeps_the_factor(self):
-        pop, note = "labeled items of d", "label the excluded items to extend the result to the full dataset."
-        weak = _ev("witness", 0.5, population=pop)
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.9, population=pop), "w": weak}, pop)
-        assert (d.determination, d.limiting_factor) == ("not_ruled_out", "no_witness")
-        assert "stronger model" in (d.recommendation or "")
-        assert (d.recommendation or "").endswith(note)
-        d = _decide(_spec("partition_restricted"), {"w": weak}, pop)
-        assert d.limiting_factor == "no_witness"
-        assert (d.recommendation or "").endswith(note)
-
-    def test_sampling_width_suggests_units_rounded_to_the_plan(self):
+    def test_within_radius_suggests_the_units_to_cross(self):
         n = units_to_cross(0.75, 0.04, 1.0, 0.01, 0.05)
         assert n is not None
         assert 100 < n < 1000
-        witness = _ev("witness", 0.5)
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85, mean=0.75), "w": witness})
-        assert (d.determination, d.limiting_factor, d.suggested_minimum) == ("not_ruled_out", "sampling_width", n)
-        assert str(n) in (d.recommendation or "")
-        plan = SamplingPlan((100, 1000, 10_000), order_seed=0)
-        local = {"kind": "local_panel_ceiling/v1", "mean": 0.75}  # an audit-split sample, at full_input
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85, plan=plan, **local), "w": witness})
-        assert d.suggested_minimum == 1000
-        assert "alpha/(k(k+1))" in (d.recommendation or "")
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85, plan=(100, 200), **local), "w": witness})
-        assert (d.limiting_factor, d.suggested_minimum) == ("sampling_width", None)
-        # Units with replicas are not plan units: the replica ceiling's minimum stays unrounded.
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85, mean=0.75, plan=plan), "w": witness})
-        assert d.suggested_minimum == n
-        assert "alpha/(k(k+1))" not in (d.recommendation or "")
+        d = _decide(_spec(), [_envelope(0.85, mean=0.75), _witness_bound(0.5)])
+        assert (d.determination, d.limitation, d.suggested_minimum) == ("not_ruled_out", "within_radius", n)
+        assert (d.minimum_source, d.minimum_quantity) == ("replicas", "accuracy")
 
-    def test_sampling_width_on_the_witness_side(self):
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.95), "w": _ev("witness", 0.75, mean=0.85)})
-        assert (d.determination, d.limiting_factor) == ("not_ruled_out", "sampling_width")
+    def test_within_radius_on_the_witness_side(self):
+        d = _decide(_spec(), [_envelope(0.95), _witness_bound(0.75, mean=0.85)])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
         assert d.suggested_minimum == units_to_cross(0.85, 0.04, 1.0, 0.01, 0.05)
+        assert (d.minimum_source, d.minimum_quantity) == ("user_model", "accuracy")
 
     def test_exact_binomial_witness_keeps_its_suggested_minimum(self):
-        witness = _ev("witness", 0.75, mean=0.85, method="exact_binomial")
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.95), "w": witness})
+        witness = _witness_bound(0.75, mean=0.85, method="exact_binomial")
+        d = _decide(_spec(), [_envelope(0.95), witness])
         n = units_to_cross(0.85, 0.04, 1.0, 0.01, 0.05, method="exact_binomial", side="lower")
         assert n is not None
-        assert (d.limiting_factor, d.suggested_minimum) == ("sampling_width", n)
+        assert (d.limitation, d.suggested_minimum) == ("within_radius", n)
 
-    def test_suggested_minimum_never_raises(self):
-        bad = _ev("ceiling", 0.85, mean=0.75, support=0.0)  # a support units_to_cross rejects
-        d = _decide(_spec(), {"c": bad, "w": _ev("witness", 0.5)})
-        assert (d.limiting_factor, d.suggested_minimum) == ("sampling_width", None)
+    def test_suggested_minimum_never_raises_and_then_names_no_bound(self):
+        bad = _envelope(0.85, mean=0.75, support=0.0)  # a support units_to_cross rejects
+        d = _decide(_spec(), [bad, _witness_bound(0.5)])
+        assert (d.limitation, d.suggested_minimum) == ("within_radius", None)
+        assert (d.minimum_source, d.minimum_quantity) == (None, None)
 
-    def test_replica_ceiling_suggests_a_minimum(self):
+    def test_replica_envelope_suggests_a_minimum(self):
         # Replica consensus lives in [0, consensus_max] (1/3 at two classes, three labels), below the accuracy-scale
         # mean; the minimum inverts the radius on the loss scale, 1 - mean.
-        t9 = TargetSpec("IC", "accuracy", 0.9)
+        t9 = TargetSpec(task="IC", metric="accuracy", threshold=0.9)
         # A feasible variance: at most mean * (support - mean) = 0.114 * 0.219 on [0, 1/3].
-        ceiling = _ev("ceiling", 0.92, mean=0.886, support=1 / 3, spec=t9, variance=0.01)
-        d = _decide(t9, {"c": ceiling, "w": _ev("witness", 0.5, spec=t9)})
+        ceiling = _envelope(0.92, mean=0.886, support=1 / 3, variance=0.01)
+        d = _decide(t9, [ceiling, _witness_bound(0.5)])
         n = units_to_cross(1 - 0.886, 0.01, 1 / 3, 0.01, 0.9 - 0.886)
         assert n is not None
-        assert (d.determination, d.limiting_factor, d.suggested_minimum) == ("not_ruled_out", "sampling_width", n)
+        assert (d.determination, d.limitation, d.suggested_minimum) == ("not_ruled_out", "within_radius", n)
 
-    def test_conflict_recommends_inspecting_its_causes(self):
-        d = _decide(_spec(), {"c": _ev("ceiling", 0.85), "w": _ev("witness", 0.9)})
-        assert (d.limiting_factor, d.suggested_minimum) == ("conflict", None)
-        for cause in ("leakage", "duplicates", "scope"):
-            assert cause in (d.recommendation or "")
+    def test_a_conflict_suggests_no_minimum(self):
+        d = _decide(_spec(), [_envelope(0.85), _witness_bound(0.9)])
+        assert (d.limitation, d.suggested_minimum) == ("conflict", None)
 
 
 @pytest.mark.required
 class TestRecallDecide:
-    def test_short_bounds_never_name_nothing(self):
-        item = _pool(R90_F05, {"w": _witness(recall_lb=0.95, fpr_ub=0.04)}, P).witness  # neither bound is short
-        assert item is not None
-        assert _short_bounds(item, R90_F05) == "confidence bounds"
-
     def test_recall_clears_but_false_positives_fail_gives_no_demonstration_or_conflict(self):
-        ev = {"w": _witness(recall_lb=0.95, fpr_ub=0.08), "c": _ceiling(0.60)}
-        d = _decide(R90_F05, ev)
-        assert d.determination not in ("demonstrated_feasible", "evidence_conflict")
+        bounds = [*_witness(recall_lb=0.95, fpr_ub=0.08), _ceiling(0.60)]
+        d = _decide(R90_F05, bounds)
+        assert d.determination != "demonstrated_feasible"
+        assert d.limitation != "conflict"
         assert d.witness is None
-        pool = _pool(R90_F05, ev, P)
-        assert [i.eid for i in pool.items if i.ev.supports == "witness"] == ["w"]  # still evidence, never a witness
+        pool = _pool(R90_F05, 0, bounds)
+        assert [b.source for b in pool.items if b.role == "witness"] == ["user_model"]  # still a bound, never a witness
         assert (pool.witnesses, pool.witness) == ([], None)
 
     def test_two_witnesses_each_with_one_favorable_bound_do_not_combine(self):
-        ev = {"a": _witness(recall_lb=0.95, fpr_ub=0.08), "b": _witness(recall_lb=0.50, fpr_ub=0.01)}
-        d = _decide(R90_F05, ev)
+        bounds = [*_witness(recall_lb=0.95, fpr_ub=0.08), *_witness(recall_lb=0.50, fpr_ub=0.01, source="knn")]
+        d = _decide(R90_F05, bounds)
         assert d.determination != "demonstrated_feasible"
-        assert (d.witness, d.witness_source) == (0.50, "b")
+        assert (d.witness, d.witness_source) == (0.50, "knn")
 
-    def test_certified_witness_below_target_still_conflicts_with_a_lower_ceiling(self):
-        d = _decide(R90_F05, {"w": _witness(recall_lb=0.70, fpr_ub=0.03), "c": _ceiling(0.60)})
-        assert (d.determination, d.witness_source) == ("evidence_conflict", "w")
+    def test_certified_witness_below_target_still_conflicts_with_a_lower_envelope(self):
+        d = _decide(R90_F05, [*_witness(recall_lb=0.70, fpr_ub=0.03), _ceiling(0.60)])
+        assert (d.determination, d.limitation, d.witness_source) == ("unresolved", "conflict", "user_model")
+
+    def test_a_deciding_recall_witness_is_certified_by_its_false_positive_bound(self):
+        d = _decide(R90_F05, _witness(recall_lb=0.95, fpr_ub=0.03))
+        assert d.determination == "demonstrated_feasible"
+        assert d.deciding == {("user_model", "recall"), ("user_model", "false_positive_rate")}
 
     def test_two_limits_for_one_class_are_decided_independently(self):
-        ev = {"w": _witness_for([R90_F05, R90_F10], recall_lb=0.92, fpr_ub=0.07)}
-        assert _decide(R90_F05, ev).determination != "demonstrated_feasible"
-        d = _decide(R90_F10, ev)
-        assert (d.determination, d.witness_source) == ("demonstrated_feasible", "w")
+        bounds = _witness_for([R90_F05, R90_F10], recall_lb=0.92, fpr_ub=0.07)
+        assert decide(R90_F05, 0, bounds).determination != "demonstrated_feasible"
+        d = decide(R90_F10, 1, bounds)
+        assert (d.determination, d.witness_source) == ("demonstrated_feasible", "user_model")
 
-    def test_never_predicting_the_class_is_no_witness(self):
+    def test_never_predicting_the_class_is_a_weak_witness(self):
         w = _witness(recall_mean=0.0, recall_lb=0.0, fpr_mean=0.0, fpr_ub=0.004)
-        d = _decide(R90_F05, {"w": w, "c": _ceiling(0.95)})  # a replica ceiling that does not exclude the target
+        d = _decide(R90_F05, [*w, _ceiling(0.95)])  # a replica envelope that does not exclude the requirement
         assert (d.determination, d.witness) == ("not_ruled_out", 0.0)
-        assert d.limiting_factor == "no_witness"
-        assert d.suggested_minimum is None
-        assert "supply a stronger model or a different frozen operating point" in (d.recommendation or "")
+        assert (d.limitation, d.suggested_minimum) == ("weak_witness", None)
 
-    def test_every_witness_over_the_false_positive_limit_is_no_witness(self):
+    def test_every_witness_over_the_false_positive_limit_is_a_weak_witness(self):
         w = _witness(recall_mean=0.97, recall_lb=0.93, fpr_mean=0.07, fpr_ub=0.09)
-        d = _decide(R90_F05, {"w": w, "c": _ceiling(0.95)})
-        assert (d.determination, d.limiting_factor, d.suggested_minimum) == ("not_ruled_out", "no_witness", None)
-        text = d.recommendation or ""
-        assert "false-positive" in text
-        assert "supply a stronger model or a different frozen operating point" in text
+        d = _decide(R90_F05, [*w, _ceiling(0.95)])
+        assert (d.determination, d.limitation, d.suggested_minimum) == ("not_ruled_out", "weak_witness", None)
 
     def test_false_positive_crossing_counts_images_through_prevalence(self):
         w = _witness(recall_mean=0.97, recall_lb=0.93, n_pos=200, fpr_mean=0.03, fpr_ub=0.06, n_neg=800)
-        d = _decide(R90_F05, {"w": w})
+        d = _decide(R90_F05, [*w, _ceiling(0.95)])
         negatives = units_to_cross(0.03, 0.03 * 0.97, 1.0, HALF, 0.02, method="exact_binomial", side="upper")
         assert negatives is not None
-        assert (d.determination, d.limiting_factor) == ("unresolved", "sampling_width")
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
         assert d.suggested_minimum == math.ceil(negatives / 0.8)  # 800 of 1000 audit items are negatives
-        assert "estimated prevalence" in (d.recommendation or "")
+        assert (d.minimum_source, d.minimum_quantity) == ("user_model", "false_positive_rate")
 
-    def test_both_crossings_take_the_larger_image_count_rounded_to_the_plan(self):
+    def test_a_witness_alone_keeps_its_minimum_beside_no_envelope(self):
+        w = _witness(recall_mean=0.97, recall_lb=0.93, n_pos=200, fpr_mean=0.03, fpr_ub=0.06, n_neg=800)
+        d = _decide(R90_F05, w)
+        assert (d.determination, d.limitation) == ("unresolved", "no_envelope")
+        assert d.suggested_minimum is not None
+
+    def test_both_crossings_take_the_larger_image_count_and_name_it(self):
         kwargs = {"recall_mean": 0.95, "recall_lb": 0.88, "fpr_mean": 0.03, "fpr_ub": 0.06}
         positives = units_to_cross(0.95, 0.0475, 1.0, HALF, 0.05, method="exact_binomial", side="lower")
         negatives = units_to_cross(0.03, 0.0291, 1.0, HALF, 0.02, method="exact_binomial", side="upper")
         assert positives is not None
         assert negatives is not None
-        images = max(math.ceil(positives / 0.2), math.ceil(negatives / 0.8))
-        assert _decide(R90_F05, {"w": _witness(**kwargs)}).suggested_minimum == images
-        plan = SamplingPlan((1000, 10 * images, 100 * images), order_seed=0)
-        d = _decide(R90_F05, {"w": _witness(**kwargs, plan=plan)})
-        assert (d.limiting_factor, d.suggested_minimum) == ("sampling_width", 10 * images)
+        for_recall, for_fp = math.ceil(positives / 0.2), math.ceil(negatives / 0.8)
+        d = _decide(R90_F05, [*_witness(**kwargs), _ceiling(0.95)])
+        assert (d.limitation, d.suggested_minimum) == ("within_radius", max(for_recall, for_fp))
+        assert d.minimum_quantity == ("recall" if for_recall >= for_fp else "false_positive_rate")
+
+    def test_the_minimum_of_an_uncertified_witness_names_a_bounds_row(self):
+        bounds = _witness(recall_mean=0.97, recall_lb=0.93, n_pos=200, fpr_mean=0.03, fpr_ub=0.06, n_neg=800)
+        d = _decide(R90_F05, [*bounds, _ceiling(0.95)])
+        assert d.witness_source is None  # uncertified: its false-positive bound is over the limit
+        assert d.minimum_source == "user_model"
+        rows = [b for b in bounds if (b.requirement, b.source, b.quantity) == (0, d.minimum_source, d.minimum_quantity)]
+        assert len(rows) == 1
 
     def test_observed_recall_at_the_requirement_has_no_attainable_minimum(self):
-        d = _decide(R90_F05, {"w": _witness(recall_mean=0.9, recall_lb=0.85, fpr_ub=0.03)})
-        assert (d.limiting_factor, d.suggested_minimum) == ("sampling_width", None)
+        d = _decide(R90_F05, [*_witness(recall_mean=0.9, recall_lb=0.85, fpr_ub=0.03), _ceiling(0.95)])
+        assert (d.limitation, d.suggested_minimum, d.minimum_source) == ("within_radius", None, None)

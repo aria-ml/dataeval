@@ -157,8 +157,6 @@ _BOUNDS = [
     (Feasibility.Config, "alpha", 0.99, 1.0),
     (Feasibility.Config, "alpha", 0.01, 0.0),
     (Feasibility.Config, "batch_size", 1, 0),
-    (Feasibility.Config, "panel_size", 2, 1),
-    (Feasibility.Config, "n_cells", 1, 0),
     (Feasibility.Config, "max_sequence_length", 1, 0),
     (Sufficiency.Config, "runs", 1, 0),
     (Sufficiency.Config, "substeps", 1, 0),
