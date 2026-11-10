@@ -185,17 +185,17 @@ class TestDeterminations:
         decided = run.determinations.filter(pl.col("determination") != "unresolved")
         assert decided.height >= 2
         for row in decided.iter_rows(named=True):
-            deciding = run.bounds.filter((pl.col("requirement") == row["requirement"]) & pl.col("is_determining"))
-            assert deciding.height >= 1
-            assert deciding["bound"].null_count() == 0
+            determining = run.bounds.filter((pl.col("requirement") == row["requirement"]) & pl.col("is_determining"))
+            assert determining.height >= 1
+            assert determining["bound"].null_count() == 0
 
     def test_the_determining_bounds_are_the_ones_the_determination_quotes(self, run):
         for row in run.determinations.iter_rows(named=True):
-            deciding = run.bounds.filter((pl.col("requirement") == row["requirement"]) & pl.col("is_determining"))
+            determining = run.bounds.filter((pl.col("requirement") == row["requirement"]) & pl.col("is_determining"))
             if row["determination"] == "demonstrated_feasible":
-                assert row["witness"] in deciding.filter(pl.col("role") == "witness")["bound"].to_list()
+                assert row["witness"] in determining.filter(pl.col("role") == "witness")["bound"].to_list()
             if row["determination"] == "infeasible_under_recorded_assumptions":
-                assert row["envelope"] in deciding.filter(pl.col("role") == "envelope")["bound"].to_list()
+                assert row["envelope"] in determining.filter(pl.col("role") == "envelope")["bound"].to_list()
 
     def test_a_conflict_is_unresolved_with_limitation_conflict(self):
         x, y, post, rng = _gauss2(2000, 8)
@@ -211,8 +211,8 @@ class TestDeterminations:
         assert (row["determination"], row["limitation"]) == ("unresolved", "conflict")
         assert (row["witness_source"], row["envelope_scope"]) == ("user_model", "full_input")
         assert row["witness"] > row["envelope"]  # the conflicting pair sits in these columns
-        deciding = out.bounds.filter(pl.col("is_determining"))
-        assert sorted(zip(deciding["source"], deciding["role"], strict=True)) == [
+        determining = out.bounds.filter(pl.col("is_determining"))
+        assert sorted(zip(determining["source"], determining["role"], strict=True)) == [
             ("replicas", "envelope"),
             ("user_model", "witness"),
         ]

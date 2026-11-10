@@ -43,7 +43,7 @@ class Decision:
     eligible witness (for recall, certified at the false-positive limit) and ``witness_source`` its source; for a
     conflict, both are the conflicting pair. ``suggested_minimum`` is the independent units at which the bound named by
     ``minimum_source`` and ``minimum_quantity`` would cross the requirement if the observed rates held: a projection.
-    ``deciding`` names the bounds the determination rests on, as ``(source, quantity)`` of its requirement.
+    ``determining`` names the bounds the determination rests on, as ``(source, quantity)`` of its requirement.
     """
 
     determination: Determination
@@ -55,7 +55,7 @@ class Decision:
     suggested_minimum: int | None
     minimum_source: Source | None
     minimum_quantity: Quantity | None
-    deciding: frozenset[tuple[Source, Quantity]]
+    determining: frozenset[tuple[Source, Quantity]]
 
 
 class _Pool(NamedTuple):
@@ -139,7 +139,7 @@ def decide(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> Decis
     ``max_false_positive_rate``. The false-positive bound itself never enters a comparison. The first matching rule
     decides:
 
-    1. ``unresolved`` with limitation ``conflict`` — a (certified) witness eligible at some deciding-scope envelope's
+    1. ``unresolved`` with limitation ``conflict`` — a (certified) witness eligible at some determining-scope envelope's
        own scope has a lower bound above that envelope's upper bound, whatever the threshold: the conclusion is
        suspended;
     2. ``demonstrated_feasible`` — the largest witness lower bound is at or above the threshold;
@@ -158,8 +158,8 @@ def decide(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> Decis
        panels;
     5. ``no_eligible_witness`` — no available witness is eligible for the judged scope, certified or not (at
        ``partition_restricted`` none can be in this release);
-    6. ``within_radius`` — a crossing exists: the deciding envelope's recorded mean is below the threshold, or the best
-       witness's above it, so the bound is on the wrong side by less than its radius. For a recall requirement, an
+    6. ``within_radius`` — a crossing exists: the determining envelope's recorded mean is below the threshold, or the
+       best witness's above it, so the bound is on the wrong side by less than its radius. For a recall requirement, an
        eligible witness, certified or not, whose observed recall is at or above the threshold and observed
        false-positive rate at or below the limit, while a bound falls short;
     7. ``weak_witness`` — otherwise: the witness is weak (for recall: its observed recall is below the threshold or its
@@ -192,14 +192,14 @@ def decide(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> Decis
         suggested_minimum=None if minimum is None else minimum[0],
         minimum_source=None if minimum is None else minimum[1],
         minimum_quantity=None if minimum is None else minimum[2],
-        deciding=_deciding(spec, verdict.deciding),
+        determining=_determining(spec, verdict.determining),
     )
 
 
 class _Verdict(NamedTuple):
     determination: Determination
     limitation: Limitation | None  # only a conflict is known at this point
-    deciding: tuple[Bound, ...]  # the bounds the determination rests on
+    determining: tuple[Bound, ...]  # the bounds the determination rests on
     envelope: Bound | None  # what the determination quotes: for a conflict, the conflicting pair
     witness: Bound | None
 
@@ -237,11 +237,11 @@ def _verdict(spec: TargetSpec, p: _Pool) -> _Verdict:
     return _Verdict("unresolved", None, tuple(b for b in (c, w) if b is not None), c, w)
 
 
-def _deciding(spec: TargetSpec, deciding: tuple[Bound, ...]) -> frozenset[tuple[Source, Quantity]]:
-    """Name the deciding bounds as ``(source, quantity)``; a deciding recall witness brings its false-positive bound."""
-    keys: set[tuple[Source, Quantity]] = {(b.source, b.quantity) for b in deciding}
+def _determining(spec: TargetSpec, determining: tuple[Bound, ...]) -> frozenset[tuple[Source, Quantity]]:
+    """Name the determining bounds as ``(source, quantity)``; a recall witness brings its false-positive bound."""
+    keys: set[tuple[Source, Quantity]] = {(b.source, b.quantity) for b in determining}
     if spec.metric == "recall":  # the false-positive bound certifies the witness
-        keys |= {(b.source, "false_positive_rate") for b in deciding if b.role == "witness"}
+        keys |= {(b.source, "false_positive_rate") for b in determining if b.role == "witness"}
     return frozenset(keys)
 
 
@@ -299,7 +299,7 @@ def _recall_crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Qua
 
 
 def _crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Quantity] | None:
-    """Return the deciding envelope or best witness whose recorded mean is past the threshold, with its units."""
+    """Return the determining envelope or best witness whose recorded mean is past the threshold, with its units."""
     if spec.metric == "recall":  # a recall envelope has no single recorded mean to project; the witness side decides
         return _recall_crossing(p, spec)
     threshold = spec.threshold
