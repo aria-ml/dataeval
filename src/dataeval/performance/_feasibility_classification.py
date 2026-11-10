@@ -1,14 +1,14 @@
 """
 Classification compositions for the feasibility evaluator: every evidence source, built from the core bounds.
 
-Sources: post-stratified local-panel ceilings (C3), replica ceilings, built-in frozen witnesses (k-NN and a linear
-probe fitted on the fit split) and a user witness from precomputed class scores or class decisions. Each source is one
-``Evidence`` item (local panels give two when accuracy and the cost-weighted AP and recall ceilings differ in scope)
-with one endpoint per target it bounds, each spent at the claim's alpha and split inside the endpoint: C3 in halves; an
-AP ceiling equally over its positive kink costs and one prevalence upper endpoint; a recall ceiling equally over its
-positive kink costs and two prevalence endpoints (lower and upper); an AP witness over a TP lower and an FP upper
-endpoint per threshold and one prevalence upper endpoint; a macro AP over its classes. A witness gives a recall target
-two endpoints instead, at half the claim's alpha each: recall (lower) and the false-positive rate the target limits
+Sources: post-stratified local-panel envelopes (C3), replica envelopes, built-in frozen witnesses (k-NN and a linear
+probe fitted on the fit split) and a user witness from class scores or class decisions. Each source gives one ``Bound``
+per requirement it bounds (local panels judge accuracy and the cost-weighted AP and recall at different scopes when
+allowances widen the first), each spent at the claim's alpha and split inside the bound: C3 in halves; an AP envelope
+equally over its positive kink costs and one prevalence upper endpoint; a recall envelope equally over its positive
+kink costs and two prevalence endpoints (lower and upper); an AP witness over a TP lower and an FP upper endpoint per
+threshold and one prevalence upper endpoint; a macro AP over its classes. A witness gives a recall requirement two
+bounds instead, at half the claim's alpha each: recall (lower) and the false-positive rate the requirement limits
 (upper).
 """
 
@@ -18,7 +18,7 @@ import math
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -38,26 +38,25 @@ from dataeval.core._consensus import (
 from dataeval.core._local_panels import fit_partition, local_panel_bound
 from dataeval.performance._feasibility_constants import (
     AP_INTERVALS,
-    COST_GRID,
     PANEL_SIZE,
     WITNESS_POS_PREVALENCE,
     WITNESS_QUANTILES,
     n_cells_for,
 )
-from dataeval.performance._feasibility_decide import _READS_SCOPE
 from dataeval.performance._feasibility_evidence import (
-    ENDPOINT_STAT_KEYS,
-    Endpoint,
-    Evidence,
+    Assumption,
+    Bound,
     Quantity,
-    SamplingPlan,
-    Supports,
-    stats_key,
+    Reason,
+    Role,
+    Sample,
+    Source,
+    State,
 )
-from dataeval.performance._feasibility_target import Aggregation, Scope, TargetSpec
+from dataeval.performance._feasibility_target import Aggregation, Allowances, Scope, TargetSpec
 from dataeval.performance._feasibility_units import Units
 
-# value (None: unavailable, its reason in raw), recommend's stats (None: no closed form), raw
+# value (None: unavailable, its reason in raw), the bound's stats (None: no closed form), raw
 _Bound = tuple[float | None, dict[str, Any] | None, dict[str, Any]]
 _ClassBound = tuple[float, dict[str, Any]]  # one class's AP or recall endpoint and its raw results
 _RiskAt = Callable[[float, float], tuple[float, Mapping[str, Any]]]  # (cost, delta) -> risk lower bound, raw result
@@ -65,42 +64,25 @@ _OneVsRest = tuple[NDArray[np.float64], _RiskAt, NDArray[np.float64]]  # a class
 _Side = Literal["lower", "upper"]
 _Method = Literal["hoeffding", "hybrid", "exact_binomial"]
 _TRIVIAL = 1e-12
-_LOCAL, _REPLICA, _BUILTIN, _USER = (
-    "local_panel_ceiling/v1",
-    "replica_ceiling/v1",
-    "builtin_witness/v1",
-    "user_witness/v1",
-)
-_ENVELOPE = "AP via the Reid-Williamson (2011) risk-to-AP envelope (DFE operating-point inequalities)"
-_RECALL = "recall at a false-positive limit via DFE operating-point inequalities over a two-sided prevalence interval"
-_HYBRID = "Hoeffding (1963) and Maurer-Pontil (2009, Theorem 4) hybrid endpoints"
-_EXACT = "Clopper-Pearson (1934) exact binomial endpoints on ungrouped Bernoulli trials"
-_RATIO = "frame_pooled as a ratio of per-group totals with simultaneous numerator and denominator endpoints"
-_WITNESS = (
-    f"Frozen witness scored once on the audit; {_EXACT}, else {_HYBRID}; {_RATIO}; AP via the DFE witness staircase"
-)
-_BASIS = {
-    _LOCAL: "DataEval's post-stratified pooling (C3) of DFE disjoint within-cell panels, proved in "
-    f"local_panel_bound's Notes with two Hoeffding (1963) steps; DFE consensus inequality; {_ENVELOPE}; {_RECALL}; "
-    f"prevalence: {_EXACT}, else hybrid",
-    _REPLICA: f"DFE replicated consensus (consensus inequality); {_HYBRID}; {_RATIO}; {_ENVELOPE}; {_RECALL}",
-    _BUILTIN: f"{_WITNESS} (Davis-Goadrich 2006)",
-    _USER: f"{_WITNESS} (Davis-Goadrich 2006)",
-}
-_REPRESENTATION = "The representation was fitted and selected independently of the audit units' labels (declared)."
-_MODELS: dict[str, Callable[[], Any]] = {
+_STAT_KEYS = ("mean", "variance", "n", "support", "delta", "method")  # the exact interval's record; it has no radius
+_MODELS: dict[Source, Callable[[], Any]] = {
     "knn": lambda: KNeighborsClassifier(n_neighbors=5),
-    "probe": lambda: LogisticRegression(max_iter=1000),
+    "linear_probe": lambda: LogisticRegression(max_iter=1000),
 }
+_SOURCES = get_args(Source)  # the order of the bounds table's rows
 
 
 class _UnavailableError(Exception):
-    """An endpoint that cannot be computed; the message is its reason."""
+    """A bound that cannot be computed; ``reason`` says why."""
+
+    def __init__(self, reason: Reason) -> None:
+        super().__init__(reason)
+        self.reason: Reason = reason
 
 
 def _need_units(n: int) -> None:
     if n < 2:
-        raise _UnavailableError(f"fewer than 2 units ({n})")
+        raise _UnavailableError("too_few_units")
 
 
 def _totals(values: NDArray[np.float64], groups: NDArray[np.intp]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -123,7 +105,7 @@ def _scale(aggregation: Aggregation | None, max_len: int | None) -> int:
     if aggregation != "frame_pooled":
         return 1
     if max_len is None:
-        raise _UnavailableError("frame_pooled targets need a declared max_sequence_length to bound per-group totals")
+        raise _UnavailableError("max_sequence_length_missing")  # a frame_pooled total needs a declared bound
     return max_len
 
 
@@ -158,6 +140,15 @@ def _flip(x: float, loss: bool) -> float:
     return 1.0 - x if loss else x
 
 
+def _radius(r: EndpointResult) -> float | None:
+    """Return the half-width the endpoint's method applied to the mean; None for an exact interval, which has none."""
+    if r["method"] == "exact_binomial":
+        return None
+    if r["method"] == "hoeffding":
+        return r["radius_hoeffding"]
+    return min(x for x in (r["radius_hoeffding"], r["radius_bernstein"]) if x is not None)  # hybrid: the smaller one
+
+
 def _accuracy_bound(
     values: NDArray[np.float64],
     groups: NDArray[np.intp],
@@ -167,7 +158,7 @@ def _accuracy_bound(
     loss: bool,
     method: _Method = "hybrid",
 ) -> _Bound:
-    """Accuracy from per-item correctness (witness) or consensus loss (``loss``: the ceiling is 1 - the risk lower)."""
+    """Accuracy from per-item correctness (witness) or consensus loss (``loss``: the envelope is 1 - the risk lower)."""
     if spec.aggregation == "frame_pooled":
         scale = _scale(spec.aggregation, call.max_len)
         sums, counts = _totals(values, groups)
@@ -178,7 +169,8 @@ def _accuracy_bound(
         raw = {"ratio_endpoint": ratio, "num_support": scale * support, "den_support": scale, "deltas": [call.alpha]}
         return _flip(ratio, loss), None, raw
     r = _mean(_per_unit(values, groups, spec.aggregation), support, call.alpha, "lower", method)
-    stats = {k: r[k] for k in ("variance", "n", "support", "delta", "method")} | {"mean": _flip(r["mean"], loss)}
+    stats = {k: r[k] for k in ("variance", "n", "support", "delta", "method")}
+    stats |= {"mean": _flip(r["mean"], loss), "radius": _radius(r)}
     return _flip(r["endpoint"], loss), stats, {**r, "deltas": [call.alpha]}
 
 
@@ -190,7 +182,7 @@ def _ap_ceiling(
     delta: float,
     method: _Method = "hybrid",
 ) -> _ClassBound:
-    """Envelope AP ceiling: ``delta`` split equally over the positive costs and one prevalence upper endpoint.
+    """Envelope AP: ``delta`` split equally over the positive costs and one prevalence upper endpoint.
 
     ``method`` is the prevalence endpoint's; the risk endpoints come from ``risk_at``.
     """
@@ -217,7 +209,7 @@ def _recall_upper(risk: Iterable[float], costs: Iterable[float], f0: float, pi_l
         slack = l_j - lam * f0
         if slack > 0:
             if pi_upper <= 0:
-                raise _UnavailableError("no positives are possible")
+                raise _UnavailableError("no_positives_possible")
             g = 1 - lam * f0 - slack / pi_upper
         elif slack < 0:
             g = math.inf if pi_lower <= 0 else 1 - lam * f0 - slack / pi_lower
@@ -235,7 +227,7 @@ def _recall_ceiling(
     f0: float,
     method: _Method,
 ) -> _ClassBound:
-    """Recall ceiling ``U_r``: ``delta`` split equally over the positive costs and two prevalence endpoints.
+    """Recall envelope ``U_r``: ``delta`` split equally over the positive costs and two prevalence endpoints.
 
     ``method`` is the prevalence endpoints'; the risk endpoints come from ``risk_at``.
     """
@@ -278,32 +270,58 @@ def _ap_bound(spec: TargetSpec, call: "_Call", per_class: Callable[[int, float],
     return value, None, {"value": value, "per_class": [r for _, r in results], "deltas": deltas}
 
 
-def _endpoint(
-    key: str, value: float | None, supports: Supports, alpha: float, reason: str | None, quantity: Quantity = "metric"
-) -> Endpoint:
-    upper = supports == "ceiling" or quantity == "false_positive_rate"
-    direction = "upper" if upper else "lower"
+def _state(value: float | None, upper: bool, reason: Reason | None) -> tuple[State, Reason | None]:
+    """Name a bound's state: unavailable without a value, uninformative at the trivial end, else informative."""
     if value is None:
-        return Endpoint(key, None, direction, alpha, "unavailable", reason, quantity)
+        return "unavailable", reason
     if value >= 1 - _TRIVIAL if upper else value <= _TRIVIAL:
-        trivial = (
-            "a false-positive bound at its maximum (1)"
-            if quantity == "false_positive_rate"
-            else "a ceiling at the metric's maximum (1)"
-            if upper
-            else "a witness at the metric's minimum (0)"
-        )
-        return Endpoint(key, value, direction, alpha, "uninformative", trivial, quantity)
-    return Endpoint(key, value, direction, alpha, "informative", quantity=quantity)
+        return "uninformative", "bound_at_maximum" if upper else "bound_at_minimum"
+    return "informative", None
 
 
-def _rate(hits: NDArray[np.bool_], delta: float, side: _Side, population: str) -> dict[str, Any]:
+def _plain(value: Any, kind: type) -> Any:
+    """Return a numpy scalar as a Python ``kind``; None stays None."""
+    return None if value is None else kind(value)
+
+
+def _make_bound(
+    shared: Mapping[str, Any],
+    quantity: Quantity,
+    value: float | None,
+    stats: Mapping[str, Any] | None,
+    alpha: float,
+    reason: Reason | None,
+) -> Bound:
+    """One ``Bound`` from a computed value and the stats recorded beside it (None: no closed form)."""
+    role: Role = shared["role"]
+    upper = role == "envelope" or quantity == "false_positive_rate"
+    state, why = _state(value, upper, reason)
+    s = stats or {}
+    return Bound(
+        **shared,
+        quantity=quantity,
+        bound_type="upper" if upper else "lower",
+        state=state,
+        reason=why,
+        bound=_plain(value, float),
+        observed=_plain(s.get("mean"), float) if role == "witness" else None,
+        n=_plain(s.get("n"), int),
+        variance=_plain(s.get("variance"), float),
+        radius=_plain(s.get("radius"), float),
+        method=s.get("method"),
+        alpha=alpha,
+        mean=_plain(s.get("mean"), float),
+        support=_plain(s.get("support"), float),
+        delta=_plain(s.get("delta"), float),
+    )
+
+
+def _rate(hits: NDArray[np.bool_], delta: float, side: _Side, empty: Reason) -> dict[str, Any]:
     """Exact binomial endpoint on the share of ``hits`` (decisions for the class) in one audit population."""
     if not len(hits):
-        return {"value": None, "stats": None, "reason": f"no {population}", "population": population}
+        return {"value": None, "stats": None, "reason": empty}
     r = binomial_endpoint(int(hits.sum()), len(hits), delta, side=side)
-    stats = {k: r[k] for k in ENDPOINT_STAT_KEYS}
-    return {"value": r["endpoint"], "stats": stats, "reason": None, "population": population}
+    return {"value": r["endpoint"], "stats": {k: r[k] for k in _STAT_KEYS}, "reason": None}
 
 
 @dataclass(frozen=True)
@@ -316,62 +334,62 @@ class _Call:
     fit: NDArray[np.intp]
     alpha: float
     max_len: int | None
-    details: dict[str, Any]
+    requirements: tuple[TargetSpec, ...]  # the order the caller gave; a bound's ``requirement`` indexes it
 
     def item(
         self,
-        kind: str,
-        supports: Supports,
+        source: Source,
+        role: Role,
         scope: Scope,
         specs: Sequence[TargetSpec],
         bound: Callable[[TargetSpec], _Bound],
         *,
-        sample: str,
-        provenance: Mapping[str, Any],
-        details: Mapping[str, Any],
-    ) -> Evidence:
-        endpoints, stats, results = [], {}, {}
+        sample: Sample,
+        assumptions: Callable[[TargetSpec], Iterable[Assumption]],
+    ) -> list[Bound]:
+        """Bound each of ``specs`` from one source: one bound each, two for a recall witness."""
+        out: list[Bound] = []
         for spec in specs:
-            key, reason = spec.canonical(), None
+            reason: Reason | None = None
             try:
-                value, stats[key], results[key] = bound(spec)
+                value, stats, raw = bound(spec)
             except _UnavailableError as e:
-                value, stats[key], results[key], reason = None, None, None, str(e)
-            spent = 0.0 if results[key] is None else math.fsum(results[key]["deltas"])
+                value, stats, raw, reason = None, None, None, e.reason
+            spent = 0.0 if raw is None else math.fsum(raw["deltas"])
             if spent > self.alpha + 1e-12:
                 raise RuntimeError(
-                    f"Internal error: {kind} splits {spent} inside {key}, above its claim's {self.alpha}"
+                    f"Internal error: {source} splits {spent} inside a {spec.metric} bound, over its claim {self.alpha}"
                 )
-            if supports == "ceiling" or spec.metric != "recall":
-                endpoints.append(_endpoint(key, value, supports, self.alpha, reason))
+            shared = {
+                "requirement": self.requirements.index(spec),
+                "source": source,
+                "role": role,
+                "information_scope": scope,
+                "population": self.units.population,
+                "sample": sample,
+                "unit": "sequence" if self.units.grouped else "image",
+                "assumptions": tuple(assumptions(spec)),
+            }
+            if role == "envelope" or spec.metric != "recall":
+                out.append(_make_bound(shared, spec.metric, value, stats, self.alpha, reason))
                 continue
             # A recall witness bounds recall (lower) and the false-positive rate the target limits (upper), half each.
-            raw, missing = results[key], {"value": None, "stats": None, "reason": reason}
+            missing = {"value": None, "stats": None, "reason": reason}
             rec, fp_rate = (missing, missing) if raw is None else (raw, raw["false_positive_rate"])
-            stats[stats_key(key, "false_positive_rate")] = fp_rate["stats"]
-            endpoints += [
-                _endpoint(key, rec["value"], supports, self.alpha / 2, rec["reason"]),
-                _endpoint(key, fp_rate["value"], supports, self.alpha / 2, fp_rate["reason"], "false_positive_rate"),
+            out += [
+                _make_bound(shared, "recall", rec["value"], rec["stats"], self.alpha / 2, rec["reason"]),
+                _make_bound(
+                    shared, "false_positive_rate", fp_rate["value"], fp_rate["stats"], self.alpha / 2, fp_rate["reason"]
+                ),
             ]
-        return Evidence(
-            kind=kind,
-            supports=supports,
-            basis=_BASIS[kind],
-            population=self.units.population,
-            sample=sample,
-            information_scope=scope,
-            unit="group" if self.units.grouped else "item",
-            provenance=dict(provenance),
-            endpoints=tuple(endpoints),
-            details={"endpoints": stats, "results": results, **self.details, **details},
-        )
+        return out
 
 
 @dataclass(frozen=True)
 class _Missing:
-    """A source whose shared setup failed: every endpoint is unavailable for the same reason."""
+    """A source whose shared setup failed: every bound is unavailable for the same reason."""
 
-    reason: str
+    reason: Reason
 
     def bound(self, _spec: TargetSpec) -> _Bound:
         raise _UnavailableError(self.reason)
@@ -415,6 +433,7 @@ class _Panels:
             "support": (r["within_radius"] + r["between_radius"]) / math.sqrt(math.log(1 / d) / (2 * n)),
             "delta": d,
             "method": "hoeffding",
+            "radius": r["within_radius"] + r["between_radius"],
         }
         return 1.0 - max(0.0, r["bound"] - self.gamma), stats, {**r, "gamma": self.gamma, "deltas": [d, d]}
 
@@ -446,67 +465,58 @@ def _draw_panels(
     """Fit the label-blind partition on the fit split and draw disjoint panels within its cells on the audit."""
     items = _one_per_group(call.audit, call.units.groups[call.audit], rng) if call.units.grouped else call.audit
     if len(call.fit) < n_cells:
-        return _Missing(f"the fit split has {len(call.fit)} items, fewer than the {n_cells} partition cells"), items
+        return _Missing("fit_split_smaller_than_cells"), items
     if len(items) < 2:
-        return _Missing(f"fewer than 2 audit units ({len(items)})"), items
+        return _Missing("too_few_units"), items
     cells = fit_partition(call.features[call.fit], n_cells, partition_seed)(call.features[items])
     panels = {h: ix for h, ix in disjoint_panels(cells, m, rng).items() if len(ix)}
     if not panels:
-        return _Missing(f"no partition cell holds {m} audit units, so no panel is complete"), items
+        return _Missing("no_complete_panel"), items
     n_by_cell = np.bincount(cells, minlength=n_cells)
     return _Panels(call, call.units.labels[items], n_by_cell, panels, m, *beta_gamma), items
 
 
-def _accuracy_scope(allowances: Mapping[str, Any], grouped: bool) -> Scope:
-    if grouped or allowances.get("beta") is None:  # single-frame panels stay partition_restricted for video (phase 1)
+def _accuracy_scope(allowances: Allowances | None, grouped: bool) -> Scope:
+    if grouped or allowances is None:  # single-frame panels stay partition_restricted for video (phase 1)
         return "partition_restricted"
-    return "fixed_representation" if allowances.get("gamma") is None else "full_input"
+    return "fixed_representation" if allowances.gamma is None else "full_input"
 
 
 def _local_panels(
     call: _Call,
     specs: Sequence[TargetSpec],
-    allowances: Mapping[str, Any],
-    sizes: tuple[int, int, list[str]],
+    allowances: Allowances | None,
+    sizes: tuple[int, int],
     partition_seed: int,
     rng: np.random.Generator,
-) -> dict[str, Evidence]:
-    """C3 ceilings; accuracy takes beta (fixed_representation) and gamma (full_input), AP and recall do not."""
+) -> list[Bound]:
+    """C3 envelopes; accuracy takes beta (fixed_representation) and gamma (full_input), AP and recall do not."""
     specs = [s for s in specs if s.aggregation != "frame_pooled"]  # frame-weighted panels are not built yet
     if not specs:
-        return {}
-    n_cells, m, provisional = sizes
+        return []
+    n_cells, m = sizes
     scope = _accuracy_scope(allowances, call.units.grouped)
-    beta = None if scope == "partition_restricted" else allowances["beta"]
-    gamma = allowances["gamma"] if scope == "full_input" else 0.0
-    source, items = _draw_panels(call, n_cells, m, partition_seed, rng, (beta, gamma))
-    parts: dict[str, tuple[Scope, list[TargetSpec]]] = {_LOCAL: (scope, specs)}
+    beta = None if allowances is None or scope == "partition_restricted" else allowances.beta
+    gamma = (allowances.gamma or 0.0) if allowances is not None and scope == "full_input" else 0.0
+    source, _ = _draw_panels(call, n_cells, m, partition_seed, rng, (beta, gamma))
+    base: tuple[Assumption, ...] = ("representation_independent_of_audit_labels",)
+    # (judged scope, requirements, what they rest on): allowances widen the accuracy envelope's scope and nothing else
+    parts: list[tuple[Scope, list[TargetSpec], tuple[Assumption, ...]]] = [(scope, specs, base)]
     if scope != "partition_restricted":
-        accuracy = [s for s in specs if s.metric == "accuracy"]
-        cost_weighted = [s for s in specs if s.metric != "accuracy"]  # AP and recall: cost-weighted one-vs-rest
-        parts = {
-            f"{_LOCAL}:accuracy": (scope, accuracy),
-            f"{_LOCAL}:cost_weighted": ("partition_restricted", cost_weighted),
-        }
-    details = {
-        "panel_size": m,
-        "n_cells": n_cells,
-        "provisional_defaults": provisional,
-        "cost_grid": COST_GRID,
-        "allowances": dict(allowances),
-        "allowances_applied": {"beta": beta, "gamma": gamma},
-        "panel_items": items,
-        "assumptions": [_REPRESENTATION, "beta and gamma allowances are user-supplied and assumed, not estimated"],
-    }
-    if call.units.grouped:
-        details["assumptions"].append("Single-frame local panels stay partition_restricted for video; no allowance.")
-    sample = "audit split, one item drawn uniformly per group" if call.units.grouped else "audit split"
-    provenance = {"route": "post-stratified local panels (C3)", "partition": "k-means fitted on the fit split"}
-    return {
-        eid: call.item(_LOCAL, "ceiling", s, part, source.bound, sample=sample, provenance=provenance, details=details)
-        for eid, (s, part) in parts.items()
+        widened: tuple[Assumption, ...] = ("allowance_beta", *(("allowance_gamma",) if scope == "full_input" else ()))
+        parts = [
+            (scope, [s for s in specs if s.metric == "accuracy"], (*base, *widened)),
+            ("partition_restricted", [s for s in specs if s.metric != "accuracy"], base),  # AP, recall: cost-weighted
+        ]
+    sample: Sample = "audit_split_one_per_group" if call.units.grouped else "audit_split"
+    return [
+        b
+        for s, part, assumed in parts
         if part
-    }
+        for b in call.item(
+            "local_panels", "envelope", s, part, source.bound, sample=sample, assumptions=lambda _, a=assumed: a
+        )
+    ]
 
 
 # --- replicas --------------------------------------------------------------------------------------------------------
@@ -562,41 +572,30 @@ class _Replicas:
         return _ap_ceiling(costs, risk_at, prevalence, scale, delta, self.method)
 
 
-def _replica_assumptions(call: _Call, specs: Sequence[TargetSpec]) -> list[str]:
-    out = [
-        "Items with replicas are a random sample of the population.",
-        (
-            "Replicas and primary labels follow one annotation protocol, each an independent label of the item "
-            "(open item 5)."
-        ),
-    ]
+def _replica_assumptions(call: _Call, spec: TargetSpec) -> list[Assumption]:
+    out: list[Assumption] = ["replicas_random_sample", "replicas_one_protocol"]
     if call.units.grouped:
-        out.append("Annotators labeled the replicas with the same video context as the primary labels.")
-    if any(s.aggregation == "sequence_mean" for s in specs):
-        out.append(
-            "Replicated groups are a random sample of sequences, with the replicated frames uniform within each."
-        )
-    if any(s.aggregation == "frame_pooled" for s in specs):
-        out.append(
-            "Replicated frames are a uniform sample of all frames (whole random sequences, or each frame "
-            "independently with one probability)."
-        )
-    if "sampling_plan" in call.details:
-        out.append("The replica set was fixed before the first look.")
+        out.append("replicas_same_video_context")
+    if spec.aggregation == "sequence_mean":
+        out.append("replicated_sequences_random_sample")
+    if spec.aggregation == "frame_pooled":
+        out.append("replicated_frames_uniform_sample")
     return out
 
 
-def _replica(call: _Call, specs: Sequence[TargetSpec], replicas: Mapping[int, NDArray[np.intp]]) -> dict[str, Evidence]:
+def _replica(call: _Call, specs: Sequence[TargetSpec], replicas: Mapping[int, NDArray[np.intp]]) -> list[Bound]:
     items = np.array(sorted(replicas), dtype=np.intp)
     rows = [np.r_[call.units.labels[i], np.asarray(replicas[i], dtype=np.intp)] for i in items]
     source = _Replicas(call, rows, np.array([len(r) for r in rows]), call.units.groups[items])
-    details = {"replica_items": items, "cost_grid": COST_GRID, "assumptions": _replica_assumptions(call, specs)}
-    sample = f"{len(items)} items with replicas"
-    provenance = {"route": "replicated consensus", "replicas": "replicas= sidecar plus the primary label"}
-    item = call.item(
-        _REPLICA, "ceiling", "full_input", specs, source.bound, sample=sample, provenance=provenance, details=details
+    return call.item(
+        "replicas",
+        "envelope",
+        "full_input",
+        specs,
+        source.bound,
+        sample="replica_items",
+        assumptions=lambda spec: _replica_assumptions(call, spec),
     )
-    return {_REPLICA: item}
 
 
 # --- witnesses -------------------------------------------------------------------------------------------------------
@@ -618,7 +617,7 @@ class _Scores:
     def bound(self, spec: TargetSpec) -> _Bound:
         if spec.metric == "ap":
             if self.decisions:
-                raise _UnavailableError("predictions are class decisions, not scores; AP needs scores")
+                raise _UnavailableError("needs_scores")  # class decisions rank nothing
             return _ap_bound(spec, self.call, partial(self.ap_class, spec.aggregation))
         if spec.metric == "recall":
             return self.recall(spec)
@@ -632,8 +631,8 @@ class _Scores:
         c = _class_index(self.call.units, name)
         hit, positive = self.audit.argmax(axis=1) == c, self.call.units.labels[self.call.audit] == c
         d = self.call.alpha / 2  # recall is refused on grouped data, so the audit items are i.i.d. trials
-        recall = _rate(hit[positive], d, "lower", f"audit items labeled {name!r}")
-        fp_rate = _rate(hit[~positive], d, "upper", f"audit items labeled other than {name!r}")
+        recall = _rate(hit[positive], d, "lower", "no_positives")
+        fp_rate = _rate(hit[~positive], d, "upper", "no_negatives")
         return recall["value"], recall["stats"], {**recall, "false_positive_rate": fp_rate, "deltas": [d, d]}
 
     def ap_class(self, aggregation: Aggregation | None, c: int, delta: float) -> _ClassBound:
@@ -675,57 +674,28 @@ def _fit_scores(call: _Call, model: Any) -> _Scores | _Missing:
     try:
         model.fit(call.features[call.fit], call.units.labels[call.fit])
         p_fit, p_audit = (model.predict_proba(call.features[rows]) for rows in (call.fit, call.audit))
-    except ValueError as e:  # too few fit units, a single fit class or an empty audit
-        return _Missing(f"{type(model).__name__} could not be fitted on the fit split or score the audit: {e}")
+    except ValueError:  # too few fit units, a single fit class or an empty audit
+        return _Missing("witness_not_fitted")
     n = call.units.n_classes
     return _Scores(call, _onto_classes(p_fit, model.classes_, n), _onto_classes(p_audit, model.classes_, n))
 
 
-def _builtin(call: _Call, specs: Sequence[TargetSpec]) -> dict[str, Evidence]:
-    out = {}
+def _builtin(call: _Call, specs: Sequence[TargetSpec]) -> list[Bound]:
+    """Build the built-in witnesses, each fitted on the fit split only and frozen before the audit."""
+    out: list[Bound] = []
+    assumed: tuple[Assumption, ...] = ("representation_independent_of_audit_labels",)
     for name, make in _MODELS.items():
-        model = make()
-        source = _fit_scores(call, model)
-        provenance = {"reads": "representation", "model": type(model).__name__, "params": model.get_params()}
-        details = {"assumptions": [_REPRESENTATION, "Fitted on the fit split only and frozen before the audit."]}
-        out[f"{_BUILTIN}:{name}"] = call.item(
-            _BUILTIN,
+        source = _fit_scores(call, make())
+        out += call.item(
+            name,
             "witness",
             "fixed_representation",
             specs,
             source.bound,
-            sample="audit split",
-            provenance=provenance | {"fit": "fit split"},
-            details=details,
+            sample="audit_split",
+            assumptions=lambda _: assumed,
         )
     return out
-
-
-def _check_leak(call: _Call, training_items: Any) -> None:
-    if training_items is None:
-        return
-    if isinstance(training_items, (str, bytes)) or not isinstance(training_items, Iterable):
-        raise ValueError("provenance['training_items'] must be a collection of datum ids, not a single id.")
-    trained = set(np.asarray(list(training_items), dtype=object).reshape(-1).tolist())  # any iterable, a set too
-    ids = call.units.item_ids[call.units.item_indices]
-    if {isinstance(t, str) for t in trained} - {isinstance(i, str) for i in ids.tolist()}:  # str vs number never match
-        raise ValueError(
-            f"provenance['training_items'] holds {sorted({type(t).__name__ for t in trained})} values, but the "
-            f"dataset's datum ids are {sorted({type(i).__name__ for i in ids.tolist()})}, so some could never match; "
-            "pass datum ids."
-        )
-    trained_groups = set(call.units.groups[[i in trained for i in ids.tolist()]].tolist())
-    leaked = [
-        i
-        for i, g in zip(ids[call.audit].tolist(), call.units.groups[call.audit].tolist(), strict=True)
-        if g in trained_groups
-    ]
-    if leaked:
-        raise ValueError(
-            f"provenance['training_items'] shares physical groups with {len(leaked)} audit items (e.g. {leaked[:5]}); "
-            "a witness trained on an audit unit cannot bound the population. Exclude those groups from its training "
-            "data or from the audit."
-        )
 
 
 def _one_hot_decisions(arr: NDArray[Any], n_items: int, n_classes: int) -> NDArray[np.float64]:
@@ -770,94 +740,109 @@ def check_predictions(predictions: ArrayLike, n_items: int, n_classes: int) -> t
 
 
 def _user(
-    call: _Call, specs: Sequence[TargetSpec], predictions: Any, provenance: Mapping[str, Any] | None
-) -> dict[str, Evidence]:
-    declared = {"reads": "full_input", **(provenance or {})}
-    _check_leak(call, declared.get("training_items"))
+    call: _Call, specs: Sequence[TargetSpec], predictions: Any, class_order_verified: bool = False
+) -> list[Bound]:
     scores, decisions = check_predictions(predictions, len(call.units.item_ids), call.units.n_classes)
     scores = scores[call.units.item_indices]
     source = _Scores(call, scores[call.fit], scores[call.audit], decisions)
-    scope: Scope = _READS_SCOPE.get(declared["reads"], "full_input")  # type: ignore[assignment]
-    details = {"assumptions": ["User-declared provenance is recorded, not verified."]}
-    if decisions:
-        details["assumptions"].append("The class decisions follow a policy frozen before the audit (declared).")
-    item = call.item(
-        _USER, "witness", scope, specs, source.bound, sample="audit split", provenance=declared, details=details
+    # The scores follow the dataset's declared class order: assumed, unless a model's own mapping matched it.
+    assumed: tuple[Assumption, ...] = (
+        ("model_independent_of_audit_items",)
+        if class_order_verified
+        else ("model_independent_of_audit_items", "class_order_matches_dataset")
     )
-    return {_USER: item}
+    # A user witness may read the whole input, so it counts at full_input only.
+    return call.item(
+        "user_model", "witness", "full_input", specs, source.bound, sample="audit_split", assumptions=lambda _: assumed
+    )
 
 
 # --- entry points ----------------------------------------------------------------------------------------------------
 
 
 def count_claims(
-    specs: Sequence[TargetSpec], *, has_replicas: bool, has_predictions: bool, builtin_witnesses: bool
+    specs: Sequence[TargetSpec],
+    *,
+    has_replicas: bool,
+    has_predictions: bool,
+    builtin_witnesses: bool,
+    has_embeddings: bool = True,
 ) -> int:
     """
     Count the (target, evidence source) claims :func:`gather_evidence` will build, for ``allocate``.
 
     Per target: local panels 1 (0 for ``frame_pooled``, whose frame-weighted panels are not built yet), replicas 1,
-    built-in witnesses 2 (k-NN and probe), the user witness 1, each when present.
+    built-in witnesses 2 (k-NN and probe), the user witness 1, each when present. Local panels and the built-in
+    witnesses need embeddings, so a call without them counts neither.
     """
-    per_target = int(has_replicas) + 2 * int(builtin_witnesses) + int(has_predictions)
-    return sum(per_target + int(s.aggregation != "frame_pooled") for s in specs)
+    per_target = int(has_replicas) + 2 * int(builtin_witnesses and has_embeddings) + int(has_predictions)
+    return sum(per_target + int(has_embeddings and s.aggregation != "frame_pooled") for s in specs)
+
+
+def _check_group_lengths(units: Units, max_sequence_length: int | None) -> None:
+    """Raise when a group is longer than the declared ``max_sequence_length``; nothing is truncated."""
+    lengths = np.bincount(units.groups) if len(units.groups) else np.zeros(1, dtype=np.intp)
+    if max_sequence_length is not None and lengths.max() > max_sequence_length:
+        raise ValueError(
+            f"A group has {lengths.max()} items, above the declared max_sequence_length={max_sequence_length}."
+        )
 
 
 def gather_evidence(
     specs: Sequence[TargetSpec],
     *,
     units: Units,
-    features: NDArray[Any],
+    features: NDArray[Any] | None,
     audit: NDArray[np.intp],
     fit: NDArray[np.intp],
     replicas: Mapping[int, NDArray[np.intp]] | None,
     predictions: Any,
-    provenance: Mapping[str, Any] | None,
-    allowances: Mapping[str, Any] | None,
+    allowances: Allowances | None,
     alpha_claim: float,
     seed: int,
-    sampling: SamplingPlan | None,
-    look: int,
     max_sequence_length: int | None,
     n_cells: int | None = None,
     panel_size: int | None = None,
-    builtin_witnesses: bool,
-) -> dict[str, Evidence]:
+    builtin_witnesses: bool = True,
+    class_order_verified: bool = False,
+) -> list[Bound]:
     """
-    Build every classification evidence source, one endpoint per target it bounds, each at ``alpha_claim``.
+    Build every classification evidence source, one bound per requirement it bounds, each at ``alpha_claim``.
+
+    The bounds come back ordered by requirement, then source (local panels, replicas, k-NN, linear probe, user model),
+    a witness's recall or metric bound before its false-positive bound. A requirement is an index into ``specs``.
 
     ``features`` are aligned with labeled items (row i is ``units.labels[i]``); ``fit`` and ``audit`` are labeled-item
-    positions (``audit`` already the sampling plan's prefix). ``replicas`` maps labeled-item positions to extra labels
-    (``resolve_replicas``); ``predictions`` are finite class scores of shape ``(len(dataset), n_classes)`` or 1-D
-    integer class decisions (see :func:`check_predictions`). The partition's cell count follows the number of audit
-    units (groups when grouped), or the plan's final size in units, so it is frozen across looks. Grouped (video) local
-    panels stay ``partition_restricted`` whatever the allowances. ``alpha_claim`` must be
-    ``allocate(alpha_call, count_claims(...))`` with the same sources (``builtin_witnesses`` included) for the call's
-    ledger to hold.
+    positions. ``replicas`` maps labeled-item positions to extra labels (``resolve_replicas``); ``predictions`` are
+    finite class scores of shape ``(len(dataset), n_classes)`` or 1-D integer class decisions (see
+    :func:`check_predictions`). Without ``features`` there are no local panels and no built-in witnesses. The
+    partition's cell count follows the number of audit units (groups when grouped). Grouped (video) local panels stay
+    ``partition_restricted`` whatever the allowances. ``alpha_claim`` must be ``allocate(alpha_call,
+    count_claims(...))`` with the same sources (``builtin_witnesses`` and embeddings included) for the call's ledger
+    to hold. ``class_order_verified`` says the user model's own class mapping matched the dataset's, which leaves
+    ``class_order_matches_dataset`` off its bounds. ``n_cells``, ``panel_size`` and ``builtin_witnesses`` are internal
+    knobs, kept so the numerical pin can run at this layer; the evaluator leaves them at their defaults.
 
     Raises
     ------
     ValueError
-        If a group is longer than ``max_sequence_length``, ``predictions`` fails :func:`check_predictions`, or its
-        declared ``training_items`` share a physical group with an audit unit.
+        If a group is longer than ``max_sequence_length`` or ``predictions`` fails :func:`check_predictions`.
     """
-    lengths = np.bincount(units.groups) if len(units.groups) else np.zeros(1, dtype=np.intp)
-    if max_sequence_length is not None and lengths.max() > max_sequence_length:
-        raise ValueError(
-            f"A group has {lengths.max()} items, above the declared max_sequence_length={max_sequence_length}."
-        )
-    details = {} if sampling is None else {"sampling_plan": sampling.sizes, "look": look}
-    call = _Call(units, np.asarray(features), audit, fit, alpha_claim, max_sequence_length, details)
-    planned = len(np.unique(units.groups[audit])) if sampling is None else sampling.sizes[-1]  # in units
-    provisional = [name for name, given in (("n_cells", n_cells), ("panel_size", panel_size)) if given is None]
-    sizes = (n_cells or n_cells_for(planned), panel_size or PANEL_SIZE, provisional)
+    _check_group_lengths(units, max_sequence_length)
+    # Without embeddings the two sources that read them are skipped, so the empty placeholder is never read.
+    placeholder = np.empty((len(units.labels), 0)) if features is None else np.asarray(features)
+    call = _Call(units, placeholder, audit, fit, alpha_claim, max_sequence_length, tuple(specs))
+    planned = len(np.unique(units.groups[audit]))  # in units
+    sizes = (n_cells or n_cells_for(planned), panel_size or PANEL_SIZE)
     partition_ss, panel_ss = np.random.SeedSequence(seed).spawn(2)  # fixed order: deterministic per source
     partition_seed = int(partition_ss.generate_state(1)[0])
-    evidence = _local_panels(call, specs, allowances or {}, sizes, partition_seed, np.random.default_rng(panel_ss))
+    bounds: list[Bound] = []
+    if features is not None:
+        bounds += _local_panels(call, specs, allowances, sizes, partition_seed, np.random.default_rng(panel_ss))
     if replicas:
-        evidence |= _replica(call, specs, replicas)
-    if builtin_witnesses:
-        evidence |= _builtin(call, specs)
+        bounds += _replica(call, specs, replicas)
+    if builtin_witnesses and features is not None:
+        bounds += _builtin(call, specs)
     if predictions is not None:
-        evidence |= _user(call, specs, predictions, provenance)
-    return evidence
+        bounds += _user(call, specs, predictions, class_order_verified)
+    return sorted(bounds, key=lambda b: (b.requirement, _SOURCES.index(b.source), b.quantity == "false_positive_rate"))
