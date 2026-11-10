@@ -1,5 +1,11 @@
 # DataEval Change Log
 
+## v1.2.1
+
+🛠️ **Improvements and Enhancements**
+
+- `cacf6c0a8` - [impr] Improve the experimental Feasibility evaluator: return typed determinations and bounds tables, take a model in place of predictions, and drop the sampling plan and provenance
+
 ## v1.2.0
 
 🌟 **Feature Release**
