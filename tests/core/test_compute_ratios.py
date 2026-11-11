@@ -376,6 +376,7 @@ class TestCalculateRatios:
         assert "xxhash" in ratios["stats"]
         assert "phash" in ratios["stats"]
 
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")  # ALL holds the blur flags
     def test_all_stats_combined(self):
         """Test with all stat types combined."""
         images = [np.random.random((3, 50, 50))]

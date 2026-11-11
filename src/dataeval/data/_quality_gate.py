@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
 from dataeval.data._selectors import FrameCandidate, FrameInput, FrameSelector, FrameVerdict, SequenceInfo
 from dataeval.flags import ImageStats
@@ -100,12 +101,23 @@ class QualityGate(FrameSelector):
         NaN, or if ``min > max`` or ``min_quantile > max_quantile``. An infinite bound is allowed,
         and bounds nothing.
 
+    Warns
+    -----
+    ExperimentalWarning
+        Once per process, if ``stat`` is one of the experimental blur statistics (``"blur"`` or
+        ``"blur_directionality"``).
+
     See Also
     --------
     :func:`~dataeval.core.image_stats` : The statistics and their units
+    :doc:`/concepts/BlurStatistics` : What moves the blur statistics, and where they are NaN
 
     Notes
     -----
+    A blur statistic costs far more per frame than the others: on one machine a 1280x720 frame took
+    about 0.1 s, against about 5 ms for ``"sharpness"``. Each figure is one frame, so read it as an
+    order of magnitude. Time a sample of the video before gating a long one on it.
+
     Bounds are inclusive, and a frame's reading is rounded to float32 as ``image_stats`` reports
     it, so a bound copied from ``image_stats`` output keeps the frame it was read from. A quantile
     cutoff is an observed value (``numpy``'s ``method="inverted_cdf"``), and a frame equal to it is
@@ -172,6 +184,9 @@ class QualityGate(FrameSelector):
                 f"QualityGate: stat must name a numeric scalar image_stats statistic, one of "
                 f"{', '.join(_numeric_scalar_stats())}; got {stat!r}."
             )
+        # QualityGate reads the statistic without calling image_stats, where the blur flags warn.
+        if calculator[1] & ImageStats.BLUR:
+            warn_experimental_once("ImageStats.BLUR", details="The column names and values may change.")
         self.stat: str = stat
         self.min: float | None = None if min is None else float(min)
         self.max: float | None = None if max is None else float(max)

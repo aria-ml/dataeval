@@ -1,9 +1,10 @@
 # Image statistics
 
 `image_stats` measures four families of statistics about an image (pixel, visual,
-dimension, and hash), and two of them, pixel and visual, answer fundamentally
-different kinds of questions. Knowing which is which is the difference between a
-number you can compare across a dataset and one you cannot.
+dimension, and hash), plus the experimental [blur statistics](BlurStatistics.md). Two of
+the families, pixel and visual, answer fundamentally different kinds of questions.
+Knowing which is which is the difference between a number you can compare across a
+dataset and one you cannot.
 
 ## Raw values and visual interpretation
 
@@ -119,6 +120,12 @@ Where a dataset mixes encodings and you want comparable pixel distributions, pas
 statistic you actually wanted; a normalized `PIXEL_MEAN` is often a less direct route
 to the same question.
 
+## Blur statistics
+
+The blur statistics, `blur` and `blur_directionality`, measure the width of edges in pixels. They are experimental ⚠️.
+`ImageStats.ALL` includes them, and `ImageStats.VISUAL` and the default of {func}`.image_stats` do not.
+[Blur statistics](BlurStatistics.md) describes them.
+
 ## Transforms and the statistics they invalidate
 
 A transform has two possible homes, and choosing the wrong one fails silently. If you put model preprocessing in the
@@ -142,19 +149,20 @@ overlay, a scan border or a dead sensor region. Use {class}`.SelectChannels` to 
 sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
-`height` and `aspect_ratio`, report the resize target, and makes `sharpness` measure the interpolation kernel. It
-leaves the pixel statistics, the channel count and the hashes alone, so resize-then-hash is a better near-duplicate
-check across heterogeneous source resolutions, not a worse one. The quality evaluators intersect the declaration with
-the {class}`.ImageStats` you asked for, and where the two overlap they raise a
-{class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now describe the
-transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
+`height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
+the blur statistics, which are edge widths in pixels. It leaves the pixel statistics, the channel count and the hashes
+alone, so resize-then-hash is a better near-duplicate check across heterogeneous source resolutions, not a worse one.
+The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the two overlap
+they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now
+describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
 responses.
 
 The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, because an arbitrary
-transform can move anything. Random transforms are seeded for each datum from the datum's `id`, so the view is stable:
-the statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice gives
-identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its sidecar,
-because provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
+transform can move anything. {class}`.SelectChannels` with `"gray"` declares the blur statistics too, because a
+luminance mix changes which picture is read. Random transforms are seeded for each datum from the datum's `id`, so the
+view is stable: the statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice
+gives identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its
+sidecar, because provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
 `v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. That is the last
 reason to prefer the curated operations.
 

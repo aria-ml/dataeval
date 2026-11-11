@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from dataeval.data import DetectionCrops, Relabel, View
+from dataeval.core._image_stats import _unmeasurable_flags
+from dataeval.data import DetectionCrops, Relabel, Resize, SelectChannels, TorchvisionTransform, View
 from dataeval.data._invalidates import invalidated_stats
 from dataeval.data._view import Operation
 from dataeval.flags import ImageStats
@@ -159,3 +160,52 @@ class TestInvalidatedStatsCrossesNonViewBarrier:
         result = invalidated_stats(outer)
         assert result & ImageStats.VISUAL_SHARPNESS
         assert result & ImageStats.DIMENSION_WIDTH
+
+
+@pytest.mark.required
+class TestBlurIsInvalidated:
+    """`ALL` holds the blur flags, so a declaration of everything covers them. An operation that names its flags
+    one by one, because it does not declare `ALL`, needs the blur entry of its own.
+
+    Resizing changes how wide an edge is, and a gray mix changes which picture is read.
+    """
+
+    def test_a_declaration_of_all_covers_blur(self):
+        class Everything(Operation):
+            @property
+            def invalidates(self) -> ImageStats:
+                return ImageStats.ALL
+
+            def apply(self, view: View) -> None:
+                pass
+
+        assert ImageStats.BLUR in Everything().invalidates
+        assert ImageStats.BLUR in invalidated_stats(View(Images(), [Everything()]))
+
+    @pytest.mark.parametrize("mode", ["stretch", "pad", "crop"])
+    def test_resize_invalidates_blur(self, mode):
+        assert ImageStats.BLUR in Resize((8, 8), mode=mode).invalidates
+
+    def test_gray_selection_invalidates_blur(self):
+        assert ImageStats.BLUR in SelectChannels("gray").invalidates
+
+    def test_other_selections_leave_blur_alone(self):
+        assert not SelectChannels([0, 1]).invalidates & ImageStats.BLUR
+        assert not SelectChannels("rgb").invalidates & ImageStats.BLUR
+
+    def test_torchvision_default_is_all_and_so_covers_blur(self):
+        assert TorchvisionTransform(object()).invalidates == ImageStats.ALL
+        assert ImageStats.BLUR in TorchvisionTransform(object()).invalidates
+
+    def test_every_audit_point_covers_blur(self):
+        """One place for the hand-kept list: a new transform or a new check that skips blur fails here.
+
+        `wide_band_names`, the other hand-kept list, is a local of `image_stats` and cannot be called alone. It is
+        guarded by `test_wide_cube_warns_and_names_blur` in `tests/core/test_blur_stats.py`.
+        """
+        assert all(ImageStats.BLUR in Resize((8, 8), mode=mode).invalidates for mode in ("stretch", "pad", "crop"))
+        assert ImageStats.BLUR in SelectChannels("gray").invalidates
+        assert ImageStats.BLUR in TorchvisionTransform(object()).invalidates
+        assert ImageStats.BLUR in _unmeasurable_flags(ImageStats.BLUR, None, False)
+        view = View(Images(), [Resize((8, 8)), SelectChannels("gray")])
+        assert ImageStats.BLUR in invalidated_stats(view)

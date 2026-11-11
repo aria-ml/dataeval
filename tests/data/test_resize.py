@@ -181,7 +181,7 @@ class TestResizePadFill:
 
 @pytest.mark.required
 class TestResizeInvalidates:
-    BASE = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS
+    BASE = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS | ImageStats.BLUR
     PAD_EXTRA = (
         ImageStats.PIXEL_ZEROS
         | ImageStats.PIXEL_HISTOGRAM

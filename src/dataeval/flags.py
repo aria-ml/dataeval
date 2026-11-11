@@ -44,6 +44,24 @@ class ImageStats(Flag):
     - `VISUAL_SHARPNESS` : Spread of edge magnitudes, via a 3x3 edge kernel
     - `VISUAL_PERCENTILES` : Display-range percentiles (0, 25, 50, 75, 100)
 
+    Blur Statistics (experimental, so names and values may change; NaN without a reference, with too few edges,
+    with a NaN pixel, or for a box that extends past the image):
+
+    - `VISUAL_BLUR` : Width of the sharpest edges, in pixels at the image's own resolution: the 5th percentile
+      of edge widths, after Liang et al. (2010)
+    - `VISUAL_BLUR_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
+      of their median widths
+
+    Known limits: a width is in pixels, so values compare only at one resolution. `image_stats` warns when one call
+    requests blur for images of more than one size; `Outliers` calls it once per dataset, so sizes that differ only
+    between datasets go unwarned. `VISUAL_BLUR` follows the sharpest edges, so motion blur moves it weakly and
+    unevenly and shows in `VISUAL_BLUR_DIRECTIONALITY` instead, which is unsigned and has a scene-dependent baseline.
+    Noise and JPEG artifacts move it by amounts and in directions that depend on the scene, so it cannot tell them
+    from focus, and a soft 8-bit image at low contrast reads sharper than at full contrast, for a cause not traced, so
+    compare only images of similar contrast. It costs far more than `VISUAL_SHARPNESS`, and nothing caps the image
+    size, so time a sample first. It was checked only on a few real frames with synthetic degradations and no
+    human-rated blur. See :doc:`/concepts/BlurStatistics`.
+
     Dimension Statistics (computed on image/box dimensions):
 
     - `DIMENSION_OFFSET_X` : X-offset of bounding box
@@ -81,7 +99,7 @@ class ImageStats(Flag):
     - `PIXEL_BASIC` : Mean, std, var
     - `PIXEL_DISTRIBUTION` : Skew, kurtosis, entropy, histogram
     - `VISUAL_BASIC` : Brightness, contrast, sharpness
-    - `DIMENSION_BASIC` : Width, height, channels
+    - `DIMENSION_BASIC` : Width, height, channels, aspect ratio
     - `DIMENSION_OFFSET` : Offset X and Y
     - `DIMENSION_POSITION` : Center, distance to center, distance to edge
     - `DIMENSION_RELATIVE` : Box geometry relative to the image (the seven `DIMENSION_REL_*` stats)
@@ -94,11 +112,17 @@ class ImageStats(Flag):
 
     - `NONE` : No statistics
     - `PIXEL` : All pixel statistics
-    - `VISUAL` : All visual statistics
+    - `VISUAL` : All visual statistics, except the blur statistics (`BLUR`)
     - `DIMENSION` : All dimension statistics
-    - `NO_HASH`: All non-hash statistics
+    - `NO_HASH`: All non-hash statistics, except the blur statistics (`BLUR`)
     - `HASH` : All hash statistics
-    - `ALL` : All available statistics
+    - `BLUR` : The two blur statistics (experimental)
+    - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
+      (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
+      deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
+      compute, and the set to start from
+    - `ALL` : Every statistic in this release, including the experimental blur statistics. A later release can add
+      statistics to it. Name `BASIC` or single statistics when the columns must not change
 
     Notes
     -----
@@ -167,6 +191,11 @@ class ImageStats(Flag):
     HASH_DHASH = auto()
     HASH_DHASH_D4 = auto()
 
+    # ===== BLUR STATS =====
+    # Appended after the hash flags so that no existing flag value moves
+    VISUAL_BLUR = auto()
+    VISUAL_BLUR_DIRECTIONALITY = auto()
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -207,6 +236,9 @@ class ImageStats(Flag):
 
     HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
+    # Kept out of VISUAL and VISUAL_BASIC, so Outliers' default keeps its columns and its speed
+    BLUR = VISUAL_BLUR | VISUAL_BLUR_DIRECTIONALITY
+
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
     PIXEL_DISTRIBUTION = PIXEL_SKEW | PIXEL_KURTOSIS | PIXEL_ENTROPY | PIXEL_HISTOGRAM
@@ -242,8 +274,11 @@ class ImageStats(Flag):
 
     NO_HASH = PIXEL | VISUAL | DIMENSION
 
+    # The core cheap statistics, from the three sub-groups above
+    BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
+
     # Ultimate convenience
-    ALL = NO_HASH | HASH
+    ALL = NO_HASH | HASH | BLUR
 
 
 class VideoStats(Flag):

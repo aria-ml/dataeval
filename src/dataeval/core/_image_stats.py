@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
+from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._base import Calculator, ViewKind
@@ -671,9 +672,10 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
     """Statistics among `flags` that need an interval, and so go NaN when none can be established.
 
     The histogram and its entropy always do; so does the whole visual family, which resolves
-    the display range, and `depth`, which reports the encoding it decoded. The remaining
-    pixel statistics only when they are being normalized against it. A declared range is
-    always known, so nothing can go unmeasurable for want of one.
+    the display range, and the blur flags, which read the same picture but sit outside it; so
+    does `depth`, which reports the encoding it decoded. The remaining pixel statistics only
+    when they are being normalized against it. A declared range is always known, so nothing
+    can go unmeasurable for want of one.
 
     Asked once for the unnamed view and once per band group, since each is measured against
     its own interval and a cube can carry a decodable range on one group and none on the
@@ -686,7 +688,11 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
     if declared is not None:
         return type(flags)(0)
     needs_range = flags & (
-        ImageStats.PIXEL_HISTOGRAM | ImageStats.PIXEL_ENTROPY | ImageStats.VISUAL | ImageStats.DIMENSION_DEPTH
+        ImageStats.PIXEL_HISTOGRAM
+        | ImageStats.PIXEL_ENTROPY
+        | ImageStats.VISUAL
+        | ImageStats.BLUR
+        | ImageStats.DIMENSION_DEPTH
     )
     if normalize_pixel_values:
         needs_range |= flags & ImageStats.PIXEL
@@ -787,6 +793,17 @@ def _enumerate_datum(
             yield i, np_image, bboxes
 
 
+def _noting_sizes(
+    datum: Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]],
+    sizes: set[tuple[int, ...]],
+) -> Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]]:
+    """Pass each datum on unchanged, adding the (H, W) of every image that has a picture to `sizes`."""
+    for item in datum:
+        if item[1].ndim >= 2:
+            sizes.add(item[1].shape[-2:])
+        yield item
+
+
 def _sort(
     source_indices: list[SourceIndex],
     aggregated_stats: dict[str, list[Any]],
@@ -863,7 +880,7 @@ def image_stats(  # noqa: C901
     data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
-    stats: StatsRequest = ImageStats.ALL,
+    stats: StatsRequest = ImageStats.NO_HASH | ImageStats.HASH,
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,
@@ -884,11 +901,11 @@ def image_stats(  # noqa: C901
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.
-    stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.ALL
+    stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.NO_HASH | ImageStats.HASH
         Flags indicating which statistics to compute. Can combine multiple flags
         using bitwise OR (|). Dependencies are resolved automatically for calculation,
         but intermediate/dependency statistics are not included in the output by
-        default unless explicitly requested.
+        default unless explicitly requested. See :class:`~dataeval.flags.ImageStats`.
 
         A single flag set is every view's request: each group named in `channels` measures
         the same statistics the image does, restricted to its own bands.
@@ -942,7 +959,9 @@ def image_stats(  # noqa: C901
         :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are computed for the
         background; any hash or dimension statistics in `stats` are computed for the
         image and its boxes as usual and skipped for the background, which has no
-        meaningful hash and no geometry of its own.
+        meaningful hash and no geometry of its own. The blur statistics are
+        skipped for the background too, because their filters would spread the masked
+        holes over every edge.
 
         Boxes are rounded outwards and unioned into the mask, so the background
         excludes slightly more than the annotations strictly cover — a retained pixel
@@ -1119,7 +1138,7 @@ def image_stats(  # noqa: C901
 
     Examples
     --------
-    Compute all statistics:
+    Compute the default statistics:
 
     >>> from dataeval.flags import ImageStats
     >>> stats = image_stats(images, boxes=boxes)
@@ -1236,6 +1255,19 @@ def image_stats(  # noqa: C901
     calculators = CalculatorRegistry.get_calculators(whole_flags)
     channel_groups = _resolve_channel_groups(channels or {}, CalculatorRegistry.get_calculators(requested))
 
+    # Once the request has proved valid, and for the unnamed view and every band group alike (`requested` is their
+    # union). The blur flags are outside `VISUAL` and the default, but `ALL` holds them, so a request for `ALL` warns
+    # too.
+    if requested & ImageStats.BLUR:
+        warn_experimental_once(
+            "ImageStats.BLUR",
+            details=(
+                "The column names and values may change. "
+                "`ImageStats.ALL` includes the blur statistics, "
+                "and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
+            ),
+        )
+
     # One calculator list per group rather than one shared list, since a mapping may ask a
     # different question of each. Narrowed to the band view here so a group that turns out
     # to produce nothing is caught at the call rather than once per datum.
@@ -1313,8 +1345,9 @@ def image_stats(  # noqa: C901
             warnings.warn(
                 f"per_background=True but none of the requested statistics apply to a background region, "
                 f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
-                f"part of it masked out, which hash statistics are not stable under and which dimension "
-                f"statistics do not describe; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
+                f"part of it masked out, which hash statistics are not stable under, which dimension "
+                f"statistics do not describe and in which the filters of the blur statistics spread the masked "
+                f"holes; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1327,7 +1360,7 @@ def image_stats(  # noqa: C901
     # test only while every group was handed the same flags.
     # Rendered here rather than in the worker: the answer is the same for every datum.
     covered = reduce(or_, band_flags.values(), ImageStats(0))
-    wide_band_names = _flag_names(whole_flags & (ImageStats.VISUAL | ImageStats.HASH) & ~covered)
+    wide_band_names = _flag_names(whole_flags & (ImageStats.VISUAL | ImageStats.BLUR | ImageStats.HASH) & ~covered)
 
     # Statistics that go NaN for want of an interval, named per view: the unnamed one is
     # measured against the whole datum's range, each group against its own.
@@ -1389,6 +1422,14 @@ def image_stats(  # noqa: C901
     calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]
     _logger.debug("Using calculators: %s", calculator_names)
 
+    # An edge width is in pixels at the image's own size, so the blur columns say nothing across sizes. The sizes are
+    # noted where this process walks the images, which holds on the pool path too: the pool takes its tasks from this
+    # generator in a thread of this process. A request with no blur flag does not wrap it.
+    datum = _enumerate_datum(images, boxes)
+    sizes: set[tuple[int, ...]] = set()
+    if requested & ImageStats.BLUR:
+        datum = _noting_sizes(datum, sizes)
+
     with PoolWrapper(processes=get_max_processes()) as p:
         for result in p.imap_unordered(
             partial(
@@ -1406,7 +1447,7 @@ def image_stats(  # noqa: C901
                     unmeasurable_names=unmeasurable_names,
                 ),
             ),
-            _enumerate_datum(images, boxes),
+            datum,
         ):
             _aggregate_batch(
                 result,
@@ -1421,6 +1462,16 @@ def image_stats(  # noqa: C901
 
             if progress_callback:
                 progress_callback(image_count, total=total_images)
+
+    if len(sizes) > 1:
+        warnings.warn(
+            f"blur statistics were requested for images of {len(sizes)} different image sizes. An edge width is "
+            f"in pixels at the image's own size, so the blur columns compare only within one size. Compare "
+            f"images of the same size with each other, not across the dataset. "
+            f"`ImageStats.ALL` includes the blur statistics, and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     # Aggregate warnings by message type, collecting indices per type
     grouped_warnings: dict[str, list[str]] = {}
