@@ -11,7 +11,11 @@ import ast
 import hashlib
 import json
 import os
+import shutil
+import sqlite3
 import subprocess
+from collections.abc import Iterable
+from contextlib import closing
 from pathlib import Path
 
 # Notebook code cells have their own hashes. Keep the shared execution inputs
@@ -22,6 +26,8 @@ INPUT_ENV = ("DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUN
 # that is not listed counts as relevant, so a new session costs one extra clean build until it is listed.
 IGNORED_SESSIONS = ("dev", "test", "verify", "type", "deps", "lint", "doctest", "lock", "docsync", "check")
 MANIFEST = Path("docs/source/.jupyter_cache/execution-inputs.json")
+CACHE = MANIFEST.parent
+NOTEBOOKS = Path("docs/source/notebooks")
 
 
 def module_name(path: str) -> str:
@@ -133,11 +139,15 @@ def cache_miss_reasons(previous: object, current: dict) -> list[str]:
     reasons = []
     old_files, new_files = previous["files"], current["files"]
     for name in sorted(old_files.keys() | new_files.keys()):
+        # An added or changed source file is decided per notebook. A removed one is not: the current tree
+        # cannot show who imported it (a guarded import changes behavior without changing its own text).
+        per_notebook = name.startswith("src/") and name.endswith(".py")
         if name not in old_files:
-            reasons.append(f"File added: {name}")
+            if not per_notebook:
+                reasons.append(f"File added: {name}")
         elif name not in new_files:
             reasons.append(f"File removed: {name}")
-        elif old_files[name] != new_files[name]:
+        elif old_files[name] != new_files[name] and not per_notebook:
             reasons.append(f"File changed: {name}")
 
     old_env, new_env = previous["environment"], current["environment"]
@@ -147,6 +157,101 @@ def cache_miss_reasons(previous: object, current: dict) -> list[str]:
             after = repr(new_env[name]) if name in new_env else "<missing>"
             reasons.append(f"Environment changed: {name}: {before} -> {after}")
     return reasons
+
+
+def changed_sources(previous: dict[str, str], current: dict[str, str]) -> set[str]:
+    """Return the `src/**/*.py` files in `current` that are new or differ from `previous`."""
+    return {
+        name
+        for name, digest in current.items()
+        if name.startswith("src/") and name.endswith(".py") and previous.get(name) != digest
+    }
+
+
+def _imports_from_file(root: Path, path: str, module: str, is_package: bool, known: set[str]) -> set[str]:
+    try:
+        return imports_of((root / path).read_text(), module, is_package, known)
+    except (SyntaxError, UnicodeDecodeError) as error:
+        raise ValueError(f"Cannot parse {path}: {error}") from error
+
+
+def affected_notebooks(root: Path, files: dict[str, str], changed: set[str]) -> dict[str, list[str]]:
+    """Map each notebook whose import closure contains a changed file to those changed files.
+
+    The closure is built from the current tree: `files` lists the `src/**/*.py` modules and `root` holds them.
+    Raises `ValueError("Cannot parse <path>: ...")` if a source file or notebook cannot be parsed.
+    """
+    sources = {module_name(path): path for path in files if path.startswith("src/") and path.endswith(".py")}
+    known = set(sources)
+    graph = {
+        module: _imports_from_file(root, path, module, path.endswith("__init__.py"), known)
+        for module, path in sources.items()
+    }
+    affected: dict[str, list[str]] = {}
+    for notebook in sorted((root / NOTEBOOKS).glob("*.py")):
+        seeds = _imports_from_file(root, f"{NOTEBOOKS}/{notebook.name}", "__notebook__", False, known)
+        hit = sorted(sources[module] for module in closure(seeds, graph) if sources[module] in changed)
+        if hit:
+            affected[notebook.name] = hit
+    return affected
+
+
+def prune_cache(root: Path, notebooks: Iterable[str]) -> list[str]:
+    """Delete the cached executions of `notebooks`, found through jupyter-cache's own database.
+
+    Returns the hash keys whose `executed/` folder was deleted. No database, no folder or no matching row is a
+    no-op; `--fix` later drops the orphaned rows. Raises `ValueError` if the database cannot be read.
+    """
+    database = root / CACHE / "global.db"
+    if not database.is_file():
+        return []
+    names = set(notebooks)
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True)) as connection:
+            rows = connection.execute("SELECT hashkey, uri FROM nbcache").fetchall()
+    except sqlite3.Error as error:
+        raise ValueError(f"Cannot read cache database: {error}") from error
+    deleted = []
+    for hashkey, uri in rows:
+        folder = root / CACHE / "executed" / hashkey
+        if os.path.basename(uri or "") in names and folder.is_dir():
+            shutil.rmtree(folder)
+            deleted.append(hashkey)
+    return sorted(deleted)
+
+
+def reuse_lines(affected: dict[str, list[str]], total: int) -> list[str]:
+    """Explain the re-executions: one sorted line per changed file, naming the notebooks unless it is all of them."""
+    by_file: dict[str, list[str]] = {}
+    for notebook, paths in affected.items():
+        for path in paths:
+            by_file.setdefault(path, []).append(notebook)
+    lines = []
+    for path in sorted(by_file):
+        names = sorted(by_file[path])
+        if len(names) == total:
+            lines.append(f"  - {path} changed: re-executing all {total} notebooks")
+        else:
+            lines.append(f"  - {path} changed: re-executing {len(names)} of {total} notebooks: {', '.join(names)}")
+    return lines
+
+
+def check_notebooks(root: Path, manifest: Path, previous: dict[str, str], current: dict[str, str]) -> int:
+    """Prune the notebooks that import a changed source file and report what is re-executed."""
+    changed = changed_sources(previous, current)
+    try:
+        affected = affected_notebooks(root, current, changed) if changed else {}
+        prune_cache(root, affected)
+    except ValueError as error:
+        return report_miss(manifest, [str(error)])
+    if not affected:
+        print("Notebook execution inputs changed, but no notebook imports a changed file; reusing cached outputs.")
+        return 0
+    total = len(list((root / NOTEBOOKS).glob("*.py")))
+    print(f"Notebook execution inputs changed; re-executing {len(affected)} of {total} notebooks and reusing the rest.")
+    for line in reuse_lines(affected, total):
+        print(line)
+    return 0
 
 
 def report_miss(manifest: Path, reasons: list[str]) -> int:
@@ -197,6 +302,8 @@ def main() -> int:
             print("Notebook execution inputs match; reusing cached outputs.")
             return 0
         reasons = cache_miss_reasons(previous, current)
+        if not reasons:
+            return check_notebooks(root, manifest, previous["files"], current["files"])
 
     return report_miss(manifest, reasons)
 

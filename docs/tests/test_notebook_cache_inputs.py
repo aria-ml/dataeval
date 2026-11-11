@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -93,7 +94,7 @@ def checkout(tmp_path: Path) -> Path:
 
 @pytest.mark.parametrize(
     "name",
-    ["src/dataeval/example.py", "uv.lock", "docs/datasets.toml"],
+    ["uv.lock", "docs/datasets.toml"],
 )
 def test_shared_execution_input_changes_require_clean_build(checkout: Path, name: str):
     with (checkout / name).open("a") as stream:
@@ -126,7 +127,7 @@ def test_dropped_inputs_do_not_force_clean_build(checkout: Path, name: str):
     assert "cache miss" not in result.stdout
 
 
-@pytest.mark.parametrize("name", ["src/dataeval/new_module.py"])
+@pytest.mark.parametrize("name", ["src/dataeval/data.json"])
 def test_new_execution_input_requires_clean_build(checkout: Path, name: str):
     write(checkout, name)
     result = run(checkout, "check")
@@ -200,15 +201,15 @@ def test_execution_environment_changes_require_clean_build(checkout: Path, name:
 
 
 def test_cache_miss_reports_all_changes_and_restored_source(checkout: Path):
-    write(checkout, "src/dataeval/example.py", "changed\n")
-    write(checkout, "src/dataeval/new_module.py")
+    write(checkout, "docs/datasets.toml", "changed\n")
+    write(checkout, "src/dataeval/data.json")
     (checkout / "uv.lock").unlink()
     write(checkout, "docs/source/.jupyter_cache/.cache_source", "docs-artifacts/main\n")
     result = run(checkout, "check", DOCS_PYTHON_VERSION="different")
     assert result.returncode == 1
     assert "Restored cache source: docs-artifacts/main" in result.stdout
-    assert "File changed: src/dataeval/example.py" in result.stdout
-    assert "File added: src/dataeval/new_module.py" in result.stdout
+    assert "File changed: docs/datasets.toml" in result.stdout
+    assert "File added: src/dataeval/data.json" in result.stdout
     assert "File removed: uv.lock" in result.stdout
     assert "Environment changed: DOCS_PYTHON_VERSION:" in result.stdout
 
@@ -221,7 +222,7 @@ def test_cache_hit_reports_reuse(checkout: Path):
 
 
 def test_missed_builds_remain_invalid_until_a_successful_build_records_inputs(checkout: Path):
-    write(checkout, "src/dataeval/example.py", "changed library\n")
+    write(checkout, "uv.lock", "changed lock\n")
     assert run(checkout, "check").returncode == 1
     # A later, unrelated change must not make the old execution cache valid.
     write(checkout, "docs/source/guide.md", "changed guide\n")
@@ -329,3 +330,137 @@ def test_manifest_from_before_this_change_requires_one_clean_build(checkout: Pat
     result = run(checkout, "check")
     assert result.returncode == 1
     assert "Environment changed: CI_JOB_IMAGE: <missing> -> ''" in result.stdout
+
+
+ENTRIES = {"nb_a.py": "hash_a", "nb_b.py": "hash_b"}
+
+
+@pytest.fixture
+def package(checkout: Path) -> Path:
+    files = {
+        "src/dataeval/__init__.py": "",
+        "src/dataeval/shared.py": "X = 1\n",
+        "src/dataeval/alpha.py": "from dataeval import shared\n",
+        "src/dataeval/beta.py": "VALUE = 2\n",
+        "src/conftest.py": "# fixtures\n",
+        "docs/source/notebooks/nb_a.py": "from dataeval import alpha\n",
+        "docs/source/notebooks/nb_b.py": "from dataeval import beta\n",
+    }
+    for name, text in files.items():
+        write(checkout, name, text)
+    (checkout / "docs/source/notebooks/example.py").unlink()  # the two notebooks above are the only ones
+    subprocess.run(["git", "add", "."], cwd=checkout, check=True)
+    cache = checkout / "docs/source/.jupyter_cache"
+    db = sqlite3.connect(cache / "global.db")
+    db.execute("CREATE TABLE nbcache (pk INTEGER PRIMARY KEY, hashkey TEXT, uri TEXT)")
+    for name, key in ENTRIES.items():
+        db.execute("INSERT INTO nbcache (hashkey, uri) VALUES (?, ?)", (key, f"/builds/x/docs/source/notebooks/{name}"))
+        write(cache / "executed" / key, "base.ipynb", "{}")
+    db.commit()
+    db.close()
+    assert run(checkout, "record").returncode == 0
+    return checkout
+
+
+def entries(root: Path) -> list[str]:
+    return sorted(p.name for p in (root / "docs/source/.jupyter_cache/executed").iterdir())
+
+
+def test_a_changed_file_re_executes_only_the_notebooks_that_import_it(package: Path):
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    result = run(package, "check")
+    assert result.returncode == 0
+    assert "src/dataeval/shared.py changed: re-executing 1 of 2 notebooks: nb_a.py" in result.stdout
+    assert "re-executing 1 of 2 notebooks and reusing the rest" in result.stdout
+    assert entries(package) == ["hash_b"]
+
+
+def test_a_file_every_notebook_imports_re_executes_all(package: Path):
+    write(package, "src/dataeval/__init__.py", "# edited\n")
+    result = run(package, "check")
+    assert "src/dataeval/__init__.py changed: re-executing all 2 notebooks" in result.stdout
+    assert entries(package) == []
+
+
+def test_a_comment_only_edit_still_re_executes_dependents(package: Path):
+    write(package, "src/dataeval/alpha.py", "from dataeval import shared  # note\n")
+    assert run(package, "check").returncode == 0
+    assert entries(package) == ["hash_b"]
+
+
+@pytest.mark.parametrize("name", ["src/conftest.py", "src/dataeval/unused.py", "src/dataeval/_version.py"])
+def test_files_no_notebook_imports_re_execute_nothing(package: Path, name: str):
+    write(package, name, "changed\n")
+    result = run(package, "check")
+    assert result.returncode == 0
+    assert "reusing cached outputs" in result.stdout
+    assert entries(package) == ["hash_a", "hash_b"]
+
+
+def test_a_new_file_imported_by_a_changed_file_re_executes_the_importer(package: Path):
+    write(package, "src/dataeval/gamma.py", "G = 1\n")
+    write(package, "src/dataeval/beta.py", "from dataeval import gamma\n")
+    result = run(package, "check")
+    assert "src/dataeval/gamma.py changed: re-executing 1 of 2 notebooks: nb_b.py" in result.stdout
+    assert entries(package) == ["hash_a"]
+
+
+def test_removing_a_source_file_requires_clean_build(package: Path):
+    (package / "src/dataeval/beta.py").unlink()
+    result = run(package, "check")
+    assert result.returncode == 1
+    assert "File removed: src/dataeval/beta.py" in result.stdout
+    assert entries(package) == ["hash_a", "hash_b"]
+
+
+def test_a_changed_non_python_file_under_src_requires_clean_build(package: Path):
+    write(package, "src/dataeval/data.json", "{}\n")
+    result = run(package, "check")
+    assert result.returncode == 1
+    assert "File added: src/dataeval/data.json" in result.stdout
+
+
+@pytest.mark.parametrize("name", ["src/dataeval/alpha.py", "docs/source/notebooks/nb_a.py"])
+def test_a_file_that_does_not_parse_requires_clean_build(package: Path, name: str):
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    write(package, name, "def (\n")
+    result = run(package, "check")
+    assert result.returncode == 1
+    assert f"Cannot parse {name}" in result.stdout
+    assert "Traceback" not in result.stderr
+
+
+def test_pruning_without_a_database_or_entry_is_a_no_op(package: Path):
+    (package / "docs/source/.jupyter_cache/global.db").unlink()
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    assert run(package, "check").returncode == 0
+
+
+def test_a_corrupt_database_requires_clean_build(package: Path):
+    (package / "docs/source/.jupyter_cache/global.db").write_bytes(b"not sqlite")
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    result = run(package, "check")
+    assert result.returncode == 1
+    assert "Cannot read cache database" in result.stdout
+
+
+def test_record_is_deterministic_and_reasons_are_sorted(package: Path):
+    first = (package / MANIFEST).read_bytes()
+    assert run(package, "record").returncode == 0
+    assert (package / MANIFEST).read_bytes() == first
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    write(package, "src/dataeval/alpha.py", "from dataeval import shared  # note\n")
+    lines = [line for line in run(package, "check").stdout.splitlines() if " changed: " in line]
+    assert len(lines) == 2
+    assert lines == sorted(lines)
+
+
+def test_a_partial_check_stays_stale_until_a_build_records_inputs(package: Path):
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    assert run(package, "check").returncode == 0
+    write(package, "docs/source/guide.md", "unrelated\n")
+    assert " changed: " in run(package, "check").stdout  # a missed build must not make the cache look valid
+    assert run(package, "record").returncode == 0
+    again = run(package, "check")
+    assert "reusing cached outputs" in again.stdout
+    assert " changed: " not in again.stdout
