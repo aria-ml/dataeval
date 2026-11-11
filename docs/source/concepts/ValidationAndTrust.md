@@ -1026,6 +1026,28 @@ statistical and computational.
     The search is not narrowed, so distinct hashes under one label are still
     compared. {class}`.Duplicates` passes it in its video segment search and
     raises no {class}`~dataeval.exceptions.ExperimentalWarning` there.
+- - {func}`.hash_neighbors` (`k`), {class}`.Duplicates` (`segment_neighbors`)
+  - With `k`, each position keeps its `k` nearest neighbors among the hashes
+    within a Hamming radius, and a pair is reported when either of its
+    positions keeps it. `segment_neighbors` passes it to the video segment
+    search, as an opt-in cap on the pairs each frame contributes.
+  - Cross-checked (against an independent brute-force reference, every pair
+    reported is among the nearest `k` of one of its positions and every
+    position keeps its `k` nearest, up to ties; the rule that chooses among
+    equally near neighbors is pinned against an independent implementation of
+    it). One {class}`.Duplicates` test on a single synthetic fixture of two
+    fixed-camera videos.
+  - Experimental: the arguments may change. No real fixed-camera footage was
+    studied. Pairs within the radius are left out by design, so a cap can
+    shrink or move a segment's extent, boundaries and `mean_distance`, and can
+    drop the segment the static runs of two videos make while keeping the
+    stretch of distinct frames they share. 10 is a provisional starting point
+    for `segment_neighbors`, chosen on simulated static runs, for shared
+    stretches inside runs of hundreds to thousands of frames; a larger value is
+    not safer. Among equally near neighbors the result depends on the order of
+    the input. The search for pairs of distinct hashes is not capped, so many
+    distinct hashes can still exceed the pair budget, and a pair of videos that
+    does exceed it loses its segments with a warning.
 
 :::
 
@@ -1275,9 +1297,16 @@ Experimental ⚠️ (API may change or be removed):
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
-- {func}`.hash_neighbors` with the `partition` argument raises
-  {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a
-  process. Every other use of {func}`.hash_neighbors` is stable.
+- {func}`.hash_neighbors` with the `partition` argument or the `k` argument
+  raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call
+  that passes each in a process. Every other use of {func}`.hash_neighbors` is
+  stable.
+- {class}`.Duplicates` with the `segment_neighbors` argument, or built from a
+  `Duplicates.Config` that sets it, raises
+  {class}`~dataeval.exceptions.ExperimentalWarning` when the first
+  {class}`.Duplicates` that carries the option is constructed in a process.
+  Building the `Config` alone raises nothing. {class}`.Duplicates` passes `k`
+  to {func}`.hash_neighbors` itself and raises nothing there.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

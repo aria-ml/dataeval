@@ -97,6 +97,7 @@ _BOUNDS = [
     (Duplicates.Config, "redundancy_radius", 0, -1),
     (Duplicates.Config, "max_segment_gap", 0, -1),
     (Duplicates.Config, "segment_offset_tolerance", 0, -1),
+    (Duplicates.Config, "segment_neighbors", 1, 0),
     (Duplicates.Config, "verify_alignment", 0, -1),
     (Duplicates.Config, "min_segment_frames", 1, 0),
     (Duplicates.Config, "min_track_frames", 1, 0),

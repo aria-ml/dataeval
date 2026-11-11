@@ -13,7 +13,8 @@ bits cannot fall into ``radius + 1`` disjoint parts without leaving one untouche
 each substring in turn therefore produces a candidate set that provably contains every true
 neighbor, and a popcount over those candidates alone decides the rest.
 
-Recall is exact — this is a blocking scheme, not a sketch, and it discards no true pair.
+Recall is exact — this is a blocking scheme, not a sketch, and it discards no true pair. The exception is
+``k``, which keeps only each position's nearest neighbors and so drops pairs by design.
 
 References
 ----------
@@ -24,8 +25,9 @@ References
 
 __all__ = []
 
+import operator
 from collections.abc import Callable, Iterator, Sequence
-from typing import TYPE_CHECKING, NamedTuple, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, NamedTuple, SupportsIndex, TypeAlias, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -354,6 +356,51 @@ def _pair_runs(
     return left, right, np.repeat(distances, counts)
 
 
+def _class_blocks(
+    block_class: NDArray[np.intp], count: int, classes: NDArray[np.intp]
+) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """One row per (entry of ``classes``, block of that class): the entry's index and the block's.
+
+    ``block_class`` is the class of each block in a table sorted by class, over ``count`` classes,
+    so a class's blocks are contiguous and each entry repeats over its own run of them.
+    """
+    per_class = np.bincount(block_class, minlength=count).astype(np.intp)
+    width = per_class[classes]
+    row = np.repeat(np.arange(len(classes), dtype=np.intp), width)
+    block = (
+        np.repeat((np.cumsum(per_class) - per_class)[classes], width)
+        + np.arange(len(row), dtype=np.intp)
+        - np.repeat(np.cumsum(width) - width, width)
+    )
+    return row, block
+
+
+def _runs_outside(
+    labeled: _Labeled,
+    starts: NDArray[np.intp],
+    sizes: NDArray[np.intp],
+    block: NDArray[np.intp],
+    other: NDArray[np.intp],
+) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
+    """Return the members of each class ``other`` outside its ``block``'s label, as two runs of ``labeled.members``.
+
+    Returns ``(begin, before, resume, after)``: the run of ``before`` members from ``begin`` that
+    precedes the class's block of that label, and the run of ``after`` from ``resume`` that follows
+    it, or the whole class as the second run when it holds no member with that label.
+    """
+    # The block table is sorted by (class, label), so the same label's block in the other class is
+    # found by one binary search, and is absent when the key there differs.
+    groups = labeled.groups
+    table = labeled.block_class.astype(np.int64) * groups + labeled.block_label
+    wanted = other.astype(np.int64) * groups + labeled.block_label[block]
+    match = np.minimum(np.searchsorted(table, wanted), len(table) - 1)
+    shared = table[match] == wanted
+    begin, end = starts[other], starts[other] + sizes[other]
+    cut = np.where(shared, labeled.block_starts[match], begin)
+    resume = np.where(shared, labeled.block_starts[match] + labeled.block_sizes[match], begin)
+    return begin, cut - begin, resume, end - resume
+
+
 def _cross_class_pairs(
     labeled: _Labeled,
     starts: NDArray[np.intp],
@@ -368,30 +415,160 @@ def _cross_class_pairs(
     class when it holds no member with that label. A same-label pair is skipped over, never made.
     """
     first, second = pairs[:, 0], pairs[:, 1]
-    per_class = np.bincount(labeled.block_class, minlength=len(sizes)).astype(np.intp)
-    # One row per (class pair, label block of its first class); a class's blocks are contiguous.
-    count = per_class[first]
-    row = np.repeat(np.arange(len(pairs), dtype=np.intp), count)
-    block = (
-        np.repeat((np.cumsum(per_class) - per_class)[first], count)
-        + np.arange(len(row), dtype=np.intp)
-        - np.repeat(np.cumsum(count) - count, count)
-    )
-    other = second[row]
-    # The block table is sorted by (class, label), so the same label's block in the other class is
-    # found by one binary search, and is absent when the key there differs.
-    groups = labeled.groups
-    table = labeled.block_class.astype(np.int64) * groups + labeled.block_label
-    wanted = other.astype(np.int64) * groups + labeled.block_label[block]
-    match = np.minimum(np.searchsorted(table, wanted), len(table) - 1)
-    shared = table[match] == wanted
-    begin, end = starts[other], starts[other] + sizes[other]
-    cut = np.where(shared, labeled.block_starts[match], begin)
-    resume = np.where(shared, labeled.block_starts[match] + labeled.block_sizes[match], begin)
+    # One row per (class pair, label block of its first class).
+    row, block = _class_blocks(labeled.block_class, len(sizes), first)
+    begin, before, resume, after = _runs_outside(labeled, starts, sizes, block, second[row])
     left_starts, left_sizes = np.tile(labeled.block_starts[block], 2), np.tile(labeled.block_sizes[block], 2)
     right_starts = np.concatenate((begin, resume))
-    right_sizes = np.concatenate((cut - begin, end - resume))
+    right_sizes = np.concatenate((before, after))
     return _pair_runs(labeled.members, left_starts, left_sizes, right_starts, right_sizes, np.tile(distances[row], 2))
+
+
+def _window_offsets(
+    positions: NDArray[np.intp], distances: NDArray[np.intp], sizes: NDArray[np.intp]
+) -> NDArray[np.intp]:
+    """Return where each position enters a tier of ``sizes`` it cannot take whole, mixed from ``(position, distance)``.
+
+    A fixed integer mix (splitmix64's finalizer) rather than a random generator, so an input has
+    one answer on every run and machine, and a mix rather than the first members, so equally near
+    neighbors are not always the lowest positions.
+    """
+    mixed = positions.astype(np.uint64) * np.uint64(0x9E3779B97F4A7C15) ^ distances.astype(np.uint64) * np.uint64(
+        0xC2B2AE3D27D4EB4F
+    )
+    mixed ^= mixed >> np.uint64(30)
+    mixed *= np.uint64(0xBF58476D1CE4E5B9)
+    mixed ^= mixed >> np.uint64(27)
+    mixed *= np.uint64(0x94D049BB133111EB)
+    mixed ^= mixed >> np.uint64(31)
+    return (mixed % sizes.astype(np.uint64)).astype(np.intp)
+
+
+def _capped_rows(sizes: NDArray[np.intp], pairs: NDArray[np.intp], labeled: _Labeled | None = None) -> int:
+    """Count the rows :func:`_capped_pairs` builds, without building them.
+
+    One row per label block of a class for the class itself and for each class it pairs with, in
+    either direction; without ``labeled`` every class is one block.
+    """
+    if labeled is None:
+        per_class = np.ones(len(sizes), dtype=np.int64)
+    else:
+        per_class = np.bincount(labeled.block_class, minlength=len(sizes)).astype(np.int64)
+    return int(per_class.sum() + per_class[pairs[:, 0]].sum() + per_class[pairs[:, 1]].sum())
+
+
+def _capped_pairs(
+    members: NDArray[np.intp],
+    starts: NDArray[np.intp],
+    sizes: NDArray[np.intp],
+    pairs: NDArray[np.intp],
+    distances: NDArray[np.intp],
+    k: int,
+    positions: NDArray[np.intp],
+    labeled: _Labeled | None = None,
+) -> _Batch:
+    """Each position's ``k`` nearest neighbors, as pairs of input positions; a pair both endpoints take repeats.
+
+    A position's neighbors fall into tiers by distance: its own class at distance zero, then the
+    classes ``pairs`` puts at each distance from it, all outside the position's label with
+    ``labeled`` and outside the position itself without. It takes whole tiers while they fit in the
+    slots left, then enters the first tier that does not fit at an offset mixed from its caller's
+    position (``positions``) and the distance, and reads that tier cyclically for the slots left. A
+    tier is read in member-layout order: class by class as :func:`_classes` lays them out, each
+    class by label block (with ``labeled``), ascending position inside each run. The members of one
+    (class, label) block share every tier, so tiers are sized once per block, no tier is listed, and
+    no position takes more than ``k`` neighbors.
+    """
+    # No position has as many neighbors as there are positions, so this changes nothing and keeps k in int64.
+    k = min(k, len(positions))
+    count = len(sizes)
+    if labeled is None:
+        order, block_class, block_starts, block_sizes = members, np.arange(count, dtype=np.intp), starts, sizes
+    else:
+        order, block_class = labeled.members, labeled.block_class
+        block_starts, block_sizes = labeled.block_starts, labeled.block_sizes
+
+    # Every class pair in both directions, and each class against itself for the tier at distance zero.
+    own = np.arange(count, dtype=np.intp)
+    source = np.concatenate((own, pairs[:, 0], pairs[:, 1]))
+    target = np.concatenate((own, pairs[:, 1], pairs[:, 0]))
+    level = np.concatenate((np.zeros(count, dtype=np.intp), distances, distances))
+    # One row per (block of the source class, target class), sorted by block, distance and target class,
+    # so each tier's rows, and the runs they offer, follow the member layout.
+    edge, block = _class_blocks(block_class, count, source)
+    target, level = target[edge], level[edge]
+    by = np.lexsort((target, level, block))
+    block, target, level = block[by], target[by], level[by]
+    if labeled is None:
+        begin, before, after = starts[target], sizes[target], np.zeros(len(target), dtype=np.intp)
+        resume = begin
+    else:
+        begin, before, resume, after = _runs_outside(labeled, starts, sizes, block, target)
+    # Without a partition a class's own tier lists the position itself, which is no neighbor of its own.
+    itself = (level == 0) if labeled is None else np.zeros(len(level), dtype=np.bool_)
+
+    # A tier is a run of rows with one block and distance; `before_tier` counts the block's nearer neighbors.
+    opens = np.ones(len(block), dtype=np.bool_)
+    opens[1:] = (block[1:] != block[:-1]) | (level[1:] != level[:-1])
+    tier_of = np.cumsum(opens) - 1
+    tier_rows = np.flatnonzero(opens)
+    tier_size = np.add.reduceat(before + after - itself.astype(np.intp), tier_rows)
+    tier_block, tier_level, tier_itself = block[tier_rows], level[tier_rows], itself[tier_rows]
+    through = np.cumsum(tier_size)
+    leads = np.ones(len(tier_rows), dtype=np.bool_)
+    leads[1:] = tier_block[1:] != tier_block[:-1]
+    before_tier = through - tier_size - (through - tier_size)[leads][np.cumsum(leads) - 1]
+    whole = before_tier + tier_size <= k
+    entered = np.flatnonzero((before_tier < k) & ~whole)
+
+    # Whole tiers: every member of the block with every member the tier's rows offer.
+    take = whole[tier_of]
+    taken = block[take]
+    left, right, near = _pair_runs(
+        order,
+        np.tile(block_starts[taken], 2),
+        np.tile(block_sizes[taken], 2),
+        np.concatenate((begin[take], resume[take])),
+        np.concatenate((before[take], after[take])),
+        np.tile(level[take], 2),
+    )
+    distinct = left != right
+    left, right, near = left[distinct], right[distinct], near[distinct]
+    if not len(entered):
+        return left, right, near
+
+    # A tier entered part way is the concatenation of its rows' runs, never listed: each row's run
+    # before the block's label and then the one after it, rows in target class order. A slot is found
+    # in this run table by binary search: O(N * k * log runs) beyond the rows, whatever a tier's size.
+    reading = ~whole[tier_of] & (before_tier[tier_of] < k)
+    run_start = np.stack((begin[reading], resume[reading]), axis=1).ravel()
+    run_size = np.stack((before[reading], after[reading]), axis=1).ravel()
+    run_end = np.cumsum(run_size)
+    tier_start = (run_end - run_size)[2 * np.searchsorted(tier_of[reading], entered)]
+
+    entered_block, entered_level = tier_block[entered], tier_level[entered]
+    entered_size, slots_left = tier_size[entered], k - before_tier[entered]
+    # Each member of an entered block holds its slots: `holder` is its entered tier, `holder_at` its position.
+    holders = block_sizes[entered_block]
+    holder = np.repeat(np.arange(len(entered), dtype=np.intp), holders)
+    rank = np.arange(len(holder), dtype=np.intp) - np.repeat(np.cumsum(holders) - holders, holders)
+    holder_at = order[block_starts[entered_block][holder] + rank]
+    offset = _window_offsets(positions[holder_at], entered_level[holder], entered_size[holder])
+    slots = slots_left[holder]
+    reader = np.repeat(np.arange(len(holder_at), dtype=np.intp), slots)
+    tier = holder[reader]
+    index = (offset[reader] + np.arange(len(reader), dtype=np.intp) - np.repeat(np.cumsum(slots) - slots, slots)) % (
+        entered_size[tier]
+    )
+    # A class's own tier, without a partition, is the block itself as laid out: skip the reader's place.
+    index += (tier_itself[entered][tier] & (index >= rank[reader])).astype(np.intp)
+    slot = tier_start[tier] + index
+    run = np.searchsorted(run_end, slot, side="right")
+    return (
+        np.concatenate((left, holder_at[reader])),
+        np.concatenate((right, order[run_start[run] + slot - (run_end[run] - run_size[run])])),
+        np.concatenate((near, entered_level[tier])),
+    )
 
 
 def _within_class_pairs(
@@ -565,6 +742,21 @@ def _checked_partition(partition: object, count: int, caller: str) -> NDArray[np
     raise ValueError(f"{caller}: partition must be a 1D integer array with one label per code; got {got}.")
 
 
+def _checked_k(k: object, caller: str) -> int:
+    """Return a caller's neighbor cap as an ``int``, refusing a bool, a float or a value below one.
+
+    ``operator.index`` takes every integer, NumPy's included, and refuses a float rather than
+    truncating it; a bool is an integer to Python but never a count here.
+    """
+    try:
+        cap = operator.index(k) if isinstance(k, SupportsIndex) and not isinstance(k, bool | np.bool_) else 0
+    except TypeError:  # an array that offers __index__ and then refuses it: a float or a non-scalar one
+        cap = 0
+    if cap < 1:
+        raise ValueError(f"{caller}: k must be a positive integer; got {k!r}.")
+    return cap
+
+
 def _prepare(
     codes: NDArray[np.uint64],
     radius: int,
@@ -724,8 +916,36 @@ def _refuse(
     implied: int,
     max_pairs: int,
     labeled: _Labeled | None = None,
+    capped: bool = False,
+    rows: bool = False,
 ) -> None:
-    """Raise, naming the reason the answer is quadratic and the function that is not."""
+    """Raise, naming the reason the answer is quadratic and the function that is not.
+
+    With ``capped`` (a call that passed ``k``), ``implied`` counts the pairs of distinct hashes the
+    search found, or with ``rows`` the rows of work :func:`_capped_rows` counts for them: the two
+    things ``max_pairs`` then bounds.
+    """
+    if capped:
+        reading = (
+            "With k, max_pairs bounds the pairs of distinct hashes the search finds and the rows of work built "
+            "from them, rather than the pairs returned"
+        )
+        if rows:
+            if labeled is None:
+                unit, fix = "one for each set of identical hashes", "Use dataeval.core.hash_groups"
+            else:
+                unit, fix = "one per label in each set of identical hashes", "Partition on fewer, coarser labels"
+            raise ValueError(
+                f"hash_neighbors: radius {radius} over {total} hashes needs {implied} rows of work for k, {unit}, "
+                f"for the set itself and for each set it pairs with, above max_pairs={max_pairs}. {reading}. "
+                f"{fix}, or raise max_pairs."
+            )
+        raise ValueError(
+            f"hash_neighbors: radius {radius} over {total} hashes yields at least {implied} pairs of distinct "
+            f"hashes, above max_pairs={max_pairs}. {reading}. k does not narrow the search for pairs of distinct "
+            "hashes. Use dataeval.core.hash_groups for connected sets instead, which is bounded by the number of "
+            "hashes, or raise max_pairs."
+        )
     within = _within_count(counts, labeled)
     if labeled is None:
         kind, spanning, sets = "pairs", "", int((counts > 1).sum())
@@ -738,7 +958,8 @@ def _refuse(
         f"above max_pairs={max_pairs}. {within} of them come from {sets} "
         f"set(s) of identical hashes{spanning}, which are quadratic in their own size however they are "
         "found. Use dataeval.core.hash_groups for connected sets instead, which is bounded by "
-        f"the number of hashes, {offer}or raise max_pairs if the pairs themselves are needed."
+        f"the number of hashes, {offer}pass k if each hash's k nearest neighbors are enough, which "
+        "returns at most k times as many pairs as hashes, or raise max_pairs if the pairs themselves are needed."
     )
 
 
@@ -750,17 +971,23 @@ def _check_budget(
     total: int,
     max_pairs: int,
     labeled: _Labeled | None = None,
+    capped: bool = False,
 ) -> None:
     """Refuse if the pairs these classes imply would outgrow the budget.
 
     With ``labeled``, two classes imply ``n_a * n_b - sum_g n_a,g * n_b,g`` pairs: those whose labels differ.
+    With ``capped``, the expansion is bounded by ``k`` per position, so only the class pairs count.
     """
-    across = int((counts[class_pairs[:, 0]] * counts[class_pairs[:, 1]]).sum()) if len(class_pairs) else 0
-    if labeled is not None and len(class_pairs):
-        histogram = labeled.histogram
-        across -= int(histogram[class_pairs[:, 0]].multiply(histogram[class_pairs[:, 1]]).sum())
-    if within + across > max_pairs:
-        _refuse(counts, radius, total, within + across, max_pairs, labeled)
+    if capped:
+        implied = len(class_pairs)
+    else:
+        across = int((counts[class_pairs[:, 0]] * counts[class_pairs[:, 1]]).sum()) if len(class_pairs) else 0
+        if labeled is not None and len(class_pairs):
+            histogram = labeled.histogram
+            across -= int(histogram[class_pairs[:, 0]].multiply(histogram[class_pairs[:, 1]]).sum())
+        implied = within + across
+    if implied > max_pairs:
+        _refuse(counts, radius, total, implied, max_pairs, labeled, capped)
 
 
 def _class_pairs(
@@ -771,14 +998,16 @@ def _class_pairs(
     max_pairs: int,
     total: int,
     labeled: _Labeled | None = None,
+    capped: bool = False,
 ) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
     """Every pair of distinct codes within ``radius``, consolidated, staying inside a budget.
 
     The budget is checked against the *deduplicated* class pairs each time they are consolidated.
     Consolidating on overrun rather than refusing outright matters because a pair can be proposed
-    by several bands: a raw overrun is not yet an answer that is too large.
+    by several bands: a raw overrun is not yet an answer that is too large. With ``capped`` the
+    budget counts the class pairs themselves (see :func:`_check_budget`).
     """
-    within = _within_count(counts, labeled)
+    within = 0 if capped else _within_count(counts, labeled)
     found: list[_Batch] = []
     raw = 0
     for batch in _search(unique, width, radius):
@@ -794,13 +1023,52 @@ def _class_pairs(
         raw += len(batch[0])
         if raw > max_pairs:
             pairs, distances = _consolidate(found, len(unique))
-            _check_budget(counts, pairs, within, radius, total, max_pairs, labeled)
+            _check_budget(counts, pairs, within, radius, total, max_pairs, labeled, capped)
             found, raw = [(pairs[:, 0], pairs[:, 1], distances)], len(pairs)
     if not found:
         return np.empty((0, 2), dtype=np.intp), np.empty(0, dtype=np.intp)
     pairs, distances = _consolidate(found, len(unique))
-    _check_budget(counts, pairs, within, radius, total, max_pairs, labeled)
+    _check_budget(counts, pairs, within, radius, total, max_pairs, labeled, capped)
     return pairs, distances
+
+
+def _neighbor_pairs(
+    codes: NDArray[np.uint64],
+    width: int,
+    radius: int,
+    max_pairs: int,
+    labels: NDArray[np.intp] | None,
+    k: int | None,
+    positions: NDArray[np.intp],
+) -> _Batch:
+    """Every pair of participating positions within ``radius``, or with ``k`` each position's ``k`` nearest.
+
+    Pairs inside one label are left out when ``labels`` is given. Without ``k`` each pair comes out
+    once; with it, once from each endpoint that keeps it, so the caller deduplicates.
+    """
+    unique, members, starts, sizes = _classes(codes)
+    labeled = None if labels is None else _labeled_classes(members, sizes, labels)
+    counts = sizes.astype(np.int64)
+    if k is not None:
+        # ponytail: k caps the member expansion, not the class-level search, which still finds every
+        # pair of distinct hashes within the radius; cap inside the band buckets if real footage
+        # holds many distinct hashes.
+        pairs, distances = _class_pairs(unique, width, radius, counts, max_pairs, len(codes), labeled, capped=True)
+        # Counted before the rows are built: a class spread over many labels multiplies them.
+        rows = _capped_rows(sizes, pairs, labeled)
+        if rows > max_pairs:
+            _refuse(counts, radius, len(codes), rows, max_pairs, labeled, capped=True, rows=True)
+        return _capped_pairs(members, starts, sizes, pairs, distances, k, positions, labeled)
+
+    # Counted, never estimated, and counted before the expansion allocates anything.
+    within = _within_count(counts, labeled)
+    if within > max_pairs:
+        _refuse(counts, radius, len(codes), within, max_pairs, labeled)
+    pairs, distances = _class_pairs(unique, width, radius, counts, max_pairs, len(codes), labeled)
+
+    left, right, zero = _within_class_pairs(members, starts, sizes, labeled)
+    near = _expand(members, starts, sizes, pairs, distances, labeled)
+    return np.concatenate((left, near[0])), np.concatenate((right, near[1])), np.concatenate((zero, near[2]))
 
 
 def pack_hashes(hashes: Sequence[str]) -> tuple[NDArray[np.uint64], NDArray[np.bool_]]:
@@ -1000,6 +1268,7 @@ def hash_neighbors(
     bits: int | None = None,
     max_pairs: int = _MAX_PAIRS,
     partition: NDArray[np.integer] | None = None,
+    k: int | None = None,
 ) -> HashNeighborResult:
     """
     Find every pair of hashes within a Hamming radius of one another.
@@ -1022,7 +1291,10 @@ def hash_neighbors(
         whole input in one bucket. Must be between 1 and ``W * 64``.
     max_pairs : int, default 10000000
         Refuse rather than return more pairs than this. With ``partition``, only the pairs
-        whose labels differ count. See Notes.
+        whose labels differ count. With ``k``, it bounds instead the pairs of distinct hashes
+        the search finds and the rows of work built from them (one per set of identical hashes,
+        or per label in it with ``partition``, for the set and each set it pairs with), since the
+        pairs returned are then at most ``N * k``. See Notes.
     partition : NDArray[np.integer] or None, default None
         Shape ``(N,)``. One integer label per position of ``codes``, including the positions
         ``valid`` excludes. When given, only the pairs whose two labels differ are reported:
@@ -1032,6 +1304,18 @@ def hash_neighbors(
         never expanded, so a large set of identical hashes under a single label is not counted
         against ``max_pairs``. Passing it raises
         :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
+
+        .. versionadded:: 1.3
+    k : int or None, default None
+        A positive integer. When given, each position keeps only its ``k`` nearest neighbors, and a
+        pair is reported when either of its positions keeps it, so pairs within ``radius`` can be
+        left out and the result holds at most ``k`` times as many pairs as positions. Every position
+        that had a neighbor still appears in a pair. For a given order of ``codes`` the result is the
+        same every time, but reordering ``codes`` can change which of several equally near neighbors
+        a position keeps. Passing it raises :class:`~dataeval.exceptions.ExperimentalWarning` once per
+        process.
+
+        .. versionadded:: 1.3
 
     Returns
     -------
@@ -1048,8 +1332,10 @@ def hash_neighbors(
         If ``radius`` is negative, if ``codes`` is not a two-dimensional array of at least one
         word, if ``bits`` is outside the width ``codes`` holds, if ``valid`` is not a
         one-dimensional array matching ``codes`` in length, if ``partition`` is not a
-        one-dimensional integer array of the same length, or if the answer would hold more
-        than ``max_pairs`` pairs.
+        one-dimensional integer array of the same length, if ``k`` is not a positive integer,
+        or, without ``k``, if the answer would hold more than ``max_pairs`` pairs; with ``k``, if the
+        pairs of distinct hashes the search finds, or the rows of work built from them, exceed
+        ``max_pairs`` (the answer itself is then at most ``N * k``).
 
     See Also
     --------
@@ -1059,8 +1345,10 @@ def hash_neighbors(
 
     Notes
     -----
-    Recall is exact: every pair within ``radius`` is reported, and no pair outside it. Two
-    strategies produce that same answer, chosen on size *and radius* and logged when the choice
+    Without ``k``, recall is exact: every pair within ``radius`` is reported (with ``partition``, every
+    such pair whose labels differ), and no pair outside it. With ``k`` it is not, by design: pairs
+    within ``radius`` that no position keeps are left out. Two
+    strategies produce the same answer, chosen on size *and radius* and logged when the choice
     is made.
 
     Most inputs use **multi-index hashing** -- each code is split into ``radius + 1`` disjoint
@@ -1076,15 +1364,20 @@ def hash_neighbors(
     degenerates into the scan it replaced, which is not a defect but a statement about the
     question: at that radius most pairs *are* neighbors.
 
-    **The answer can be quadratic even when the search is not.** *k* copies of one image are
-    ``k * (k - 1) / 2`` pairs however cheaply they are found, so a few thousand duplicates --
+    **The answer can be quadratic even when the search is not.** *n* copies of one image are
+    ``n * (n - 1) / 2`` pairs however cheaply they are found, so a few thousand duplicates --
     ordinary in the data a duplicate detector is aimed at -- is tens of millions of rows and
     gigabytes of memory. ``max_pairs`` is counted exactly rather than estimated, and counted
     *before the pairs are expanded*, which is the allocation that would dominate; the search
     itself still runs, and its own working set is bounded but not free. With ``partition`` the
     count is of the pairs whose labels differ, so a set of identical hashes under one label costs
     nothing against it; the search is not narrowed, so distinct hashes under one label are still
-    compared. Exceeding the budget raises rather than truncating: a silently shortened neighbor
+    compared. Pass ``k`` when each position's nearest neighbors are enough: the pairs returned are
+    then at most ``N * k``, so ``max_pairs`` bounds the pairs of distinct hashes the search finds and
+    the rows of work built from them instead. The rows number at least twice those pairs plus one
+    per set of identical hashes (per label in each set, with ``partition``), so the budget admits at
+    most about ``max_pairs / 2`` pairs of distinct hashes, or about a quarter of ``max_pairs`` with two
+    labels per set. Exceeding the budget raises rather than truncating: a silently shortened neighbor
     list reads as a complete one. When the question is which hashes belong together rather than
     which pairs link them, :func:`~dataeval.core.hash_groups` answers it in space bounded by ``N``.
 
@@ -1113,35 +1406,37 @@ def hash_neighbors(
            [1, 2]])
     >>> result["distances"]
     array([0, 1])
+
+    With ``k``, each position keeps its nearest neighbors only. Here each of the three hashes keeps
+    one, and the pair at distance ``3`` is kept by neither of its positions:
+
+    >>> codes, valid = pack_hashes(["ff00ff00ff00ff00", "ff00ff00ff00ff01", "ff00ff00ff00ff07"])
+    >>> result = hash_neighbors(codes, radius=3, valid=valid, k=1)
+    >>> result["pairs"]
+    array([[0, 1],
+           [1, 2]])
+    >>> result["distances"]
+    array([1, 2])
     """
     # The labels index the caller's positions, so they are checked against the input before `valid` drops any.
     labels = None if partition is None else _checked_partition(partition, len(codes), "hash_neighbors")
+    cap = None if k is None else _checked_k(k, "hash_neighbors")
     positions, codes, width = _prepare(codes, radius, valid, bits, "hash_neighbors")
     if labels is not None:
         warn_experimental_once("hash_neighbors(partition=...)")
         labels = labels[positions]
+    if cap is not None:
+        warn_experimental_once("hash_neighbors(k=...)")
     if len(codes) < 2:
         return _empty_result()
 
-    unique, members, starts, sizes = _classes(codes)
-    labeled = None if labels is None else _labeled_classes(members, sizes, labels)
-    counts = sizes.astype(np.int64)
-    # Counted, never estimated, and counted before the expansion allocates anything.
-    within = _within_count(counts, labeled)
-    if within > max_pairs:
-        _refuse(counts, radius, len(codes), within, max_pairs, labeled)
-    pairs, distances = _class_pairs(unique, width, radius, counts, max_pairs, len(codes), labeled)
-
-    left, right, zero = _within_class_pairs(members, starts, sizes, labeled)
-    near = _expand(members, starts, sizes, pairs, distances, labeled)
-    left = np.concatenate((left, near[0]))
-    right = np.concatenate((right, near[1]))
-    distances = np.concatenate((zero, near[2]))
+    left, right, distances = _neighbor_pairs(codes, width, radius, max_pairs, labels, cap, positions)
     if not len(left):
         return _empty_result()
 
     # Within-class and cross-class pairs are disjoint by construction — two distinct codes are
-    # never zero bits apart — so this sorts and canonicalizes rather than deduplicating.
+    # never zero bits apart — so without k this sorts and canonicalizes rather than deduplicating.
+    # With k it also drops the second copy of a pair both of its positions kept.
     result_pairs, result_distances = _dedupe(left, right, distances, len(codes))
     _logger.debug("hash_neighbors: %d pair(s) within radius %d", len(result_pairs), radius)
     return HashNeighborResult(pairs=positions[result_pairs], distances=result_distances)

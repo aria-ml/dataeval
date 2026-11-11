@@ -22,17 +22,25 @@ from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput, _duplicates
 from dataeval.quality._duplicates import (
+    DEFAULT_DUPLICATES_MAX_SEGMENT_GAP,
+    DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES,
+    DEFAULT_DUPLICATES_MIN_TRACK_FRAMES,
+    DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE,
+    DEFAULT_DUPLICATES_VERIFY_ALIGNMENT,
+    DEFAULT_DUPLICATES_VIDEO_HASH_RADIUS,
     _aligned_digests,
     _annotation_digests,
     _as_frames,
     _as_frames_multi,
     _build_duplicates_dataframe,
+    _checked_segment_policy,
     _crossing_pairs,
     _datum_keys,
     _dominant,
     _find_hash_groups,
     _HashedRuns,
     _merge_near_groups,
+    _SegmentPolicy,
 )
 from dataeval.types import RemovalPlan, SourceIndex
 
@@ -1832,9 +1840,13 @@ class TestCrossingPairs:
         assert distances.tolist() == [0] * 200
 
     def test_overrun_is_logged_at_warning(self, monkeypatch, caplog):
-        """A pair too large to match costs its segments; the WARNING names max_pairs and does not offer partition."""
+        """A pair too large to match costs its segments; the WARNING names segment_neighbors, the only knob a user has.
+
+        The search's own refusal advises `hash_groups`, `partition` and `max_pairs`, none of which a Duplicates user can
+        reach, so that text goes to DEBUG and the WARNING says what to set instead.
+        """
         monkeypatch.setattr(_duplicates, "hash_neighbors", functools.partial(hash_neighbors, max_pairs=100))
-        caplog.set_level(logging.WARNING, logger="dataeval.quality")
+        caplog.set_level(logging.DEBUG, logger="dataeval.quality")
         value = _spread_hashes(1, 4)[0]
         runs = _hashed_runs([value] * 30, [value] * 30)  # 900 pairs cross, above the budget of 100
 
@@ -1845,9 +1857,43 @@ class TestCrossingPairs:
         (record,) = [record for record in caplog.records if record.levelno >= logging.WARNING]
         assert record.levelno == logging.WARNING
         message = record.getMessage()
-        assert "max_pairs" in message
-        assert "cross-group" in message
+        assert "segment_neighbors" in message
+        assert "experimental" in message
+        assert "30 and 30 frame" in message
         assert "partition" not in message, "a Duplicates user cannot pass partition"
+        assert "max_pairs" not in message, "a Duplicates user cannot raise max_pairs"
+        assert "hash_groups" not in message
+        (core,) = [
+            record
+            for record in caplog.records
+            if record.levelno == logging.DEBUG and "max_pairs" in record.getMessage()
+        ]
+        assert "cross-group pairs" in core.getMessage()
+
+    def test_overrun_with_k_is_logged_without_advice_the_user_cannot_use(self, monkeypatch, caplog):
+        """With a cap passed, a refusal means the sequences hold too many distinct hashes, and the WARNING says so."""
+        monkeypatch.setattr(_duplicates, "hash_neighbors", functools.partial(hash_neighbors, max_pairs=100))
+        caplog.set_level(logging.DEBUG, logger="dataeval.quality")
+        # 30 hashes one bit from a common base, the same 30 in both sequences: every pair of them is within the
+        # radius, so there are 435 pairs of distinct hashes however the k nearest are read.
+        base = _spread_hashes(1, 4)[0]
+        variants = [base ^ (1 << bit) for bit in range(30)]
+        runs = _hashed_runs(variants, variants)
+
+        pairs, distances = _crossing_pairs(runs, np.arange(30), np.arange(30, 60), 4, k=2)
+
+        assert pairs.shape == (0, 2)
+        assert distances.shape == (0,)
+        (record,) = [record for record in caplog.records if record.levelno >= logging.WARNING]
+        message = record.getMessage()
+        assert "segment_neighbors=2" in message
+        assert "distinct hashes" in message
+        assert "no segments" in message
+        assert "max_pairs" not in message
+        assert "partition" not in message
+        assert any(
+            record.levelno == logging.DEBUG and "max_pairs" in record.getMessage() for record in caplog.records
+        ), "the search's own refusal is kept at DEBUG"
 
     def test_internal_partition_is_silent(self, monkeypatch):
         """The partition is the search's own, so a user who never passed one gets no experimental warning."""
@@ -1857,6 +1903,205 @@ class TestCrossingPairs:
             warnings.simplefilter("error", ExperimentalWarning)
             _crossing_pairs(runs, np.arange(5), np.arange(5, 10), 4)
         assert not experimental_module._WARNED, "the user's own later use of partition must still warn once"
+
+
+_STATIC_FRAMES = 800
+_STATIC_BUDGET = 5_000
+# What the capped search may add to the uncapped count of dominant segments, at k = 10 only. Measured on this fixture's
+# design (the uncapped count is 2 at every size), at 60, 100 and then 200 to 1,500 scene frames per video, the count at
+# k = 10 was 2, 3 and then 1 at every size swept from 200 up: never more than one above the uncapped count. No count is
+# asserted at k = 25, where it was not bounded by that slack (see the test).
+_DOMINANT_SLACK = 1
+
+
+def _fixed_camera_pair(static: int = _STATIC_FRAMES) -> Any:
+    """Two videos from one fixed camera that share one 200-frame stretch.
+
+    Frames are flat fills hashed with xxhash, so a distinct fill is a distinct hash and no two of them fall within the
+    radius by chance. Fill 250 is the scene. Each video holds `static` frames of it, so `static ** 2` identical pairs
+    cross between the videos, far above the budget the tests patch in. Left is the scene, 20 frames only it holds
+    (fills 210 to 229), then the stretch (fills 10 to 209); right is the stretch, 20 frames only it holds (230 to 249),
+    then the scene. The stretch therefore runs at offset `static + 20`, a diagonal no scene pair lies on, so it is
+    told apart from the scene however many of the scene's pairs are kept. The 20 frames of each video that match
+    nothing keep containment below one, so it is a value a cap could change.
+    """
+    stretch = _fills(10, 200, step=1)
+    left = [250] * static + _fills(210, 20, step=1) + stretch
+    right = stretch + _fills(230, 20, step=1) + [250] * static
+    return make_tracking_dataset([left, right])
+
+
+def _stretch_span(static: int = _STATIC_FRAMES) -> tuple[list[int], list[int]]:
+    """Where `_fixed_camera_pair`'s stretch sits in each video, as a segment row reports it."""
+    return [static + 20, 0], [static + 219, 199]
+
+
+def _segment_rows(result: DuplicatesOutput) -> pl.DataFrame:
+    return result.data().filter(pl.col("dup_type") == "segment")
+
+
+def _finds_stretch(result: DuplicatesOutput, static: int = _STATIC_FRAMES) -> bool:
+    start, end = _stretch_span(static)
+    return any(
+        row["span_start"] == start and row["span_end"] == end for row in _segment_rows(result).iter_rows(named=True)
+    )
+
+
+def _fixed_camera_detector(**kwargs: Any) -> Duplicates:
+    return Duplicates(flags=ImageStats.HASH_XXHASH, **kwargs)
+
+
+def _policy(**changes: Any) -> _SegmentPolicy:
+    """The segment policy a video evaluation starts from, with `changes` applied."""
+    base = _SegmentPolicy(
+        radius=DEFAULT_DUPLICATES_VIDEO_HASH_RADIUS,
+        min_length=DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES,
+        max_gap=DEFAULT_DUPLICATES_MAX_SEGMENT_GAP,
+        offset_tolerance=DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE,
+        neighbors=None,
+        verify_alignment=DEFAULT_DUPLICATES_VERIFY_ALIGNMENT,
+        track_length=DEFAULT_DUPLICATES_MIN_TRACK_FRAMES,
+    )
+    return base._replace(**changes)
+
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+class TestSegmentNeighbors:
+    """The opt-in cap on the pairs each frame contributes to the segment search."""
+
+    @pytest.fixture
+    def within_budget(self) -> DuplicatesOutput:
+        """The fixed-camera pair under the default budget, where the uncapped search runs: the reference."""
+        return _fixed_camera_detector().evaluate(_fixed_camera_pair())
+
+    @pytest.fixture
+    def beyond_budget(self, within_budget, monkeypatch, caplog) -> None:
+        """A budget the pair's crossing pairs overrun, the way two long static runs overrun the default one.
+
+        Asks for the reference first, so it is computed before the budget is patched.
+        """
+        _ = within_budget
+        monkeypatch.setattr(_duplicates, "hash_neighbors", functools.partial(hash_neighbors, max_pairs=_STATIC_BUDGET))
+        caplog.set_level(logging.WARNING, logger="dataeval.quality")
+
+    def test_the_uncapped_search_finds_the_stretch_where_it_fits(self, within_budget):
+        """The premise of the tests below, its "fits" half: the uncapped search finds the stretch within the budget."""
+        assert _finds_stretch(within_budget)
+
+    @pytest.mark.usefixtures("beyond_budget")
+    def test_segment_neighbors_finds_the_stretch_beyond_the_budget(self, within_budget, caplog):
+        """Acceptances 8 and 9.
+
+        Without the option the pair loses its segments, the rest of the evaluation is intact and one WARNING names the
+        option. With it, at k = 10 and 25, the stretch is found at its offset and containment is the uncapped value.
+        At k = 10 no segments are manufactured either: the capped search reports at most the uncapped count of dominant
+        segments plus `_DOMINANT_SLACK`.
+
+        No count is asserted at k = 25, because the count was not bounded by that slack there. On this fixture's design
+        the uncapped count is 2 at every size, and at k = 25 the count by scene frames per video was 2 at 60, 4 at 100,
+        10 at 200, 17 at 300, 8 at 400, 5 at 600, 700 and 750, then 1, 2, 2, 1, 1 at 800, 850, 900, 1,000 and 1,500
+        (at k = 10: 2, 3, then 1 at every size swept from 200 up). It rises to 17 and then falls as the scene grows.
+        So a larger k is not safer, and this test does not claim it is.
+
+        The uncapped reference has two rows, the stretch and the scene's own diagonal. At k = 10 and 25 the capped run
+        has one, the stretch alone: a cap can drop a true static run's own segment while keeping the sparse stretch.
+        The bound below is only an upper bound, so it passes.
+        """
+        reference = _segment_rows(within_budget)
+        # One value per pair, so every row of the pair, and every row at any cap, carries it.
+        (uncapped,) = {tuple(containment) for containment in reference["containment"].to_list()}
+        assert uncapped[0] < 1.0, "frames match nothing here, so containment is a value a cap could move"
+
+        unset = _fixed_camera_detector().evaluate(_fixed_camera_pair())
+        assert _segment_rows(unset).is_empty()
+        # The segment columns (spans, containment) exist only where a segment was found, and the groups are numbered
+        # through the segment groups, so compare the rest of the rows by their content.
+        kept = unset.data().filter(pl.col("dup_type") != "segment").drop("group_id")
+        full = within_budget.data().filter(pl.col("dup_type") != "segment").drop("group_id")
+        assert kept.equals(full.select(kept.columns))
+        (warning,) = [record for record in caplog.records if record.levelno >= logging.WARNING]
+        assert "segment_neighbors" in warning.getMessage()
+
+        for neighbors in (10, 25):
+            caplog.clear()
+            capped = _fixed_camera_detector(segment_neighbors=neighbors).evaluate(_fixed_camera_pair())
+            rows = _segment_rows(capped)
+            assert not [record for record in caplog.records if record.levelno >= logging.WARNING], neighbors
+            assert _finds_stretch(capped), f"the stretch is found at its offset at k = {neighbors}"
+            assert all(tuple(containment) == uncapped for containment in rows["containment"].to_list()), neighbors
+            if neighbors == 10:
+                assert len(rows) <= len(reference) + _DOMINANT_SLACK
+
+    @pytest.mark.usefixtures("beyond_budget")
+    def test_redetection_keeps_segment_neighbors(self):
+        """A re-detection rebuilds its policy from what the result stored, so a cap lost there loses the stretch."""
+        result = _fixed_camera_detector(segment_neighbors=10).evaluate(_fixed_camera_pair())
+        redetected = result.with_radius(0)
+        for output in (result, result.items, redetected):
+            assert output.segment_neighbors == 10
+        assert _finds_stretch(redetected)
+        assert _segment_rows(redetected).equals(_segment_rows(result))
+
+    def test_unset_option_is_bit_identical_and_silent(self, monkeypatch):
+        """Acceptance 11: an unset option searches as before and warns of nothing.
+
+        A cap at least as large as any frame's neighbor count keeps every pair, so it must give the uncapped answer
+        too. The spy sees what the segment search asks `hash_neighbors` for.
+        """
+        monkeypatch.setattr(experimental_module, "_WARNED", set())
+        asked: list[dict[str, Any]] = []
+
+        def spy(*args: Any, **kwargs: Any) -> Any:
+            asked.append(kwargs)
+            return hash_neighbors(*args, **kwargs)
+
+        monkeypatch.setattr(_duplicates, "hash_neighbors", spy)
+        dataset = _fixed_camera_pair(60)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            unset = _fixed_camera_detector().evaluate(dataset)
+            explicit = _fixed_camera_detector(segment_neighbors=None).evaluate(dataset)
+        assert not experimental_module._WARNED, "an unset option, and the search's own partition, spend no warning"
+        assert asked
+        assert all(call.get("k") is None for call in asked)
+        assert unset.segment_neighbors is None
+        assert unset.data().equals(explicit.data())
+        assert _finds_stretch(unset, 60)
+
+        asked.clear()
+        with pytest.warns(ExperimentalWarning, match="segment_neighbors"):
+            roomy = _fixed_camera_detector(segment_neighbors=10_000).evaluate(dataset)
+        assert all(call.get("k") == 10_000 for call in asked)
+        assert roomy.data().equals(unset.data())
+        assert {"Duplicates(segment_neighbors=...)"} == experimental_module._WARNED, (
+            "only the user's own option is spent: the search's cap and partition stay silent and warn on the user's use"
+        )
+
+    def test_the_option_warns_once_when_set(self, monkeypatch):
+        monkeypatch.setattr(experimental_module, "_WARNED", set())
+        with pytest.warns(ExperimentalWarning, match=r"Duplicates\(segment_neighbors=\.\.\.\)") as got:
+            Duplicates(segment_neighbors=10)
+        assert len([w for w in got if issubclass(w.category, ExperimentalWarning)]) == 1
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            Duplicates(segment_neighbors=10)
+            Duplicates(config=Duplicates.Config())
+
+    def test_config_round_trip(self):
+        config = Duplicates.Config(segment_neighbors=10)
+        assert Duplicates.Config.model_validate(config.model_dump()) == config
+        assert Duplicates.Config.model_validate_json(config.model_dump_json()) == config
+        assert Duplicates.Config().segment_neighbors is None
+        assert "segment_neighbors" not in Duplicates.Config().model_fields_set
+
+        detector = Duplicates(config=config)
+        assert detector.segment_neighbors == 10
+        assert detector.config.segment_neighbors == 10
+        assert Duplicates(config=detector.config).segment_neighbors == 10
+        assert Duplicates(config=config, segment_neighbors=25).segment_neighbors == 25, "an argument wins"
+        assert Duplicates().segment_neighbors is None
+        assert Duplicates(min_segment_frames=5).config.model_fields_set == {"min_segment_frames"}
 
 
 @pytest.mark.required
@@ -2044,6 +2289,49 @@ class TestSegmentPolicyValidation:
         dataset = make_tracking_dataset([_fills(10, 6)])
         with pytest.raises(ValueError, match=match):
             Duplicates(flags=ImageStats.HASH_XXHASH, **kwargs).evaluate(dataset)
+
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+    def test_option_validation(self):
+        """Acceptance 10: None or a positive integer, refused at construction and in a policy; NumPy integers pass."""
+        for bad in (0, -1, True, 2.0, 2.5, np.float64(3.0), "3", [3]):
+            with pytest.raises(ValueError, match="segment_neighbors"):
+                Duplicates(segment_neighbors=bad)  # type: ignore[arg-type]
+            with pytest.raises(ValueError, match="segment_neighbors"):
+                _checked_segment_policy(_policy(neighbors=bad))
+        for good in (None, 1, 10, np.int64(7), np.int32(7)):
+            _checked_segment_policy(_policy(neighbors=good))
+        detector = Duplicates(segment_neighbors=np.int64(7))  # type: ignore[arg-type]
+        assert detector.segment_neighbors == 7
+        assert type(detector.segment_neighbors) is int
+
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+    @pytest.mark.parametrize("bad", [0, -1, True, 2.5])
+    @pytest.mark.parametrize(
+        "dataset", [MockDataset, lambda: make_tracking_dataset([_fills(10, 6)])], ids=["images", "tracking"]
+    )
+    def test_a_bad_value_is_refused_when_evaluating(self, bad, dataset):
+        """The check at evaluation time, which a constructor's own validation would hide if the value went in there.
+
+        The detector is built validly and the attribute is set past the constructor, so the refusal is the policy's
+        own. Image data never reaches the segment search, so an unchecked value would be ignored in silence there.
+        """
+        detector = Duplicates(flags=ImageStats.HASH_XXHASH, segment_neighbors=10)
+        detector.segment_neighbors = bad  # type: ignore[assignment]
+        with pytest.raises(ValueError, match="segment_neighbors"):
+            detector.evaluate(dataset())
+
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+    def test_no_effect_on_images_but_still_validated(self):
+        """A valid value changes nothing for images, and a nonsense one set past the constructor is still refused."""
+        images = _near_variants()
+        plain = Duplicates(hash_radius=4).evaluate(images)
+        detector = Duplicates(hash_radius=4, segment_neighbors=np.int64(10))  # type: ignore[arg-type]
+        capped = detector.evaluate(images)
+        assert capped.data().equals(plain.data())
+        assert "span_start" not in capped.data().columns
+        detector.segment_neighbors = 0
+        with pytest.raises(ValueError, match="segment_neighbors"):
+            detector.evaluate(images)
 
     def test_a_pair_too_large_to_warp_loses_its_alignment_and_says_so(self, monkeypatch, caplog):
         """One pair costing too much is skipped, not raised: the other relations still stand."""

@@ -1,5 +1,6 @@
 """Tests for Hamming-radius search and grouping over packed perceptual hashes."""
 
+import itertools
 import re
 import warnings
 
@@ -42,6 +43,144 @@ def brute_crossing_pairs(hexes, radius, valid, partition):
     """Independent reference for a partition: `brute_pairs` kept to the pairs whose labels differ."""
     found = brute_pairs(hexes, radius, valid)
     return {(i, j): d for (i, j), d in found.items() if partition[i] != partition[j]}
+
+
+def found_pairs(result):
+    """A result as `{pair: distance}`, the form the references use."""
+    return {(int(i), int(j)): int(d) for (i, j), d in zip(result["pairs"], result["distances"], strict=True)}
+
+
+def neighbor_distances(pairs):
+    """Each position's neighbor distances in `{pair: distance}`, nearest first."""
+    lists = {}
+    for (i, j), distance in pairs.items():
+        lists.setdefault(i, []).append(distance)
+        lists.setdefault(j, []).append(distance)
+    return {position: sorted(distances) for position, distances in lists.items()}
+
+
+def unearned_pairs(found, reference, k):
+    """Reported pairs outside the reference, or in the k nearest of neither endpoint.
+
+    Seed-free: a pair at distance d is in p's k nearest when fewer than k of p's neighbors are
+    strictly closer, however equally near neighbors were chosen between.
+    """
+    nearest = neighbor_distances(reference)
+
+    def ranks(position, distance):
+        return sum(other < distance for other in nearest[position]) < k
+
+    return [
+        pair
+        for pair, distance in found.items()
+        if reference.get(pair) != distance or not (ranks(pair[0], distance) or ranks(pair[1], distance))
+    ]
+
+
+def unkept_positions(found, reference, k):
+    """Positions that did not keep their k nearest: all neighbors closer than the k-th, and k up to it."""
+    kept = neighbor_distances(found)
+    missing = []
+    for position, distances in neighbor_distances(reference).items():
+        cut = distances[min(k, len(distances)) - 1]
+        got = kept.get(position, [])
+        closer = sum(d < cut for d in got) == sum(d < cut for d in distances)
+        if not closer or sum(d <= cut for d in got) < min(k, len(distances)):
+            missing.append(position)
+    return missing
+
+
+def tied_at_the_cut(reference, k):
+    """Positions whose k-th nearest distance holds more neighbors than the slots left, so a window is read."""
+    return [p for p, ds in neighbor_distances(reference).items() if sum(d <= ds[min(k, len(ds)) - 1] for d in ds) > k]
+
+
+def window_rule_pairs(digests, radius, valid, k, offset, partition=None):
+    """Independent reference for the cap's rule, in plain Python, given the window offset.
+
+    Classes of identical codes in the order `_classes` lays them out (largest first, ties by code),
+    each laid out by label and then position. A position's tier at each distance lists the members
+    of the classes there in that layout, leaving out itself and its own label. It takes whole tiers
+    while they fit, then reads `offset(position, distance, size)` onward, cyclically, in the first
+    that does not. Returns the pairs and the tiers read part way.
+    """
+    classes = {}
+    for i, digest in enumerate(digests):
+        if valid[i]:
+            classes.setdefault(int(digest, 16), []).append(i)
+    label = (lambda i: 0) if partition is None else (lambda i: partition[i])
+    layout = [
+        (v, sorted(m, key=lambda i: (label(i), i)))
+        for v, m in sorted(classes.items(), key=lambda c: (-len(c[1]), c[0]))
+    ]
+    found, entered = {}, []
+    for value, members in layout:
+        for p in members:
+            tiers = {}
+            for other, others in layout:
+                distance = bin(value ^ other).count("1")
+                if distance <= radius:
+                    keep = [q for q in others if q != p and (partition is None or label(q) != label(p))]
+                    tiers.setdefault(distance, []).extend(keep)
+            slots = k
+            for distance in sorted(tiers):
+                tier = tiers[distance]
+                if len(tier) <= slots:
+                    taken, slots = tier, slots - len(tier)
+                else:
+                    start = offset(p, distance, len(tier))
+                    taken, slots = [tier[(start + j) % len(tier)] for j in range(slots)], 0
+                    entered.append(tier)
+                found.update({(min(p, q), max(p, q)): distance for q in taken})
+                if not slots:
+                    break
+    return dict(sorted(found.items())), entered
+
+
+def work_rows(digests, radius, valid, partition=None):
+    """Independent count of the cap's work table: each class's labels, for itself and each class near it.
+
+    Without a partition every class is one label and every pair of classes counts. With one, two
+    classes that each hold the same single label imply no pair and are not searched.
+    """
+    labels = {}
+    for i, digest in enumerate(digests):
+        if valid[i]:
+            labels.setdefault(int(digest, 16), set()).add(0 if partition is None else int(partition[i]))
+    rows = sum(len(held) for held in labels.values())
+    for a, b in itertools.combinations(sorted(labels), 2):
+        same = partition is not None and len(labels[a]) == len(labels[b]) == 1 and labels[a] == labels[b]
+        if bin(a ^ b).count("1") <= radius and not same:
+            rows += len(labels[a]) + len(labels[b])
+    return rows
+
+
+def tiered_hexes(rng):
+    """Random digests with near and exact duplicates, plus copies of six codes near one base.
+
+    The copies make classes of up to 12 members whose nearer tiers span several classes and
+    exceed a small k, so equally near neighbors outnumber the slots left.
+    """
+    base = int(rng.integers(0, 2**63))
+    flips = {0: 12, 1 << 3: 5, 1 << 17: 4, 1 << 40: 1, (1 << 3) | (1 << 17): 3, (1 << 9) | (1 << 30) | (1 << 50): 2}
+    values = [base ^ flip for flip, copies in flips.items() for _ in range(copies)]
+    digests = random_hexes(rng, 100, 16, near=40, duplicates=30) + [f"{value:016x}" for value in values]
+    return [digests[i] for i in rng.permutation(len(digests))]
+
+
+def ruler_codes(groups):
+    """Codes whose every neighbor sits at a distance of its own.
+
+    Each group's members hold the first m bits of word 0 for m on a Golomb ruler, whose pairwise
+    differences are all distinct, and a word of ones of their own keeps the groups 128 bits apart.
+    """
+    marks = [0, 1, 6, 10, 23, 26, 34, 41, 53, 55]
+    codes = np.zeros((groups * len(marks), groups + 1), dtype=np.uint64)
+    for group in range(groups):
+        for index, mark in enumerate(marks):
+            codes[group * len(marks) + index, 0] = np.uint64((1 << mark) - 1)
+            codes[group * len(marks) + index, 1 + group] = np.uint64(2**64 - 1)
+    return codes
 
 
 def brute_groups(pairs, count, valid):
@@ -289,6 +428,341 @@ class TestHashNeighbors:
         with warnings.catch_warnings():
             warnings.simplefilter("error", ExperimentalWarning)
             hash_neighbors(codes, radius=1, partition=np.zeros(1, dtype=np.int64))
+
+    def test_k_warns_once_as_experimental(self, monkeypatch):
+        monkeypatch.setattr(experimental_module, "_WARNED", set())
+        codes, _ = pack_hashes(["ff00ff00ff00ff00"])
+        # A refused k, or one passed inside quiet_experimental(), does not spend the warning.
+        with pytest.raises(ValueError, match="k must"):
+            hash_neighbors(codes, radius=1, k=0)
+        with warnings.catch_warnings(), experimental_module.quiet_experimental():
+            warnings.simplefilter("error", ExperimentalWarning)
+            hash_neighbors(codes, radius=1, k=1)
+        named = re.escape("'hash_neighbors(k=...)' is experimental")
+        with pytest.warns(ExperimentalWarning, match=named) as got:
+            hash_neighbors(codes, radius=1, k=1)
+        assert len([w for w in got if issubclass(w.category, ExperimentalWarning)]) == 1
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            hash_neighbors(codes, radius=1, k=1)
+
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+class TestNeighborCap:
+    """Each position keeps its k nearest neighbors, and a pair is reported when either endpoint keeps it.
+
+    Equally near neighbors are chosen between by a seeded window, so the references here never
+    depend on the seed: they check which pairs could have been kept, not which ones were.
+    """
+
+    @pytest.mark.parametrize("scan", [True, False])
+    @pytest.mark.parametrize("k", [1, 2, 5])
+    def test_every_reported_pair_is_in_a_nearest_k(self, monkeypatch, k, scan):
+        """Invalid positions holding real codes, and tiers that span several classes and exceed k."""
+        rng = np.random.default_rng(60 + k)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+
+        result = hash_neighbors(codes, radius=6, valid=valid, k=k)
+        found = found_pairs(result)
+        reference = brute_pairs(digests, 6, valid)
+        assert len(found) < len(reference)
+        assert tied_at_the_cut(reference, k)
+        assert unearned_pairs(found, reference, k) == []
+        assert unkept_positions(found, reference, k) == []
+        assert result["pairs"].dtype == np.intp
+        assert result["distances"].dtype == np.intp
+        assert result["pairs"].tolist() == sorted(result["pairs"].tolist())
+
+    @pytest.mark.parametrize("k", [1, 3])
+    def test_every_position_with_a_neighbor_appears(self, k):
+        rng = np.random.default_rng(61)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        found = found_pairs(hash_neighbors(codes, radius=6, valid=valid, k=k))
+        reference = brute_pairs(digests, 6, valid)
+        assert len(found) < len(reference)
+        assert set(neighbor_distances(found)) == set(neighbor_distances(reference))
+
+    @pytest.mark.parametrize("k", [1, 3, 10])
+    def test_at_most_n_times_k_pairs(self, k):
+        """Two large sets of identical hashes a bit apart, whose uncapped answer is quadratic in them."""
+        rng = np.random.default_rng(62)
+        codes, _ = pack_hashes(["deadbeefcafef00d"] * 300 + ["deadbeefcafef00c"] * 200 + random_hexes(rng, 100, 16))
+        uncapped = hash_neighbors(codes, radius=6)
+        capped = hash_neighbors(codes, radius=6, k=k)
+        assert len(uncapped["pairs"]) > len(codes) * k
+        assert len(capped["pairs"]) <= len(codes) * k
+        assert set(np.unique(capped["pairs"]).tolist()) == set(np.unique(uncapped["pairs"]).tolist())
+
+    @pytest.mark.parametrize("scan", [True, False])
+    @pytest.mark.parametrize("extra", [0, 50])
+    def test_k_at_least_the_degree_equals_the_uncapped_answer(self, monkeypatch, extra, scan):
+        rng = np.random.default_rng(63)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+        uncapped = hash_neighbors(codes, radius=6, valid=valid)
+        degree = max(len(distances) for distances in neighbor_distances(found_pairs(uncapped)).values())
+        assert degree > 10
+        capped = hash_neighbors(codes, radius=6, valid=valid, k=degree + extra)
+        assert capped["pairs"].tolist() == uncapped["pairs"].tolist()
+        assert capped["distances"].tolist() == uncapped["distances"].tolist()
+        assert capped["pairs"].dtype == np.intp
+        assert capped["distances"].dtype == np.intp
+
+    def test_k_one_keeps_every_position_with_a_neighbor(self):
+        rng = np.random.default_rng(64)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        found = found_pairs(hash_neighbors(codes, radius=6, valid=valid, k=1))
+        reference = brute_pairs(digests, 6, valid)
+        kept, nearest = neighbor_distances(found), neighbor_distances(reference)
+        assert tied_at_the_cut(reference, 1)
+        assert set(kept) == set(nearest)
+        # Each position's own pick is one of its nearest; the pairs others picked can only add to it.
+        assert all(kept[position][0] == distances[0] for position, distances in nearest.items())
+
+    @pytest.mark.parametrize("partition", [None, np.repeat([0, 1], 500)], ids=["unpartitioned", "partitioned"])
+    def test_a_tier_larger_than_k_is_not_read_from_its_lowest_positions(self, partition):
+        """A thousand identical hashes: every position's one tier holds hundreds, and k takes ten of them.
+
+        Read from its lowest positions, each tier would hand those few positions a pair with every
+        other one; the seeded window spreads the picks, so no position holds more than a few times k.
+        """
+        codes, _ = pack_hashes(["deadbeefcafef00d"] * 1000)
+        pairs = hash_neighbors(codes, radius=0, partition=partition, k=10)["pairs"]
+        assert np.bincount(pairs.ravel(), minlength=1000).max() <= 5 * 10
+
+    def test_capped_answer_is_deterministic(self, monkeypatch):
+        """The same input gives the same answer on either search path; a reordered one is still a nearest-k answer.
+
+        Equally near neighbors are told apart only by position, so reordering them need not
+        permute the answer. That limit is the documented one, and is all this checks of it.
+        """
+        rng = np.random.default_rng(65)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        assert tied_at_the_cut(brute_pairs(digests, 6, valid), 3)
+        first = hash_neighbors(codes, radius=6, valid=valid, k=3)
+        answers = [hash_neighbors(codes, radius=6, valid=valid, k=3)]
+        for scan in (True, False):
+            monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_, scan=scan: scan)
+            answers.append(hash_neighbors(codes, radius=6, valid=valid, k=3))
+        for again in answers:
+            assert again["pairs"].tolist() == first["pairs"].tolist()
+            assert again["distances"].tolist() == first["distances"].tolist()
+
+        order = rng.permutation(len(digests))
+        reordered = found_pairs(hash_neighbors(codes[order], radius=6, valid=valid[order], k=3))
+        reference = brute_pairs([digests[i] for i in order], 6, valid[order])
+        assert unearned_pairs(reordered, reference, 3) == []
+        assert unkept_positions(reordered, reference, 3) == []
+
+    def test_reordering_with_distinct_distances_permutes_the_output(self):
+        codes = ruler_codes(3)
+        digests = ["".join(f"{int(word):016x}" for word in row) for row in codes]
+        reference = brute_pairs(digests, 25, [True] * len(digests))
+        nearest = neighbor_distances(reference)
+        assert all(len(set(distances)) == len(distances) for distances in nearest.values())
+        assert max(len(distances) for distances in nearest.values()) > 2
+
+        result = hash_neighbors(codes, radius=25, k=2)
+        assert len(result["pairs"]) < len(reference)
+        rng = np.random.default_rng(66)
+        for _ in range(5):
+            order = rng.permutation(len(codes))
+            permuted = hash_neighbors(codes[order], radius=25, k=2)
+            mapped = sorted(
+                ((min(order[i], order[j]), max(order[i], order[j])), d)
+                for (i, j), d in zip(permuted["pairs"].tolist(), permuted["distances"].tolist(), strict=True)
+            )
+            assert [pair for pair, _ in mapped] == [tuple(pair) for pair in result["pairs"].tolist()]
+            assert [d for _, d in mapped] == result["distances"].tolist()
+
+    @pytest.mark.parametrize("scan", [True, False])
+    @pytest.mark.parametrize("groups", [None, 2, 3])
+    def test_the_window_rule_is_pinned(self, monkeypatch, groups, scan):
+        """With a known offset in place of the mix, the whole answer equals the rule's reference.
+
+        The fixture's tiers read part way span several classes and are not in ascending position,
+        so the layout order, the cyclic read and the distance in the offset all show in the answer.
+        """
+        rng = np.random.default_rng(80 + 2 * (groups or 0) + scan)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        partition = None if groups is None else rng.integers(0, groups, size=len(digests))
+        monkeypatch.setattr(
+            _hash_index, "_window_offsets", lambda positions, distances, sizes: (positions + distances) % sizes
+        )
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+        for k in (1, 2, 3, 5):
+            result = hash_neighbors(codes, radius=6, valid=valid, partition=partition, k=k)
+            expected, entered = window_rule_pairs(digests, 6, valid, k, lambda p, d, m: (p + d) % m, partition)
+            assert list(found_pairs(result).items()) == list(expected.items())
+            assert any(len({digests[q] for q in tier}) > 1 for tier in entered)
+            assert any(tier != sorted(tier) for tier in entered)
+
+    def test_window_offsets_are_pinned(self):
+        """Golden offsets of the real mix, checked against a plain-Python splitmix64 finalizer.
+
+        Updating these values is an intentional change of every capped result: equally near
+        neighbors would be chosen between differently for every input.
+        """
+        mask = 2**64 - 1
+
+        def mix(position, distance, size):
+            x = ((position * 0x9E3779B97F4A7C15) ^ (distance * 0xC2B2AE3D27D4EB4F)) & mask
+            x ^= x >> 30
+            x = (x * 0xBF58476D1CE4E5B9) & mask
+            x ^= x >> 27
+            x = (x * 0x94D049BB133111EB) & mask
+            return (x ^ (x >> 31)) % size
+
+        cases = [(0, 0, 7), (1, 0, 7), (5, 3, 1000), (12345, 6, 999_983), (2**40 + 17, 1, 64), (999, 0, 2), (77, 4, 3)]
+        golden = [0, 2, 231, 585432, 63, 0, 2]
+        positions, distances, sizes = (np.array(column, dtype=np.intp) for column in zip(*cases, strict=True))
+        assert _hash_index._window_offsets(positions, distances, sizes).tolist() == golden
+        assert [mix(*case) for case in cases] == golden
+
+    def test_window_offsets_depend_on_the_distance(self):
+        positions, sizes = np.arange(200, dtype=np.intp), np.full(200, 1000, dtype=np.intp)
+        one = _hash_index._window_offsets(positions, np.full(200, 1, dtype=np.intp), sizes)
+        two = _hash_index._window_offsets(positions, np.full(200, 2, dtype=np.intp), sizes)
+        assert ((one >= 0) & (one < sizes)).all()
+        assert (one != two).mean() > 0.9
+        assert len(set(one.tolist())) > 150
+
+    @pytest.mark.parametrize(
+        "k",
+        [0, -1, 2.5, True, np.array(2.5), np.array([3])],
+        ids=["zero", "negative", "float", "bool", "float-array", "non-scalar-array"],
+    )
+    def test_k_validation(self, k):
+        codes, _ = pack_hashes(["ff00ff00ff00ff00"] * 4)
+        expected = f"hash_neighbors: k must be a positive integer; got {k!r}."
+        with pytest.raises(ValueError, match=re.escape(expected)):
+            hash_neighbors(codes, radius=1, k=k)
+
+    @pytest.mark.parametrize("k", [np.int64(3), np.uint8(3)], ids=["int64", "uint8"])
+    def test_k_validation_accepts_a_numpy_integer(self, k):
+        codes, _ = pack_hashes(["ff00ff00ff00ff00"] * 4)
+        assert len(hash_neighbors(codes, radius=1, k=k)["pairs"]) == 6
+
+    @pytest.mark.parametrize("scan", [True, False])
+    @pytest.mark.parametrize("groups", [2, 3])
+    def test_k_with_partition_composes(self, monkeypatch, groups, scan):
+        """The cap applies after the partition: to each position's neighbors under other labels."""
+        rng = np.random.default_rng(70 + 2 * groups + scan)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        partition = rng.integers(0, groups, size=len(digests))
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+        reference = brute_crossing_pairs(digests, 6, valid, partition)
+        assert 0 in reference.values()
+        for k in (1, 3):
+            found = found_pairs(hash_neighbors(codes, radius=6, valid=valid, partition=partition, k=k))
+            assert len(found) < len(reference)
+            assert tied_at_the_cut(reference, k)
+            assert unearned_pairs(found, reference, k) == []
+            assert unkept_positions(found, reference, k) == []
+            assert len(found) <= int(valid.sum()) * k
+
+        degree = max(len(distances) for distances in neighbor_distances(reference).values())
+        whole = hash_neighbors(codes, radius=6, valid=valid, partition=partition, k=degree)
+        assert list(found_pairs(whole).items()) == list(reference.items())
+
+    def test_k_still_refuses_a_distinct_code_overrun(self):
+        """With k the budget counts the pairs of distinct hashes searched, never the identical ones expanded."""
+        rng = np.random.default_rng(67)
+        base = int(rng.integers(0, 2**63))
+        values = {base ^ sum(1 << int(bit) for bit in rng.choice(64, size=3, replace=False)) for _ in range(60)}
+        digests = [f"{value:016x}" for value in sorted(values)]
+        codes, _ = pack_hashes(digests)
+        searched = len(brute_pairs(digests, 6, [True] * len(digests)))  # every code distinct
+        assert searched > 1000
+        # Each distinct code is a one-block class, so its rows of work are itself and each pair both ways.
+        hash_neighbors(codes, radius=6, k=5, max_pairs=len(digests) + 2 * searched)
+        with pytest.raises(ValueError, match="rows of work for k.*Use dataeval.core.hash_groups, or raise max_pairs"):
+            hash_neighbors(codes, radius=6, k=5, max_pairs=searched)
+        with pytest.raises(ValueError, match=f"{searched} pairs of distinct hashes.*With k"):
+            hash_neighbors(codes, radius=6, k=5, max_pairs=searched - 1)
+
+        static, _ = pack_hashes(["deadbeefcafef00d"] * 1000)
+        with pytest.raises(ValueError, match="pass k"):
+            hash_neighbors(static, radius=0, max_pairs=1000)
+        capped = hash_neighbors(static, radius=0, max_pairs=1000, k=10)
+        assert 1000 <= len(capped["pairs"]) <= 1000 * 10
+
+        crossing, _ = pack_hashes(["deadbeefcafef00d"] * 4000 + ["deadbeefcafef00c"] * 4000)
+        partition = np.repeat([0, 1], 4000)
+        with pytest.raises(ValueError, match="16000000 cross-group pairs.*pass k"):
+            hash_neighbors(crossing, radius=6, partition=partition)
+        capped = hash_neighbors(crossing, radius=6, partition=partition, k=10)
+        assert len(capped["pairs"]) <= 8000 * 10
+        assert np.unique(capped["pairs"]).tolist() == list(range(8000))
+        assert (partition[capped["pairs"][:, 0]] != partition[capped["pairs"][:, 1]]).all()
+
+    def test_k_refuses_a_work_table_that_many_labels_multiply(self, monkeypatch):
+        """Copies of one hash, each under a label of its own, beside distinct hashes 1 to 3 bits away.
+
+        The pairs of distinct hashes fit a budget their rows of work do not, since each copy's label
+        is a row for every class near it. Refused below the count, the rule's answer at it.
+        """
+        rng = np.random.default_rng(68)
+        base = int(rng.integers(0, 2**63))
+        flips = {
+            sum(1 << int(bit) for bit in rng.choice(64, size=int(rng.integers(1, 4)), replace=False)) for _ in range(20)
+        }
+        digests = [f"{base:016x}"] * 300 + [f"{base ^ flip:016x}" for flip in sorted(flips)]
+        codes, valid = pack_hashes(digests)
+        partition = np.arange(len(digests))
+        rows = work_rows(digests, 6, valid, partition)
+        searched = len(brute_pairs(sorted(set(digests)), 6, [True] * len(set(digests))))
+        assert len(flips) > 10
+        assert 10 * searched < rows
+        message = f"needs {rows} rows of work for k.*Partition on fewer, coarser labels, or raise max_pairs"
+        with pytest.raises(ValueError, match=message):
+            hash_neighbors(codes, radius=6, partition=partition, k=3, max_pairs=rows - 1)
+
+        monkeypatch.setattr(
+            _hash_index, "_window_offsets", lambda positions, distances, sizes: (positions + distances) % sizes
+        )
+        result = hash_neighbors(codes, radius=6, partition=partition, k=3, max_pairs=rows)
+        expected, _ = window_rule_pairs(digests, 6, valid, 3, lambda p, d, m: (p + d) % m, partition)
+        assert list(found_pairs(result).items()) == list(expected.items())
+
+    @pytest.mark.parametrize("groups", [None, 1, 2, 50, "own"])
+    def test_the_work_rows_counted_are_the_rows_built(self, monkeypatch, groups):
+        """The count the budget sees is the table the cap builds, under one label, two or many per class."""
+        rng = np.random.default_rng(69)
+        digests = tiered_hexes(rng)
+        codes, valid = pack_hashes(digests)
+        valid[::9] = False
+        if groups is None:
+            partition = None
+        else:
+            partition = np.arange(len(digests)) if groups == "own" else rng.integers(0, groups, size=len(digests))
+        counted, built = [], []
+        count, blocks = _hash_index._capped_rows, _hash_index._class_blocks
+        monkeypatch.setattr(_hash_index, "_capped_rows", lambda *a: counted.append(count(*a)) or counted[-1])
+        monkeypatch.setattr(_hash_index, "_class_blocks", lambda *a: built.append(len(blocks(*a)[0])) or blocks(*a))
+        hash_neighbors(codes, radius=6, valid=valid, partition=partition, k=3)
+        assert counted == built == [work_rows(digests, 6, valid, partition)]
+
+    def test_k_on_one_large_class_is_one_row(self):
+        """A thousand identical hashes and no partition: one class, one block, one row, so no budget refuses it."""
+        codes, _ = pack_hashes(["deadbeefcafef00d"] * 1000)
+        assert 1000 <= len(hash_neighbors(codes, radius=6, k=10, max_pairs=1)["pairs"]) <= 1000 * 10
 
 
 @pytest.mark.required
