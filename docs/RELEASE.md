@@ -127,8 +127,8 @@ shipped in a patch and again in the next minor release appears in both sections,
 
 ### What the tag triggers
 
-1. **GitLab tag pipeline** runs the `docs` job, and `push-docs-cache.sh` pushes the notebooks and Jupyter cache to
-   `docs-artifacts/vX.Y.Z` -- the branch the Colab links now point at
+1. **GitLab tag pipeline** runs the `docs` job as a clean build, and `push-docs-cache.sh` pushes the notebooks and
+   Jupyter cache to `docs-artifacts/vX.Y.Z` -- the branch the Colab links now point at
 2. **GitLab tag pipeline** also runs `publish verification` and `export-merged-sbom`
 3. **The GitLab push mirror** copies the tag to `github.com/aria-ml/dataeval`, where **GitHub Actions**
    (`publish.yml`) builds the package, publishes to PyPI with a signed PEP 740 attestation for each file, and creates

@@ -315,9 +315,10 @@ links, and the tag pushed alongside it already runs everything a release needs.
 
 ### Docs notebook cache
 
-The docs build reuses cached notebook outputs and re-executes only the notebooks whose code cells changed. It runs
-every notebook again when a shared input changes (`src/`, the lock file, the docs CI configuration and similar), and
-in the scheduled nightly build. [`docs/CACHE_MANAGEMENT.md`](docs/CACHE_MANAGEMENT.md) lists the inputs.
+The docs build reuses cached notebook outputs and re-executes a notebook only when its code cells or a source file it
+imports changed, which for a widely imported file can be every notebook. The scheduled nightly build and version tags
+always rebuild all of them. [`docs/CACHE_MANAGEMENT.md`](docs/CACHE_MANAGEMENT.md) lists the inputs and explains how to
+force a clean build.
 
 ### What requires manual action
 

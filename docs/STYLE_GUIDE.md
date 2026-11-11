@@ -349,8 +349,8 @@ In a how-to, the visible sections show the task and the assertion cells hold the
 - Do not let the prose depend on output that varies between machines, such as paths, timings, the device or training
   results.
 - The notebook cache is keyed on the code cells, comments included. Editing a code comment re-executes that notebook
-  in the next build. A change in `src/` does not invalidate the cache, so run `uv run nox -e docs -- clean` when a
-  library change could alter outputs.
+  in the next build. A change in `src/` does not invalidate the cache locally, so run `uv run nox -e docs -- clean`
+  when a library change could alter outputs.
 
 ## Create embeddings the standard way
 
@@ -503,6 +503,5 @@ change that alters the meaning.
 - Make one deliverable for each merge request. Do not bundle unrelated documentation changes, because they become one
   changelog line.
 - Write each commit message as one line, `[docs] Subject`, with no body and no trailer.
-- Leave the cache alone. The main pipeline reuses cached notebook outputs unless a code cell or a shared execution
-  input such as `src/` changed.
+- Leave the cache alone. CI decides what to re-execute.
 - List the checks you ran and the ones you could not run.

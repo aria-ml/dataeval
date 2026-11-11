@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Validate the inputs that Jupyter's per-notebook code-cell hashes cannot see.
+"""Decide which cached notebook outputs the docs build can reuse.
 
-GitLab records this manifest only after a successful docs build. Checking the
-manifest from the restored cache (rather than the previous commit) also handles
-missed builds, older branch caches, and fallbacks to docs-artifacts/main.
+A notebook is re-executed when a shared input changed or when a source file it imports changed. GitLab records
+the manifest only after a successful docs build. Checking the manifest from the restored cache (rather than the
+previous commit) also handles missed builds, older branch caches, and fallbacks to docs-artifacts/main.
+
+`check` exits 1 when everything must be re-executed. It exits 0 when the cache can be reused, after deleting the
+cached outputs of the notebooks that import a changed source file.
 """
 
 import argparse
@@ -18,8 +21,19 @@ from collections.abc import Iterable
 from contextlib import closing
 from pathlib import Path
 
-# Notebook code cells have their own hashes. Keep the shared execution inputs
-# here, so editing one notebook or a Markdown page doesn't invalidate every one.
+# Inputs that can change what a notebook prints. Each notebook's code cells have their own hashes and the source
+# files it imports are tracked per notebook, so editing one notebook or a Markdown page does not invalidate every
+# one. File hashes are raw bytes on purpose: cached warnings embed `src/...py:LINE`, so even a comment edit must
+# re-execute the notebooks that import the file.
+# Deliberately not tracked, because none of these changes a notebook's output:
+#   pyproject.toml          uv.lock pins the dependencies, and `nox -s check` keeps the two in step
+#   .cuda-version           the docs job sets DATAEVAL_NOX_UV_EXTRAS_OVERRIDE itself, which is tracked
+#   the CI YAML files       the Python version, extras, runner tag and image name are tracked as environment values
+#   docs/source/conf.py     sets no kernel environment, and a failing notebook still fails the build
+#   jupytext.toml, the two docs cache scripts   file pairing and tooling
+#   other nox sessions      see IGNORED_SESSIONS
+# Not tracked and not detectable here: imports the static analysis cannot see, a mutable image tag, and packages
+# fetched at run time. The nightly clean, version-tag builds and the `DOCS_CLEAN` variable are the backstops.
 INPUT_PATHS = ("src", "uv.lock", "noxfile.py", "docs/datasets.toml")
 INPUT_ENV = ("DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG", "CI_JOB_IMAGE")
 # Sessions the docs job never runs. An edit to one of them must not re-execute the notebooks. A session
