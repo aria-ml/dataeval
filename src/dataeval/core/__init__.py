@@ -72,6 +72,7 @@ __all__ = [
     "factor_predictors",
     "fit_partition",
     "frame_annotation_hash",
+    "frame_stats",
     "hamming_distance",
     "hash_groups",
     "hash_neighbors",
@@ -162,6 +163,7 @@ from dataeval.core._coverage import CoverageResult, coverage_adaptive, coverage_
 from dataeval.core._divergence import DivergenceResult, divergence_fnn, divergence_mst
 from dataeval.core._ego_stats import EgoStatsResult, ego_stats
 from dataeval.core._feature_distance import FeatureDistanceResult, feature_distance
+from dataeval.core._frame_stats import frame_stats
 from dataeval.core._hash import dhash, dhash_d4, hamming_distance, phash, phash_d4, xxhash
 from dataeval.core._hash_index import (
     HashGroupResult,

@@ -1,6 +1,6 @@
 """Module for flag enums that control function behavior."""
 
-__all__ = ["ImageStats", "VideoStats"]
+__all__ = ["FrameStats", "ImageStats", "VideoStats"]
 
 from enum import Flag, auto
 
@@ -453,3 +453,38 @@ class VideoStats(Flag):
 
     # Ultimate convenience: grows between releases, so name BASIC or single flags for columns that must not change
     ALL = BASIC | EGO | PERSISTENCE | BLUR
+
+
+class FrameStats(Flag):
+    """
+    Flag enumeration for controlling per-frame statistics computation.
+
+    Each statistic describes one frame against the frame before it, so a result has one row per frame of
+    every video, and the first frame of each video has no value. Flags can be combined using bitwise OR (|)
+    to select multiple statistics. :func:`~dataeval.core.frame_stats` is experimental.
+
+    Individual Stats
+    ----------------
+    - `TIMING` : Seconds since the previous frame (``elapsed_time_s``), read from the frame timestamps and
+      never from pixels
+    - `EXACT_REPEAT` : Whether the frame is identical to the previous one (``repeat_frame``), which decodes
+      every frame
+
+    Convenience Groups
+    ------------------
+    - `NONE` : No statistics
+    - `ALL` : Every statistic in this release. A later release can add statistics to it, and it decodes
+      every frame because it includes `EXACT_REPEAT`
+
+    Examples
+    --------
+    Measure timing only, which decodes no pixels:
+
+    >>> stats = FrameStats.TIMING
+    """
+
+    NONE = 0
+    TIMING = auto()
+    EXACT_REPEAT = auto()
+
+    ALL = TIMING | EXACT_REPEAT
