@@ -2,18 +2,19 @@
 
 __all__ = []
 
+import operator
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from itertools import combinations, groupby
-from typing import Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
+from typing import Annotated, Any, Generic, Literal, NamedTuple, Self, TypeAlias, TypeVar, cast, overload
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from pydantic import NonNegativeInt, PositiveFloat, PositiveInt
+from pydantic import BeforeValidator, NonNegativeInt, PositiveFloat, PositiveInt
 
 from dataeval import Embeddings
-from dataeval._experimental import quiet_experimental
+from dataeval._experimental import quiet_experimental, warn_experimental_once
 from dataeval._log import get_logger
 from dataeval.core import (
     AnnotationDivergence,
@@ -207,6 +208,7 @@ class _SegmentPolicy(NamedTuple):
     min_length: int
     max_gap: int
     offset_tolerance: int
+    neighbors: int | None
     verify_alignment: int | None
     track_length: int
 
@@ -1684,6 +1686,7 @@ def _crossing_pairs(
     left: NDArray[np.intp],
     right: NDArray[np.intp],
     radius: int,
+    k: int | None = None,
 ) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
     """Return the matched pairs crossing from one sequence to the other, in their own positions.
 
@@ -1693,27 +1696,43 @@ def _crossing_pairs(
     hold quadratically many identical frames each, cost only the pairs that cross between them.
 
     Those crossing pairs still count against the search's pair budget, and two sequences that
-    share a large set of identical frames can overrun it. Segments are one relation among
-    several, so an overrun costs this pair its segments and says so, at WARNING, rather than
-    taking the whole result down with it.
+    share a large set of identical frames can overrun it. With ``k``, each frame keeps only its
+    ``k`` nearest crossing neighbors, which bounds the pairs by ``k`` per frame and keeps every
+    frame that had a neighbor; the budget then bounds the pairs of distinct hashes the search finds and the
+    rows of work built from them. Segments are
+    one relation among several, so an overrun, with ``k`` or without, costs this pair its segments
+    and says so, at WARNING, rather than taking the whole result down with it.
     """
     joined = np.concatenate((left, right))
     # Left rows precede right rows in ``joined``, so a pair's smaller position is always its left one.
     partition = np.concatenate((np.zeros(len(left), dtype=np.intp), np.ones(len(right), dtype=np.intp)))
     try:
-        # The partition is this search's own, not an option the user chose, so it stays silent.
+        # The partition is this search's own, and the cap is the user's option, which `Duplicates` announces itself
+        # when it is constructed, so the search stays silent about both.
         with quiet_experimental():
             neighbors = hash_neighbors(
-                frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits, partition=partition
+                frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits, partition=partition, k=k
             )
     except ValueError as err:
-        _logger.warning(
-            "Duplicates: no segments for a %d and %d frame sequence pair; the pairs crossing between "
-            "them exceeded the pair budget, max_pairs (%s).",
-            len(left),
-            len(right),
-            err,
-        )
+        # The search's refusal advises `hash_groups`, `partition` and `max_pairs`, none of which a caller of
+        # `Duplicates` can reach, so the WARNING says what that caller can do and the refusal is kept for debugging.
+        _logger.debug("Duplicates: the segment search refused a %d and %d frame pair: %s", len(left), len(right), err)
+        if k is None:
+            _logger.warning(
+                "Duplicates: no segments for a %d and %d frame sequence pair; the pairs crossing between them "
+                "exceeded the pair budget. segment_neighbors (experimental) caps the pairs each frame contributes.",
+                len(left),
+                len(right),
+            )
+        else:
+            _logger.warning(
+                "Duplicates: no segments for a %d and %d frame sequence pair; it still exceeded the pair budget "
+                "with segment_neighbors=%d, because the two sequences hold too many distinct hashes within the "
+                "radius of one another.",
+                len(left),
+                len(right),
+                k,
+            )
         return np.empty((0, 2), dtype=np.intp), np.empty(0, dtype=np.intp)
     pairs = neighbors["pairs"]
     if not len(pairs):
@@ -1723,6 +1742,25 @@ def _crossing_pairs(
     return crossing, neighbors["distances"]
 
 
+def _checked_neighbors(value: Any) -> int | None:
+    """Return ``segment_neighbors`` as an ``int``, or None where unset, refusing a bool, a float or a value below one.
+
+    ``operator.index`` takes every integer, NumPy's included, and refuses a float rather than
+    truncating it; a bool is an integer to Python but never a count here. It is the Config's
+    validator as well as the policy's check, so a bool or a whole-number float is refused rather
+    than coerced to a count on its way in.
+    """
+    if value is None:
+        return None
+    try:
+        count = 0 if isinstance(value, bool | np.bool_) else operator.index(value)
+    except TypeError:  # a float, a string, or an array that offers __index__ and then refuses it
+        count = 0
+    if count < 1:
+        raise ValueError(f"segment_neighbors must be None or a positive integer; got {value!r}.")
+    return count
+
+
 def _checked_segment_policy(policy: _SegmentPolicy) -> None:
     """Reject a nonsense segment policy.
 
@@ -1730,6 +1768,7 @@ def _checked_segment_policy(policy: _SegmentPolicy) -> None:
     tracking dataset: an image-only call would otherwise accept a nonsense policy and quietly
     return a result computed without it -- the same reason ``hash_radius`` is checked up front.
     """
+    _checked_neighbors(policy.neighbors)
     if policy.min_length < 1:
         raise ValueError(f"min_segment_frames must be at least 1; got {policy.min_length}.")
     if policy.max_gap < 0 or policy.offset_tolerance < 0:
@@ -1874,7 +1913,7 @@ def _shared_stretches(runs: _HashedRuns, frame_map: NDArray[np.intp], policy: _S
     aligned: list[AlignmentMatch] = []
     for first, second in _sharing_runs(runs, policy.radius):
         left, right = members[first], members[second]
-        crossed, distances = _crossing_pairs(runs, left, right, policy.radius)
+        crossed, distances = _crossing_pairs(runs, left, right, policy.radius, policy.neighbors)
         segments = (
             match_segments(
                 crossed,
@@ -3016,6 +3055,9 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
     min_segment_frames, max_segment_gap, segment_offset_tolerance : int
         The shared-stretch policy these results were found under. Kept so a re-detection finds
         the same segments the original did.
+    segment_neighbors : int or None
+        The cap on each frame's nearest matches in the other video that the shared-stretch search
+        ran under, or None if unset. Kept for the same reason as the policy above.
     verify_alignment : int or None
         Mean bits per frame two sequences could differ by and still be reported as aligned, or
         None if warped matching was off.
@@ -3066,6 +3108,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         min_segment_frames: int = DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES,
         max_segment_gap: int = DEFAULT_DUPLICATES_MAX_SEGMENT_GAP,
         segment_offset_tolerance: int = DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE,
+        segment_neighbors: int | None = None,
         verify_alignment: int | None = DEFAULT_DUPLICATES_VERIFY_ALIGNMENT,
         min_track_frames: int = DEFAULT_DUPLICATES_MIN_TRACK_FRAMES,
         levels: frozenset[str] | None = None,
@@ -3087,6 +3130,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
         self.min_segment_frames = min_segment_frames
         self.max_segment_gap = max_segment_gap
         self.segment_offset_tolerance = segment_offset_tolerance
+        self.segment_neighbors = segment_neighbors
         self.verify_alignment = verify_alignment
         self.min_track_frames = min_track_frames
         default = TRACKING_LEVEL_NAMES if frame_map is not None else IMAGE_LEVEL_NAMES
@@ -3105,6 +3149,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             min_length=self.min_segment_frames,
             max_gap=self.max_segment_gap,
             offset_tolerance=self.segment_offset_tolerance,
+            neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             track_length=self.min_track_frames,
         )
@@ -3227,6 +3272,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             levels=self.levels if levels is None else levels,
@@ -3997,6 +4043,7 @@ class DuplicatesOutput(DataFrameOutput, Generic[TExactDuplicatesGroup, TNearDupl
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             levels=self.levels,
@@ -4110,6 +4157,20 @@ class Duplicates(Evaluator):
         negative. Has no effect on image datasets.
 
         .. versionadded:: 1.2
+    segment_neighbors : int or None, default None
+        How many of its nearest matches in the other video each frame keeps when searching for shared
+        stretches, at the frame level and the track level, so two videos that each hold a long static
+        run need not exceed the search's pair budget. None -- the default -- keeps every match. A pair
+        of videos that exceeds the budget, capped or not, loses its segments, and a WARNING says so.
+        A frame with a match in the other video still has one. A segment's extent, boundaries and
+        ``mean_distance`` can shrink or move, and the cap can drop the segment formed by the two
+        videos' static runs themselves while keeping a stretch of distinct frames the videos share.
+        10 is a provisional starting point, chosen on simulated static runs, for shared stretches
+        inside runs of hundreds to thousands of frames; a larger value is not safer. Must be
+        positive. Has no effect on image datasets. Setting it raises
+        :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
+
+        .. versionadded:: 1.3
     verify_alignment : int or None, default None
         Mean bits per frame two videos may differ by, along a *warped* alignment, and still be
         reported as a ``dup_type="aligned"`` row. None -- the default -- skips warped matching.
@@ -4179,6 +4240,9 @@ class Duplicates(Evaluator):
         Frames a shared stretch may skip and still count as continuous.
     segment_offset_tolerance : int
         How far two stretches may differ in offset and still be joined into one.
+    segment_neighbors : int or None
+        Each frame's nearest matches in the other video kept in the shared-stretch search, or None
+        to keep every match. Experimental. See the parameter of the same name.
     verify_alignment : int or None
         Mean bits per frame a warped alignment may cost and still be reported, or None if warped
         matching is off.
@@ -4266,6 +4330,9 @@ class Duplicates(Evaluator):
         segment_offset_tolerance : int, default 0
             How far two stretches may differ in offset and still be joined into one. ``0`` requires
             a single constant offset. Tracking datasets only.
+        segment_neighbors : int or None, default None
+            Each frame's nearest matches in the other video kept in the shared-stretch search, or None
+            to keep every match. Experimental. See :class:`Duplicates`. Tracking datasets only.
         verify_alignment : int or None, default None
             Mean bits per frame two videos may differ by, along a warped alignment, and still be
             reported as a match. None -- the default -- skips warped matching entirely. Tracking
@@ -4292,6 +4359,7 @@ class Duplicates(Evaluator):
         min_segment_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_SEGMENT_FRAMES
         max_segment_gap: NonNegativeInt = DEFAULT_DUPLICATES_MAX_SEGMENT_GAP
         segment_offset_tolerance: NonNegativeInt = DEFAULT_DUPLICATES_SEGMENT_OFFSET_TOLERANCE
+        segment_neighbors: Annotated[PositiveInt | None, BeforeValidator(_checked_neighbors)] = None
         verify_alignment: NonNegativeInt | None = DEFAULT_DUPLICATES_VERIFY_ALIGNMENT
         min_track_frames: PositiveInt = DEFAULT_DUPLICATES_MIN_TRACK_FRAMES
 
@@ -4304,6 +4372,7 @@ class Duplicates(Evaluator):
     min_segment_frames: int
     max_segment_gap: int
     segment_offset_tolerance: int
+    segment_neighbors: int | None
     verify_alignment: int | None
     min_track_frames: int
     extractor: FeatureExtractor | None
@@ -4322,6 +4391,7 @@ class Duplicates(Evaluator):
         min_segment_frames: int | None = None,
         max_segment_gap: int | None = None,
         segment_offset_tolerance: int | None = None,
+        segment_neighbors: int | None = None,
         verify_alignment: int | None = None,
         min_track_frames: int | None = None,
         extractor: FeatureExtractor | None = None,
@@ -4331,6 +4401,10 @@ class Duplicates(Evaluator):
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
+        # Told once, from here rather than from the search: the search runs inside `quiet_experimental()` and is
+        # silent, so the user who passes the option, directly or through a Config, hears of it exactly once.
+        if self.segment_neighbors is not None:
+            warn_experimental_once("Duplicates(segment_neighbors=...)")
 
     def _radius_for(self, tracking: bool) -> int:
         """Return the radius one evaluation uses: the one asked for, or the default for its data.
@@ -4383,6 +4457,7 @@ class Duplicates(Evaluator):
             min_length=self.min_segment_frames,
             max_gap=self.max_segment_gap,
             offset_tolerance=self.segment_offset_tolerance,
+            neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             track_length=self.min_track_frames,
         )
@@ -4516,6 +4591,7 @@ class Duplicates(Evaluator):
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             frame_map=None,
@@ -4589,6 +4665,7 @@ class Duplicates(Evaluator):
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             frame_map=None,
@@ -4656,6 +4733,7 @@ class Duplicates(Evaluator):
             "min_segment_frames",
             "max_segment_gap",
             "segment_offset_tolerance",
+            "segment_neighbors",
             "verify_alignment",
             "min_track_frames",
             "encoding_digest",
@@ -4886,6 +4964,7 @@ class Duplicates(Evaluator):
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             levels=plan.levels,
@@ -5002,6 +5081,7 @@ class Duplicates(Evaluator):
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             levels=plan.levels,
@@ -5123,6 +5203,7 @@ class Duplicates(Evaluator):
             min_segment_frames=self.min_segment_frames,
             max_segment_gap=self.max_segment_gap,
             segment_offset_tolerance=self.segment_offset_tolerance,
+            segment_neighbors=self.segment_neighbors,
             verify_alignment=self.verify_alignment,
             min_track_frames=self.min_track_frames,
             levels=plan.levels,
