@@ -1291,8 +1291,9 @@ warning goes away):
   The class itself is stable and is not scheduled for removal.
 
 Everything else in the public API is considered stable for the v1.x series. A group of statistics can gain members in
-a release, and `ImageStats.ALL` and `VideoStats.ALL` can gain experimental ones. `BASIC` in each family changes only
-after a deprecation. See {class}`.ImageStats` and {class}`.VideoStats`.
+a release, and `ImageStats.ALL` and `VideoStats.ALL` can gain experimental ones. `ImageStats.BASIC`,
+`ImageStats.STANDARD` and `VideoStats.BASIC` change only after a deprecation. See {class}`.ImageStats` and
+{class}`.VideoStats`.
 
 ## When not to use DataEval
 

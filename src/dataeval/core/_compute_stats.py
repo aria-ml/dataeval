@@ -186,7 +186,7 @@ def compute_stats(
     data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
-    stats: StatsRequest = ImageStats.NO_HASH | ImageStats.HASH,
+    stats: StatsRequest = ImageStats.STANDARD | ImageStats.HASH,
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,

@@ -114,7 +114,10 @@ class ImageStats(Flag):
     - `PIXEL` : All pixel statistics
     - `VISUAL` : All visual statistics, except the blur statistics (`BLUR`)
     - `DIMENSION` : All dimension statistics
-    - `NO_HASH`: All non-hash statistics, except the blur statistics (`BLUR`)
+    - `STANDARD` : The pixel, visual and dimension statistics (`PIXEL`, `VISUAL` and `DIMENSION`), with no hashes and
+      no blur. Its columns change only after a deprecation and a migration note. `image_stats` computes it plus `HASH`
+      when given no `stats`, and `HASH` can gain members. `Duplicates` needs the hashes, so add `HASH` for it
+    - `NO_HASH` : The same set as `STANDARD`, under its v1.2 name
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
@@ -122,7 +125,7 @@ class ImageStats(Flag):
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
     - `ALL` : Every statistic in this release, including the experimental blur statistics. A later release can add
-      statistics to it. Name `BASIC` or single statistics when the columns must not change
+      statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must not change
 
     Notes
     -----
@@ -272,13 +275,15 @@ class ImageStats(Flag):
     HASH_DUPLICATES_BASIC = HASH_XXHASH | HASH_PHASH | HASH_DHASH
     HASH_DUPLICATES_D4 = HASH_XXHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
-    NO_HASH = PIXEL | VISUAL | DIMENSION
+    # NO_HASH is its v1.2 name and must come second, so that Python prints STANDARD. A test pins its columns.
+    STANDARD = PIXEL | VISUAL | DIMENSION
+    NO_HASH = STANDARD
 
     # The core cheap statistics, from the three sub-groups above
     BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
 
-    # Ultimate convenience
-    ALL = NO_HASH | HASH | BLUR
+    # Ultimate convenience, spelled from the families so that a change to STANDARD cannot take a statistic out of it
+    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR
 
 
 class VideoStats(Flag):

@@ -44,9 +44,9 @@ an image and one for a video:
 
 ### Request the image statistics
 
-`ImageStats.ALL` includes the two flags, which form the `ImageStats.BLUR` group. `VISUAL`, `VISUAL_BASIC`, `NO_HASH`,
-`BASIC` and the default of {func}`.image_stats` do not, so a default {func}`.image_stats` or {class}`.Outliers` run never
-runs the blur measurement. Ask for blur by flag:
+`ImageStats.ALL` and `ImageStats.BLUR`, the group of the two flags, are the only named groups that hold them. `VISUAL`
+does not, and neither does the default of {func}`.image_stats`, so a default {func}`.image_stats` or {class}`.Outliers`
+run never runs the blur measurement. Ask for blur by flag:
 
 ```python
 image_stats(images, stats=ImageStats.BLUR)

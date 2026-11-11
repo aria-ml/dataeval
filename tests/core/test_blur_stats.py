@@ -49,8 +49,9 @@ DEFAULT_COLUMNS = """
 BASIC_COLUMNS = "aspect_ratio brightness channels contrast height mean sharpness std var width"
 OUTLIERS_COLUMNS = "item_index metric_name metric_value direction bound percentile population_mean population_std"
 POPULATION_COLUMNS = "level metric_name method population n judged reason"
-# What a default `Outliers` run computes: DIMENSION | PIXEL | VISUAL, the ones it can judge and the ones it cannot.
-OUTLIERS_STATS = """
+# The 33 columns of `ImageStats.STANDARD` (PIXEL | VISUAL | DIMENSION), which a default `Outliers` run computes: the
+# ones it can judge and the ones it cannot.
+STANDARD_COLUMNS = """
     aspect_ratio brightness center channels contrast darkness depth distance_center distance_edge entropy height
     histogram invalid_box kurtosis mean missing offset_x offset_y percentiles rel_distance_center rel_distance_edge
     rel_height rel_offset_x rel_offset_y rel_size rel_width sharpness size skew std var width zeros
@@ -95,12 +96,46 @@ def test_columns_and_values():
 def test_blur_is_in_all_and_in_no_smaller_group():
     """`ALL` is every statistic in the release, so it holds blur. The groups `Outliers` and `BASIC` stand on do not."""
     assert ImageStats.BLUR in ImageStats.ALL
-    assert ImageStats.ALL == ImageStats.NO_HASH | ImageStats.HASH | ImageStats.BLUR
-    assert ImageStats.ALL & ~ImageStats.BLUR == ImageStats.NO_HASH | ImageStats.HASH
+    assert ImageStats.ALL == ImageStats.STANDARD | ImageStats.HASH | ImageStats.BLUR
+    assert ImageStats.ALL & ~ImageStats.BLUR == ImageStats.STANDARD | ImageStats.HASH
     assert ~ImageStats.ALL == ImageStats.NONE
-    for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.NO_HASH, ImageStats.BASIC):
+    for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.STANDARD, ImageStats.BASIC):
         assert not ImageStats.BLUR & group
     assert ImageStats.BASIC == ImageStats.PIXEL_BASIC | ImageStats.VISUAL_BASIC | ImageStats.DIMENSION_BASIC
+
+
+def test_standard_is_the_three_families_and_no_hash_is_its_v12_name():
+    """`STANDARD` names the pixel, visual and dimension statistics, with no hashes and no blur.
+
+    `NO_HASH` shipped in v1.2 for the same set and stays as another name for it, so Python prints `STANDARD` for both.
+    """
+    assert ImageStats.STANDARD == ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION
+    assert ImageStats.NO_HASH is ImageStats.STANDARD
+    assert ImageStats.NO_HASH.name == "STANDARD"
+    assert "STANDARD" in repr(ImageStats.NO_HASH)
+    assert "NO_HASH" not in repr(ImageStats.NO_HASH)
+    assert ImageStats["NO_HASH"] is ImageStats.STANDARD
+    assert ImageStats.BASIC in ImageStats.STANDARD
+    assert not ImageStats.STANDARD & (ImageStats.HASH | ImageStats.BLUR)
+
+
+def test_all_is_spelled_from_the_families():
+    """`ALL` is every family, so a later change to what `STANDARD` holds cannot take a statistic out of it."""
+    families = ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION | ImageStats.HASH | ImageStats.BLUR
+    assert families == ImageStats.ALL
+
+
+def test_standard_columns_are_a_promise():
+    """The 33 names of `ImageStats.STANDARD` are a promise: they change only after a deprecation and a migration note.
+
+    A statistic added to `PIXEL`, `VISUAL` or `DIMENSION` makes this test fail. An enum group cannot warn at import, so
+    the person who trips it decides: keep the new flag out of `STANDARD` by redefining it, for example
+    `(PIXEL | VISUAL | DIMENSION) & ~NEW_FLAG`, or grow it only in a major release, with a migration note. Change the
+    names here on purpose, in the same change as the notes.
+    """
+    stats = image_stats([picture()], stats=ImageStats.STANDARD)["stats"]
+
+    assert sorted(stats) == STANDARD_COLUMNS.split()
 
 
 def test_basic_columns_are_a_promise():
@@ -115,7 +150,7 @@ def test_basic_columns_are_a_promise():
 
 @pytest.mark.parametrize("function", [image_stats, compute_stats])
 def test_signature_default_is_the_v12_set_without_blur(function):
-    assert inspect.signature(function).parameters["stats"].default == ImageStats.NO_HASH | ImageStats.HASH
+    assert inspect.signature(function).parameters["stats"].default == ImageStats.STANDARD | ImageStats.HASH
 
 
 def test_a_bare_call_equals_the_v12_set_with_no_blur_and_no_warning(fresh_process):
@@ -516,7 +551,7 @@ def test_default_columns_unchanged():
     assert list(bare_stats) == DEFAULT_COLUMNS.split()
     assert outliers.data().columns == OUTLIERS_COLUMNS.split()
     assert outliers.populations.columns == POPULATION_COLUMNS.split()
-    assert sorted(cast(Any, outliers.calculation_results)["stats"]) == OUTLIERS_STATS.split()
+    assert sorted(cast(Any, outliers.calculation_results)["stats"]) == STANDARD_COLUMNS.split()
 
 
 def test_default_paths_never_run_the_blur_measurement(monkeypatch):

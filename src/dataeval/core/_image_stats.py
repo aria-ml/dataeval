@@ -880,7 +880,7 @@ def image_stats(  # noqa: C901
     data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
-    stats: StatsRequest = ImageStats.NO_HASH | ImageStats.HASH,
+    stats: StatsRequest = ImageStats.STANDARD | ImageStats.HASH,
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,
@@ -901,7 +901,7 @@ def image_stats(  # noqa: C901
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.
-    stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.NO_HASH | ImageStats.HASH
+    stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.STANDARD | ImageStats.HASH
         Flags indicating which statistics to compute. Can combine multiple flags
         using bitwise OR (|). Dependencies are resolved automatically for calculation,
         but intermediate/dependency statistics are not included in the output by
