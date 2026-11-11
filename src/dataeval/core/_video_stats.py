@@ -21,6 +21,7 @@ from dataeval._metadata._reductions import coverage_for, expressions, identity_o
 from dataeval.core import _ego_stats
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core._calculators._video_base import ReadingCalculator, VideoCalculator
+from dataeval.core._calculators._videoblurstats import VideoBlurStatCalculator
 from dataeval.core._compute_stats import AddressedResult, _produced_stat_names, _reconcile_stats
 from dataeval.core._persistence import REPORT_GRID, edge_sharpness
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
@@ -56,10 +57,13 @@ class VideoRow(NamedTuple):
         One finished value per statistic, each wrapped in a one-element list.
     warnings : list[str]
         Every calculator's warnings for this video.
+    blur_short_side : int or None
+        The short side the `BLUR` statistics measured this video at, None when they measured no frame.
     """
 
     scalars: dict[str, list[Any]]
     warnings: list[str]
+    blur_short_side: int | None = None
 
 
 def _measure(stream: VideoStream, calculators: _Plan, options: VideoOptions) -> VideoRow:
@@ -78,7 +82,9 @@ def _measure(stream: VideoStream, calculators: _Plan, options: VideoOptions) -> 
     if readings:
         # Reduced here, in the worker, so a video's per-frame readings are dropped with it.
         scalars |= _roll_readings(readings, clock, calculators)
-    return VideoRow(scalars, [w for calc, _ in built for w in calc.warnings])
+    # Any, because the registry decorator leaves the class untyped.
+    blur: Any = next((calc for calc, _ in built if isinstance(calc, VideoBlurStatCalculator)), None)
+    return VideoRow(scalars, [w for calc, _ in built for w in calc.warnings], blur.short_side if blur else None)
 
 
 def _column(name: str, values: list[Any]) -> NDArray[Any]:
@@ -114,15 +120,27 @@ def _check_persistence(options: VideoOptions) -> None:
         )
 
 
+def _check_blur(options: VideoOptions) -> None:
+    """Refuse `BLUR` settings that cannot run, naming the keyword."""
+    samples = options.blur_samples
+    if isinstance(samples, bool) or not isinstance(samples, int | np.integer):
+        raise ValueError(f"blur_samples must be an integer; got {samples!r}.")
+    if samples < 1:
+        raise ValueError(f"blur_samples must be positive; got {options.blur_samples}.")
+
+
 def _check_options(stats: VideoStats, options: VideoOptions) -> None:
     """Refuse a request that cannot run, before any video is read."""
     if options.redundancy_radius < 0:
         raise ValueError(f"redundancy_radius must be non-negative; got {options.redundancy_radius}.")
-    if stats & VideoStats.EGO:
-        _check_ego(options)
-    if stats & VideoStats.PERSISTENCE:
-        _check_persistence(options)
-    if stats & (VideoStats.EGO | VideoStats.PERSISTENCE):
+    for flags, check in (
+        (VideoStats.EGO, _check_ego),
+        (VideoStats.PERSISTENCE, _check_persistence),
+        (VideoStats.BLUR, _check_blur),
+    ):
+        if stats & flags:
+            check(options)
+    if stats & (VideoStats.EGO | VideoStats.PERSISTENCE | VideoStats.BLUR):
         # Imported here, on the caller's thread: a missing extra fails up front, and run_videos
         # caps OpenCV's threads only once cv2 is imported.
         _ego_stats._require_cv2()
@@ -168,7 +186,7 @@ def _roll_readings(readings: dict[str, list[Any]], clock: VideoClock, calculator
 def video_stats(  # noqa: C901
     source: VideoStream | Sequence[VideoStream] | MultiobjectTrackingDataset,
     *,
-    stats: VideoStats = VideoStats.NO_EGO,
+    stats: VideoStats = VideoStats.BASIC,
     redundancy_radius: int = DEFAULT_REDUNDANCY_RADIUS,
     ego_gap: int = 1,
     ego_proc_short_side: int = 360,
@@ -176,6 +194,7 @@ def video_stats(  # noqa: C901
     blur_measure: SharpnessMeasure | None = None,
     blur_sigma: float = 6.0,
     persistence_samples: int = 64,
+    blur_samples: int = 64,
     progress_callback: ProgressCallback | None = None,
 ) -> AddressedResult:
     """
@@ -191,7 +210,7 @@ def video_stats(  # noqa: C901
     source : VideoStream, Sequence[VideoStream] or MultiobjectTrackingDataset
         One video's frames (item 0), a sequence of videos, or a tracking dataset whose
         items carry their video first.
-    stats : VideoStats, default VideoStats.NO_EGO
+    stats : VideoStats, default VideoStats.BASIC
         Which statistics to compute. See :class:`~dataeval.flags.VideoStats`.
     redundancy_radius : int, default 4
         Largest Hamming distance, in bits, between neighboring frames' perceptual hashes for the
@@ -224,6 +243,9 @@ def video_stats(  # noqa: C901
         Most start frames the `PERSISTENCE` maps keep per video, spread evenly over its whole
         length. Each start pairs with the frames 10 and 30 frames after it. Ignored unless
         `stats` selects a `PERSISTENCE` statistic.
+    blur_samples : int, default 64
+        Most frames per video that count toward the `BLUR` median, spread evenly over its whole
+        length. Ignored unless `stats` selects a `BLUR` statistic.
     progress_callback : ProgressCallback or None, default None
         Called once per finished video with the count so far and the total.
 
@@ -239,7 +261,7 @@ def video_stats(  # noqa: C901
     Raises
     ------
     ImportError
-        If `stats` selects an `EGO` or `PERSISTENCE` statistic and OpenCV is not installed.
+        If `stats` selects an `EGO`, `PERSISTENCE` or `BLUR` statistic and OpenCV is not installed.
         Install it with the ``dataeval[opencv]`` extra.
     ValueError
         If `redundancy_radius` is negative, or if `stats` selects an `EGO` statistic and
@@ -247,7 +269,8 @@ def video_stats(  # noqa: C901
         32 px, or if `ego_mask` is not a 2D image or does not fit the frames (see :func:`ego_stats`),
         or if `stats` selects a `PERSISTENCE` statistic and `blur_sigma` is not positive and
         finite or `persistence_samples` is not positive, or if `blur_measure` returns other than
-        one finite, non-negative value per cell.
+        one finite, non-negative value per cell, or if `stats` selects a `BLUR` statistic and
+        `blur_samples` is not a positive integer.
     TypeError
         If `stats` selects a `PERSISTENCE` blur statistic and `blur_measure` is not callable.
 
@@ -255,7 +278,8 @@ def video_stats(  # noqa: C901
     -----
     UserWarning
         If `stats` selects no statistics. One row per video is still returned, with no
-        columns.
+        columns. Also, if `stats` selects a `BLUR` statistic and the videos are measured at more
+        than one short side.
 
     See Also
     --------
@@ -296,22 +320,40 @@ def video_stats(  # noqa: C901
     camera, and then the still rest of the frame reads near 1. ``blur_map_raw`` is the natural
     log of how much each cell softens the same content, so ``log(0.5)`` means half the
     sharpness. Both blur maps are relative to the video's own average, so a lens that is soft
-    everywhere alike reads 0. ``blur_map`` subtracts the map's own trend over `blur_sigma`
-    cells, which removes blur wider than about `blur_sigma` cells, such as haze across half the
-    lens, and part of a defect about that wide. On clean real footage, the raw map of one video
-    read large areas as soft that no lens defect caused, so compare raw maps across many videos
-    from one camera rather than reading one alone. A loss of sharpness that grows at a steady
-    rate, in log, across the frame reads 0 in both maps, because each pair's correction for
-    frame-wide sharpness changes removes it too. A cell is NaN where too few frame pairs moved
-    it with the camera or too few of its pixels have texture, and the blur maps are also NaN
-    where ``ego_map`` is 0.1 or more. ``ego_map`` needs at least 31 frames of camera motion, and
-    a textureless video, a still camera or one moving less than 2 pixels a pair reads NaN
+    everywhere alike reads 0. ``blur_level`` gives an absolute whole-frame edge width in pixels.
+    It is a different measure from the maps' and does not combine with them. ``blur_map``
+    subtracts the map's own trend over `blur_sigma` cells, which removes blur wider than about
+    `blur_sigma` cells, such as haze across half the lens, and part of a defect about that
+    wide. On clean real footage, the raw map of one video read large areas as soft that no lens
+    defect caused, so compare raw maps across many videos from one camera
+    rather than reading one alone. A loss of sharpness that grows at a steady rate, in log,
+    across the frame reads 0 in both maps, because each pair's correction for frame-wide
+    sharpness changes removes it too. A cell is NaN where too few frame pairs moved it with the
+    camera or too few of its pixels have texture, and the blur maps are also NaN where
+    ``ego_map`` is 0.1 or more. ``ego_map`` needs at least 31 frames of camera motion, and a
+    textureless video, a still camera or one moving less than 2 pixels a pair reads NaN
     everywhere, with a warning naming the reason. The pair gaps are counted in frames, so they
     span different times at different frame rates. Each video keeps at most
     `persistence_samples` start frames, and at least half that many once it is long enough to
     fill them, spread evenly over its whole length, so memory and the solve stay bounded however
     long the video is. :meth:`~dataeval.Metadata.add_factors` skips the maps, as it skips every
     statistic with more than one value per row.
+
+    **Blur (experimental).** Selecting `BLUR_LEVEL`, directly, through the `BLUR` group or through `ALL`, raises
+    :class:`~dataeval.exceptions.ExperimentalWarning` once per process, and the column name and the `blur_samples`
+    keyword may change. ``blur_level`` is the median of the finite per-frame values of the measurement behind the
+    ``blur`` of :func:`image_stats`, over at most `blur_samples` frames spread evenly over the video. A frame is
+    measured when it joins the sample and may be dropped when the sample outgrows it, so more than `blur_samples`
+    frames can be measured. A frame is read as 8-bit gray (Rec. 601 luma), shrunk to a short side of 720 pixels and
+    never enlarged, and a video reads only frames of its first frame's size, logging a sampled frame of another
+    size. A width is in pixels at the measured size, so a call that measures videos at more than one short side
+    warns once. Whether videos of different native sizes compare was not tested, and 720 is provisional.
+    :func:`image_stats` measures a frame at its own size and averages a color frame's bands, so above a short side
+    of 720 its values are at another scale, and for a color frame they differ slightly even at the same size. The
+    limits of `ImageStats.VISUAL_BLUR` apply, among them that a soft 8-bit frame at low contrast reads sharper than
+    at full contrast. The column is NaN when no sampled frame has a finite value. It does not say how much the blur
+    varies within a video. The evidence is 11 clips with simulated blur and no human-rated blur. See
+    :doc:`/concepts/BlurStatistics`.
 
     **Parallelism.** Videos are measured concurrently, one per worker thread, when
     :func:`~dataeval.config.set_max_processes` allows more than one worker. Each worker
@@ -356,6 +398,7 @@ def video_stats(  # noqa: C901
         blur_measure=(edge_sharpness if blur_measure is None else blur_measure) if stats & _BLUR else None,
         blur_sigma=blur_sigma,
         persistence_samples=persistence_samples,
+        blur_samples=blur_samples,
     )
     _check_options(stats, options)
     if stats & VideoStats.PERSISTENCE:
@@ -363,6 +406,15 @@ def video_stats(  # noqa: C901
             "VideoStats.PERSISTENCE",
             details="The map shape, column names and the blur_measure, blur_sigma and persistence_samples keywords "
             "may change.",
+        )
+    if stats & VideoStats.BLUR:
+        warn_experimental_once(
+            "VideoStats.BLUR",
+            details=(
+                "The column name and the `blur_samples` keyword may change. "
+                "`VideoStats.ALL` includes the blur statistics, "
+                "and `VideoStats.ALL & ~VideoStats.BLUR` leaves them out."
+            ),
         )
     calculators = cast(_Plan, CalculatorRegistry.get_calculators(stats))
     names = _produced_stat_names(calculators)
@@ -374,6 +426,19 @@ def video_stats(  # noqa: C901
             grouped_warnings.setdefault(msg, []).append(str(i))
     for msg, indices in grouped_warnings.items():
         _logger.warning("%s — indices: %s", msg, ", ".join(indices))
+
+    # An edge width is in pixels at the measured size, so the blur columns say nothing across sizes. The rows carry
+    # the sides back from the workers, whether they are threads or processes.
+    sides = sorted({row.blur_short_side for row in rows if row.blur_short_side is not None})
+    if len(sides) > 1:
+        warnings.warn(
+            f"blur statistics were requested for videos measured at {len(sides)} different short sides "
+            f"({', '.join(map(str, sides))}). An edge width is in pixels at the measured size, so the blur columns "
+            "compare only between videos measured at one size. "
+            "`VideoStats.ALL` includes the blur statistics, and `VideoStats.ALL & ~VideoStats.BLUR` leaves them out.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     columns = {name: _column(name, [row.scalars[name][0] for row in rows]) for name in sorted(names)}
     return AddressedResult(stats=columns, source_index=[SourceIndex(i) for i in range(len(rows))])

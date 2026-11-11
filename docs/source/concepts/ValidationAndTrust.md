@@ -924,15 +924,15 @@ statistical and computational.
     vignetting alone. Compare absolute values only within footage from one
     platform. Within one video, a part did not change which frames a sharpness
     gate dropped.
-- - {func}`.image_stats` (`ImageStats.BLUR`)
+- - {func}`.image_stats` (`ImageStats.BLUR`) and {func}`.video_stats` (`VideoStats.BLUR`)
   - Edge width after Liang et al. (2010), with a percentile summary in place of the paper's own score.
   - Internal only (the vectorized edge widths match a slower per-point loop kept in the tests, from the team's earlier
     prototype, so not independent; tests on synthetic images check the trends, the NaN cases and determinism; nothing
     is compared with a published implementation)
-  - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations, with
-    no human-rated blur. Widths are in pixels, so compare only at one resolution. Not a calibrated level of defocus and
-    not a motion blur detector. Noise and JPEG artifacts move it by amounts and in directions that depend on the scene,
-    and a soft 8-bit image at low contrast reads sharper than at full contrast. See
+  - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations and on
+    11 clips with simulated blur, with no human-rated blur. Widths are in pixels, so compare only at one resolution. Not
+    a calibrated level of defocus and not a motion blur detector. Noise and JPEG artifacts move it by amounts and in
+    directions that depend on the scene, and a soft 8-bit image at low contrast reads sharper than at full contrast. See
     [Blur statistics](BlurStatistics.md).
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
@@ -1251,9 +1251,15 @@ Experimental ⚠️ (API may change or be removed):
   (`PERSISTENCE_EGO`, `PERSISTENCE_BLUR`, `PERSISTENCE_BLUR_RAW`, selected
   directly, through the group or through `ALL`) raises
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in
-  a process. Every other {func}`.video_stats` statistic is stable.
+  a process. Every other {func}`.video_stats` statistic is stable, except the
+  `BLUR` statistic in the next item.
   {class}`~dataeval.protocols.SharpnessMeasure`, the protocol a `blur_measure`
-  follows, is experimental with them and raises nothing on its own.
+  follows, is experimental with the persistence statistics and raises nothing
+  on its own.
+- {func}`.video_stats` with `VideoStats.BLUR_LEVEL`, selected directly, through the `BLUR` group or through `ALL`,
+  raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process. The default,
+  `VideoStats.BASIC`, never raises it. The column name and the `blur_samples` keyword may change. See
+  [Blur statistics](BlurStatistics.md).
 - {func}`.image_stats` with any `ImageStats.BLUR` flag (`VISUAL_BLUR`, `VISUAL_BLUR_DIRECTIONALITY`) raises
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
@@ -1285,8 +1291,8 @@ warning goes away):
   The class itself is stable and is not scheduled for removal.
 
 Everything else in the public API is considered stable for the v1.x series. A group of statistics can gain members in
-a release, and `ImageStats.ALL` can gain experimental ones. `ImageStats.BASIC` changes only after a deprecation. See
-{class}`.ImageStats`.
+a release, and `ImageStats.ALL` and `VideoStats.ALL` can gain experimental ones. `BASIC` in each family changes only
+after a deprecation. See {class}`.ImageStats` and {class}`.VideoStats`.
 
 ## When not to use DataEval
 

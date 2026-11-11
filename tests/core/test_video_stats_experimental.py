@@ -41,8 +41,9 @@ def test_persistence_flag_warns_experimental():
         VideoStats.ALL,
     ],
 )
+@pytest.mark.filterwarnings("ignore:'VideoStats.BLUR' is experimental:dataeval.exceptions.ExperimentalWarning")
 def test_any_persistence_flag_or_all_warns(stats):
-    with pytest.warns(ExperimentalWarning):
+    with pytest.warns(ExperimentalWarning, match="VideoStats.PERSISTENCE' is experimental"):
         run(stats)
 
 
@@ -60,7 +61,10 @@ def test_warns_once_per_process():
         warnings.simplefilter("always", ExperimentalWarning)
         run(VideoStats.PERSISTENCE)
         run(VideoStats.ALL)
-    assert not [x for x in w if issubclass(x.category, ExperimentalWarning)]
+    # ALL also selects the BLUR family, which has its own once-per-process warning, given here for the first time.
+    given = [str(x.message) for x in w if issubclass(x.category, ExperimentalWarning)]
+    assert not [m for m in given if "VideoStats.PERSISTENCE" in m]
+    assert len([m for m in given if "VideoStats.BLUR" in m]) == 1
 
 
 def test_quiet_experimental_silences_it_and_leaves_it_unspent():
