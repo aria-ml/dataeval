@@ -17,7 +17,7 @@ import dataeval.core._calculators._register  # noqa: F401
 from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
 from dataeval.config import get_max_processes
-from dataeval.core._calculators._base import Calculator, ViewKind
+from dataeval.core._calculators._base import Calculator, ContextNeed, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core._compute_stats import (
@@ -27,7 +27,7 @@ from dataeval.core._compute_stats import (
     _produced_stat_names,
     _reconcile_stats,
 )
-from dataeval.data import unzip_dataset
+from dataeval.data._unzip import _unzip_annotations
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     ArrayLike,
@@ -38,6 +38,7 @@ from dataeval.protocols import (
     _is_protocol_instance,
 )
 from dataeval.types import FactorLevel, SourceIndex
+from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
     _UNKNOWN_RANGE,
@@ -50,7 +51,6 @@ from dataeval.utils.preprocessing import (
     boxes_to_mask,
     get_value_range,
     normalize_image_shape,
-    to_bounding_box,
     to_channel_group,
 )
 
@@ -198,6 +198,7 @@ class BatchPlan:
     band_plans: Mapping[str, BandPlan]
     wide_band_names: str
     unmeasurable_names: str
+    needs: ContextNeed
 
 
 @dataclass
@@ -220,6 +221,9 @@ def _collect_calculator_stats(
     value_range: ValueRange | None = None,
     view: ViewKind = ViewKind.WHOLE,
     bands: tuple[int, ...] | None = None,
+    *,
+    context: AnnotationContext | None = None,
+    focal: int | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -241,6 +245,11 @@ def _collect_calculator_stats(
         Which view of the datum `datum` is, so that statistics undefined over it are
         skipped. `calculators` is expected to have been narrowed to the same view already;
         passing it here keeps the two from drifting apart.
+    context : AnnotationContext or None, default None
+        The datum's boxes classified once, handed to the cache for a statistic that compares a box with its peers.
+        The same object for every row and view of one datum.
+    focal : int or None, default None
+        Index of `box` among the datum's boxes, or None on the datum's own row.
 
     Returns
     -------
@@ -262,6 +271,8 @@ def _collect_calculator_stats(
         exclude=exclude,
         value_range=value_range,
         bands=bands,
+        context=context,
+        focal=focal,
     )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor)
@@ -319,6 +330,8 @@ def _collect_band_stats(
     exclude: NDArray[np.bool_] | None,
     prefix: str,
     view: ViewKind = ViewKind.BAND,
+    context: AnnotationContext | None = None,
+    focal: int | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """Run one named band group as its own view of the datum.
 
@@ -338,6 +351,8 @@ def _collect_band_stats(
         value_range=band_range,
         view=view,
         bands=bands,
+        context=context,
+        focal=focal,
     )
 
 
@@ -391,7 +406,7 @@ def _pad_missing_stats(results: list["DatumResult"], empty_values_map: dict[str,
 
 
 def _compute_batch(  # noqa: C901
-    args: tuple[int, NDArray[Any], list[BoundingBox] | None],
+    args: tuple[int, NDArray[Any], Annotations | None],
     plan: BatchPlan,
 ) -> DatumBatchResult:
     # Bound to locals rather than read through `plan.` at each use: this body runs once per
@@ -407,7 +422,8 @@ def _compute_batch(  # noqa: C901
     wide_band_names = plan.wide_band_names
     unmeasurable_names = plan.unmeasurable_names
 
-    i, datum, boxes = args
+    i, datum, annotations = args
+    boxes = annotations.boxes if annotations is not None else None
     results: list[DatumResult] = []
     box_count = 0
     invalid_box_count = 0
@@ -499,6 +515,13 @@ def _compute_batch(  # noqa: C901
                 f"channels={{'{group_name}': ChannelGroup(..., value_range=(low, high))}}."
             )
 
+    # The boxes of this datum classified once, handed to every row and every view of it. Built only where a selected
+    # statistic declared a need for it: the context is lazy, but a request that includes none should not pay even to
+    # construct it. A datum with no annotation gets an empty one rather than None, so a consumer never branches.
+    shape = tuple(datum.shape)
+    extent = (shape[-2], shape[-1]) if len(shape) >= 2 else (0, 0)
+    context = AnnotationContext(annotations, extent) if plan.needs else None
+
     # Process each item (full image and/or boxes)
     for i_b, box, unmasked, background in items:
         if box is not None:
@@ -521,6 +544,8 @@ def _compute_batch(  # noqa: C901
                 box,
                 normalize_pixel_values=normalize_pixel_values,
                 value_range=value_range,
+                context=context,
+                focal=i_b,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -543,6 +568,8 @@ def _compute_batch(  # noqa: C901
                     normalize_pixel_values=normalize_pixel_values,
                     exclude=None,
                     prefix="",
+                    context=context,
+                    focal=i_b,
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -562,6 +589,8 @@ def _compute_batch(  # noqa: C901
                 prefix=BACKGROUND_PREFIX,
                 value_range=value_range,
                 view=ViewKind.MASK,
+                context=context,
+                focal=i_b,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -593,6 +622,8 @@ def _compute_batch(  # noqa: C901
                     exclude=exclude,
                     prefix=BACKGROUND_PREFIX,
                     view=ViewKind.MASK | ViewKind.BAND,
+                    context=context,
+                    focal=i_b,
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -775,28 +806,55 @@ def _resolve_stat_flags(
 _END = object()
 
 
+def _refuse_ragged(named: dict[str, Any], index: int) -> None:
+    """Raise, naming the first of the parallel iterables in `named` that ran out at `index`."""
+    for name, entry in named.items():
+        if entry is _END:
+            joined = f"{', '.join(list(named)[:-1])} and {list(named)[-1]}"
+            raise ValueError(f"{joined} differ in length: {name} ran out at index {index}")
+
+
+def _annotate(
+    box: Iterable[BoxLike] | Annotations | None,
+    label: tuple[Any, ...],
+    shape: tuple[int, ...],
+    index: int,
+) -> Annotations:
+    """Build one image's annotations, from its box entry and its label entry if the call passed any labels."""
+    # An entry that is already an `Annotations` keeps the raw coordinates it was built with.
+    if isinstance(box, Annotations):
+        return box
+    # An unannotated image takes a `None` label entry, which is no labels; an annotated one that does so is refused by
+    # the length check, since "one class id per box" has no exception for a missing entry.
+    labels = (np.empty(0, dtype=np.int64) if label[0] is None else label[0]) if label else None
+    return build_annotations(cast("Iterable[BoxLike] | None", box), shape, index, labels)
+
+
 def _enumerate_datum(
     images: Iterable[ArrayLike],
-    boxes: Iterable[Iterable[BoxLike] | None] | None,
-) -> Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]]:
+    boxes: Iterable[Iterable[BoxLike] | Annotations | None] | None,
+    labels: Iterable[ArrayLike | None] | None = None,
+) -> Iterator[tuple[int, NDArray[Any], Annotations | None]]:
     if boxes is None:
         for i, image in enumerate(images):
             yield i, np.asarray(image), None
-    else:
-        for i, (image, box) in enumerate(zip_longest(images, boxes, fillvalue=_END)):
-            if image is _END or box is _END:
-                ran_out = "images" if image is _END else "boxes"
-                raise ValueError(f"images and boxes differ in length: {ran_out} ran out at index {i}")
-            np_image = np.asarray(image)
-            entries = () if box is None else cast("Iterable[BoxLike]", box)
-            bboxes = [to_bounding_box(b, image_shape=np_image.shape) for b in entries]
-            yield i, np_image, bboxes
+        return
+    sources = {"images": images, "boxes": boxes, **({} if labels is None else {"labels": labels})}
+    for i, entries in enumerate(zip_longest(*sources.values(), fillvalue=_END)):
+        _refuse_ragged(dict(zip(sources, entries, strict=True)), i)
+        image, box, *label = entries
+        np_image = np.asarray(image)
+        yield (
+            i,
+            np_image,
+            _annotate(cast("Iterable[BoxLike] | Annotations | None", box), tuple(label), np_image.shape, i),
+        )
 
 
 def _noting_sizes(
-    datum: Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]],
+    datum: Iterator[tuple[int, NDArray[Any], Annotations | None]],
     sizes: set[tuple[int, ...]],
-) -> Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]]:
+) -> Iterator[tuple[int, NDArray[Any], Annotations | None]]:
     """Pass each datum on unchanged, adding the (H, W) of every image that has a picture to `sizes`."""
     for item in datum:
         if item[1].ndim >= 2:
@@ -880,6 +938,7 @@ def image_stats(  # noqa: C901
     data: Iterable[ArrayLike] | ImageDataset,
     *,
     boxes: Iterable[Iterable[BoxLike] | None] | None = None,
+    labels: Iterable[ArrayLike | None] | None = None,
     stats: StatsRequest = ImageStats.STANDARD | ImageStats.HASH,
     per_image: bool = True,
     per_target: bool = True,
@@ -901,6 +960,12 @@ def image_stats(  # noqa: C901
         An iterable of images or a Dataset to compute statistics on.
     boxes : Iterable[Iterable[BoxLike] | None] | None
         Optional bounding boxes for each image. If None, defers to the data provided.
+    labels : Iterable[ArrayLike | None] or None, default None
+        **Experimental.** One sequence of integer class ids per image, one id per box in that image's `boxes`
+        entry, so `boxes` is required. An image with no boxes takes None or an empty sequence. The labels are
+        checked and carried alongside the boxes; no statistic reads them yet.
+
+        .. versionadded:: 1.3
     stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.STANDARD | ImageStats.HASH
         Flags indicating which statistics to compute. Can combine multiple flags
         using bitwise OR (|). Dependencies are resolved automatically for calculation,
@@ -1190,6 +1255,14 @@ def image_stats(  # noqa: C901
     if value_range is not None:
         _validate_declared_range(value_range)
 
+    # A dataset supplies its own labels with its own boxes, so there is nothing for `labels` to align with unless the
+    # caller supplies the boxes too.
+    if labels is not None and boxes is None:
+        raise ValueError(
+            "labels= requires boxes=: a dataset supplies its own labels, so pass boxes= and labels= together, "
+            "or neither."
+        )
+
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
     aggregated_details: dict[str, list[Any]] = {}
@@ -1352,6 +1425,28 @@ def image_stats(  # noqa: C901
                 stacklevel=2,
             )
 
+    # What the request asks beyond each box's own pixels, over every pass that will run: the unnamed view, each band
+    # group, and the background of both. Declared per statistic on its handler, so a request that names none builds no
+    # context and reads no labels.
+    needs = reduce(
+        or_,
+        (
+            calculator.context_needs(flags)
+            for calculator, flags in [
+                *calculators,
+                *background_calculators,
+                *(c for group in band_calculators.values() for c in group),
+                *(c for group in background_band_calculators.values() for c in group),
+            ]
+        ),
+        ContextNeed.NONE,
+    )
+    if ContextNeed.LABELS in needs and boxes is not None and labels is None:
+        raise ValueError(
+            "a selected statistic compares boxes by class, so pass labels= alongside boxes=, or leave boxes= unset "
+            "and let the dataset supply both."
+        )
+
     # Said once per datum that trips it, aggregated with the rest. Only the unnamed view is
     # at risk, and only for the statistics no group answers in its place — naming bands
     # settles the question for a statistic some group also measures, but a mapping can name
@@ -1410,12 +1505,12 @@ def image_stats(  # noqa: C901
     # object-detection shaped when asked for targets, so requesting a background over a
     # plain image dataset must not send it looking for boxes that cannot be there.
     needs_boxes = (per_target or per_background) and has_boxes
-    images, boxes = (
+    images, box_entries = (
         (data, boxes)
         if not isinstance(data, Dataset)
-        else (unzip_dataset(data, per_target=False)[0], boxes)
+        else (_unzip_annotations(data, per_target=False)[0], boxes)
         if boxes is not None
-        else unzip_dataset(data, per_target=needs_boxes)
+        else _unzip_annotations(data, per_target=needs_boxes, with_labels=ContextNeed.LABELS in needs)
     )
 
     # Build description for progress bar
@@ -1425,7 +1520,7 @@ def image_stats(  # noqa: C901
     # An edge width is in pixels at the image's own size, so the blur columns say nothing across sizes. The sizes are
     # noted where this process walks the images, which holds on the pool path too: the pool takes its tasks from this
     # generator in a thread of this process. A request with no blur flag does not wrap it.
-    datum = _enumerate_datum(images, boxes)
+    datum = _enumerate_datum(images, box_entries, labels)
     sizes: set[tuple[int, ...]] = set()
     if requested & ImageStats.BLUR:
         datum = _noting_sizes(datum, sizes)
@@ -1445,6 +1540,7 @@ def image_stats(  # noqa: C901
                     band_plans=band_plans,
                     wide_band_names=wide_band_names,
                     unmeasurable_names=unmeasurable_names,
+                    needs=needs,
                 ),
             ),
             datum,
