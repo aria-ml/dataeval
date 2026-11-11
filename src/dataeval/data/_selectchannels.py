@@ -134,7 +134,7 @@ class SelectChannels(Operation):
         if self._invalidates is not None:
             return self._invalidates
         if self.channels == "gray":
-            return ImageStats.DIMENSION_CHANNELS | ImageStats.PIXEL | ImageStats.VISUAL
+            return ImageStats.DIMENSION_CHANNELS | ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.BLUR
         return ImageStats.DIMENSION_CHANNELS
 
     def apply(self, view: View[Any]) -> None:

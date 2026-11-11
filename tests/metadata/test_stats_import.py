@@ -138,7 +138,7 @@ class TestAddFactorsFromComputeStats:
         assert not any(label.item == empty and label.key is not None for label in _actual_by_label(md, "instance_mean"))
 
     def test_vector_valued_stats_are_skipped_not_fatal(self, od_dataset):
-        """ImageStats.ALL includes histogram/percentiles/center, which have no column form."""
+        """The default statistics include histogram/percentiles/center, which have no column form."""
         result = image_stats(od_dataset, normalize_pixel_values=False)
 
         md = Metadata(od_dataset)

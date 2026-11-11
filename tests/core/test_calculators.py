@@ -2536,6 +2536,7 @@ class TestPerGroupStats:
         for name, values in single.items():
             assert values == pytest.approx(mapped[name])
 
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")  # ALL holds the blur flags
     def test_a_mapping_matches_one_flag_set_over_a_background(self):
         """Region and band compose the same way in either spelling, over every statistic.
 

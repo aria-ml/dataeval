@@ -9,6 +9,7 @@ DataEval retires a deprecated API one minor release after deprecating it, so a g
 :::{toctree}
 :hidden:
 
+v1.3
 v1.2
 v1.1
 :::
@@ -17,6 +18,9 @@ v1.1
 :widths: 20 80
 :header-rows: 0
 
+- - [](v1.3.md)
+  - v1.2 to v1.3: experimental blur statistics for `image_stats` (`ImageStats.BLUR`), and `Resize`,
+    `SelectChannels("gray")` and `TorchvisionTransform` declare them as invalidated.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the

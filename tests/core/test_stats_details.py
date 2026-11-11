@@ -138,6 +138,7 @@ class TestImageStatsDetails:
         assert background.dtype == np.int64
         assert background.tolist() == [ID_BASE if item else -1 for item in on_item_row]
 
+    @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")  # ALL holds the blur flags
     def test_legacy_calls_produce_neither_field(self):
         result = image_stats(IMAGES, boxes=BOXES, stats=ImageStats.ALL, per_background=True)
         assert "details" not in result

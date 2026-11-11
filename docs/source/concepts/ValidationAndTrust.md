@@ -924,6 +924,16 @@ statistical and computational.
     vignetting alone. Compare absolute values only within footage from one
     platform. Within one video, a part did not change which frames a sharpness
     gate dropped.
+- - {func}`.image_stats` (`ImageStats.BLUR`)
+  - Edge width after Liang et al. (2010), with a percentile summary in place of the paper's own score.
+  - Internal only (the vectorized edge widths match a slower per-point loop kept in the tests, from the team's earlier
+    prototype, so not independent; tests on synthetic images check the trends, the NaN cases and determinism; nothing
+    is compared with a published implementation)
+  - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations, with
+    no human-rated blur. Widths are in pixels, so compare only at one resolution. Not a calibrated level of defocus and
+    not a motion blur detector. Noise and JPEG artifacts move it by amounts and in directions that depend on the scene,
+    and a soft 8-bit image at low contrast reads sharper than at full contrast. See
+    [Blur statistics](BlurStatistics.md).
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
@@ -1244,6 +1254,10 @@ Experimental ⚠️ (API may change or be removed):
   a process. Every other {func}`.video_stats` statistic is stable.
   {class}`~dataeval.protocols.SharpnessMeasure`, the protocol a `blur_measure`
   follows, is experimental with them and raises nothing on its own.
+- {func}`.image_stats` with any `ImageStats.BLUR` flag (`VISUAL_BLUR`, `VISUAL_BLUR_DIRECTIONALITY`) raises
+  {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
+  {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
+  {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,
@@ -1270,7 +1284,9 @@ warning goes away):
   Video already defaults to `6` and does not warn.
   The class itself is stable and is not scheduled for removal.
 
-Everything else in the public API is considered stable for the v1.x series.
+Everything else in the public API is considered stable for the v1.x series. A group of statistics can gain members in
+a release, and `ImageStats.ALL` can gain experimental ones. `ImageStats.BASIC` changes only after a deprecation. See
+{class}`.ImageStats`.
 
 ## When not to use DataEval
 

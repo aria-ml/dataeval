@@ -19,10 +19,13 @@ from dataeval.utils.preprocessing import crop_with_fill, normalize_image_shape
 ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
 
 # Every dimension statistic reports the resize target rather than the source, and
-# ``sharpness`` measures the interpolation kernel. Channel count survives; ``HASH`` is
+# ``sharpness`` measures the interpolation kernel. The blur flags are in pixels at the
+# image's own resolution, so a resize rescales them. Channel count survives; ``HASH`` is
 # deliberately absent, since resize-then-phash is a *better* near-duplicate check across
 # heterogeneous source resolutions.
-_BASE_INVALIDATES = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS
+_BASE_INVALIDATES = (
+    (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS | ImageStats.BLUR
+)
 
 # Letterbox padding adds a block of flat fill pixels, which moves every percentile-derived
 # visual statistic, the pixel histogram and the entropy read off it, and every spread and

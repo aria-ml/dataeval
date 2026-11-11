@@ -7,6 +7,7 @@ Each page may cover several evaluators that work together to answer questions ab
 
 - [Data integrity](DataIntegrity.md)
 - [Image statistics](ImageStatistics.md)
+- [Blur statistics](BlurStatistics.md)
 - [Ontology](Ontology.md)
 - [Metadata levels](MetadataLevels.md)
 - [Binning](Binning.md)
@@ -28,6 +29,7 @@ Each page may cover several evaluators that work together to answer questions ab
 
 DataIntegrity
 ImageStatistics
+BlurStatistics
 Ontology
 MetadataLevels
 Binning
