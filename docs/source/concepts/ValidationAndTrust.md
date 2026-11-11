@@ -1015,6 +1015,17 @@ statistical and computational.
     survive photometric change but not arbitrary geometric warping; the `_d4`
     variants add invariance to the eight square symmetries, not to arbitrary
     rotation.
+- - {func}`.hash_neighbors` (`partition`)
+  - Every pair of packed hashes within a Hamming radius, by multi-index hashing.
+    With `partition`, only the pairs whose two labels differ, found without
+    expanding a pair inside one label.
+  - Cross-checked (the pairs and distances equal those of an independent
+    brute-force reference kept to the pairs whose labels differ, under both of
+    its search strategies)
+  - Experimental: the argument may change. No study on real footage backs it.
+    The search is not narrowed, so distinct hashes under one label are still
+    compared. {class}`.Duplicates` passes it in its video segment search and
+    raises no {class}`~dataeval.exceptions.ExperimentalWarning` there.
 
 :::
 
@@ -1264,6 +1275,9 @@ Experimental ⚠️ (API may change or be removed):
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
+- {func}`.hash_neighbors` with the `partition` argument raises
+  {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a
+  process. Every other use of {func}`.hash_neighbors` is stable.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

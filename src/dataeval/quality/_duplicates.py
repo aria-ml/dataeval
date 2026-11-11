@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from pydantic import NonNegativeInt, PositiveFloat, PositiveInt
 
 from dataeval import Embeddings
+from dataeval._experimental import quiet_experimental
 from dataeval._log import get_logger
 from dataeval.core import (
     AnnotationDivergence,
@@ -1687,21 +1688,28 @@ def _crossing_pairs(
     """Return the matched pairs crossing from one sequence to the other, in their own positions.
 
     A pair inside a single sequence is redundancy, which has its own relation, so only the
-    crossing pairs are kept.
+    crossing pairs are wanted. The search is told which sequence each row belongs to, so it never
+    expands a pair inside one sequence into frame pairs, and two static-camera sequences, which
+    hold quadratically many identical frames each, cost only the pairs that cross between them.
 
-    The search still enumerates those within-sequence pairs before they are dropped, and they count
-    against its own pair budget: two static-camera sequences hold quadratically many identical
-    frames that were never going to cross. Segments are one relation among several, so an overrun
-    costs this pair its segments and says so, rather than taking the whole result down with it.
+    Those crossing pairs still count against the search's pair budget, and two sequences that
+    share a large set of identical frames can overrun it. Segments are one relation among
+    several, so an overrun costs this pair its segments and says so, at WARNING, rather than
+    taking the whole result down with it.
     """
     joined = np.concatenate((left, right))
+    # Left rows precede right rows in ``joined``, so a pair's smaller position is always its left one.
+    partition = np.concatenate((np.zeros(len(left), dtype=np.intp), np.ones(len(right), dtype=np.intp)))
     try:
-        neighbors = hash_neighbors(frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits)
+        # The partition is this search's own, not an option the user chose, so it stays silent.
+        with quiet_experimental():
+            neighbors = hash_neighbors(
+                frames.codes[joined], radius, valid=frames.valid[joined], bits=frames.bits, partition=partition
+            )
     except ValueError as err:
-        _logger.info(
-            "Duplicates: no segments for a %d and %d frame sequence pair; matching them exceeded "
-            "the neighbor budget (%s). Their frames repeat themselves heavily enough that the "
-            "within-sequence matches alone are quadratic -- redundant_runs reports those.",
+        _logger.warning(
+            "Duplicates: no segments for a %d and %d frame sequence pair; the pairs crossing between "
+            "them exceeded the pair budget, max_pairs (%s).",
             len(left),
             len(right),
             err,
@@ -1710,13 +1718,9 @@ def _crossing_pairs(
     pairs = neighbors["pairs"]
     if not len(pairs):
         return np.empty((0, 2), dtype=np.intp), np.empty(0, dtype=np.intp)
-    first = pairs[:, 0] < len(left)
-    crosses = first != (pairs[:, 1] < len(left))
-    pairs, first = pairs[crosses], first[crosses]
-    # Re-expressed as (position in left, position in right), whichever way each pair fell.
-    query = np.where(first, pairs[:, 0], pairs[:, 1])
-    candidate = np.where(first, pairs[:, 1], pairs[:, 0]) - len(left)
-    return np.stack((query, candidate), axis=1).astype(np.intp), neighbors["distances"][crosses]
+    # (position in left, position in right).
+    crossing = np.stack((pairs[:, 0], pairs[:, 1] - len(left)), axis=1).astype(np.intp)
+    return crossing, neighbors["distances"]
 
 
 def _checked_segment_policy(policy: _SegmentPolicy) -> None:
