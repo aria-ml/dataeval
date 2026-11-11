@@ -78,8 +78,12 @@ def imports_of(text: str, module: str, is_package: bool, known: set[str]) -> set
                 base = node.module or ""
             found |= _with_parents(base, known)
             for alias in node.names:
+                if alias.name == "*":
+                    # A star import brings in any submodule that `__all__` names, imported or not.
+                    found |= {name for name in known if name.rpartition(".")[0] == base}
+                    continue
                 candidate = f"{base}.{alias.name}" if base else alias.name
-                if alias.name != "*" and candidate in known:
+                if candidate in known:
                     found |= _with_parents(candidate, known)
     return found
 
@@ -210,16 +214,22 @@ def affected_notebooks(root: Path, files: dict[str, str], changed: set[str]) -> 
     return affected
 
 
-def prune_cache(root: Path, notebooks: Iterable[str]) -> list[str]:
-    """Delete the cached executions of `notebooks`, found through jupyter-cache's own database.
+def prune_cache(root: Path, stale: Iterable[str], current: Iterable[str]) -> list[str]:
+    """Delete the cached executions of the `stale` notebooks, found through jupyter-cache's own database.
 
-    Returns the hash keys whose `executed/` folder was deleted. No database, no folder or no matching row is a
-    no-op; `--fix` later drops the orphaned rows. Raises `ValueError` if the database cannot be read.
+    jupyter-cache keys an entry on the notebook's code cells and keeps the notebook name of the build that created
+    it, so a notebook renamed without a code change still has its entry under the old name. An entry whose name is
+    not in `current` cannot be attributed to a notebook, so it is deleted too, at the cost of one extra execution.
+    Two notebooks with identical code cells share one entry and one name; that case is not covered.
+
+    Returns the hash keys whose `executed/` folder was deleted. Nothing stale, no database, no folder or no matching
+    row is a no-op; `--fix` later drops the orphaned rows. Raises `ValueError` if the database cannot be read.
     """
+    names = set(stale)
     database = root / CACHE / "global.db"
-    if not database.is_file():
+    if not names or not database.is_file():
         return []
-    names = set(notebooks)
+    known = set(current)
     try:
         with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True)) as connection:
             rows = connection.execute("SELECT hashkey, uri FROM nbcache").fetchall()
@@ -228,7 +238,8 @@ def prune_cache(root: Path, notebooks: Iterable[str]) -> list[str]:
     deleted = []
     for hashkey, uri in rows:
         folder = root / CACHE / "executed" / hashkey
-        if os.path.basename(uri or "") in names and folder.is_dir():
+        name = os.path.basename(uri or "")
+        if (name in names or name not in known) and folder.is_dir():
             shutil.rmtree(folder)
             deleted.append(hashkey)
     return sorted(deleted)
@@ -253,15 +264,16 @@ def reuse_lines(affected: dict[str, list[str]], total: int) -> list[str]:
 def check_notebooks(root: Path, manifest: Path, previous: dict[str, str], current: dict[str, str]) -> int:
     """Prune the notebooks that import a changed source file and report what is re-executed."""
     changed = changed_sources(previous, current)
+    notebooks = sorted(path.name for path in (root / NOTEBOOKS).glob("*.py"))
     try:
         affected = affected_notebooks(root, current, changed) if changed else {}
-        prune_cache(root, affected)
+        prune_cache(root, affected, notebooks)
     except ValueError as error:
         return report_miss(manifest, [str(error)])
     if not affected:
         print("Notebook execution inputs changed, but no notebook imports a changed file; reusing cached outputs.")
         return 0
-    total = len(list((root / NOTEBOOKS).glob("*.py")))
+    total = len(notebooks)
     print(f"Notebook execution inputs changed; re-executing {len(affected)} of {total} notebooks and reusing the rest.")
     for line in reuse_lines(affected, total):
         print(line)

@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -269,7 +270,8 @@ def test_module_name_maps_paths_to_modules():
 def test_imports_resolve_absolute_forms_with_their_parent_packages():
     assert imports("import dataeval.a.b") == {"dataeval", "dataeval.a", "dataeval.a.b"}
     assert imports("from dataeval.a import b, nothing") == {"dataeval", "dataeval.a", "dataeval.a.b"}
-    assert imports("from dataeval.a import *") == {"dataeval", "dataeval.a"}
+    assert imports("from dataeval.a import *") == {"dataeval", "dataeval.a", "dataeval.a.b", "dataeval.a.c"}
+    assert imports("from dataeval import *") == {"dataeval", "dataeval.a", "dataeval.d"}
     assert imports("import numpy\nfrom os import path") == set()
 
 
@@ -350,16 +352,21 @@ def package(checkout: Path) -> Path:
         write(checkout, name, text)
     (checkout / "docs/source/notebooks/example.py").unlink()  # the two notebooks above are the only ones
     subprocess.run(["git", "add", "."], cwd=checkout, check=True)
-    cache = checkout / "docs/source/.jupyter_cache"
-    db = sqlite3.connect(cache / "global.db")
-    db.execute("CREATE TABLE nbcache (pk INTEGER PRIMARY KEY, hashkey TEXT, uri TEXT)")
+    with sqlite3.connect(checkout / "docs/source/.jupyter_cache/global.db") as db:
+        db.execute("CREATE TABLE nbcache (pk INTEGER PRIMARY KEY, hashkey TEXT NOT NULL UNIQUE, uri TEXT NOT NULL)")
     for name, key in ENTRIES.items():
-        db.execute("INSERT INTO nbcache (hashkey, uri) VALUES (?, ?)", (key, f"/builds/x/docs/source/notebooks/{name}"))
-        write(cache / "executed" / key, "base.ipynb", "{}")
-    db.commit()
-    db.close()
+        add_entry(checkout, name, key)
     assert run(checkout, "record").returncode == 0
     return checkout
+
+
+def add_entry(root: Path, notebook: str, key: str) -> None:
+    cache = root / "docs/source/.jupyter_cache"
+    with closing(sqlite3.connect(cache / "global.db")) as db, db:
+        db.execute(
+            "INSERT INTO nbcache (hashkey, uri) VALUES (?, ?)", (key, f"/builds/x/docs/source/notebooks/{notebook}")
+        )
+    write(cache / "executed" / key, "base.ipynb", "{}")
 
 
 def entries(root: Path) -> list[str]:
@@ -464,3 +471,29 @@ def test_a_partial_check_stays_stale_until_a_build_records_inputs(package: Path)
     again = run(package, "check")
     assert "reusing cached outputs" in again.stdout
     assert " changed: " not in again.stdout
+
+
+def test_an_entry_that_names_no_current_notebook_is_removed_with_the_stale_ones(package: Path):
+    # jupyter-cache keys entries on code cells and keeps the name of the build that made them, so a renamed
+    # notebook with unchanged code still has its entry under the old name. It cannot be attributed, so it goes.
+    add_entry(package, "nb_old.py", "hash_old")
+    write(package, "src/dataeval/shared.py", "X = 2\n")
+    assert run(package, "check").returncode == 0
+    assert entries(package) == ["hash_b"]
+
+
+def test_an_entry_that_names_no_current_notebook_is_kept_when_nothing_is_stale(package: Path):
+    add_entry(package, "nb_old.py", "hash_old")
+    write(package, "src/conftest.py", "changed\n")
+    assert run(package, "check").returncode == 0
+    assert entries(package) == ["hash_a", "hash_b", "hash_old"]
+
+
+@pytest.mark.parametrize("decorator", ["@nox.session", '@session(uv_groups=["x"], uv_extras=["cpu"])'])
+@pytest.mark.parametrize("session", cache_inputs.IGNORED_SESSIONS)
+def test_noxfile_digest_ignores_every_listed_session(session: str, decorator: str):
+    text = (
+        f'import nox\n\n\n{decorator}\ndef {session}(session):\n    session.run("a")\n\n\n'
+        '@nox.session\ndef docs(session):\n    session.run("b")\n'
+    )
+    assert cache_inputs.noxfile_digest(text) == cache_inputs.noxfile_digest(text.replace('"a"', '"changed"'))
