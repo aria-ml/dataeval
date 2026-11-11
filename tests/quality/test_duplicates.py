@@ -1,6 +1,9 @@
+import functools
 import logging
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import combinations
 from typing import Any, cast
 
 import numpy as np
@@ -8,11 +11,13 @@ import polars as pl
 import pytest
 from numpy.typing import NDArray
 
+import dataeval._experimental as experimental_module
 from dataeval import Metadata
-from dataeval.core import align_subsequence, pack_hashes
+from dataeval.core import align_subsequence, hash_neighbors, pack_hashes
 from dataeval.core._clusterer import ClusterResult
 from dataeval.core._image_stats import image_stats
 from dataeval.data import FrameIndices, SequenceFrames, Stride
+from dataeval.exceptions import ExperimentalWarning
 from dataeval.extractors import FlattenExtractor
 from dataeval.flags import ImageStats
 from dataeval.quality import Duplicates, DuplicatesOutput, _duplicates
@@ -22,9 +27,11 @@ from dataeval.quality._duplicates import (
     _as_frames,
     _as_frames_multi,
     _build_duplicates_dataframe,
+    _crossing_pairs,
     _datum_keys,
     _dominant,
     _find_hash_groups,
+    _HashedRuns,
     _merge_near_groups,
 )
 from dataeval.types import RemovalPlan, SourceIndex
@@ -1748,6 +1755,108 @@ class TestSequenceRelations:
         assert detector.min_segment_frames == 30
         assert detector.max_segment_gap == 5
         assert detector.segment_offset_tolerance == 0
+
+
+def _spread_hashes(count: int, radius: int, seed: int = 0) -> list[int]:
+    """`count` random 64-bit hashes, every pair more than `radius` bits apart (asserted, so the fixture states it)."""
+    values = [int(v) for v in np.random.default_rng(seed).integers(0, 2**64, size=count, dtype=np.uint64)]
+    assert all((a ^ b).bit_count() > radius for a, b in combinations(values, 2))
+    return values
+
+
+def _hashed_runs(*sequences: Sequence[int]) -> _HashedRuns:
+    """Rows of the given 64-bit hashes, one run per sequence, in the form the segment search reads."""
+    values = [value for sequence in sequences for value in sequence]
+    digests = [f"{value:016x}" for value in values]
+    codes, valid = pack_hashes(digests)
+    keys = np.repeat(np.arange(len(sequences)), [len(sequence) for sequence in sequences]).astype(np.intp)
+    return _HashedRuns("xxhash", digests, np.arange(len(values), dtype=np.intp), keys, codes, valid, 64)
+
+
+@pytest.mark.required
+class TestCrossingPairs:
+    """The segment search's pairs between two sequences, found without expanding the pairs inside either."""
+
+    def test_crossing_pairs_unchanged_where_it_fit(self):
+        """What the search returned before it used a partition: every crossing pair, ordered by (left, right).
+
+        The fixture holds exact repeats and near variants inside the left sequence, near variants of the left
+        frames in the right one (some within the radius, some beyond it), and a third sequence between them
+        that matches both and must not appear.
+        """
+        radius = 4
+        rng = np.random.default_rng(1)
+        base = _spread_hashes(20, radius)
+
+        def varied(value: int, flipped: int) -> int:
+            return value ^ sum(1 << int(bit) for bit in rng.choice(64, size=flipped, replace=False))
+
+        left = base + [base[0]] * 3 + [varied(base[5], 2)]
+        right = [varied(value, int(flips)) for value, flips in zip(base, rng.integers(0, 8, size=20), strict=True)]
+        right += [base[0]] * 2 + _spread_hashes(3, radius, seed=7)
+        between = [varied(value, 1) for value in base[:10]]
+        expected = [
+            (i, j, (a ^ b).bit_count())
+            for i, a in enumerate(left)
+            for j, b in enumerate(right)
+            if (a ^ b).bit_count() <= radius
+        ]
+        assert {distance for _, _, distance in expected} > {0}, "the fixture needs a pair that is not an exact copy"
+        assert len(expected) < len(left) * len(right) // 10, "the fixture needs pairs beyond the radius"
+
+        runs = _hashed_runs(left, between, right)
+        left_rows = np.flatnonzero(runs.keys == 0)
+        right_rows = np.flatnonzero(runs.keys == 2)
+        pairs, distances = _crossing_pairs(runs, left_rows, right_rows, radius)
+
+        assert pairs.tolist() == [[i, j] for i, j, _ in expected]
+        assert distances.tolist() == [distance for _, _, distance in expected]
+        assert pairs.dtype == np.intp
+
+    def test_static_runs_of_different_scenes_no_longer_refuse(self):
+        """Two static-camera runs whose only shared frames are a short stretch.
+
+        Left is 4,000 copies of hash SA, then 200 distinct hashes M. Right is M, then 4,000 copies of hash SB. SA,
+        SB and the 200 hashes of M are pairwise more than the radius apart (asserted), so the only pairs crossing
+        between the runs are M against M, at offset 4,000. Each run holds about 8 million identical pairs inside
+        itself, 16 million together, above the default budget of 10 million, which refused before.
+        """
+        radius = 4
+        spread = _spread_hashes(202, radius)
+        scene_a, scene_b, shared = spread[0], spread[1], spread[2:]
+        runs = _hashed_runs([scene_a] * 4000 + shared, shared + [scene_b] * 4000)
+
+        pairs, distances = _crossing_pairs(runs, np.arange(4200), np.arange(4200, 8400), radius)
+
+        assert pairs.tolist() == [[4000 + i, i] for i in range(200)]
+        assert distances.tolist() == [0] * 200
+
+    def test_overrun_is_logged_at_warning(self, monkeypatch, caplog):
+        """A pair too large to match costs its segments; the WARNING names max_pairs and does not offer partition."""
+        monkeypatch.setattr(_duplicates, "hash_neighbors", functools.partial(hash_neighbors, max_pairs=100))
+        caplog.set_level(logging.WARNING, logger="dataeval.quality")
+        value = _spread_hashes(1, 4)[0]
+        runs = _hashed_runs([value] * 30, [value] * 30)  # 900 pairs cross, above the budget of 100
+
+        pairs, distances = _crossing_pairs(runs, np.arange(30), np.arange(30, 60), 4)
+
+        assert pairs.shape == (0, 2)
+        assert distances.shape == (0,)
+        (record,) = [record for record in caplog.records if record.levelno >= logging.WARNING]
+        assert record.levelno == logging.WARNING
+        message = record.getMessage()
+        assert "max_pairs" in message
+        assert "cross-group" in message
+        assert "partition" not in message, "a Duplicates user cannot pass partition"
+
+    def test_internal_partition_is_silent(self, monkeypatch):
+        """The partition is the search's own, so a user who never passed one gets no experimental warning."""
+        monkeypatch.setattr(experimental_module, "_WARNED", set())
+        runs = _hashed_runs(_spread_hashes(5, 4), _spread_hashes(5, 4))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            _crossing_pairs(runs, np.arange(5), np.arange(5, 10), 4)
+        assert not experimental_module._WARNED, "the user's own later use of partition must still warn once"
 
 
 @pytest.mark.required

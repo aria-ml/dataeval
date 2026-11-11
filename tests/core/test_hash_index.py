@@ -1,8 +1,12 @@
 """Tests for Hamming-radius search and grouping over packed perceptual hashes."""
 
+import re
+import warnings
+
 import numpy as np
 import pytest
 
+import dataeval._experimental as experimental_module
 from dataeval.core import _hash_index
 from dataeval.core._hash_index import (
     _band_bounds,
@@ -14,6 +18,7 @@ from dataeval.core._hash_index import (
     hash_neighbors,
     pack_hashes,
 )
+from dataeval.exceptions import ExperimentalWarning
 
 WIDTHS = [16, 32, 64]  # hex characters: 64-, 128- and 256-bit digests
 
@@ -31,6 +36,12 @@ def brute_pairs(hexes, radius, valid):
                 if distance <= radius:
                     found[(i, j)] = distance
     return dict(sorted(found.items()))
+
+
+def brute_crossing_pairs(hexes, radius, valid, partition):
+    """Independent reference for a partition: `brute_pairs` kept to the pairs whose labels differ."""
+    found = brute_pairs(hexes, radius, valid)
+    return {(i, j): d for (i, j), d in found.items() if partition[i] != partition[j]}
 
 
 def brute_groups(pairs, count, valid):
@@ -228,6 +239,163 @@ class TestHashNeighbors:
         codes, _ = pack_hashes(["deadbeefcafef00d"] * 40)
         allowed = hash_neighbors(codes, radius=0, max_pairs=40 * 39 // 2)
         assert len(allowed["pairs"]) == 40 * 39 // 2
+
+    @pytest.mark.parametrize("scan", [True, False])
+    def test_omitted_partition_changes_nothing(self, monkeypatch, scan):
+        """Duplicate classes, near pairs and invalid positions that hold real codes, on both search paths."""
+        rng = np.random.default_rng(31 + scan)
+        digests = random_hexes(rng, 150, 16, near=40, duplicates=30)
+        codes, valid = pack_hashes(digests)
+        valid[::7] = False
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+        result = hash_neighbors(codes, radius=6, valid=valid)
+        pairs, distances = result["pairs"], result["distances"]
+        found = {(int(i), int(j)): int(d) for (i, j), d in zip(pairs, distances, strict=True)}
+        assert found == brute_pairs(digests, 6, valid)
+        assert pairs.dtype == np.intp
+        assert distances.dtype == np.intp
+        assert (pairs[:, 0] < pairs[:, 1]).all()
+        assert pairs.tolist() == sorted(pairs.tolist())
+
+    @pytest.mark.parametrize(
+        ("partition", "got"),
+        [
+            (np.zeros(3, dtype=np.int64), "got shape (3,) for 4 codes"),
+            (np.zeros((4, 1), dtype=np.int64), "got shape (4, 1) for 4 codes"),
+            (np.zeros(4), "got dtype float64"),
+            (np.zeros(4, dtype=np.bool_), "got dtype bool"),
+        ],
+        ids=["length", "2d", "float", "bool"],
+    )
+    def test_partition_must_match_the_codes(self, partition, got):
+        codes, _ = pack_hashes(["ff00ff00ff00ff00"] * 4)
+        expected = f"hash_neighbors: partition must be a 1D integer array with one label per code; {got}."
+        with pytest.raises(ValueError, match=re.escape(expected)):
+            hash_neighbors(codes, radius=1, partition=partition)
+
+    def test_partition_warns_once_as_experimental(self, monkeypatch):
+        monkeypatch.setattr(experimental_module, "_WARNED", set())
+        codes, _ = pack_hashes(["ff00ff00ff00ff00"])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            hash_neighbors(codes, radius=1)
+        # A refused partition does not spend the warning.
+        with pytest.raises(ValueError, match="partition"):
+            hash_neighbors(codes, radius=1, partition=np.zeros(2, dtype=np.int64))
+        named = re.escape("'hash_neighbors(partition=...)' is experimental")
+        with pytest.warns(ExperimentalWarning, match=named) as got:
+            hash_neighbors(codes, radius=1, partition=np.zeros(1, dtype=np.int64))
+        assert len([w for w in got if issubclass(w.category, ExperimentalWarning)]) == 1
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ExperimentalWarning)
+            hash_neighbors(codes, radius=1, partition=np.zeros(1, dtype=np.int64))
+
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+class TestPartition:
+    """Only the pairs whose labels differ, found without ever producing a same-label pair."""
+
+    @pytest.mark.parametrize("scan", [True, False])
+    @pytest.mark.parametrize("groups", [2, 3])
+    def test_partition_equals_the_filtered_answer(self, monkeypatch, groups, scan):
+        """Class sizes above one, and invalid positions that still carry labels, on both search paths."""
+        rng = np.random.default_rng(40 + 2 * groups + scan)
+        digests = random_hexes(rng, 150, 16, near=40, duplicates=30)
+        codes, valid = pack_hashes(digests)
+        valid[::7] = False
+        partition = rng.integers(0, groups, size=len(digests))
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: scan)
+
+        result = hash_neighbors(codes, radius=6, valid=valid, partition=partition)
+        found = {(int(i), int(j)): int(d) for (i, j), d in zip(result["pairs"], result["distances"], strict=True)}
+        unpartitioned = brute_pairs(digests, 6, valid)
+        expected = brute_crossing_pairs(digests, 6, valid, partition)
+        # The fixture holds pairs inside one class and between classes on both sides of the partition.
+        assert 0 < len(expected) < len(unpartitioned)
+        assert 0 in expected.values()
+        assert set(expected.values()) - {0}
+        assert any(d == 0 and pair not in expected for pair, d in unpartitioned.items())
+        assert list(found.items()) == list(expected.items())
+        assert result["pairs"].dtype == np.intp
+        assert result["distances"].dtype == np.intp
+
+        # The budget counts exactly the pairs returned, before they are expanded.
+        hash_neighbors(codes, radius=6, valid=valid, partition=partition, max_pairs=len(expected))
+        with pytest.raises(ValueError, match="cross-group"):
+            hash_neighbors(codes, radius=6, valid=valid, partition=partition, max_pairs=len(expected) - 1)
+
+    def test_labels_need_not_be_contiguous(self):
+        rng = np.random.default_rng(50)
+        codes, valid = pack_hashes(random_hexes(rng, 120, 16, near=40, duplicates=30))
+        ranks = rng.integers(0, 3, size=len(codes))
+        labels = np.array([-5, 7, 10**12])[ranks]
+        expected = hash_neighbors(codes, radius=6, valid=valid, partition=ranks)
+        result = hash_neighbors(codes, radius=6, valid=valid, partition=labels)
+        assert len(expected["pairs"])
+        assert result["pairs"].tolist() == expected["pairs"].tolist()
+        assert result["distances"].tolist() == expected["distances"].tolist()
+
+    def test_one_group_is_empty_and_singletons_cross_everywhere(self):
+        rng = np.random.default_rng(51)
+        codes, valid = pack_hashes(random_hexes(rng, 120, 16, near=40, duplicates=30))
+        one_group = hash_neighbors(codes, radius=6, valid=valid, partition=np.full(len(codes), 3))
+        assert one_group["pairs"].shape == (0, 2)
+        assert one_group["distances"].shape == (0,)
+
+        plain = hash_neighbors(codes, radius=6, valid=valid)
+        singletons = hash_neighbors(codes, radius=6, valid=valid, partition=np.arange(len(codes)))
+        assert len(plain["pairs"])
+        assert singletons["pairs"].tolist() == plain["pairs"].tolist()
+        assert singletons["distances"].tolist() == plain["distances"].tolist()
+
+    @pytest.mark.parametrize("other", ["deadbeefcafef00d", "deadbeefcafef00c"], ids=["same-code", "one-bit-away"])
+    def test_partition_budget(self, other):
+        """Two static runs: quadratic inside each, so only a partition makes the answer fit."""
+        first = "deadbeefcafef00d"
+        far = f"{int(first, 16) ^ (2**64 - 1):016x}"  # the complement, 64 bits away
+        codes, _ = pack_hashes([first] * 4000 + [far] * 4000)
+        partition = np.repeat([0, 1], 4000)
+        with pytest.raises(ValueError, match="pass partition"):
+            hash_neighbors(codes, radius=6)
+        result = hash_neighbors(codes, radius=6, partition=partition)
+        assert result["pairs"].shape == (0, 2)
+
+        # 4,000 x 4,000 cross-group pairs, inside one class or between two, refused before any is expanded.
+        crossing, _ = pack_hashes([first] * 4000 + [other] * 4000)
+        with pytest.raises(ValueError, match="16000000 cross-group pairs"):
+            hash_neighbors(crossing, radius=6, partition=partition)
+
+    def test_class_pairs_inside_one_group_are_not_carried(self, monkeypatch):
+        """Distinct codes that all share one label imply no reported pair, so the search drops them.
+
+        Carried, they cost nothing against the budget, and once they outnumber it every later batch
+        consolidates them all again: a partitioned call could then run for minutes where the
+        unpartitioned one refuses at once. About 60 distinct codes 3 bits from one base form group 0,
+        so their pairs are all within radius 6; group 1 is one code 1 bit from the base.
+        """
+        rng = np.random.default_rng(52)
+        base = int(rng.integers(0, 2**63))
+        values = {base ^ sum(1 << int(bit) for bit in rng.choice(64, size=3, replace=False)) for _ in range(60)}
+        digests = [f"{value:016x}" for value in sorted(values)] + [f"{base ^ 1:016x}"]
+        codes, valid = pack_hashes(digests)
+        partition = np.array([0] * (len(digests) - 1) + [1])
+        carried: list[int] = []
+        consolidate = _hash_index._consolidate
+
+        def spy(batches, count):
+            pairs, distances = consolidate(batches, count)
+            carried.append(len(pairs))
+            return pairs, distances
+
+        monkeypatch.setattr(_hash_index, "_consolidate", spy)
+        monkeypatch.setattr(_hash_index, "_prefer_scan", lambda *_: False)
+        result = hash_neighbors(codes, radius=6, valid=valid, partition=partition, max_pairs=100)
+        found = {(int(i), int(j)): int(d) for (i, j), d in zip(result["pairs"], result["distances"], strict=True)}
+        expected = brute_crossing_pairs(digests, 6, valid, partition)
+        assert len(values) > 50
+        assert found == expected
+        assert max(carried) <= 100
 
 
 @pytest.mark.required
