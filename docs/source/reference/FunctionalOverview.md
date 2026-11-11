@@ -428,6 +428,6 @@ These tools apply only to video and have no row in the tables.
 | {class}`.VideoSegments`, {class}`.Window`, {class}`.Cuts` | Present the tracking dataset as video segments, cut into fixed-length windows or at frame boundaries you name. |
 | {class}`.VideoStitch` | Combines videos of the tracking dataset into stitched sequences. |
 | {func}`.ego_stats` | Measures the camera motion of each frame. Needs the `dataeval[opencv]` extra. |
-| {func}`.video_stats` | Computes statistics of each video as a whole, one row for each video. The `PERSISTENCE` statistics are experimental, see [Stability status](../concepts/ValidationAndTrust.md#stability-status). |
+| {func}`.video_stats` | Computes statistics of each video as a whole, one row for each video. The `PERSISTENCE` and `BLUR` statistics are experimental, see [Stability status](../concepts/ValidationAndTrust.md#stability-status). |
 | {func}`.track_stats` | Computes motion statistics of each track. |
 | {func}`.build_tracks` | Builds a dict of tracks for one target or a whole dataset. |

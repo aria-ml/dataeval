@@ -98,6 +98,7 @@ class VideoOptions(NamedTuple):
     blur_measure: SharpnessMeasure | None = None
     blur_sigma: float = 6.0
     persistence_samples: int = 64
+    blur_samples: int = 64
 
 
 class FrameView:

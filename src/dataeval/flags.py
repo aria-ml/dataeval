@@ -336,6 +336,18 @@ class VideoStats(Flag):
       the video's average, with blur wider than `blur_sigma` cells removed (``blur_map``)
     - `PERSISTENCE_BLUR_RAW` : The same, before that removal (``blur_map_raw``)
 
+    Blur Statistics (experimental: the column name and the `blur_samples` keyword may change, and selecting it,
+    directly or through `ALL`, raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process; one value
+    per video, the median over a sample of its frames of the measurement behind `ImageStats.VISUAL_BLUR`; needs
+    OpenCV, from the ``dataeval[opencv]`` extra):
+
+    - `BLUR_LEVEL` : Median over the sampled frames of the width of the sharpest edges, in pixels (``blur_level``)
+
+    At most `blur_samples` frames per video count toward the median, spread evenly over its length. Frames are shrunk
+    to a short side of 720 pixels and never enlarged, so compare only videos of one frame size, and only frames of the
+    size of a video's first frame are measured. See :func:`~dataeval.core.video_stats` and
+    :doc:`/concepts/BlurStatistics`.
+
     Convenience Groups
     ------------------
     - `NONE` : No statistics
@@ -343,9 +355,13 @@ class VideoStats(Flag):
     - `REDUNDANCY` : All redundancy statistics
     - `EGO` : All ego-motion statistics
     - `PERSISTENCE` : All persistence statistics (experimental)
-    - `NO_EGO` : All statistics that need no OpenCV. The default for
-      :func:`~dataeval.core.video_stats`
-    - `ALL` : All available statistics, including the experimental persistence statistics
+    - `BLUR` : The blur statistic (experimental)
+    - `BASIC` : The descriptive and redundancy statistics, which need no OpenCV. The default for
+      :func:`~dataeval.core.video_stats`. Its columns change only after a deprecation and a migration note. The set to
+      start from
+    - `NO_EGO` : The same set as `BASIC`, under its v1.2 name
+    - `ALL` : Every statistic in this release, including the experimental persistence and blur statistics. A later
+      release can add statistics to it. Name `BASIC` or single statistics when the columns must not change
 
     Notes
     -----
@@ -354,7 +370,11 @@ class VideoStats(Flag):
     choose which columns come back.
 
     Selecting any `PERSISTENCE` flag computes ``ego_map``, which the blur maps rely on, and
-    selecting either blur flag pays for one solve that gives both blur maps.
+    selecting either persistence blur flag pays for one solve that gives both blur maps.
+
+    Selecting `BLUR_LEVEL` measures a sample of each video's frames, and a long video can measure more
+    frames than count toward its median. The cost is seconds per video on the clips timed;
+    :doc:`/concepts/BlurStatistics` gives the measurements.
 
     Examples
     --------
@@ -397,6 +417,9 @@ class VideoStats(Flag):
     PERSISTENCE_BLUR = auto()
     PERSISTENCE_BLUR_RAW = auto()
 
+    # ===== BLUR STATS =====
+    BLUR_LEVEL = auto()
+
     # ===== GROUPS =====
     DESCRIPTIVE = DESCRIPTIVE_FRAME_COUNT | DESCRIPTIVE_DURATION | DESCRIPTIVE_FRAME_RATE
     REDUNDANCY = REDUNDANCY_FRACTION | REDUNDANCY_LONGEST_RUN
@@ -416,7 +439,12 @@ class VideoStats(Flag):
 
     PERSISTENCE = PERSISTENCE_EGO | PERSISTENCE_BLUR | PERSISTENCE_BLUR_RAW
 
-    NO_EGO = DESCRIPTIVE | REDUNDANCY
+    # The group name of the blur statistics, which can grow; today it is the one flag.
+    BLUR = BLUR_LEVEL
 
-    # Ultimate convenience
-    ALL = NO_EGO | EGO | PERSISTENCE
+    # The core cheap statistics. NO_EGO is its v1.2 name and must come second, so that Python prints BASIC.
+    BASIC = DESCRIPTIVE | REDUNDANCY
+    NO_EGO = BASIC
+
+    # Ultimate convenience: grows between releases, so name BASIC or single flags for columns that must not change
+    ALL = BASIC | EGO | PERSISTENCE | BLUR
