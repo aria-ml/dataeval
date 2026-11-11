@@ -1,6 +1,7 @@
 __all__ = []
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import fields
 from enum import Flag
 from typing import Any, Generic, NotRequired
 
@@ -295,6 +296,61 @@ def _reject_stat_name_mismatch(combined: StatsMap, stats: StatsMap, position: in
     )
 
 
+_UNSET: Any = object()  # a config key one spec lacks, which no JSON value can equal
+
+
+def _show(value: Any) -> str:
+    return "unset" if value is _UNSET else repr(value)
+
+
+def _settings(spec: MeasurementSpec) -> dict[str, Any]:
+    """Return a spec's settings as one flat mapping, each config key under its own name."""
+    flat = {f.name: getattr(spec, f.name) for f in fields(MeasurementSpec) if f.name != "config"}
+    return flat | {f"config[{key!r}]": value for key, value in spec.config.items()}
+
+
+def _spec_differences(left: MeasurementSpec, right: MeasurementSpec) -> list[str]:
+    """Name each setting two specs disagree on, as ``setting: left vs right``."""
+    a, b = _settings(left), _settings(right)
+    return [
+        f"{name}: {_show(a.get(name, _UNSET))} vs {_show(b.get(name, _UNSET))}"
+        for name in sorted(a.keys() | b.keys())
+        if a.get(name, _UNSET) != b.get(name, _UNSET)
+    ]
+
+
+def _reject_spec_mismatch(
+    combined: Mapping[str, MeasurementSpec],
+    specs: Mapping[str, MeasurementSpec],
+    position: int,
+) -> None:
+    """Refuse to combine results whose statistics were measured differently.
+
+    Two columns under one name are comparable only when they were measured the same way, and
+    the concatenated array carries no trace of which setting produced which row. A factor
+    recorded in some results and not in others is a disagreement too: the unrecorded rows
+    were measured some way nobody can say.
+    """
+    for factor in sorted(combined.keys() | specs.keys()):
+        so_far, here = combined.get(factor), specs.get(factor)
+        if so_far == here:
+            continue
+        if so_far is None:
+            what = f"has no measurement spec in the results so far but result {position} records one"
+        elif here is None:
+            what = f"has a measurement spec in the results so far but result {position} records none"
+        else:
+            what = (
+                f"was measured differently in the results so far and in result {position} "
+                f"({'; '.join(_spec_differences(so_far, here))})"
+            )
+        raise ValueError(
+            f"Cannot combine results measured differently: {factor!r} {what}. Every result must be "
+            "computed with the same settings; otherwise the combined array would hold values that "
+            "are not comparable under one name.",
+        )
+
+
 def combine_stats_results(  # noqa: C901
     results: AddressedResult | Sequence[AddressedResult],
 ) -> tuple[StatsMap, list[SourceIndex], list[int]]:
@@ -306,6 +362,12 @@ def combine_stats_results(  # noqa: C901
     For multiple results, concatenates stats arrays by key, applies cumulative
     item offsets to source_index entries (making item indices globally unique
     across datasets), and computes cumulative dataset_steps boundaries.
+
+    Results that carry rows must agree on every factor's
+    :class:`~dataeval.types.MeasurementSpec`, since values measured with different settings
+    are not comparable under one name. A result with no rows is skipped, and results that
+    record no specs at all combine as before. Only the statistics are combined: ``details``
+    and ``measurement_specs`` stay with the results that carry them.
 
     Parameters
     ----------
@@ -325,6 +387,10 @@ def combine_stats_results(  # noqa: C901
     TypeError
         If an empty sequence is provided, or if a result carries no `source_index`, as a
         `track_stats` result does, placed by level and key instead.
+    ValueError
+        If results with rows were computed over different statistics, or if a factor's
+        measurement spec differs between them (or is recorded in some and not others). The
+        message names the factor and the settings that differ.
     """
     if isinstance(results, dict):
         _reject_unaddressable(results)
@@ -338,6 +404,7 @@ def combine_stats_results(  # noqa: C901
         return results[0]["stats"], list(results[0]["source_index"]), []
 
     combined_stats: StatsMap | None = None
+    combined_specs: Mapping[str, MeasurementSpec] = {}
     combined_source_index: list[SourceIndex] = []
     dataset_steps: list[int] = []
     offset = 0
@@ -364,8 +431,10 @@ def combine_stats_results(  # noqa: C901
             pass
         elif combined_stats is None:
             combined_stats = dict(stats)
+            combined_specs = r.get("measurement_specs", {})
         else:
             _reject_stat_name_mismatch(combined_stats, stats, position)
+            _reject_spec_mismatch(combined_specs, r.get("measurement_specs", {}), position)
             combined_stats = {k: np.concatenate([combined_stats[k], stats[k]]) for k in combined_stats}
 
         # `_replace` rather than a field-by-field rebuild: only `item` moves, and naming the
