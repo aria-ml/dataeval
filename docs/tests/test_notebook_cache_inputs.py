@@ -1,5 +1,6 @@
 """Exercise docs cache invalidation against real Git checkouts and saved manifests."""
 
+import importlib.util
 import json
 import os
 import shutil
@@ -12,6 +13,18 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = "docs/notebook_cache_inputs.py"
 MANIFEST = "docs/source/.jupyter_cache/execution-inputs.json"
+
+
+def load_script():
+    spec = importlib.util.spec_from_file_location("notebook_cache_inputs", ROOT / SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+cache_inputs = load_script()
 
 
 def write(root: Path, name: str, content: str = "original\n") -> None:
@@ -212,3 +225,45 @@ def test_manifest_survives_artifact_publish_and_main_fallback(checkout: Path, tm
     subprocess.run(["bash", str(ROOT / "docs/fetch-docs-cache.sh"), "feature"], cwd=checkout, env=env, check=True)
     assert (checkout / MANIFEST).read_bytes() == manifest
     assert run(checkout, "check").returncode == 0
+
+
+KNOWN = {"dataeval", "dataeval.a", "dataeval.a.b", "dataeval.a.c", "dataeval.d"}
+
+
+def imports(text: str, module: str = "x", is_package: bool = False) -> set[str]:
+    return cache_inputs.imports_of(text, module, is_package, KNOWN)
+
+
+def test_module_name_maps_paths_to_modules():
+    assert cache_inputs.module_name("src/dataeval/a/__init__.py") == "dataeval.a"
+    assert cache_inputs.module_name("src/dataeval/_x.py") == "dataeval._x"
+    assert cache_inputs.module_name("src/conftest.py") == "conftest"
+
+
+def test_imports_resolve_absolute_forms_with_their_parent_packages():
+    assert imports("import dataeval.a.b") == {"dataeval", "dataeval.a", "dataeval.a.b"}
+    assert imports("from dataeval.a import b, nothing") == {"dataeval", "dataeval.a", "dataeval.a.b"}
+    assert imports("from dataeval.a import *") == {"dataeval", "dataeval.a"}
+    assert imports("import numpy\nfrom os import path") == set()
+
+
+def test_imports_resolve_relative_forms_from_a_package_and_from_a_module():
+    assert imports("from . import c", "dataeval.a", is_package=True) == {"dataeval", "dataeval.a", "dataeval.a.c"}
+    assert imports("from . import c", "dataeval.a.b") == {"dataeval", "dataeval.a", "dataeval.a.c"}
+    assert imports("from .. import d", "dataeval.a.b") == {"dataeval", "dataeval.d"}
+
+
+def test_imports_include_function_level_and_type_checking_imports():
+    assert imports("def f():\n    import dataeval.d\n") == {"dataeval", "dataeval.d"}
+    assert imports("if TYPE_CHECKING:\n    from dataeval.a import b\n") == {"dataeval", "dataeval.a", "dataeval.a.b"}
+
+
+def test_imports_raise_syntax_error_for_unparsable_source():
+    with pytest.raises(SyntaxError):
+        imports("def (")
+
+
+def test_closure_follows_edges_and_tolerates_cycles():
+    graph = {"a": {"b"}, "b": {"a", "c"}, "c": set()}
+    assert cache_inputs.closure({"a"}, graph) == {"a", "b", "c"}
+    assert cache_inputs.closure({"c"}, graph) == {"c"}

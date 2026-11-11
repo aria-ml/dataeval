@@ -7,6 +7,7 @@ missed builds, older branch caches, and fallbacks to docs-artifacts/main.
 """
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -33,6 +34,58 @@ INPUT_PATHS = (
 )
 INPUT_ENV = ("DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG")
 MANIFEST = Path("docs/source/.jupyter_cache/execution-inputs.json")
+
+
+def module_name(path: str) -> str:
+    """Map a repository path such as `src/dataeval/a/__init__.py` to its module name `dataeval.a`."""
+    parts = Path(path).with_suffix("").parts[1:]
+    return ".".join(parts[:-1] if parts and parts[-1] == "__init__" else parts)
+
+
+def _with_parents(name: str, known: set[str]) -> set[str]:
+    parts = name.split(".")
+    return {".".join(parts[: i + 1]) for i in range(len(parts))} & known
+
+
+def imports_of(text: str, module: str, is_package: bool, known: set[str]) -> set[str]:
+    """Return the modules in `known` that `text` imports, each with its parent packages.
+
+    Every import statement counts wherever it sits (module level, inside a function or under
+    `TYPE_CHECKING`), so this over-approximates what runs. Raises `SyntaxError` if `text` does not parse.
+    """
+    # ponytail: file-level closure, so a shared file such as protocols.py re-executes every notebook.
+    # Symbol level needs recorded execution or a call graph that Python's dynamic dispatch makes unsound.
+    found: set[str] = set()
+    package = module if is_package else module.rpartition(".")[0]
+    package_parts = package.split(".") if package else []
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                found |= _with_parents(alias.name, known)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                base_parts = package_parts[: max(len(package_parts) - (node.level - 1), 0)]
+                base = ".".join([*base_parts, *([node.module] if node.module else [])])
+            else:
+                base = node.module or ""
+            found |= _with_parents(base, known)
+            for alias in node.names:
+                candidate = f"{base}.{alias.name}" if base else alias.name
+                if alias.name != "*" and candidate in known:
+                    found |= _with_parents(candidate, known)
+    return found
+
+
+def closure(seeds: set[str], graph: dict[str, set[str]]) -> set[str]:
+    """Return everything reachable from `seeds` through `graph`, seeds included."""
+    seen: set[str] = set()
+    todo = list(seeds)
+    while todo:
+        node = todo.pop()
+        if node not in seen:
+            seen.add(node)
+            todo.extend(graph.get(node, ()))
+    return seen
 
 
 def execution_inputs(root: Path) -> dict:
