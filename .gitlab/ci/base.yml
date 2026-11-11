@@ -191,17 +191,23 @@ stages:
   rules:
     - if: $PUBLISH_VERIFICATION
       when: never
-    # A version tag republishes the notebooks to docs-artifacts/<tag>, which is where the
-    # colab links rewritten by scripts/release.py point.
+    # A version tag always rebuilds every notebook and republishes them to docs-artifacts/<tag>,
+    # which is where the colab links rewritten by scripts/release.py point. Other tags, such as
+    # the moving `latest-known-good`, keep the cached build below.
+    - if: $CI_COMMIT_TAG =~ /^v\d+/
+      variables:
+        DOCS_CLEAN: '-- clean'
     - if: $CI_COMMIT_TAG
     # Keep the scheduled clean rebuild for changes outside the repository
-    # (datasets, model downloads, etc.). Other builds validate the restored
-    # cache's execution inputs in the docs job before reusing notebook outputs.
+    # (datasets, model downloads, etc.). Every other build validates the restored cache in the docs
+    # job (docs/notebook_cache_inputs.py) and re-executes only the notebooks that need it.
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'
     - if: $CI_COMMIT_BRANCH == 'main'
     - if: $CI_COMMIT_BRANCH =~ $RELEASE_BRANCH_PATTERN
+    # These paths only start the job. docs/notebook_cache_inputs.py decides inside the job which
+    # notebooks to re-execute, so a change here does not by itself rebuild every notebook.
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
       changes:
         paths:
