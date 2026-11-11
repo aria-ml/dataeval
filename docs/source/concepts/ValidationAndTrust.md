@@ -981,6 +981,14 @@ statistical and computational.
     (with a mask, most of what the mask leaves) can be read as the camera; one
     pair cannot tell the two apart, and the temporal gate catches it only when
     it is brief.
+- - {func}`.frame_stats` ⚠️
+  - Per-frame time since the previous frame and whether a frame repeats the one before it exactly, with declared
+    roll-ups to the sequence level.
+  - Anchored (clocks and frames constructed with known steps and repeats)
+  - Experimental: the names may change. Reads the timestamps a decoder reports and does not check them against the
+    capture. A missing, repeated or restarted timestamp leaves the step NaN rather than guessed, and a clip that starts
+    later is one long step. A repeat is exact equality, so a re-encoded or noisy copy of a frame reads as not repeated.
+    Tested on constructed inputs only, not on real footage.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same
@@ -1309,6 +1317,8 @@ Experimental ⚠️ (API may change or be removed):
   {class}`.Duplicates` that carries the option is constructed in a process.
   Building the `Config` alone raises nothing. {class}`.Duplicates` passes `k`
   to {func}`.hash_neighbors` itself and raises nothing there.
+- {func}`.frame_stats` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process, whichever
+  {class}`.FrameStats` flags it selects. The flag names, the column and detail names, and the roll-up names may change.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

@@ -22,7 +22,8 @@ v1.1
   - v1.2 to v1.3: experimental blur statistics for `image_stats` (`ImageStats.BLUR`) and `video_stats`
     (`VideoStats.BLUR`), and `Resize`, `SelectChannels("gray")` and `TorchvisionTransform` declare the image ones as
     invalidated. `Duplicates` searches videos with long static stretches for shared segments with experimental
-    `hash_neighbors` arguments `partition` and `k`, and a `segment_neighbors` option.
+    `hash_neighbors` arguments `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats`
+    measures the time between frames and exact repeats.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the
