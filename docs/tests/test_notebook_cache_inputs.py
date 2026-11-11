@@ -36,10 +36,12 @@ def write(root: Path, name: str, content: str = "original\n") -> None:
 
 
 def run(root: Path, action: str, **env: str) -> subprocess.CompletedProcess:
+    # The recorded environment values must not depend on where the tests run: GitLab sets CI_JOB_IMAGE in every job.
+    inherited = {name: value for name, value in os.environ.items() if name not in cache_inputs.INPUT_ENV}
     return subprocess.run(
         [sys.executable, SCRIPT, action],
         cwd=root,
-        env={**os.environ, **env},
+        env={**inherited, **env},
         capture_output=True,
         text=True,
         check=False,
