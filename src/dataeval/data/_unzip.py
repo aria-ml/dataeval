@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, Dataset, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
+from dataeval.utils._annotations import Annotations, build_annotations
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import unwrap_image, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
@@ -47,6 +48,66 @@ def _reject_tracking(dataset: Dataset[Any], per_target: bool) -> None:
         )
 
 
+def _unzip_annotations(
+    dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]],
+    per_target: bool,
+    with_labels: bool = False,
+) -> tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None]:
+    """
+    Unzip a dataset into image and annotation iterators, keeping each box's coordinates as given.
+
+    The shared body of :func:`unzip_dataset`, which returns only the converted boxes. This one returns the whole
+    ``Annotations`` for each image, with its raw coordinates and, when `with_labels`,
+    its labels.
+
+    Parameters
+    ----------
+    dataset : Dataset
+        The dataset to unzip.
+    per_target : bool
+        If True, extract each image's annotations.
+    with_labels : bool, default False
+        If True, also read each target's labels. Left False, the labels are never read.
+
+    Returns
+    -------
+    tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None]
+        Two iterators, one of images and one of annotations, which is None when `per_target` is False.
+    """
+    from itertools import tee
+
+    # Per-target extraction reads d[1].boxes, so the dataset must be an OD-shaped MAITE
+    # dataset. Image-only callers can still pass a bare image dataset.
+    validate_dataset(
+        dataset,
+        expected="object_detection" if per_target else "image_only",
+        caller="unzip_dataset",
+    )
+
+    _reject_tracking(dataset, per_target)
+
+    def _generate_pairs() -> Iterator[tuple[NDArray[Any], Annotations | None]]:
+        for i in range(len(dataset)):
+            d = dataset[i]
+            image = np.asarray(unwrap_image(d))
+            if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
+                boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
+                labels = as_numpy(d[1].labels) if with_labels else None
+                annotations = build_annotations(boxes, image.shape, i, labels)
+            else:
+                annotations = None
+            yield image, annotations
+
+    # Create two independent iterators from the generator
+    iter1, iter2 = tee(_generate_pairs(), 2)
+
+    # Extract images and annotations separately
+    images_iter = _SizedIterator((pair[0] for pair in iter1), len(dataset))
+    annotations_iter = (pair[1] for pair in iter2) if per_target else None
+
+    return images_iter, annotations_iter
+
+
 def unzip_dataset(
     dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]],
     per_target: bool,
@@ -68,37 +129,6 @@ def unzip_dataset(
     tuple[Iterator[NDArray[Any]], Iterator[list[BoundingBox] | None] | None]
         Two iterators, one for images and one for targets.
     """
-    from itertools import tee
-
-    # Per-target extraction reads d[1].boxes, so the dataset must be an OD-shaped MAITE
-    # dataset. Image-only callers can still pass a bare image dataset.
-    validate_dataset(
-        dataset,
-        expected="object_detection" if per_target else "image_only",
-        caller="unzip_dataset",
-    )
-
-    _reject_tracking(dataset, per_target)
-
-    def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
-        for i in range(len(dataset)):
-            d = dataset[i]
-            image = np.asarray(unwrap_image(d))
-            if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
-                try:
-                    boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-                    target = [BoundingBox(box[0], box[1], box[2], box[3], image_shape=image.shape) for box in boxes]
-                except (ValueError, IndexError) as err:
-                    raise ValueError(f"Invalid bounding box format for image {i}: {d[1].boxes}") from err
-            else:
-                target = None
-            yield image, target
-
-    # Create two independent iterators from the generator
-    iter1, iter2 = tee(_generate_pairs(), 2)
-
-    # Extract images and targets separately
-    images_iter = _SizedIterator((pair[0] for pair in iter1), len(dataset))
-    targets_iter = (pair[1] for pair in iter2) if per_target else None
-
-    return images_iter, targets_iter
+    images, annotations = _unzip_annotations(dataset, per_target)
+    targets = None if annotations is None else (a.boxes if a is not None else None for a in annotations)
+    return images, targets

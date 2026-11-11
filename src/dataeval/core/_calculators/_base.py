@@ -41,6 +41,29 @@ class ViewKind(Flag):
 ALL_VIEWS = ViewKind.WHOLE | ViewKind.MASK | ViewKind.BAND
 
 
+class ContextNeed(Flag):
+    """What a statistic needs beyond its own box, declared per statistic on its :class:`Handler`.
+
+    A statistic that compares a box with its peers cannot be computed from the one converted box a calculator sees.
+    Declaring the need lets `image_stats` build the per-image annotation context, and read a dataset's labels, only
+    for a request that includes such a statistic. A request that includes none builds nothing and reads nothing.
+
+    Attributes
+    ----------
+    NONE : ContextNeed
+        The statistic reads only its own box. The default.
+    CONTEXT : ContextNeed
+        The statistic reads the image's other boxes through ``cache.context``.
+    LABELS : ContextNeed
+        The statistic also reads their class labels. Any non-empty need builds the context; this one additionally
+        reads a dataset's labels.
+    """
+
+    NONE = 0
+    CONTEXT = auto()
+    LABELS = auto()
+
+
 class Handler(NamedTuple):
     """One statistic: its output name, how to compute it, and the views it is defined over.
 
@@ -60,11 +83,16 @@ class Handler(NamedTuple):
         Views this statistic is defined over, combined with ``|``. ``WHOLE`` alone —
         the default — means it describes the datum as given and is not recomputed for
         any masked region or band group.
+    needs : ContextNeed, default ContextNeed.NONE
+        What the statistic reads beyond its own box. Declared per statistic, not per calculator: a calculator
+        can hold one statistic that compares a box with its peers and another that also compares their classes,
+        and only a request that includes the second should read labels.
     """
 
     name: str
     compute: Callable[[], list[Any]]
     views: ViewKind = ViewKind.WHOLE
+    needs: ContextNeed = ContextNeed.NONE
 
 
 class Calculator(ABC, Generic[TFlag]):
@@ -138,6 +166,14 @@ class Calculator(ABC, Generic[TFlag]):
         """
         blank = cls.__new__(cls)
         return {flag: handler for flag, handler in blank.get_handlers().items() if flag in flags}
+
+    @classmethod
+    def context_needs(cls, flags: TFlag) -> ContextNeed:
+        """Return the union of what the statistics `flags` select read beyond their own box."""
+        needs = ContextNeed.NONE
+        for handler in cls._handlers_for(flags).values():
+            needs |= handler.needs
+        return needs
 
     @classmethod
     def stat_names(cls, flags: TFlag) -> set[str]:

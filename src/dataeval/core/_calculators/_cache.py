@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.utils._annotations import AnnotationContext
 from dataeval.utils.preprocessing import (
     BoundingBox,
     ValueRange,
@@ -74,6 +75,12 @@ class CalculatorCache:
         does, once per box — should read it once and pass it here. Also how a caller
         passes a *declared* range down, which is the only way float data outside the two
         conventional image spellings gets one at all. Found on demand when None.
+    context : AnnotationContext or None, default None
+        The datum's boxes classified once, for a statistic that compares `box` with its peers. None unless a selected
+        statistic declared a need for it. Shared by every row of one datum, and by every view of a row.
+    focal : int or None, default None
+        Index of `box` among the datum's boxes, or None on the datum's own row. Which box the `context` methods are
+        asked about.
     """
 
     def __init__(
@@ -84,6 +91,8 @@ class CalculatorCache:
         exclude: NDArray[np.bool_] | None = None,
         value_range: ValueRange | None = None,
         bands: tuple[int, ...] | None = None,
+        context: AnnotationContext | None = None,
+        focal: int | None = None,
     ) -> None:
         is_spatial = len(datum.shape) >= 2
         self.raw = datum
@@ -96,6 +105,8 @@ class CalculatorCache:
         self.exclude = exclude
         self._value_range = value_range
         self.bands = bands
+        self.context = context
+        self.focal = focal
 
         # Ensure bounding box
         self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
