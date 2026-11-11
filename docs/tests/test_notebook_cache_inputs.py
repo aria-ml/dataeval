@@ -44,6 +44,22 @@ def run(root: Path, action: str, **env: str) -> subprocess.CompletedProcess:
     )
 
 
+NOX = """import nox
+
+DOCS_ENVS = {"LANG": "C"}
+
+
+@nox.session
+def test(session):
+    session.run("pytest")
+
+
+@nox.session
+def docs(session):
+    session.run("sphinx-build")
+"""
+
+
 @pytest.fixture
 def checkout(tmp_path: Path) -> Path:
     subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
@@ -60,12 +76,12 @@ def checkout(tmp_path: Path) -> Path:
         "docs/source/conf.py",
         "docs/datasets.toml",
         "docs/source/notebooks/jupytext.toml",
-        "docs/source/notebooks/models/ae",
         "docs/source/notebooks/example.py",
         "docs/source/guide.md",
         "tests/example.py",
     ):
         write(tmp_path, name)
+    write(tmp_path, "noxfile.py", NOX)
     shutil.copyfile(ROOT / SCRIPT, tmp_path / SCRIPT)
     write(tmp_path, ".gitignore", "__pycache__/\n_version.py\n.jupyter_cache/\n")
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
@@ -77,22 +93,7 @@ def checkout(tmp_path: Path) -> Path:
 
 @pytest.mark.parametrize(
     "name",
-    [
-        "src/dataeval/example.py",
-        "uv.lock",
-        "pyproject.toml",
-        "noxfile.py",
-        ".cuda-version",
-        ".gitlab-ci.yml",
-        ".gitlab/ci/base.yml",
-        ".gitlab/ci/docs.yml",
-        SCRIPT,
-        "docs/check_notebook_cache.py",
-        "docs/source/conf.py",
-        "docs/datasets.toml",
-        "docs/source/notebooks/jupytext.toml",
-        "docs/source/notebooks/models/ae",
-    ],
+    ["src/dataeval/example.py", "uv.lock", "docs/datasets.toml"],
 )
 def test_shared_execution_input_changes_require_clean_build(checkout: Path, name: str):
     with (checkout / name).open("a") as stream:
@@ -103,7 +104,29 @@ def test_shared_execution_input_changes_require_clean_build(checkout: Path, name
     assert "All notebooks will be re-executed" in result.stdout
 
 
-@pytest.mark.parametrize("name", ["src/dataeval/new_module.py", "docs/source/notebooks/models/new_weights"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "pyproject.toml",
+        ".cuda-version",
+        ".gitlab-ci.yml",
+        ".gitlab/ci/base.yml",
+        ".gitlab/ci/docs.yml",
+        SCRIPT,
+        "docs/check_notebook_cache.py",
+        "docs/source/conf.py",
+        "docs/source/notebooks/jupytext.toml",
+    ],
+)
+def test_dropped_inputs_do_not_force_clean_build(checkout: Path, name: str):
+    with (checkout / name).open("a") as stream:
+        stream.write("\n# changed\n")
+    result = run(checkout, "check")
+    assert result.returncode == 0
+    assert "cache miss" not in result.stdout
+
+
+@pytest.mark.parametrize("name", ["src/dataeval/new_module.py"])
 def test_new_execution_input_requires_clean_build(checkout: Path, name: str):
     write(checkout, name)
     result = run(checkout, "check")
@@ -166,7 +189,9 @@ def test_unreadable_manifest_explains_why_cache_cannot_be_validated(checkout: Pa
     assert f"Cannot read execution-input manifest: {MANIFEST}" in result.stdout
 
 
-@pytest.mark.parametrize("name", ["DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG"])
+@pytest.mark.parametrize(
+    "name", ["DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG", "CI_JOB_IMAGE"]
+)
 def test_execution_environment_changes_require_clean_build(checkout: Path, name: str):
     previous = json.loads((checkout / MANIFEST).read_text())["environment"][name]
     result = run(checkout, "check", **{name: "different"})
@@ -267,3 +292,40 @@ def test_closure_follows_edges_and_tolerates_cycles():
     graph = {"a": {"b"}, "b": {"a", "c"}, "c": set()}
     assert cache_inputs.closure({"a"}, graph) == {"a", "b", "c"}
     assert cache_inputs.closure({"c"}, graph) == {"c"}
+
+
+def test_noxfile_digest_ignores_listed_sessions_only():
+    digest = cache_inputs.noxfile_digest
+    base = digest(NOX)
+    assert digest(NOX.replace('"pytest"', '"pytest", "-x"')) == base
+    assert digest(NOX.replace('"sphinx-build"', '"sphinx-build", "-W"')) != base
+    assert digest(NOX.replace('"C"', '"en"')) != base
+    assert digest(NOX + "\n\n@nox.session\ndef brand_new(session):\n    pass\n") != base
+    with pytest.raises(SyntaxError):
+        digest("def (")
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "code"),
+    [('"pytest"', '"pytest", "-x"', 0), ('"sphinx-build"', '"sphinx-build", "-W"', 1), ('"C"', '"en"', 1)],
+)
+def test_noxfile_edits_force_a_clean_build_only_outside_ignored_sessions(checkout: Path, old: str, new: str, code: int):
+    path = checkout / "noxfile.py"
+    path.write_text(path.read_text().replace(old, new))
+    assert run(checkout, "check").returncode == code
+
+
+def test_unparsable_noxfile_requires_clean_build(checkout: Path):
+    write(checkout, "noxfile.py", "def (\n")
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert "Cannot parse noxfile.py" in result.stdout
+
+
+def test_manifest_from_before_this_change_requires_one_clean_build(checkout: Path):
+    manifest = json.loads((checkout / MANIFEST).read_text())
+    del manifest["environment"]["CI_JOB_IMAGE"]
+    (checkout / MANIFEST).write_text(json.dumps(manifest))
+    result = run(checkout, "check")
+    assert result.returncode == 1
+    assert "Environment changed: CI_JOB_IMAGE: <missing> -> ''" in result.stdout

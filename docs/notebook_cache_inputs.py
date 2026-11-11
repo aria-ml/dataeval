@@ -16,23 +16,11 @@ from pathlib import Path
 
 # Notebook code cells have their own hashes. Keep the shared execution inputs
 # here, so editing one notebook or a Markdown page doesn't invalidate every one.
-INPUT_PATHS = (
-    "src",
-    "uv.lock",
-    "pyproject.toml",
-    "noxfile.py",
-    ".cuda-version",
-    ".gitlab-ci.yml",
-    ".gitlab/ci/base.yml",
-    ".gitlab/ci/docs.yml",
-    "docs/notebook_cache_inputs.py",
-    "docs/check_notebook_cache.py",
-    "docs/source/conf.py",
-    "docs/datasets.toml",
-    "docs/source/notebooks/jupytext.toml",
-    "docs/source/notebooks/models",
-)
-INPUT_ENV = ("DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG")
+INPUT_PATHS = ("src", "uv.lock", "noxfile.py", "docs/datasets.toml")
+INPUT_ENV = ("DOCS_PYTHON_VERSION", "DATAEVAL_NOX_UV_EXTRAS_OVERRIDE", "DOCS_RUNNER_TAG", "CI_JOB_IMAGE")
+# Sessions the docs job never runs. An edit to one of them must not re-execute the notebooks. A session
+# that is not listed counts as relevant, so a new session costs one extra clean build until it is listed.
+IGNORED_SESSIONS = ("dev", "test", "verify", "type", "deps", "lint", "doctest", "lock", "docsync", "check")
 MANIFEST = Path("docs/source/.jupyter_cache/execution-inputs.json")
 
 
@@ -88,8 +76,25 @@ def closure(seeds: set[str], graph: dict[str, set[str]]) -> set[str]:
     return seen
 
 
+def noxfile_digest(text: str) -> str:
+    """Hash `noxfile.py` without the sessions in `IGNORED_SESSIONS`, which the docs job never runs.
+
+    Module-level code, helpers, the `docs` session and any unlisted session stay in. The digest hashes
+    raw source lines, so it does not depend on the Python version. Raises `SyntaxError` if `text` does not parse.
+    """
+    dropped: set[int] = set()
+    for node in ast.parse(text).body:
+        if isinstance(node, ast.FunctionDef) and node.name in IGNORED_SESSIONS and node.decorator_list:
+            dropped.update(range(node.decorator_list[0].lineno, (node.end_lineno or node.lineno) + 1))
+    kept = "".join(line for number, line in enumerate(text.splitlines(keepends=True), start=1) if number not in dropped)
+    return hashlib.sha256(kept.encode()).hexdigest()
+
+
 def execution_inputs(root: Path) -> dict:
-    """Hash tracked and new, non-ignored inputs, including working-tree edits."""
+    """Hash tracked and new, non-ignored inputs, including working-tree edits.
+
+    Raises `ValueError` if `noxfile.py` cannot be parsed, because its digest cannot be trusted.
+    """
     names = (
         subprocess
         .check_output(
@@ -99,14 +104,17 @@ def execution_inputs(root: Path) -> dict:
         .decode()
         .split("\0")
     )
-    return {
-        "files": {
-            name: hashlib.sha256((root / name).read_bytes()).hexdigest()
-            for name in sorted(set(names) - {""})
-            if (root / name).is_file()
-        },
-        "environment": {name: os.environ.get(name, "") for name in INPUT_ENV},
+    files = {
+        name: hashlib.sha256((root / name).read_bytes()).hexdigest()
+        for name in sorted(set(names) - {""})
+        if (root / name).is_file()
     }
+    if "noxfile.py" in files:
+        try:
+            files["noxfile.py"] = noxfile_digest((root / "noxfile.py").read_text())
+        except (SyntaxError, UnicodeDecodeError) as error:
+            raise ValueError(f"Cannot parse noxfile.py: {error}") from error
+    return {"files": files, "environment": {name: os.environ.get(name, "") for name in INPUT_ENV}}
 
 
 def cache_miss_reasons(previous: object, current: dict) -> list[str]:
@@ -141,6 +149,21 @@ def cache_miss_reasons(previous: object, current: dict) -> list[str]:
     return reasons
 
 
+def report_miss(manifest: Path, reasons: list[str]) -> int:
+    """Print why the cache cannot be reused and return the exit code that asks for a clean build."""
+    print("Notebook execution cache miss; a clean build is required.")
+    try:
+        source = manifest.with_name(".cache_source").read_text().strip()
+    except OSError:
+        source = ""
+    if source:
+        print(f"  Restored cache source: {source}")
+    for reason in reasons:
+        print(f"  - {reason}")
+    print("All notebooks will be re-executed because the shared execution inputs could not be validated.")
+    return 1
+
+
 def main() -> int:
     """Check before building, or record the inputs after a successful build."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -148,7 +171,12 @@ def main() -> int:
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     manifest = root / MANIFEST
-    current = execution_inputs(root)
+    try:
+        current = execution_inputs(root)
+    except ValueError as error:
+        if args.action == "record":
+            raise
+        return report_miss(manifest, [str(error)])
 
     if args.action == "record":
         # Do not create a cache for a skipped or unsuccessful docs build.
@@ -170,17 +198,7 @@ def main() -> int:
             return 0
         reasons = cache_miss_reasons(previous, current)
 
-    print("Notebook execution cache miss; a clean build is required.")
-    try:
-        source = manifest.with_name(".cache_source").read_text().strip()
-    except OSError:
-        source = ""
-    if source:
-        print(f"  Restored cache source: {source}")
-    for reason in reasons:
-        print(f"  - {reason}")
-    print("All notebooks will be re-executed because the shared execution inputs could not be validated.")
-    return 1
+    return report_miss(manifest, reasons)
 
 
 if __name__ == "__main__":
