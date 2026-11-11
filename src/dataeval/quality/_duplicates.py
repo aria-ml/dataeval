@@ -1344,6 +1344,10 @@ def _detect_hash_duplicates(
     return (item_exact, item_near), (target_exact, target_near)
 
 
+_HASH_COLUMNS = frozenset({"xxhash", "phash", "dhash", "phash_d4", "dhash_d4"})
+"""The columns duplicate detection reads, one for each hash statistic of :class:`~dataeval.flags.ImageStats`."""
+
+
 def _prepare_hash_inputs(
     calculation_results: StatsResult | Sequence[StatsResult],
 ) -> tuple[StatsMap, list[SourceIndex], set[str], Sequence[int] | None]:
@@ -4438,7 +4442,7 @@ class Duplicates(Evaluator):
         ----------
         stats : StatsResult | Sequence[StatsResult]
             Pre-computed statistics containing hash values. Must include
-            at least one of: xxhash, phash, dhash, rhash. Can be a single
+            at least one of: xxhash, phash, dhash, phash_d4, dhash_d4. Can be a single
             result or a sequence of results.
         per_image : bool, default True
             Whether to include item-level (image) duplicate groups.
@@ -4452,6 +4456,12 @@ class Duplicates(Evaluator):
         DuplicatesOutput
             Duplicate detection results as a DataFrame of duplicate groups.
             For cross-dataset detection, includes a dataset_indices column.
+
+        Raises
+        ------
+        ValueError
+            If ``stats`` has rows but none of the hash columns. Compute them with
+            ``ImageStats.HASH``.
 
         See Also
         --------
@@ -4472,6 +4482,13 @@ class Duplicates(Evaluator):
         calc_results = stats if isinstance(stats, dict) else list(stats)
 
         hash_stats, source_index, available_stats, dataset_steps = _prepare_hash_inputs(calc_results)
+        # Rows with no hash column cannot show a duplicate, and an empty result would read as "none found".
+        # An empty dataset has no rows, and its statistics carry no hash column either, so it is let through.
+        if source_index and not available_stats & _HASH_COLUMNS:
+            raise ValueError(
+                f"stats has rows but none of the hash columns ({', '.join(sorted(_HASH_COLUMNS))}), so no duplicate "
+                "could be found in it. Compute them with ImageStats.HASH. A set such as ImageStats.BASIC has none."
+            )
         (item_exact, item_near), (target_exact, target_near) = _detect_hash_duplicates(
             hash_stats, source_index, self._radius_for(tracking=False)
         )

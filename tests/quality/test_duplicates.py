@@ -167,6 +167,32 @@ class TestDuplicates:
         with pytest.raises((TypeError, KeyError)):
             dupes.from_stats(1234)  # type: ignore
 
+    @pytest.mark.parametrize("flags", [ImageStats.BASIC, ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.DIMENSION])
+    def test_from_stats_without_hash_columns_raises_and_names_the_flag(self, flags):
+        """Rows with no hash column cannot show a duplicate, so an empty result would be a false all-clear.
+
+        Two copies of each image are in the data, and a request with hashes finds them.
+        """
+        data = np.random.random((20, 3, 16, 16))
+        images = np.concatenate((data, data))
+        assert Duplicates().from_stats(image_stats(images, stats=ImageStats.HASH)).data().shape[0] > 0
+
+        with pytest.raises(ValueError, match=r"ImageStats\.HASH"):
+            Duplicates().from_stats(image_stats(images, stats=flags))
+
+    def test_from_stats_without_hash_columns_raises_for_a_sequence(self):
+        images = np.random.random((10, 3, 16, 16))
+        no_hash = image_stats(images, stats=ImageStats.BASIC)
+
+        with pytest.raises(ValueError, match=r"ImageStats\.HASH"):
+            Duplicates().from_stats([no_hash, no_hash])
+
+    def test_from_stats_of_an_empty_dataset_is_no_duplicates_not_an_error(self):
+        """An empty dataset has no rows to hash, so the missing hash columns are not a mistake."""
+        result = Duplicates().from_stats(image_stats([], stats=ImageStats.HASH))
+
+        assert result.data().shape[0] == 0
+
     def test_duplicates_ignore_non_duplicate_too_small(self):
         dupes = Duplicates()
         images = [np.random.random((3, 16, 16)) for _ in range(20)]
