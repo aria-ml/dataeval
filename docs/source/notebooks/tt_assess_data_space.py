@@ -32,7 +32,7 @@
 # - Analyze clustered embeddings to find duplicates and
 #   [outliers](../concepts/DataIntegrity.md#outlier-detection-image-statistics-and-embeddings)
 # - Run additional analysis to find gaps in data
-#   [coverage](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space)
+#   [coverage](../concepts/DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space)
 #
 # ## What you will learn
 #
@@ -463,7 +463,7 @@ assert len(set(underrepresented[:6]) & {3267, 4928, 278, 5104, 3867}) >= 3  # mo
 #
 # - [Clustering](../concepts/Clustering.md) — Mathematical foundations of minimum spanning tree linkage clustering.
 # - [Measuring coverage: geometry in embedding
-#   space](../concepts/DatasetBias.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive
+#   space](../concepts/DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space) — Read how naive and adaptive
 #   coverage find the images in sparse regions of the space.
 # - [Run clustering analysis](./h2_cluster_analysis.py) — Cluster a dataset and find outliers and near duplicates
 #   in the clusters.

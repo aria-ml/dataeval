@@ -64,14 +64,14 @@ before any bias analysis.
 ### Are my class labels unevenly distributed?
 
 Use {class}`.Balance` to measure class frequency imbalance.
-See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md) and the
+See the [Dataset bias concept page](../concepts/DatasetBias.md) and the
 [identify dataset gaps tutorial](../notebooks/tt_identify_dataset_gaps.py).
 
 ### Are certain attribute groups underrepresented in my dataset?
 
 Use {class}`.Diversity` to measure representation across metadata factors
 (image conditions, object characteristics, collection circumstances).
-See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
+See the [Dataset bias concept page](../concepts/DatasetBias.md).
 
 ### Are label distributions inconsistent across subgroups?
 
@@ -90,7 +90,7 @@ Use {class}`.Coverage` to find the samples that sit in under-sampled regions of 
 the classes with the least variety. It needs a class label for each embedding. For embeddings without labels,
 {func}`.coverage_naive` and {func}`.coverage_adaptive` return the same under-sampled samples. Use
 {func}`.completeness` to measure how effectively the dataset spans available embedding dimensions.
-See the [Dataset Bias and Coverage concept page](../concepts/DatasetBias.md).
+See the [Dataset coverage concept page](../concepts/DatasetCoverage.md).
 
 ### Are my training and test splits drawn from the same distribution?
 

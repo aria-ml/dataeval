@@ -188,7 +188,7 @@ reusable-holdout mechanism of [Dwork et al. (2015)](#ref4).
 ## Related concept pages
 
 - [Data integrity](DataIntegrity.md): cross-split duplicates and near-duplicates (L1.4)
-- [Dataset bias and coverage](DatasetBias.md): sampling bias and shortcut learning (L3.3)
+- [Dataset bias](DatasetBias.md): sampling bias and shortcut learning (L3.3)
 - [Distribution shift](DistributionShift.md): a test set drawn from a different distribution (L3)
 
 ## See this in practice

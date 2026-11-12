@@ -704,7 +704,7 @@ assert (splits.class_axis.name, splits.class_axis.source) == ("drone", "derived"
 #   consistent factor levels across collections.
 # - [Identify gaps in a labeled dataset](./tt_identify_dataset_gaps.py) — Find the classes and regions of the embedding
 #   space that lack coverage.
-# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
+# - [Dataset bias](../concepts/DatasetBias.md) — Learn about mutual information, parity, and diversity
 #   metrics.
 
 # %% [markdown]

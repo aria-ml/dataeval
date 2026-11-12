@@ -502,7 +502,7 @@ requirement.
 - [Data integrity](DataIntegrity.md): label errors and sensor corruption
   can raise the estimated BER by adding noise at the class boundary; address
   integrity problems before interpreting BER results
-- [Dataset bias and coverage](DatasetBias.md): poor coverage can raise the
+- [Dataset bias](DatasetBias.md) and [Dataset coverage](DatasetCoverage.md): poor coverage can raise the
   effective BER on held-out data even when the training distribution appears
   separable, and bias can cause the BER on the operational distribution to
   exceed the BER measured on the training set

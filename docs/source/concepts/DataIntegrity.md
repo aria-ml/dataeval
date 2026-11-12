@@ -521,7 +521,7 @@ run deduplication across the train/validation split boundary.
   factors
 - [Clustering](Clustering.md): the underlying algorithm used by Duplicates
   (cluster mode), Outliers (cluster mode), and label_errors
-- [Dataset bias and coverage](DatasetBias.md): when your data is clean but
+- [Dataset bias](DatasetBias.md) and [Dataset coverage](DatasetCoverage.md): when your data is clean but
   still unrepresentative
 - [Distribution shift](DistributionShift.md): when your data was clean at
   training time but the deployment distribution has changed

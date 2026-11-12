@@ -713,7 +713,7 @@ a research frontier.
 - {doc}`Acting on Results <ActingOnResults>`: what to do with a finding, and
   which findings do not warrant action
 - {doc}`Data Integrity <DataIntegrity>`,
-  {doc}`Dataset Bias and Coverage <DatasetBias>`,
+  {doc}`Dataset Bias <DatasetBias>`, {doc}`Dataset Coverage <DatasetCoverage>`,
   {doc}`Performance Limits <PerformanceLimits>`,
   {doc}`Distribution Shift <DistributionShift>`,
   {doc}`Divergence <Divergence>`, {doc}`Clustering <Clustering>`,
