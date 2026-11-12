@@ -25,7 +25,8 @@ _PROBE = np.linspace(0.0, 1.0, 3 * 16 * 16).reshape(3, 16, 16)
 def _single_statistics() -> dict[str, tuple[type[Any], ImageStats]]:
     """Each statistic one :class:`~dataeval.flags.ImageStats` member produces alone, with its calculator.
 
-    Read off the calculators' declared names, so nothing is computed.
+    Read off the calculators' declared names, so nothing is computed. A statistic that declares it reads the image's
+    other boxes is left out: a gate measures whole frames, which have no boxes, so it would read NaN on every frame.
     """
     from dataeval.core._calculators._registry import CalculatorRegistry
 
@@ -33,6 +34,8 @@ def _single_statistics() -> dict[str, tuple[type[Any], ImageStats]]:
     for flag in ImageStats:
         calculators = CalculatorRegistry.get_calculators(flag)
         if len(calculators) == 1 and len(names := calculators[0][0].stat_names(flag)) == 1:
+            if calculators[0][0].context_needs(flag):
+                continue
             statistics[names.pop()] = (calculators[0][0], flag)
     return statistics
 
@@ -182,7 +185,8 @@ class QualityGate(FrameSelector):
         if calculator is None or not _reads_one_number(stat, calculator):
             raise ValueError(
                 f"QualityGate: stat must name a numeric scalar image_stats statistic, one of "
-                f"{', '.join(_numeric_scalar_stats())}; got {stat!r}."
+                f"{', '.join(_numeric_scalar_stats())}; got {stat!r}. A statistic that compares a box with its peers "
+                f"is not accepted, because a gate measures whole frames, which have no boxes."
             )
         # QualityGate reads the statistic without calling image_stats, where the blur flags warn.
         if calculator[1] & ImageStats.BLUR:

@@ -74,7 +74,8 @@ class ImageStats(Flag):
     - `DIMENSION_DEPTH` : Bit depth of image
     - `DIMENSION_CENTER` : Center coordinates [x, y]
     - `DIMENSION_DISTANCE_CENTER` : Distance from box center to image center
-    - `DIMENSION_DISTANCE_EDGE` : Distance from box to nearest image edge
+    - `DIMENSION_DISTANCE_EDGE` : Distance from box to nearest image edge. It is unsigned: a box 5 px outside the
+      image reads like one 5 px inside, and `SPATIAL_BOX_IN_IMAGE_FRACTION` tells them apart
     - `DIMENSION_INVALID_BOX` : Whether bounding box is invalid
     - `DIMENSION_REL_OFFSET_X` : X-offset of bounding box as a fraction of image width
     - `DIMENSION_REL_OFFSET_Y` : Y-offset of bounding box as a fraction of image height
@@ -82,7 +83,8 @@ class ImageStats(Flag):
     - `DIMENSION_REL_HEIGHT` : Box height as a fraction of image height
     - `DIMENSION_REL_SIZE` : Box area as a fraction of image area
     - `DIMENSION_REL_DISTANCE_CENTER` : Distance to the image center as a fraction of the half-diagonal
-    - `DIMENSION_REL_DISTANCE_EDGE` : Distance to the nearest edge as a fraction of that edge's dimension
+    - `DIMENSION_REL_DISTANCE_EDGE` : Distance to the nearest edge as a fraction of that edge's dimension, unsigned
+      like `DIMENSION_DISTANCE_EDGE`
 
     Hash Statistics (computed on raw image data):
 
@@ -91,6 +93,29 @@ class ImageStats(Flag):
     - `HASH_DHASH` : Difference/gradient hash of image
     - `HASH_PHASH_D4` : Perceptual hash with D4 symmetry (rotation/flip invariant)
     - `HASH_DHASH_D4` : Difference hash with D4 symmetry (rotation/flip invariant)
+
+    Spatial Statistics (experimental, so names and values may change; one box measured against the other boxes of its
+    image and against the image's edges, so they need boxes and are NaN on an image's own row):
+
+    - `SPATIAL_NN_DISTANCE_NORM` : Distance from the box's center to the center of its nearest other box, over the
+      box's own diagonal. It is directed, since each box divides by its own diagonal, and it is center to center,
+      not the gap between boxes. It reads the boxes as given, not clipped to the image
+    - `SPATIAL_BOX_IN_IMAGE_FRACTION` : The share of the box's area that lies inside the image, in (0, 1]. It is
+      always 1.0 on datasets whose annotation tools clip boxes to the image
+
+    A box is a neighbor when it has positive area, finite ordered edges and part of it inside the image. A request
+    that includes a spatial statistic also returns details, in the result's ``details``, one value per row:
+
+    - `spatial_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image,
+      has reversed edges or is not finite (read from the coordinates as given, so a reversed box is `invalid_box`
+      here though `DIMENSION_INVALID_BOX` is False for it, unless the box is a `BoundingBox`, whose constructor has
+      already swapped its edges); `incomplete_geometry`, when another box of the image is
+      reversed or not finite, so a nearer neighbor may exist that could not be placed (the value is still computed
+      from the valid boxes, and the largest `SPATIAL_NN_DISTANCE_NORM` values are then the least reliable); or
+      `not_applicable`, on an image's own row
+    - `nn_distance_norm_target_index` : The nearest neighbor's index among the image's boxes, -1 for none. On equal
+      distances the lowest index is nearest
+    - `nn_distance_norm_reason` : `no_neighbor` when the status is `ok` and no other valid box exists, else empty
 
     Convenience Groups
     ------------------
@@ -120,17 +145,23 @@ class ImageStats(Flag):
     - `NO_HASH` : The same set as `STANDARD`, under its v1.2 name
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
+    - `SPATIAL` : The two spatial statistics (experimental). In no other group. They need boxes, and are NaN on every
+      other row
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
-    - `ALL` : Every statistic in this release, including the experimental blur statistics. A later release can add
-      statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must not change
+    - `ALL` : Every statistic in this release, including the experimental blur and spatial statistics. A later
+      release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must not
+      change
 
     Notes
     -----
     Some statistics have dependencies on others, the dependencies will be added
     automatically during processing.
+
+    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL`` is what `ALL` held in v1.2. The `SPATIAL` statistics
+    need box rows, so a request for `ALL` with no box rows returns their columns as NaN and warns.
 
     Examples
     --------
@@ -199,6 +230,11 @@ class ImageStats(Flag):
     VISUAL_BLUR = auto()
     VISUAL_BLUR_DIRECTIONALITY = auto()
 
+    # ===== SPATIAL STATS =====
+    # Appended after the blur flags so that no existing flag value moves
+    SPATIAL_NN_DISTANCE_NORM = auto()
+    SPATIAL_BOX_IN_IMAGE_FRACTION = auto()
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -242,6 +278,9 @@ class ImageStats(Flag):
     # Kept out of VISUAL and VISUAL_BASIC, so Outliers' default keeps its columns and its speed
     BLUR = VISUAL_BLUR | VISUAL_BLUR_DIRECTIONALITY
 
+    # Compares a box with the other boxes of its image, so it has a value only on a box's own row
+    SPATIAL = SPATIAL_NN_DISTANCE_NORM | SPATIAL_BOX_IN_IMAGE_FRACTION
+
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
     PIXEL_DISTRIBUTION = PIXEL_SKEW | PIXEL_KURTOSIS | PIXEL_ENTROPY | PIXEL_HISTOGRAM
@@ -283,7 +322,7 @@ class ImageStats(Flag):
     BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
 
     # Ultimate convenience, spelled from the families so that a change to STANDARD cannot take a statistic out of it
-    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR
+    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL
 
 
 class VideoStats(Flag):

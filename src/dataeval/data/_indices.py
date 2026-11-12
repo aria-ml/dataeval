@@ -8,6 +8,7 @@ import numpy as np
 
 from dataeval.data._video_proxies import _FrameTracksTarget
 from dataeval.data._view import Operation, Transform, View
+from dataeval.flags import ImageStats
 from dataeval.types import SourceIndex
 from dataeval.types._removal import canonical_address
 from dataeval.types._target import detection_count, track_ids_of
@@ -189,6 +190,9 @@ class Indices(Operation):
     **Keep a plan's items to see them.** Without `exclude`, a plan of whole items keeps exactly the items it
     names, which shows what would be removed: ``View(dataset, Indices(plan))``.
 
+    **It declares the spatial statistics invalidated** (``ImageStats.SPATIAL``) when `exclude` removes rows inside
+    items, because the neighbors a box is measured against are then gone and a target reads as isolated.
+
     Examples
     --------
     >>> from dataeval.data import Indices, View
@@ -218,6 +222,11 @@ class Indices(Operation):
                 "Pass exclude=True to remove the rows the keyed addresses name."
             )
         self.requires = _required_kind(self._within)
+
+    @property
+    def invalidates(self) -> ImageStats:
+        """The SPATIAL statistics when rows inside items are removed, since a target then reads as isolated."""
+        return ImageStats.SPATIAL if self.exclude and self._within else ImageStats.NONE
 
     def apply(self, view: View[Any]) -> None:
         if not self.exclude:

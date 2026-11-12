@@ -11,6 +11,7 @@ from dataeval._experimental import experimental
 from dataeval._ontology import Ontology
 from dataeval.data._view import Operation, View
 from dataeval.exceptions import DeprecatedWarning, OntologyError
+from dataeval.flags import ImageStats
 from dataeval.protocols import Array, ArrayLike, DatasetMetadata, ObjectDetectionTarget
 from dataeval.types._target import own_class_scores
 from dataeval.utils._array import argmax_label, as_numpy
@@ -124,7 +125,8 @@ class Relabel(Operation):
         (an image-classification datum whose class is OOV is dropped; an
         object-detection detection that is OOV is dropped, and an image left with
         no detections is dropped unless ``drop_empty=False``). ``"raise"`` raises if
-        any source class is OOV.
+        any source class is OOV. ``"drop"`` also declares the spatial statistics
+        (``ImageStats.SPATIAL``) invalidated, since the neighbors of a box can be dropped.
     drop_empty : bool, default True
         Whether to drop a *detection* datum with no in-vocabulary detections.
         When ``False``, keep datums that have no detections, or whose detections are
@@ -311,6 +313,11 @@ class Relabel(Operation):
             names = ", ".join(sorted(self.dropped.values()))
             raise OntologyError(f"Source classes not expressible in target vocabulary: {names}")
         return cast(DatasetMetadata, {**metadata, "index2label": self.index2label})
+
+    @property
+    def invalidates(self) -> ImageStats:
+        """The SPATIAL statistics under ``on_unmatched="drop"``, which removes the detections of unmatched classes."""
+        return ImageStats.SPATIAL if self.on_unmatched == "drop" else ImageStats.NONE
 
     def apply(self, view: View[Any]) -> None:
         # Drop out-of-vocabulary datums (cheap keep-check reads through preceding ops),

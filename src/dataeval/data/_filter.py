@@ -19,6 +19,7 @@ from dataeval.data._indices import _dropper, _Within
 from dataeval.data._reads import Reads
 from dataeval.data._video_proxies import _FrameTracksTarget
 from dataeval.data._view import Operation, Transform, View
+from dataeval.flags import ImageStats
 from dataeval.protocols import Array, MultiobjectTrackingTarget, ObjectDetectionTarget, SegmentationTarget
 from dataeval.types import FactorLevel
 from dataeval.utils._array import argmax_label, as_numpy
@@ -199,6 +200,9 @@ class Filter(Operation):
     **The vocabulary is unchanged**, so a filtered view keeps every class index; :class:`Relabel` compacts it. The
     detections left behind are renumbered from 0, as after :class:`Indices`.
 
+    **It declares the spatial statistics invalidated** (``ImageStats.SPATIAL``) unless ``drop="items"``, because
+    removing detections removes the neighbors a box is measured against, and a target then reads as isolated.
+
     **An empty result warns**, naming the predicate; a non-empty one logs what it kept on the ``dataeval`` logger at
     INFO.
 
@@ -246,6 +250,11 @@ class Filter(Operation):
         self.classes = classes
         self.drop: Drop = drop
         self._expr = _predicate(where, classes)
+
+    @property
+    def invalidates(self) -> ImageStats:
+        """The SPATIAL statistics when detections are removed, since a target then reads as isolated."""
+        return ImageStats.NONE if self.drop == "items" else ImageStats.SPATIAL
 
     def _repr_overrides(self) -> dict[str, str]:
         # The default repr of a polars expression carries a memory address, which would make repr(view) differ run to

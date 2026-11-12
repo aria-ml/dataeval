@@ -22,9 +22,13 @@ ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
 # ``sharpness`` measures the interpolation kernel. The blur flags are in pixels at the
 # image's own resolution, so a resize rescales them. Channel count survives; ``HASH`` is
 # deliberately absent, since resize-then-phash is a *better* near-duplicate check across
-# heterogeneous source resolutions.
+# heterogeneous source resolutions. The SPATIAL statistics change too: boxes are clipped to the new canvas and those
+# that fall outside are dropped, and a stretch scales the two axes unequally.
 _BASE_INVALIDATES = (
-    (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS | ImageStats.BLUR
+    (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
+    | ImageStats.VISUAL_SHARPNESS
+    | ImageStats.BLUR
+    | ImageStats.SPATIAL
 )
 
 # Letterbox padding adds a block of flat fill pixels, which moves every percentile-derived
@@ -126,7 +130,10 @@ class Resize(Operation):
     ``sharpness`` is affected just as sharply and much less visibly: bilinear downsampling
     smooths, so sharpness after a resize measures the interpolation kernel. Both are
     declared in ``invalidates``, so the quality evaluators warn rather than report them as
-    data findings.
+    data findings. So are the spatial statistics (``ImageStats.SPATIAL``): the boxes are
+    clipped to the new canvas and those left outside it are dropped, so ``box_in_image_fraction``
+    reads 1.0 afterward and a target's neighbors may be gone, and ``mode="stretch"`` scales the
+    two axes by different factors, which a normalized center distance does not survive.
 
     ``PIXEL_MEAN``/``PIXEL_STD`` are deliberately *not* declared for ``mode="stretch"``.
     Aggressive downsampling does shrink pixel variance, but it is a second-order effect and

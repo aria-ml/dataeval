@@ -110,9 +110,9 @@ print("extractor produces:", tuple(np.asarray(embedding).shape), "-- normalized,
 # ## Narrow the flags
 #
 # If the resize is part of the dataset definition, drop the statistics it invalidates and keep the rest. The default
-# resize declares as invalidated the dimension statistics (except the channel count), sharpness and the blur
-# statistics. It does not declare the pixel statistics or the hashes, so `flags=ImageStats.PIXEL` runs without a
-# warning.
+# resize declares as invalidated the dimension statistics (except the channel count), sharpness, the blur statistics
+# and the spatial statistics. It does not declare the pixel statistics or the hashes, so `flags=ImageStats.PIXEL` runs
+# without a warning.
 
 # %%
 with warnings.catch_warnings(record=True) as caught:
