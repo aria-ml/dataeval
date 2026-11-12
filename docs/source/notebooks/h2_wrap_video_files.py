@@ -96,7 +96,8 @@ print([path.name for path in paths])
 #
 # DataEval walks a video stream from the first frame, more than once, so open the file inside `__iter__` and close it
 # when the walk ends, including when the consumer stops early. Each frame carries `pixels` as a `(C, H, W)` array, its
-# own `frame_index`, and `time_s` and `pts` from the file.
+# own `frame_index`, and `time_s` and `pts` from the file. Building {class}`.Metadata` decodes every frame this way. To
+# skip that decode, see [Defer image and video decoding](./h2_defer_decoding.py).
 
 
 # %%

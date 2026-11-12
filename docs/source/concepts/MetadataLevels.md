@@ -528,6 +528,8 @@ what granularity was this measured?" is a level question.
 
 ### How-to guides
 
+- [Defer image and video decoding](../notebooks/h2_defer_decoding.py): returning lazy images and frames so that
+  building metadata decodes no pixels.
 - [Filter a dataset by metadata factors](../notebooks/h2_filter_by_metadata.py): keeping the images and detections
   that match a predicate over factors.
 - [Keep metadata in sync with its dataset and cache it](../notebooks/h2_sync_and_cache_metadata.py):

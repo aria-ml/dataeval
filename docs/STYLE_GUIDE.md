@@ -18,6 +18,7 @@ DataEval follows the [Diataxis](https://diataxis.fr) framework. Every page has o
 | Concept page | Explains an idea, the reasoning behind it and its limits. | `docs/source/concepts` | `CamelCase.md` |
 | Getting started | Orients a new reader: installation, quickstart, which tool, what data each tool needs. | `docs/source/getting-started` | `kebab-case.md` |
 | API reference | Generated from docstrings. | `src/dataeval` | not applicable |
+| Reference page | A table or list that a reader looks things up in and does not read through, such as the validation evidence of each evaluator. Written by hand and kept in step with the code. It states facts and links to the concept page that explains them, and it does not restate a docstring. | `docs/source/reference` | `CamelCase.md` |
 
 A tutorial is heavy and a how-to is light. A tutorial takes the reader through a whole workflow in ten to thirty
 minutes and ends by summarizing what they learned. A how-to is the shortest path to one result.

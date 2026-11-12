@@ -55,9 +55,9 @@ pl.Config.set_tbl_rows(20)
 # %% [markdown]
 # ## Split the dataset into two campaigns
 #
-# Pass `lazy=True` so that images decode only when requested. See the
-# [Defer image decoding](./h2_wrap_dataframe_dataset.py#defer-image-decoding) step of how to wrap a DataFrame as a
-# dataset. The flight telemetry includes altitude, gimbal orientation and airframe type.
+# Pass `lazy=True` so that images decode only when requested. For a dataset you write yourself, see
+# [Defer image and video decoding](./h2_defer_decoding.py). The flight telemetry includes altitude, gimbal orientation
+# and airframe type.
 
 # %%
 dataset = SeaDrone(root="./data", image_set="val", download=True, lazy=True)

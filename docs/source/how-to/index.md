@@ -56,6 +56,7 @@ datasets for machine learning.
 
 ../notebooks/h2_wrap_dataframe_dataset.py
 ../notebooks/h2_wrap_video_files.py
+../notebooks/h2_defer_decoding.py
 ../notebooks/h2_select_frames.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_build_dataset_views.py
@@ -86,14 +87,17 @@ datasets for machine learning.
 
 - - [](../notebooks/h2_wrap_dataframe_dataset.py)
   - Wrap a pandas DataFrame catalog of images or bounding boxes as a
-    DataEval dataset, and defer image decoding to speed up
-    metadata-only analysis
+    DataEval dataset
   - [![Open In Colab][colab-badge]][wdf-colab]
 - - [](../notebooks/h2_wrap_video_files.py)
   - Wrap video files and their tracking annotations as a multi-object
     tracking dataset, and serve each file's frame rate and duration as
     named factors
   - [![Open In Colab][colab-badge]][wvf-colab]
+- - [](../notebooks/h2_defer_decoding.py)
+  - Return lazy images and video frames from a dataset you write, so a
+    metadata-only walk decodes no pixels
+  - [![Open In Colab][colab-badge]][ddc-colab]
 - - [](../notebooks/h2_select_frames.py)
   - Thin each video to a budget of frames with Stride, EvenlySpaced or
     Representative, and read how many source frames each kept frame stands for
@@ -223,6 +227,7 @@ datasets for machine learning.
 [cmrg-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_conform_and_merge_datasets.ipynb
 [wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_wrap_video_files.ipynb
 [sel-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_select_frames.ipynb
+[ddc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_defer_decoding.ipynb
 
 ## Model development
 

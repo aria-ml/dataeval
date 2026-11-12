@@ -13,7 +13,7 @@ DataEval's evidence for its own correctness is
 [documented and checkable](#how-dataeval-validates-its-own-implementations), but it is
 not uniform across the library, so every evaluator and core function is rated
 individually and not covered by a blanket claim. Each table on
-[Validation evidence by evaluator](ValidationEvidence.md) carries the entry's name plus these columns:
+[Validation evidence by evaluator](../reference/ValidationEvidence.md) carries the entry's name plus these columns:
 
 - **Evidence basis** is the source of the method: a published result, a DataEval
   concept page where the derivation is written down, or a third-party library.
@@ -21,13 +21,12 @@ individually and not covered by a blanket claim. Each table on
   correctness is the relevant evidence.
 - **Validation evidence** is how DataEval verifies its own implementation in CI.
   It takes one of six levels, [defined below](#validation-evidence-levels).
-- **Policy levers** are the parameters that gate the evaluator's decisions, with
-  their defaults. They appear in evaluator tables only, because core functions
-  carry no policy. A default is a choice someone made, not a property of the
-  math.
 - **Contraindications** are conditions under which the output is invalid or
   meaningless. These are not performance caveats; they are cases where the number
   is wrong or undefined and should not be reported.
+
+The defaults of an evaluator's parameters are choices someone made and not
+properties of the math. The API reference lists them.
 
 Check your intended metric's row before you cite it: verify that the
 contraindications do not apply to your data, and use the validation level to
@@ -75,7 +74,7 @@ single largest uncontrolled variable in a DataEval assessment. BER,
 divergence, coverage, prioritization, label-error detection, and every
 embedding-based drift detector inherit the geometry of whatever extractor
 produced their input, so an extractor problem shows up as a wrong number in a
-table on [Validation evidence by evaluator](ValidationEvidence.md) and not as an error.
+table on [Validation evidence by evaluator](../reference/ValidationEvidence.md) and not as an error.
 
 {doc}`Embeddings <Embeddings>` covers how to choose one. Extractors carry no
 validation-evidence rating of their own, because they produce inputs rather than
@@ -403,16 +402,16 @@ given mission, operating population or embedding extractor.
 
 ## Evaluators
 
-Every evaluator's evidence basis, validation evidence, policy levers and contraindications are listed in
-[Validation evidence by evaluator](ValidationEvidence.md#evaluators), grouped as data quality, dataset bias, dataset
-scope, distribution shift and performance.
+Every evaluator's evidence basis, validation evidence and contraindications are listed in
+[Validation evidence by evaluator](../reference/ValidationEvidence.md#evaluators), grouped as data quality, dataset
+bias, dataset scope, distribution shift and performance.
 
 ## Core functions
 
 Core functions carry no thresholds or policy, and their contraindications are statistical and computational. They are
-listed in [Validation evidence by evaluator](ValidationEvidence.md#core-functions) in six groups: feasibility and
-performance limits, divergence and embedding geometry, ranking and selection, image statistics and hashing, metadata and
-bias, and labels and ontology.
+listed in [Validation evidence by evaluator](../reference/ValidationEvidence.md#core-functions) in six groups:
+feasibility and performance limits, divergence and embedding geometry, ranking and selection, image statistics and
+hashing, metadata and bias, and labels and ontology.
 
 ## How DataEval validates its own implementations
 
@@ -430,7 +429,7 @@ project's tests. `dataeval.utils.losses` shares that lineage.
 conceptually inspired by alibi-detect's reconstruction detector, but the
 detector code and its tests are DataEval's own. It reaches alibi-derived code
 only through the shared reconstruction scorer, which is why its row on
-[Validation evidence by evaluator](ValidationEvidence.md#distribution-shift) carries two ratings.
+[Validation evidence by evaluator](../reference/ValidationEvidence.md#distribution-shift) carries two ratings.
 
 DataEval's HDBSCAN implementation (`dataeval.core._fast_hdbscan`) is adapted
 from [fast_hdbscan](https://github.com/TutteInstitute/fast_hdbscan) v0.2.0-0.2.2
@@ -715,7 +714,7 @@ a research frontier.
 
 ## Related concept pages
 
-- [Validation evidence by evaluator](ValidationEvidence.md): the evidence basis, validation level, policy levers and
+- [Validation evidence by evaluator](../reference/ValidationEvidence.md): the evidence basis, validation level and
   contraindications of every evaluator and core function
 - {doc}`Embeddings <Embeddings>`: the largest uncontrolled variable in any
   DataEval assessment; read this before trusting any embedding-based result
@@ -734,7 +733,8 @@ a research frontier.
 ## References
 
 Method-level citations live on the concept page for each method, linked from
-the tables on [Validation evidence by evaluator](ValidationEvidence.md). The sources specific to this page are:
+the tables on [Validation evidence by evaluator](../reference/ValidationEvidence.md). The sources specific to this page
+are:
 
 1. Seldon Technologies Ltd. (2023). *alibi-detect v0.11.4.*
    [repository](https://github.com/SeldonIO/alibi-detect/tree/v0.11.4)

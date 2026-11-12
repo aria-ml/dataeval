@@ -29,20 +29,15 @@ Terms used on this page, each defined in more depth on the concept page:
 
 ## Read a result
 
-Start with `print(result)`. It shows:
+Start with `print(result)`. It shows one line per requirement, the call's joint confidence, the assumptions the bounds
+rest on, which DataEval declares and does not verify, and what a minimum means: the independent units that would cross
+the requirement if the observed rates hold.
 
-1. One line per requirement: its determination, its limitation, the determining envelope and the determining witness, each
-   with its source, and its suggested minimum. A recall requirement's witness brings both of its bounds.
-2. The call's joint confidence.
-3. The assumptions the bounds rest on, which DataEval declares and does not verify.
-4. What a minimum means: the independent units that would cross the requirement if the observed rates hold.
-
-For the full picture, `result.bounds` lays out every bound of the call as one table, with one row per source,
-requirement and quantity. It gives the source, the bound, the observed score of a witness, its information scope, its
-independent units and its share of `alpha`, and `is_determining` marks the bounds a determination rests on. `result.determinations`
-holds the printed rows as a table. With `dataeval-plots` installed, `dataeval_plots.plot(result)` draws one band per
-quantity, grouped into requirements the evidence demonstrates, leaves unknown, or rules out under the recorded
-assumptions. `plot_evidence=True` draws each source's observed score and bound instead.
+`result.bounds` lays out every bound of the call as one table, with one row per source, requirement and quantity, and
+`is_determining` marks the bounds a determination rests on. `result.determinations` holds the printed rows as a table.
+With `dataeval-plots` installed, `dataeval_plots.plot(result)` draws one band per quantity, grouped into requirements
+the evidence demonstrates, leaves unknown, or rules out under the recorded assumptions. `plot_evidence=True` draws each
+source's observed score and bound instead.
 
 ## Choose what evidence to supply
 
@@ -62,20 +57,8 @@ Practical rules:
 
 - Put every requirement in one call. They then share one error budget (see
   [How the error budget is spent](#how-the-error-budget-is-spent)).
-- Describe your model. Pass its class scores or class decisions as `predictions=`, or the model itself as `model=`.
-  DataEval records that it was trained without the audit units and frozen before it scored them, and does not check
-  either, so train it on items that are not in the dataset you pass. A `model=` call also needs a batch size, from
-  `Feasibility(batch_size=...)` or `dataeval.config.set_batch_size`.
-- Fold scores when the requirement is coarser than the model. If a requirement is about a coarser class than the model
-  was trained on, relabel the dataset with {class}`.Relabel` and fold the model's scores through the same map with
-  `Relabel.fold_scores(scores, view=view)`. Columns of source classes that map to one target class are summed,
-  columns of dropped classes are discarded, nothing is renormalized, and with `view` the rows of dropped items are
-  removed so the result lines up with the relabeled items.
-- Freeze other operating points before the call. Feasibility has no decision threshold of its own and does not search
-  for one on the audit. To judge a different operating point, such as a threshold on one class's score, apply it before
-  the call as a complete multiclass policy (the class when its score reaches the threshold, otherwise the highest-scoring
-  other class) and pass the resulting decisions. The bounds record that the decisions follow a policy frozen before the
-  audit. Each operating point needs its own call, with the error budget split across the planned calls.
+- Describe your model. DataEval records that it was trained without the audit units and frozen before it scored them,
+  and does not check either, so train it on items that are not in the dataset you pass.
 - Collect repeated labels when ruling out matters. Without `replicas=` or allowances, every envelope covers only
   `partition_restricted` models, so a `full_input` requirement can be demonstrated but not ruled out.
 
@@ -404,11 +387,9 @@ claim. Every bound records its claim's share in `alpha`, and inside a claim the 
 
 Macro AP first divides the claim's share equally among the classes.
 
-The guarantee covers one call on one fixed audit. Further calls need the budget divided again:
-
-- Comparing $k$ representations or models across calls needs `alpha / k` per call.
-- Rerunning with $k$ other seeds and keeping the best result is a selection among those calls and also needs `alpha / k`.
-- Growing the audit and looking again is a selection among those calls and also needs `alpha / k`.
+The guarantee covers one call on one fixed audit. Comparing $k$ representations or models across calls, keeping the
+best of $k$ seeds, or growing the audit and looking again is a selection among calls, and each call then needs
+`alpha / k`.
 
 ## What to do about a non-final determination
 
@@ -455,19 +436,13 @@ at which it would cross the threshold, if the observed rates hold.
   the bound is a recall envelope (no single point estimate to project), when the bound has no closed-form radius to
   invert (AP bounds and `frame_pooled` ratios), or when no size up to $10^7$ suffices.
 
-[Acting on results](ActingOnResults.md#performance-limits-findings) describes what to do with these findings.
-
 ## Limitations of the first release
 
-- Object detection and tracking datasets raise `NotImplementedError`.
 - `frame_pooled` video requirements get no local-panel envelope and spend no budget on one. Their envelopes come only from
   replicas.
 - Feasibility always fits its own label-blind k-means partition. A partition you supply is not accepted, and because the
   partition is internal, a per-cell β is rejected and no witness can read it.
-- β and Γ are taken as given and recorded as assumed, never estimated.
 - The panel size and cell count are provisional internal settings.
-- Feasibility does not check that your model was trained without the audit items. It records
-  `model_independent_of_audit_items`.
 - A recall requirement is for image classification only: one class per requirement, one frozen operating point per call,
   with the false-positive limit on the pooled negatives. It is refused on grouped (video) data and with
   `false_positive_scope="each_class"`. Feasibility judges whether the requirement is reachable. It does not evaluate or
@@ -481,7 +456,8 @@ the [Performance limits](PerformanceLimits.md#limitations) page.
 - [Performance limits](PerformanceLimits.md): what Feasibility answers, why, and how it relates to BER, UAP and
   Sufficiency
 - [Embeddings](Embeddings.md): the representation that local panels partition and the built-in witnesses read
-- [Acting on results](ActingOnResults.md): what to do with a non-final determination
+- [Acting on results](ActingOnResults.md#performance-limits-findings): what to do with the BER, UAP and Sufficiency
+  findings that complement a determination
 
 ## See this in practice
 

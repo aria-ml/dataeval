@@ -277,6 +277,7 @@ Overview <concepts/index>
 API reference <reference/autoapi/dataeval/index>
 Functional overview <reference/FunctionalOverview>
 JATIC maturity <reference/maturity>
+Validation evidence by evaluator <reference/ValidationEvidence>
 reference/glossary
 :::
 

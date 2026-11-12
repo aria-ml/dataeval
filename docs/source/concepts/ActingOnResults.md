@@ -5,12 +5,32 @@ evidence, such as scores, indices, p-values and bounds, and many add a rule-base
 or a determination. None of them makes the decision. That decision requires understanding what the result means in the
 context of the program, its data collection constraints, and its performance requirements.
 
-This page maps each category of DataEval output to the decisions it informs and
-the actions available to you. It is not a procedure to follow linearly. Real
-datasets present multiple issues simultaneously, and fixing one can reveal or
-interact with another. Use this page as a reference: when a diagnostic produces
-a result you need to act on, find the relevant section and understand your
-options before committing to a course of action.
+This page maps each category of DataEval output to the decisions it informs and the actions available. It is a
+reference and not a procedure to follow linearly, because real datasets present several issues at once and fixing one
+can reveal or interact with another.
+
+The table lists each signal with the first check that its section describes.
+
+| Signal | First check | Section |
+| ------ | ----------- | ------- |
+| Duplicate or near-duplicate group | Which projections agreed, and whether the labels differ | [Duplicates](#duplicates-and-near-duplicates) |
+| Flagged outlier | A data quality problem or a legitimate but unusual sample | [Outliers](#outliers) |
+| Image statistics | Inputs to outlier detection and characterization, not pass or fail | [Image statistics](#image-statistics) |
+| High `error_rank` | Review the highest-ranked samples first | [Label errors](#label-errors-and-label-statistics) |
+| High Balance value for a factor and the class | A collection artifact or intrinsic to the task | [Balance and diversity](#balance-and-diversity) |
+| Low Diversity | Which factor values are underrepresented | [Balance and diversity](#balance-and-diversity) |
+| Parity cell | The cell's `status`, then its `deficit` | [Parity](#parity) |
+| Coverage gap or low completeness | The `uncovered_indices` samples as seeds for collection | [Coverage](#coverage-and-completeness) |
+| Prioritize ranking | Where to draw the cutoff, a program decision | [Prioritize](#what-prioritize-does-not-do) |
+| Class imbalance to correct | The `global` or `interclass` strategy | [Class balance](#class-balance-remediation) |
+| BER lower bound above the allowance | Whether the representation is the bottleneck | [BER](#ber-upper-and-lower-bounds) |
+| UAP below the requirement | A stronger crop classifier or embedding | [UAP](#uap) |
+| Fitted Sufficiency curve | Whether the ceiling, $1 - c_0$, is below the requirement | [Sufficiency](#sufficiency-learning-curves) |
+| Feasibility determination that is not final | The limitation names the evidence to collect | [Feasibility](FeasibilityEvidence.md#what-to-do-about-a-non-final-determination) |
+| Drift flag | Characterize the drift before acting | [Drift](#drift-detection-results) |
+| Out-of-distribution flag | Why the sample is distant from the training data | [OOD](#ood-detection-results) |
+| Flagged samples from any evaluator | Which metadata factors set them apart | [Metadata](#diagnosing-findings-with-metadata) |
+| Divergence score | How far the distributions differ | [Divergence](#divergence-scores) |
 
 One framing applies across the page: DataEval reports evidence and classifies it by rule, and the decision belongs to
 the practitioner. A high BER lower bound is evidence that class overlap may be irreducible. It does not establish that
@@ -505,9 +525,11 @@ architecture can all violate that assumption.
 
 ### Drift detection results
 
-All drift detectors return a binary `drifted` flag and a p-value (or AUROC for
-the domain classifier). A drift detection is a signal to investigate, not a
-signal to immediately retrain.
+All drift detectors return a binary `drifted` flag, a distance and the threshold
+it was compared against. The detectors built on a hypothesis test also report a
+p-value, {class}`.DriftWasserstein` reports a ratio and
+{class}`.DriftDomainClassifier` reports an AUROC. A drift detection is a signal
+to investigate, not a signal to immediately retrain.
 
 First response to drift detection: characterize the drift before acting.
 {class}`.DriftUnivariate` identifies which features drifted.
