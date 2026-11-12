@@ -185,7 +185,7 @@ for warning in caught:
 # %% [markdown]
 # A cut that fits is silent. DataEval also reports an encoding finer than the sample can support, whether it came as a
 # bin count or a declared vocabulary, and names no replacement count on purpose.
-# [Binning](../concepts/Binning.md#a-fine-cut-costs-the-same-correlation-from-the-other-side) has the measurements.
+# [Binning](../concepts/BinEdges.md#effect-of-fine-binning-on-the-correlation-score) has the measurements.
 # Neither report refits anything. {meth}`.Metadata.reencode` is the explicit request, and it returns a new instance so a
 # result computed under the old codes stays attributable to them.
 

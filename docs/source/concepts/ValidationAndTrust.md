@@ -2,7 +2,7 @@
 
 # Validation and trust
 
-## When should you trust a DataEval result?
+## When to trust a DataEval result
 
 Use this page as a pre-flight check before citing any DataEval metric. Every
 evaluator relies on specific assumptions about your data, so the validity of a
@@ -10,10 +10,10 @@ measurement depends on whether those assumptions hold. This page makes them
 explicit.
 
 DataEval's evidence for its own correctness is
-[real and checkable](#how-dataeval-validates-its-own-implementations), but it is
+[documented and checkable](#how-dataeval-validates-its-own-implementations), but it is
 not uniform across the library, so every evaluator and core function is rated
-individually rather than covered by a blanket claim. Each table below carries
-the entry's name plus these columns:
+individually and not covered by a blanket claim. Each table on
+[Validation evidence by evaluator](ValidationEvidence.md) carries the entry's name plus these columns:
 
 - **Evidence basis** is the source of the method: a published result, a DataEval
   concept page where the derivation is written down, or a third-party library.
@@ -32,11 +32,11 @@ the entry's name plus these columns:
 Check your intended metric's row before you cite it: verify that the
 contraindications do not apply to your data, and use the validation level to
 calibrate the strength of your claim. Where DataEval's own evidence is thin,
-[Known gaps](#known-gaps-in-this-pages-evidence) says so directly.
+[Known gaps](#known-gaps-in-this-pages-evidence) says so.
 
 ```{important}
-DataEval is not a certification tool. It produces measurements, not pass/fail
-judgments. If a result surprises you, check the policy behind it (for
+DataEval is not a certification tool. It produces measurements and rule-based classifications of them, not
+certifications. If a result surprises you, check the policy behind it (for
 evaluators), the extractor that produced its input (for anything
 embedding-based), or the
 [binning applied to its factors](#metadata-binning-a-policy-applied-to-every-factor)
@@ -62,7 +62,7 @@ modes.
   wrap core observations in policy: a
   threshold, a default distribution, a significance level, a ranking rule. The
   evaluator tables name the policy each one carries, because that policy, not
-  the underlying math, is the most common source of results that do not transfer
+  the underlying math, is a common source of results that do not transfer
   between domains. The trust question is: "is the math right, and is the built-in
   policy appropriate for my problem?"
 
@@ -74,7 +74,7 @@ single largest uncontrolled variable in a DataEval assessment. BER,
 divergence, coverage, prioritization, label-error detection, and every
 embedding-based drift detector inherit the geometry of whatever extractor
 produced their input, so an extractor problem shows up as a wrong number in a
-table below rather than as an error.
+table on [Validation evidence by evaluator](ValidationEvidence.md) and not as an error.
 
 {doc}`Embeddings <Embeddings>` covers how to choose one. Extractors carry no
 validation-evidence rating of their own, because they produce inputs rather than
@@ -309,7 +309,7 @@ bear on trusting a result:
     is cut more finely; `factors` compares two possibly-binned factors and is
     scored so its denominator no longer grows with a bin count you did not
     choose, though the mutual information above the line still shifts with the
-    binning. See [Binning](Binning.md#binning-reaches-the-three-outputs-differently).
+    binning. See [Choosing bin edges](BinEdges.md#binning-reaches-the-three-outputs-differently).
 - - {func}`.split_dataset` with `split_on`
   - Floats and declared cuts only
   - Groups are formed from recorded factor values, except for a float factor or
@@ -391,786 +391,16 @@ implementation.
 
 ## Evaluators
 
-### Data quality
-
-See {doc}`Data Integrity <DataIntegrity>` for what these measure.
-
-:::{list-table}
-:widths: 13 21 15 21 30
-:header-rows: 1
-
-- - Evaluator
-  - Evidence basis
-  - Validation evidence
-  - Policy levers
-  - Contraindications
-- - {class}`.Duplicates`
-  - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); clustering
-    via scikit-learn KMeans or DataEval's HDBSCAN. See
-    {doc}`Clustering <Clustering>`.
-  - Anchored (hashes); Delegated (KMeans); Ported (HDBSCAN)
-  - `cluster_sensitivity`: what counts as "near". `None` by default, so
-    cluster detection is off unless set together with an `extractor`.
-    `merge_near_duplicates=True`; `cluster_algorithm="hdbscan"`.
-  - Hash and embedding modes fail on disjoint transformation classes.
-    Neither establishes semantic identity: a hash collision is visual
-    similarity, not the same object.
-- - {class}`.Outliers`
-  - Robust statistics (Double-MAD, z-score, IQR fences) over the image
-    statistics vocabulary.
-  - Cross-checked (skew, kurtosis, entropy verified against SciPy);
-    Anchored (thresholds)
-  - `outlier_threshold`: what counts as "extreme"; defaults to
-    `AdaptiveThreshold` (tail-weighted Double-MAD, asymmetric bounds).
-    `cluster_threshold` defaults to `ZScoreThreshold(upper_multiplier=2.5)`.
-    `flags` selects the statistics scored.
-  - The default tolerates skew and heavy tails but assumes one mode: on
-    multimodal data (night plus day, mixed sensors) it flags a legitimate
-    second population. The z-score `cluster_threshold` is not robust there
-    either. Outputs are linting warnings for review, never a deletion list.
-
-:::
-
-Both sets of defaults are tuned for general-purpose imagery. If your dataset is
-domain-specific, treat them as a starting point to calibrate, not as a
-standard.
-
-```{note}
-The two detection modes in {class}`.Duplicates` are complementary, not
-competing. Hashing is fast and survives photometric change; embedding-based
-clustering survives geometric change. Datasets with augmentation pipelines
-generally need both.
-```
-
-```{warning}
-The specific transformation-by-transformation behavior of each mode is
-demonstrated empirically in the
-[Detect common augmentations as duplicates](../notebooks/tt_augmentation_duplicates.py)
-tutorial. Consult that notebook for the current results rather than relying on
-a summary table here: the behavior depends on hash size, cluster sensitivity,
-and the extractor in use, and a static table would go stale silently.
-```
-
-### Dataset bias
-
-See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
-
-:::{list-table}
-:widths: 13 21 15 21 30
-:header-rows: 1
-
-- - Evaluator
-  - Evidence basis
-  - Validation evidence
-  - Policy levers
-  - Contraindications
-- - {class}`.Balance`
-  - Normalized mutual information ([Linfoot, 1957](DatasetBias.md#references);
-    [Vinh et al., 2010](DatasetBias.md#references)). Estimators from
-    scikit-learn.
-  - Delegated (MI estimation); Internal only (normalization)
-  - `class_imbalance_threshold=0.3` and `factor_correlation_threshold=0.5`
-    decide what is reported as imbalanced or entangled. `num_neighbors=5` is
-    deprecated and will be removed in v1.2.0: it sets the MI estimator's
-    neighborhood, and every column arriving from a {class}`.Metadata` is already
-    binned and so never reaches the neighbor-based estimator. Setting it warns.
-  - Declares every factor discrete, so the result depends on a binning you may
-    not have chosen. See
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-    The class-to-factor values are corrected for chance; the factor-to-factor
-    block is not, so at small n, or with a factor binned into many more bins
-    than the sample supports, that block looks more entangled than it is.
-- - {class}`.Diversity`
-  - Shannon and inverse-Simpson indices
-    ([Hill, 1973](DatasetBias.md#references);
-    [Heip et al., 1998](DatasetBias.md#references)).
-  - Anchored
-  - `method="simpson"` chooses inverse-Simpson over Shannon; the two weight
-    rare categories differently. `threshold=0.5` decides what counts as low
-    diversity.
-  - Discrete and categorical variables only. Over binned continuous data the
-    score measures the binning as much as the data. See
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-- - {class}`.Parity` ⚠️
-  - Pearson's chi-squared on independent rows; the second-order Rao–Scott F
-    with Kish effective groups on grouped rows ([Rao & Scott, 1984](Parity.md#references);
-    [Thomas & Rao, 1987](Parity.md#references)). Exact hypergeometric and
-    Korn–Graubard cell tests, the grouped cells' variance bounded below by a
-    Kish cluster-model variance whose within-group correlation for each group
-    is the largest of the class's correlation pooled over the other levels, its
-    largest at another single level, the level's correlation in the other
-    classes, and the level's largest correlation in another single class (the
-    model is Kish's; how its correlation is estimated is this package's choice,
-    not a cited method), Bergsma's V with its null bias
-    matched to the design effect,
-    Cochran's screen, Benjamini–Hochberg adjustment; all cited in the
-    docstrings. See
-    [Parity](Parity.md).
-  - Cross-checked (statistic, p-value and cell p-values on independent rows
-    against SciPy); Anchored (grouped: sandwich covariance against a dense
-    implementation of its definition, the cluster-model cell variance against a
-    dense implementation of its definition, calibration under the null in eight
-    simulated designs within three Monte Carlo standard errors, and no cell
-    flagged beyond that bound in eleven null designs with bursty classes: up to
-    40 × 40 and 100 classes, two and three classes, group sizes and burst
-    patterns that differ by level, classes bursting in blocks of levels at
-    20 × 20 and 40 × 40; one further test holds the known limit below at its
-    measured rate)
-  - `score_threshold=0.3` (Cramér's V) and `p_value_threshold=0.05` (on
-    BH-adjusted p-values) decide which factors are `associated`.
-    `lift_threshold=1.25` decides which significant cells are actionable; 1
-    disables the band. `assume_independent=True`: set it only for a custom
-    container that records no sampling unit.
-  - Experimental: the API may change or be removed. Dependence between
-    groups, such as consecutive sequences from one flight, is not corrected and
-    makes p-values too small. With `group_source="declared"`, the p-values hold
-    only if the declaration is true. The reference distribution is asymptotic in
-    effective groups: calibration was measured in the scenarios on the concept
-    page, not proven in general, and power is low with few groups. A grouped
-    cell's variance is never below the cluster-model one, which does not shrink
-    when the cell is short. In two- and three-level tables of four classes this
-    cut the power to find a planted deficit by three quarters to nine tenths
-    at 60 to 100 groups (none lost at 200 to 300). In a 20 × 20 table of
-    bursty classes over 2,000 images, about five bursts per cell, a class at a
-    tenth of its share was never found; over 20,000 images a class at 30% of
-    its share always was. A deficit held by few groups is therefore often
-    reported as not significant rather than `underrepresented`. Contraindication: a class that comes in bursts at
-    one level of the factor only, while that level's other classes do not burst
-    (with two classes there are no others), such as a rare class seen in one or
-    a few crowded images at one level. A cell of that class at that level that
-    holds none of its bursts looks like a real shortage, and no variance
-    estimated from the data tells them apart; Parity does not detect it. In
-    simulated nulls, 11–17% of tables had a falsely flagged cell with two
-    classes and about two bursty images at one of 3 to 10 levels, 3–10% for one
-    such cell in a 2 × 2 to 3 × 4 table, and 26–33% and 49–54% when each of 20
-    or 40 levels burst in its own class, against the nominal 5%. The
-    contraindication is repeated in the `Parity` and `parity` docstrings.
-    `inconclusive` and `untestable` are not passes. Nominal: ordered bins are
-    read as unordered, and the binning decides cell occupancy. See
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-    Measures association, not coverage against a mission.
-
-:::
-
-### Dataset scope
-
-See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
-{doc}`Acting on Results <ActingOnResults>` for how to act on a prioritization.
-
-:::{list-table}
-:widths: 13 21 15 21 30
-:header-rows: 1
-
-- - Evaluator
-  - Evidence basis
-  - Validation evidence
-  - Policy levers
-  - Contraindications
-- - {class}`.Coverage`
-  - Coverage radius from
-    [Asudeh et al. (2021)](https://dl.acm.org/doi/abs/10.1145/3448016.3457315);
-    the per-class dispersion, isotropy, and near-duplicate signals it adds are
-    DataEval's own. `isotropy` is {func}`.completeness`'s effective-dimension
-    estimate applied per class; see that row below for its lineage. See
-    [Measuring coverage](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
-  - Internal only
-  - `method="adaptive"` and `num_observations=20` set the radius (the latter is
-    Sudman's 20-50 guidance). `percent=0.01` is the fraction reported as
-    uncovered. `min_class_samples=20` and `near_duplicate_factor=0.5` gate the
-    per-class and duplicate signals. `isotropy_min_samples=None` gates
-    `isotropy` at one more than the embedding dimensionality.
-    `dispersion_factor=0.5`, `isotropy_factor=0.5` and
-    `near_duplicate_threshold=0.1` set the per-class flags. They are
-    conservative and tuned for deep embeddings. Below about 8 dimensions the
-    near-duplicate flag can trip on healthy classes.
-  - Coverage of a poor embedding space is not coverage of the data. Small
-    datasets return degenerate radii. `isotropy` is null, not zero, for any
-    class below its sample floor, which on a high-dimensional extractor is most
-    classes; reduce dimensionality first if you need it.
-- - {class}`.Prioritize`
-  - Coreset and cluster-complexity ranking
-    ([Sorscher et al., 2022](https://arxiv.org/abs/2206.14486);
-    [Abbas et al., 2024](https://arxiv.org/abs/2401.04578);
-    [Zheng et al., 2023](https://arxiv.org/abs/2210.15809)). See
-    [Prioritization](DatasetBias.md#prioritization-as-coverage-driven-data-selection).
-  - Internal only
-  - `method="knn"` selects the ranking criterion; `policy="difficulty"` and
-    `order="easy_first"` the selection rule on top of it; `num_bins=50` the
-    stratification granularity. Each is a separate objective: changing one
-    changes what "prioritized" means.
-  - Ranks by embedding geometry alone, with no notion of label correctness,
-    annotation cost, or operational importance. See
-    [What Prioritize does not do](ActingOnResults.md#what-prioritize-does-not-do).
-- - {class}`.Representation`
-  - Observed label mass over an {class}`.Ontology`, judged against an expected
-    distribution. See {doc}`Ontology <Ontology>`.
-  - Internal only
-  - `expected=None` is the entire policy. `None` is a uniform expectation over
-    leaf classes; pass a mapping to assert per-class minimum shares.
-  - Only as good as the ontology and expectation supplied. The uniform default
-    is wrong for any domain with a skewed operational prior.
-
-:::
-
-### Distribution shift
-
-See {doc}`Distribution Shift <DistributionShift>` for what these measure and
-how to choose among them.
-
-:::{list-table}
-:widths: 13 21 15 21 30
-:header-rows: 1
-
-- - Evaluator
-  - Evidence basis
-  - Validation evidence
-  - Policy levers
-  - Contraindications
-- - {class}`.DriftUnivariate`
-  - [Rabanser et al. (2019)](DistributionShift.md#references) methodology.
-    All five tests (`ks`, `cvm`, `mwu`, `anderson`, `bws`) are computed by
-    `scipy.stats`. Corrections: Bonferroni,
-    [Benjamini-Hochberg (1995)](DistributionShift.md#references).
-  - Delegated (test statistics); Ported (workflow, from alibi-detect 0.11.4)
-  - `method="ks"`, `p_val=0.05`, `correction="bonferroni"`,
-    `alternative="two-sided"`. Bonferroni is the conservative choice; `"fdr"`
-    trades false positives for power across many features.
-  - Do not apply to raw high-dimensional input. Univariate tests over
-    thousands of correlated dimensions lose power even with correction; reduce
-    dimensionality first. Feature-wise tests cannot see shift that exists only
-    in the joint distribution.
-- - {class}`.DriftMMD`
-  - [Gretton et al.](DistributionShift.md#references) kernel two-sample test;
-    permutation-based significance.
-  - Ported (alibi-detect 0.11.4)
-  - `p_val=0.05`; `sigma=None` selects the bandwidth heuristic, which is not
-    universally appropriate; `n_permutations=100` bounds the smallest
-    reachable p-value.
-  - Permutation testing scales quadratically in sample size: unsuitable for
-    per-frame or real-time use without chunking.
-- - {class}`.DriftDomainClassifier`
-  - Domain-classifier drift detection; cross-validated discriminability.
-  - Internal only
-  - `threshold=0.55` AUROC is the entire drift verdict; `n_folds=5` sets how
-    much data each fold sees.
-  - AUROC is optimistic under severe imbalance between reference and test sets.
-    A negative result is weak evidence: it may mean no drift, or an
-    underpowered proxy classifier.
-- - {class}`.DriftKNeighbors`
-  - Nearest-neighbor distance-based detection. See
-    [K-nearest neighbor drift detection](DistributionShift.md#k-nearest-neighbor-drift-detection-driftkneighbors).
-  - Internal only
-  - `k=10`, `p_val=0.05`, `distance_metric="euclidean"`. Note this differs
-    from {class}`.OODKNeighbors`, which defaults to `"cosine"`.
-  - Depends on the embedding metric being meaningful. Sensitive to `k` and to
-    reference-set size.
-- - {class}`.DriftReconstruction`
-  - Autoencoder reconstruction error. The detector is DataEval's own; the
-    scoring math it calls is shared with {class}`.OODReconstruction`.
-  - Internal only (detector); Ported (shared scorer, from alibi-detect 0.11.4)
-  - `p_val=0.05`; `epochs=20` and `batch_size=64` govern the autoencoder
-    trained in `fit()`; `gmm_weight=0.5` and `gmm_score_mode="standardized"`
-    fuse reconstruction and density scores.
-  - Inherits every bias of the autoencoder it trains or is handed.
-    Reconstruction error conflates "novel" with "hard to reconstruct."
-- - {class}`.DriftWasserstein`
-  - Wasserstein distance against a validation baseline. See
-    [Wasserstein-based drift detection](DistributionShift.md#wasserstein-based-drift-detection-driftwasserstein).
-  - Internal only
-  - `ratio_threshold=1.4`: drift is flagged when the mean over features of the
-    train/test distance divided by the train/validation baseline, corrected for
-    the sample sizes, exceeds 1.4. A convention, not a calibrated false alarm
-    rate. Measured false alarms: about 0% to 3% from 16 independent continuous
-    features, 5% to 19% with correlated features, roughly 15% to 35% with 1 to
-    4 features.
-  - Requires a held-out validation split to set the baseline, and the baseline
-    is one train/validation comparison. Unusable on constant or discrete
-    features and on infinite-variance tails. The mean does not see a shift
-    confined to a few of many features (1 of 512 was not detected). In chunked
-    mode only the default constant threshold is calibrated.
-- - {class}`.ChunkedDrift`
-  - Wrapper applying any detector over sequential chunks.
-  - Internal only
-  - `chunker` / `chunk_size` / `chunk_count`: one must be supplied; there is
-    no default chunking. `threshold=None` falls back to the wrapped
-    detector's own chunk threshold.
-  - Chunk size trades detection latency against statistical power; small chunks
-    give unstable per-chunk verdicts. A configuration choice, not a property of
-    the wrapped detector. The chunk size is also applied to the reference, and
-    every threshold except `ConstantThreshold` sets its bounds from the spread
-    of the reference chunks, so `fit` rejects a reference that splits into
-    fewer than 3 chunks. A few more than 3 still gives a rough spread.
-- - {class}`.OODReconstruction`
-  - Autoencoder / VAE reconstruction-based OOD scoring.
-  - Ported (alibi-detect 0.11.4); Cross-checked against scikit-learn in tests
-  - `threshold_perc=95.0` declares the top 5% of reference scores OOD. It
-    assumes your reference set is 5% contaminated. `epochs=20`,
-    `batch_size=64`, `gmm_weight=0.5` govern the model and score fusion.
-  - Inherits every bias of the autoencoder/VAE it trains or is handed.
-    Per-instance scores are not calibrated probabilities; the threshold needs a
-    trusted in-distribution reference set.
-- - {class}`.OODKNeighbors`
-  - Distance-based OOD scoring. See
-    [Distance-based detection](DistributionShift.md#distance-based-detection-oodkneighbors).
-  - Cross-checked (against scikit-learn in tests)
-  - `k=10`, `distance_metric="cosine"`, `threshold_perc=95.0`. Same
-    contamination assumption as {class}`.OODReconstruction`.
-  - Same embedding dependence as `DriftKNeighbors`. Threshold requires
-    calibration on trusted in-distribution data.
-- - {class}`.OODDomainClassifier`
-  - Domain-classifier OOD detection.
-  - Internal only
-  - `n_folds=5`, `n_repeats=5`, `n_std=2.0`. `threshold_perc=None` by default,
-    so the cutoff comes from `n_std` above the reference mean rather than a
-    percentile.
-  - Same imbalance caveat as `DriftDomainClassifier`.
-
-:::
-
-```{note}
-Drift detection answers "has the input distribution changed?" It does not
-answer "has model performance degraded?" DataEval measures the first. See
-[Taxonomy of shift](DistributionShift.md#taxonomy-of-shift) for why a detected
-shift may be harmless and an undetected one may not be.
-```
-
-### Performance
-
-See {doc}`Performance Limits <PerformanceLimits>`.
-
-:::{list-table}
-:widths: 13 21 15 21 30
-:header-rows: 1
-
-- - Evaluator
-  - Evidence basis
-  - Validation evidence
-  - Policy levers
-  - Contraindications
-- - {class}`.Sufficiency`
-  - Power-law learning curves
-    ([Hestness et al., 2017](PerformanceLimits.md#references)); curve fitting
-    via basin-hopping ([Wales & Doye, 1997](PerformanceLimits.md#references)).
-  - Internal only
-  - `runs=1` and `substeps=5` decide how much evidence the curve is fitted to.
-    A single run yields no usable confidence interval; raise it before
-    quoting one.
-  - Extrapolation assumes future data is drawn from the same distribution as
-    the pilot data. If new collection introduces shift, the projection is
-    void. Projections far beyond the largest measured substep are speculative.
-
-:::
+Every evaluator's evidence basis, validation evidence, policy levers and contraindications are listed in
+[Validation evidence by evaluator](ValidationEvidence.md#evaluators), grouped as data quality, dataset bias, dataset
+scope, distribution shift and performance.
 
 ## Core functions
 
-Core functions carry no thresholds or policy. Their contraindications are
-statistical and computational.
-
-### Feasibility and performance limits
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.ber_knn`, {func}`.ber_mst`
-  - "Learning to Bound the Multi-class Bayes Error", Theorems 3 and 4
-    ([arXiv:1811.06419](https://arxiv.org/abs/1811.06419)), cited in both
-    docstrings. See
-    [BER estimation](PerformanceLimits.md#ber-estimation-mst-and-knn-bounds).
-  - Ground-truth checked (bounds must contain, and stay tight around, the
-    analytic Bayes error of two Gaussians at four separations)
-  - Only as meaningful as the embedding: a weak extractor inflates apparent
-    class overlap and overstates difficulty. `ber_knn` is sensitive to `k`; MST
-    construction is costly at scale. Classification only.
-- - {func}`.uap` ⚠️
-  - Empirical upper-bound average precision
-    ([Borji & Iranmanesh, 2019](PerformanceLimits.md#references)).
-  - Anchored
-  - Experimental: the API may change or be removed. Reduces detection to
-    classification over crops; ignores localization error entirely.
-- - {func}`.nullmodel_metrics` and the `nullmodel_*` family
-  - Dummy-classifier baselines.
-  - Ground-truth checked (uniform, proportional, and dominant-class accuracies
-    matched against `1/C`, `sum(p_i * q_i)`, and `p[argmax(q)]`)
-  - Baselines only: what a trivial model achieves on your class distribution,
-    not what is achievable.
-
-:::
-
-### Divergence and embedding geometry
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.divergence_mst`, {func}`.divergence_fnn`
-  - Henze-Penrose style divergence via multivariate run statistics. See
-    {doc}`Divergence <Divergence>`.
-  - Ground-truth checked (returns 0 for identical distributions and 1 for
-    disjoint ones, and increases monotonically with separation)
-  - Embedding-dependent, like BER. A divergence near 0 in a poor embedding
-    space is not evidence that two datasets match.
-- - {func}`.minimum_spanning_tree`, {func}`.compute_neighbors`
-  - Standard graph and neighbor construction.
-  - Internal only
-  - Geometric primitives with no statistical interpretation on their own.
-- - {func}`.cluster`, {func}`.compute_cluster_stats`
-  - scikit-learn KMeans; DataEval's HDBSCAN implementation. See
-    {doc}`Clustering <Clustering>`.
-  - Delegated (KMeans); Ported (HDBSCAN, from fast_hdbscan);
-    Cross-checked (clusterer tests use scikit-learn)
-  - Cluster counts are a modeling choice, not a discovered fact. See
-    [Practical considerations](Clustering.md#practical-considerations).
-- - {func}`.completeness`
-  - Effective dimensionality $d_\text{eff} = e^H$ over the covariance
-    eigenvalues: the eigenvalue form of the effective rank of
-    [Roy & Vetterli (2007)](DatasetBias.md#references), also used by
-    [Kim et al. (2023)](DatasetBias.md#references) and
-    [Zhuo et al. (2023)](DatasetBias.md#references), and the entropy-based
-    sibling of the participation ratio
-    ([Gao et al., 2017](DatasetBias.md#references)). All four are cited in the
-    docstring. The two normalizations are DataEval's own: $d_\text{eff}/d$
-    (completeness) and $d_\text{eff}/r$ (isotropy). See
-    [Completeness and isotropy](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
-  - Internal only
-  - Measures how the data fills the embedding's dimensions, not whether the
-    embedding is semantically right. The two scores are not directly comparable
-    as a ratio: completeness decomposes the rank-normalized matrix, isotropy the
-    raw centered one. `isotropy` is degenerate unless samples exceed dimensions.
-- - {func}`.coverage_naive`, {func}`.coverage_adaptive`
-  - Radius-based coverage of
-    [Asudeh et al. (2021)](https://dl.acm.org/doi/abs/10.1145/3448016.3457315),
-    with the 20-50 observation guidance from Sudman (1976), both cited in the
-    docstrings. See
-    [Measuring coverage](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
-  - Internal only
-  - Undefined below a minimum sample count. The naive and adaptive radii
-    answer different questions; they are not interchangeable.
-- - {func}`.feature_distance`
-  - Feature-wise distance between two continuous distributions.
-  - Internal only
-  - Feature-wise only; blind to joint-distribution differences.
-
-:::
-
-### Ranking and selection
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.rank_kmeans_distance`, {func}`.rank_hdbscan_distance`
-  - Self-supervised prototypicality metric of
-    [Sorscher et al. (2022)](https://arxiv.org/abs/2206.14486): cluster the
-    embeddings, rank each sample by distance to its centroid.
-  - Internal only
-  - Favors sparse regions: on non-uniform manifolds it can oversample sparse
-    outlier regions and undersample dense, decision-boundary-rich ones.
-- - {func}`.rank_kmeans_complexity`, {func}`.rank_hdbscan_complexity`
-  - Concept-cluster complexity of
-    [Abbas et al. (2024)](https://arxiv.org/abs/2401.04578): complexity is the
-    product of intra- and inter-cluster distance, and the sampling budget is
-    allocated across clusters in proportion to it.
-  - Internal only
-  - Complexity weighting mitigates but does not eliminate the above. Depends on
-    cluster structure actually existing in the embedding.
-- - {func}`.rank_knn`
-  - Nearest-neighbor distance profiling.
-  - Internal only
-  - Sensitive to `k` and to local density variation.
-- - {func}`.rank_result_class_balanced`, {func}`.rank_result_stratified`
-  - `rank_result_stratified` implements the score-bin stratification of
-    [Zheng et al. (2023)](https://arxiv.org/abs/2210.15809), which preserves
-    distribution coverage at high pruning rates.
-    `rank_result_class_balanced` has no identified source.
-  - Internal only
-  - These impose a selection policy on an observation. Using them means
-    accepting a balance or stratification objective that may conflict with the
-    ranking's original criterion.
-
-:::
-
-### Image statistics and hashing
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.image_stats`, {func}`.combine_stats_results`,
-    {func}`.compute_ratios`
-  - Image statistics vocabulary. See
-    [Image statistics as a linting vocabulary](DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
-  - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
-  - Descriptive only. A statistic being unusual is not evidence a sample is
-    bad. Every pixel counts, so a part of the vehicle in frame shifts the
-    statistics. On real drone footage, a hood covering about a fifth of the
-    frame lowered sharpness to 89% of the clean value, against 93% for lens
-    vignetting alone. Compare absolute values only within footage from one
-    platform. Within one video, a part did not change which frames a sharpness
-    gate dropped.
-- - {func}`.image_stats` (`ImageStats.BLUR`) and {func}`.video_stats` (`VideoStats.BLUR`)
-  - Edge width after Liang et al. (2010), with a percentile summary in place of the paper's own score.
-  - Internal only (the vectorized edge widths match a slower per-point loop kept in the tests, from the team's earlier
-    prototype, so not independent; tests on synthetic images check the trends, the NaN cases and determinism; nothing
-    is compared with a published implementation)
-  - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations and on
-    11 clips with simulated blur, with no human-rated blur. Widths are in pixels, so compare only at one resolution. Not
-    a calibrated level of defocus and not a motion blur detector. Noise and JPEG artifacts move it by amounts and in
-    directions that depend on the scene, and a soft 8-bit image at low contrast reads sharper than at full contrast. See
-    [Blur statistics](BlurStatistics.md).
-- - {func}`.track_stats`
-  - Per-track statistics for video sequences.
-  - Anchored
-  - Assumes track identity is already resolved: detections carrying no track id
-    take no part, and nothing here re-associates them.
-- - {func}`.ego_stats`
-  - Per-frame camera ego-motion, from a robust affine fit to cheap optical flow,
-    with declared roll-ups to the sequence level. See
-    [Camera motion as a per-frame factor](MetadataLevels.md#camera-motion-as-a-per-frame-factor).
-  - Ground-truth checked (kinematics recovered from analytically constructed
-    flow fields)
-  - Measures apparent motion, so it cannot distinguish a moving camera from
-    a scene moving coherently against a still one. A pair is refused rather than
-    guessed when the camera cannot be told apart from an independent mover, a
-    mover captures the fit, or the fit settles between the camera's motion and a
-    large mover's, which the samples read better as two motions; when the fitted
-    motion does not explain the new frame
-    (a hard cut, a large field-of-view switch, a misread fast pan) or nothing in
-    the frame confirms it (a nearly textureless noisy frame); when the pair
-    cannot be read (the frames differ in size, a processed side is under 32 px,
-    or a frame holds a non-finite pixel or is a single gray level); when the flow
-    samples cannot pin an affine motion or, with a `mask`, too few remain or they
-    or the fit's inliers do not spread across the frame; or when the pair departs
-    from the camera state the rest of the sequence agrees on (the temporal gate,
-    which assumes a roughly steady camera). The per-frame `ego_trusted` flag
-    reports which frames were refused, and a sequence roll-up answers null rather
-    than from too little evidence once fewer than a quarter of its frames were
-    trusted. The affine model is first-order and carries no depth, so a camera
-    translating through a scene with strong parallax is fitted only
-    approximately. `pan_speed` and `mover_speed` are in the pixels of the frames
-    they were measured on and are not comparable across resolutions without
-    normalizing; the rates are. A reading is attributed to the later frame of
-    the pair it was measured from, so the leading `gap` frames of every sequence
-    carry no reading. A burned-in overlay (a HUD, telemetry text) reads as scene
-    content: a light one gets pans refused, and a dense one drags a pan's reading
-    toward a still camera, which stays trusted when the drag is mild and is
-    refused when it splits the samples into two motions. Passing the overlay as
-    `mask=` excludes it. A part of the vehicle in view, such as a hood or a bow,
-    reads as scene content the same way. On real drone footage, an unmasked hood
-    covering about a fifth of the frame read about one pair in nine wrong while
-    trusting it, and a mask brought that under one in a hundred. A mover pulling
-    the fit toward its own motion is refused once its pull stands well above the
-    flow noise, so a slow mover in noisy footage can still read as a trusted
-    zoom of a pixel or two. A mover holding most of the samples the fit sees
-    (with a mask, most of what the mask leaves) can be read as the camera; one
-    pair cannot tell the two apart, and the temporal gate catches it only when
-    it is brief.
-- - {func}`.frame_stats` ⚠️
-  - Per-frame time since the previous frame and whether a frame repeats the one before it exactly, with declared
-    roll-ups to the sequence level.
-  - Anchored (clocks and frames constructed with known steps and repeats)
-  - Experimental: the names may change. Reads the timestamps a decoder reports and does not check them against the
-    capture. A missing, repeated or restarted timestamp leaves the step NaN rather than guessed, and a clip that starts
-    later is one long step. A repeat is exact equality, so a re-encoded or noisy copy of a frame reads as not repeated.
-    Tested on constructed inputs only, not on real footage.
-- - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
-  - Per-pixel persistence while the scene moves behind the camera, and a
-    flat-field estimate of how much each part of the frame softens the same
-    content, from frame pairs aligned by a similarity transform.
-  - Anchored (constructed videos with a known burned-in patch and known
-    blurred regions)
-  - Experimental: the map shape, column names and keywords may change.
-    Checked only on synthetic and NRTK-simulated defects, never on real
-    damaged footage. Needs camera motion and texture: a still or flat video
-    reads NaN, and so does a flat region fixed to the camera. A frame pair
-    counts only when one camera motion fitted to what changed explains more of
-    the frame than "nothing moved" does, and a pixel only where that motion
-    moved it at least 2 px at a 360 px short side, so a still camera over
-    movers, or one moving slower than that, reads NaN rather than reading its
-    scenery as fixed (see [Studies on real footage](#studies-on-real-footage)).
-    One mover that fills most of the frame and moves as one can still pass for
-    the camera. The blur maps are relative to each video's average, so softness
-    that is the same everywhere is invisible, and a loss of sharpness that
-    grows at a steady rate across the frame reads 0. `blur_map` removes blur
-    wider than about `blur_sigma` cells. `blur_map_raw` keeps it, but on clean
-    real footage the raw map of one video read large areas as soft that no lens
-    defect caused, so read it across many videos from one camera. `ego_map`
-    does not tell a burned-in overlay from a part of the vehicle. Frame pairs
-    are 10 and 30 frames apart, so they span different times at different frame
-    rates.
-- - {func}`.phash`, {func}`.phash_d4`, {func}`.dhash`, {func}`.dhash_d4`,
-    {func}`.xxhash`
-  - Perceptual hashing ([Zauner, 2010](DataIntegrity.md#references)); xxHash
-    for exact matching.
-  - Anchored
-  - `xxhash` detects exact byte-level duplicates only. Perceptual hashes
-    survive photometric change but not arbitrary geometric warping; the `_d4`
-    variants add invariance to the eight square symmetries, not to arbitrary
-    rotation.
-- - {func}`.hash_neighbors` (`partition`)
-  - Every pair of packed hashes within a Hamming radius, by multi-index hashing.
-    With `partition`, only the pairs whose two labels differ, found without
-    expanding a pair inside one label.
-  - Cross-checked (the pairs and distances equal those of an independent
-    brute-force reference kept to the pairs whose labels differ, under both of
-    its search strategies)
-  - Experimental: the argument may change. No study on real footage backs it.
-    The search is not narrowed, so distinct hashes under one label are still
-    compared. {class}`.Duplicates` passes it in its video segment search and
-    raises no {class}`~dataeval.exceptions.ExperimentalWarning` there.
-- - {func}`.hash_neighbors` (`k`), {class}`.Duplicates` (`segment_neighbors`)
-  - With `k`, each position keeps its `k` nearest neighbors among the hashes
-    within a Hamming radius, and a pair is reported when either of its
-    positions keeps it. `segment_neighbors` passes it to the video segment
-    search, as an opt-in cap on the pairs each frame contributes.
-  - Cross-checked (against an independent brute-force reference, every pair
-    reported is among the nearest `k` of one of its positions and every
-    position keeps its `k` nearest, up to ties; the rule that chooses among
-    equally near neighbors is pinned against an independent implementation of
-    it). One {class}`.Duplicates` test on a single synthetic fixture of two
-    fixed-camera videos.
-  - Experimental: the arguments may change. No real fixed-camera footage was
-    studied. Pairs within the radius are left out by design, so a cap can
-    shrink or move a segment's extent, boundaries and `mean_distance`, and can
-    drop the segment the static runs of two videos make while keeping the
-    stretch of distinct frames they share. 10 is a provisional starting point
-    for `segment_neighbors`, chosen on simulated static runs, for shared
-    stretches inside runs of hundreds to thousands of frames; a larger value is
-    not safer. Among equally near neighbors the result depends on the order of
-    the input. The search for pairs of distinct hashes is not capped, so many
-    distinct hashes can still exceed the pair budget, and a pair of videos that
-    does exceed it loses its segments with a warning.
-
-:::
-
-### Metadata and bias
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.parity` ⚠️
-  - Pearson's chi-squared, or the second-order Rao–Scott F over `groups`, with
-    exact cell tests; Bergsma, Cochran, Rao & Scott, Thomas & Rao, Korn &
-    Graubard, Kish and Benjamini & Hochberg are cited in the docstrings. See
-    [Parity](Parity.md).
-  - Cross-checked (independent rows, against SciPy); Anchored (grouped)
-  - Experimental. Needs `groups` or `assume_independent=True`, and raises
-    without one. Same grouping, calibration and binning caveats as
-    {class}`.Parity` ⚠️. An untestable factor or cell is NaN, not independent:
-    read `testable` and `insufficient` before using a score.
-- - {func}`.label_parity`
-  - Pearson's chi-squared test of homogeneity on the 2 × K table of class
-    counts; the second-order Rao–Scott F when groups are given. See
-    [Label parity](DistributionShift.md#label-parity).
-  - Cross-checked (statistic and p-value without groups against
-    `scipy.stats.chi2_contingency`); Anchored (calibration at unequal sample
-    sizes, grouped calibration with unequal detections per image, symmetry)
-  - Detection and tracking labels need `expected_groups` and `observed_groups`:
-    read as independent labels, two detection datasets with one class
-    distribution were declared different 84–91% of the time in simulation.
-    Calling without groups or `assume_independent=True` warns in 1.2 and raises
-    from 2.0. Detection-label frequency only, not image-level class presence.
-    Both inputs need one class vocabulary. "No shift observed" is not evidence
-    of parity. Says nothing about feature-space differences between the two
-    sets.
-- - {func}`.mutual_info`, {func}`.mutual_info_classwise`
-  - [Linfoot (1957)](https://www.sciencedirect.com/science/article/pii/S001999585790116X),
-    cited in the docstring.
-  - Delegated (estimators from scikit-learn)
-  - Handles continuous factors natively in the factor-to-factor block:
-    {func}`.is_continuous` selects `mutual_info_regression` per column and the
-    Linfoot transform maps the result to [0, 1], so binning is a
-    {class}`.Metadata` convention, not a requirement here, but
-    {class}`.Balance` applies it anyway, see
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor). The
-    class-to-factor row instead divides by the class entropy and subtracts the
-    mutual information expected under a random assignment with the same
-    margins, so it is not biased upward at small n the way that block is.
-- - {func}`.is_continuous`
-  - DataEval-original heuristic. Uses the Wasserstein distance from
-    `scipy.stats`; the normalized near-neighbor construction and the two
-    corroborating signals are DataEval's own. See
-    [Metadata binning](#metadata-binning-a-policy-applied-to-every-factor).
-  - Internal only
-  - A tuned classifier, not a test with a stated error rate: the five constants
-    that decide its verdict have no derivation and no measured
-    misclassification rate. Returns `False` below 20 samples or 3 distinct
-    values, so on a small dataset every numeric factor is called discrete.
-    Its answer decides whether a factor gets binned, so a wrong call is
-    invisible in the metric that follows.
-- - {func}`.factor_deviation`, {func}`.factor_predictors`
-  - Metadata attribution for flagged samples. See
-    [Diagnosing findings with metadata](ActingOnResults.md#diagnosing-findings-with-metadata).
-  - Internal only
-  - Associational, not causal. A factor that predicts flagged samples is a
-    lead to investigate, not an established cause.
-
-:::
-
-### Labels and ontology
-
-:::{list-table}
-:widths: 20 26 18 36
-:header-rows: 1
-
-- - Function
-  - Evidence basis
-  - Validation evidence
-  - Contraindications
-- - {func}`.label_errors`
-  - Embedding-geometry label error detection. See
-    [Label error detection](DataIntegrity.md#label-error-detection-embedding-geometry).
-  - Internal only
-  - Produces candidates for review, not confirmed errors. Precision depends
-    on embedding quality; ambiguous samples are flagged as readily as
-    genuine mistakes.
-- - {func}`.label_stats`
-  - Label distribution accounting.
-  - Anchored
-  - Descriptive.
-- - {func}`.label_coverage`
-  - Observed label mass over an {class}`.Ontology`. See
-    {doc}`Ontology <Ontology>`.
-  - Internal only
-  - Reports observed distribution only. Judging that distribution against an
-    expectation is {class}`.Representation`'s job, not this function's.
-- - {func}`.label_reconciliation`, {func}`.label_alignment`
-  - Ontology reconciliation and matching. See
-    [Reconciliation](Ontology.md#reconciliation-checking-labels-against-the-ontology)
-    and [Alignment](Ontology.md#alignment-relating-two-vocabularies).
-  - Internal only
-  - Matcher output is a proposal requiring human confirmation. Confidence
-    scores are matcher-relative and not comparable across matchers. See
-    [Confidence and abstention](Ontology.md#confidence-and-abstention).
-- - {func}`.ontology_validation`
-  - Structural and naming facts about an ontology artifact. See
-    [Validation](Ontology.md#validation-checking-the-ontology-artifact).
-  - Internal only
-  - Checks structure, not semantic correctness. A well-formed ontology can
-    still be the wrong ontology for your problem.
-
-:::
+Core functions carry no thresholds or policy, and their contraindications are statistical and computational. They are
+listed in [Validation evidence by evaluator](ValidationEvidence.md#core-functions) in six groups: feasibility and
+performance limits, divergence and embedding geometry, ranking and selection, image statistics and hashing, metadata and
+bias, and labels and ontology.
 
 ## How DataEval validates its own implementations
 
@@ -1187,8 +417,8 @@ project's tests. `dataeval.utils.losses` shares that lineage.
 {class}`.DriftReconstruction` is the exception in that group: it is
 conceptually inspired by alibi-detect's reconstruction detector, but the
 detector code and its tests are DataEval's own. It reaches alibi-derived code
-only through the shared reconstruction scorer, which is why its row above
-carries two ratings.
+only through the shared reconstruction scorer, which is why its row on
+[Validation evidence by evaluator](ValidationEvidence.md#distribution-shift) carries two ratings.
 
 DataEval's HDBSCAN implementation (`dataeval.core._fast_hdbscan`) is adapted
 from [fast_hdbscan](https://github.com/TutteInstitute/fast_hdbscan) v0.2.0-0.2.2
@@ -1216,7 +446,7 @@ The suite contains three kinds of evidence, and they are not equally strong:
 - **Regression tests** pin an estimator's output against a value recorded from
   a previous run. They catch unintended change, but they pass just as happily
   when an estimator has been wrong from the start, which is why the two kinds
-  below, not this one, carry the weight of the ratings in the tables above.
+  below, not this one, carry the weight of the ratings in the evidence tables.
 - **Cross-implementation checks** compare against an independent library:
   image statistics (skew, kurtosis, entropy) against SciPy, and several
   clustering and OOD tests against scikit-learn.
@@ -1377,7 +607,7 @@ DataEval is not applicable when:
   ({func}`.factor_deviation`, {func}`.factor_predictors`) and bias metrics are
   associational. They generate hypotheses.
 
-Additionally, treat any single number with suspicion when:
+Additionally, treat a single number with caution when:
 
 - It comes from an experimental feature (see [above](#stability-status)).
 - It was produced by an extractor you have not validated on your domain.
@@ -1389,8 +619,8 @@ Additionally, treat any single number with suspicion when:
 
 ## Known gaps in this page's evidence
 
-Stating these is the point of the page. Each is a real, current limitation of
-DataEval's evidentiary record, not a research frontier.
+Each gap below is a current limitation of DataEval's evidentiary record and not
+a research frontier.
 
 1. Most public symbols carry no literature citation in their docstring. A
    minority of public functions and classes have a `References` section, though
@@ -1473,24 +703,26 @@ DataEval's evidentiary record, not a research frontier.
 
 ## Related concept pages
 
-- {doc}`Embeddings <Embeddings>` — the largest uncontrolled variable in any
+- [Validation evidence by evaluator](ValidationEvidence.md): the evidence basis, validation level, policy levers and
+  contraindications of every evaluator and core function
+- {doc}`Embeddings <Embeddings>`: the largest uncontrolled variable in any
   DataEval assessment; read this before trusting any embedding-based result
-- {doc}`Acting on Results <ActingOnResults>` — what to do with a finding, and
+- {doc}`Acting on Results <ActingOnResults>`: what to do with a finding, and
   which findings do not warrant action
 - {doc}`Data Integrity <DataIntegrity>`,
   {doc}`Dataset Bias and Coverage <DatasetBias>`,
   {doc}`Performance Limits <PerformanceLimits>`,
   {doc}`Distribution Shift <DistributionShift>`,
   {doc}`Divergence <Divergence>`, {doc}`Clustering <Clustering>`,
-  {doc}`Ontology <Ontology>` — the theory behind each feature, with each
+  {doc}`Ontology <Ontology>`: the theory behind each feature, with each
   page's own references
-- {doc}`Data Leakage <Leakage>` — why an assessment can be internally valid and
+- {doc}`Data Leakage <Leakage>`: why an assessment can be internally valid and
   still not generalize
 
 ## References
 
 Method-level citations live on the concept page for each method, linked from
-the tables above. The sources specific to this page are:
+the tables on [Validation evidence by evaluator](ValidationEvidence.md). The sources specific to this page are:
 
 1. Seldon Technologies Ltd. (2023). *alibi-detect v0.11.4.*
    [repository](https://github.com/SeldonIO/alibi-detect/tree/v0.11.4)

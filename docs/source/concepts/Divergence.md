@@ -4,20 +4,19 @@
 
 {term}`Drift` detectors answer a binary question: has the
 [distribution shifted](DistributionShift.md) enough to reject the null
-hypothesis? That answer is appropriate for continuous monitoring, where you need
-a clear signal to act on. But it leaves a question unanswered: how far apart are
-two datasets, and is the gap growing over time?
+hypothesis? That answer suits continuous monitoring, where a clear signal to act
+on is needed. It does not say how far apart two datasets are, or whether the gap
+is growing over time.
 
-HP divergence answers that question. It is a nonparametric, quantitative measure
-of distributional distance, not a hypothesis test but a number on a meaningful
-scale from 0 to 1. This makes it the right tool when you need to characterize,
-compare, or track the magnitude of distributional difference rather than merely
-detect its presence.
+HP divergence addresses that question. It is a nonparametric, quantitative
+measure of distributional distance: a number on a scale from 0 to 1, and not a
+hypothesis test. It suits characterizing, comparing and tracking the magnitude of
+a distributional difference, and not only detecting its presence.
 
 ## What is it
 
 {term}`HP divergence <Divergence>` measures the distance between two datasets
-in their feature space. The scale is fixed and interpretable:
+in their feature space. The scale is fixed:
 
 - 0: the two datasets are approximately identically distributed
 - 1: the two datasets are completely separable, with no overlap between their
@@ -27,41 +26,6 @@ Unlike formal drift tests, which return a p-value and a binary flag, HP
 divergence returns a single continuous score that can be tracked across
 time, compared across dataset pairs, or used as an input to downstream
 decision logic.
-
-## When to use it
-
-Use HP divergence when you need to quantify distributional distance rather than
-test for it. Specific situations where it is the right choice:
-
-Comparing training and operational distributions before deployment: a divergence
-near 0 confirms that the operational data is well-covered by the training
-distribution. A divergence approaching 1 is a warning that the model will be
-operating largely outside its training envelope. This is a pre-deployment check,
-not a monitoring signal: you run it once to characterize the gap before a model
-enters service.
-
-Tracking distributional drift over time: running divergence on successive
-operational batches against a fixed reference produces a time series of distance
-scores. A rising trend identifies gradual, accumulating drift that might never
-trigger a single-batch drift test but is nonetheless moving the operational
-distribution away from the training distribution.
-
-Comparing data collection campaigns: when new data is collected to augment an
-existing dataset, divergence quantifies how much the new data adds
-distributionally versus how much it overlaps with existing data. Low divergence
-means the new collection is redundant; high divergence means it covers new
-territory.
-
-Prioritizing investigation after drift detection: when a formal drift test flags
-a shift, HP divergence on subsets of the batch (by collection source, geographic
-region, time window, or sensor) can localize which subpopulation is driving the
-detected shift, without the multiple-testing burden of running individual drift
-tests on each subpopulation.
-
-HP divergence is not the right tool when you need a formal statistical decision:
-use the {term}`drift <Drift>` detectors in {class}`.DriftUnivariate`,
-{class}`.DriftMMD`, or {class}`.DriftDomainClassifier` when you need a p-value
-or a defensible pass/fail determination.
 
 ## Theory
 
@@ -97,8 +61,8 @@ tree over the pooled set of both datasets and estimates divergence from the
 fraction of edges that cross the dataset boundary. An edge that crosses from a
 point in dataset A to a point in dataset B is evidence of distributional overlap
 at that point in feature space; a tree dominated by within-dataset edges
-indicates separation. The MST estimator is more accurate for small samples but
-scales quadratically with dataset size.
+indicates separation. The MST estimator tends to be more accurate for small
+samples and costs more on large datasets.
 
 KNN-based estimator ([Cover & Hart, 1967](#ref1)): estimates divergence from the
 proportion of each point's $k$ nearest neighbors that come from the same
@@ -138,7 +102,7 @@ similarity. It may reflect the embedding's failure to represent the relevant
 variation.
 
 No significance threshold: HP divergence does not produce a p-value. There is no
-principled threshold above which divergence is "too high." Interpretation
+established threshold above which divergence is "too high." Interpretation
 requires a reference point: a baseline divergence from a previous comparison, an
 expected value from domain knowledge, or a trend over time. A divergence of 0.3
 is only interpretable in relation to something.
@@ -147,15 +111,49 @@ Sample size sensitivity: both estimators can be biased with very small samples.
 The KNN estimator in particular can overestimate divergence when samples are
 sparse relative to the dimensionality of the embedding space.
 
+## When to use it
+
+Use HP divergence to quantify distributional distance and not to test for it.
+
+Comparing training and operational distributions before deployment: a divergence
+near 0 indicates that, in the embedding space used, the training distribution
+covers the operational data. A divergence approaching 1 indicates that the model
+may be operating largely outside its training envelope. This is a
+pre-deployment check and not a monitoring signal: it is run once to characterize
+the gap before a model enters service.
+
+Tracking distributional drift over time: running divergence on successive
+operational batches against a fixed reference produces a time series of distance
+scores. A rising trend identifies gradual, accumulating drift that might never
+trigger a single-batch drift test but is nonetheless moving the operational
+distribution away from the training distribution.
+
+Comparing data collection campaigns: when new data is collected to augment an
+existing dataset, divergence quantifies how much the new data adds
+distributionally versus how much it overlaps with existing data. Low divergence
+indicates that the new collection is largely redundant in the embedding space,
+and high divergence indicates that it covers new regions.
+
+Prioritizing investigation after drift detection: when a formal drift test flags
+a shift, HP divergence on subsets of the batch (by collection source, geographic
+region, time window, or sensor) can localize which subpopulation is driving the
+detected shift, without the multiple-testing burden of running individual drift
+tests on each subpopulation.
+
+HP divergence is not the right tool when you need a formal statistical decision:
+use the {term}`drift <Drift>` detectors in {class}`.DriftUnivariate`,
+{class}`.DriftMMD`, or {class}`.DriftDomainClassifier` when you need a p-value
+or a formal test decision.
+
 ## Related concept pages
 
-- [Distribution shift](DistributionShift.md) — formal hypothesis tests for
+- [Distribution shift](DistributionShift.md): formal hypothesis tests for
   drift detection
-- [Performance limits](PerformanceLimits.md) — BER shares the same estimators
+- [Performance limits](PerformanceLimits.md): BER shares the same estimators
   and is the within-dataset analog of HP divergence
-- [Embeddings](Embeddings.md) — the feature representation both estimators
+- [Embeddings](Embeddings.md): the feature representation both estimators
   depend on
-- [Acting on results](ActingOnResults.md) — how to use divergence scores in
+- [Acting on results](ActingOnResults.md): how to use divergence scores in
   practice
 
 ## See this in practice

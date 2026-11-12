@@ -1,48 +1,44 @@
+<!-- markdownlint-disable MD051 -->
+
 # Embeddings
 
-This page explains the role and importance of embeddings in vision tasks and
-guides you through understanding how to work with them using DataEval's tools.
+This page describes what embeddings are, why DataEval evaluators use them, and how to create them with DataEval's
+extractors.
 
 ## What are they
 
-Embeddings are high-dimensional vector representations of images that capture
-meaningful visual and semantic features in a dense numerical format. Instead
-of working with raw pixel values, machine learning systems use embeddings as
-compressed representations that preserve what matters most about image content.
+An embedding is a high-dimensional vector representation of an image, produced by a feature extractor, typically a
+trained neural network. Instead of working with raw pixel values, machine learning systems use embeddings as compressed
+representations of image content. What an embedding preserves depends on the model, its training objective, and the
+domain it was trained on.
 
-An embedding transforms an image (millions of pixels) into a vector of typically
-128 to 2048 dimensions. The dimensionality of these vectors affects their
-capabilities: higher-dimensional embeddings can capture more nuanced visual and
-semantic distinctions, while lower-dimensional embeddings are more efficient to
-compute and visualize but may lose subtle details. These vectors capture image
-content such that similar vectors represent meaningfully similar images.
+An embedding transforms an image (millions of pixels) into a vector of typically 128 to 2048 dimensions. The
+dimensionality of these vectors affects their capabilities: higher-dimensional embeddings can capture more nuanced
+visual and semantic distinctions, while lower-dimensional embeddings are more efficient to compute and visualize but may
+lose subtle details. With a well-matched extractor, images with similar content map to nearby vectors. How closely that
+holds depends on the extractor and the data.
 
 ## Why are they important
 
-Embeddings solve a fundamental problem in computer vision: how do you
-quantitatively compare images in a meaningful way? Raw pixel operations like
-image subtraction are dominated by irrelevant variations: lighting changes,
-small spatial shifts, noise, and compression artifacts can make identical
-scenes appear completely different computationally. Meanwhile,
-important differences like object identity or scene context might produce
-smaller pixel-level changes.
+Comparing images quantitatively requires a representation in which distance reflects similarity of content. Raw pixel
+operations such as image subtraction are dominated by variations that do not change content: lighting changes, small
+spatial shifts, noise, and compression artifacts can make identical scenes differ substantially. Differences in object
+identity or scene context can produce smaller pixel-level changes.
 
-Embeddings transform images from a representation where all visual information
-has equal importance to one where task-relevant visual and semantic patterns
-are emphasized and irrelevant variations are suppressed. They learn to extract
-and combine visual features hierarchically, from edges to textures to shapes to
-objects to scenes, in ways that capture what actually matters for understanding
-image content.
+A trained model maps images from a representation in which every pixel carries equal weight to one in which patterns
+relevant to its training task are emphasized and other variations are suppressed. Deep networks learn features
+hierarchically, from edges to textures to shapes to objects to scenes ([Bengio et al., 2013](#ref1)). Which patterns a
+model emphasizes depends on its training objective.
 
-This transformation enables geometric operations that align with human
-intuition about image similarity. For example, embeddings of different dog
-photos will be closer together in vector space than embeddings of dogs and
-cars, regardless of variations in lighting, pose, or background.
+This allows geometric operations, such as distance and neighbor search, that often align with human judgments of image
+similarity. For example, embeddings of different dog photos are typically closer together in vector space than
+embeddings of a dog and a car, even when lighting, pose, or background vary. This depends on the extractor and the
+domain.
 
-Embeddings capture two distinct but related types of similarity:
+Embedding distances can reflect two related kinds of similarity:
 
 **Semantic similarity** refers to images that contain similar concepts or
-meanings. A photo of a golden retriever and a cartoon drawing of a dog would
+meanings. A photo of a golden retriever and a cartoon drawing of a dog can
 have high semantic similarity despite looking visually different.
 
 **Visual similarity** refers to images that share similar visual
@@ -50,21 +46,17 @@ characteristics like colors, textures, or shapes, regardless of semantic
 content. A photo of golden wheat and a golden retriever might have high visual
 similarity due to their shared color palette.
 
-The type of task an embedding model was trained for significantly affects what
-patterns they emphasize. Embeddings from classification models tend to focus on
-whole-image features that distinguish between categories, while embeddings from
-object detection models may emphasize localized features and spatial
-relationships. Models trained with contrastive learning objectives create
-embeddings optimized for similarity comparisons, while those trained for
-reconstruction tasks may better preserve fine-grained visual details.
+The task an embedding model was trained for affects which patterns its embeddings emphasize. Embeddings from
+classification models tend to focus on whole-image features that distinguish between categories, while embeddings from
+object detection models may emphasize localized features and spatial relationships. Models trained with contrastive
+learning objectives ([Chen et al., 2020](#ref2)) produce embeddings optimized for similarity comparisons, while those
+trained for reconstruction tasks may better preserve fine-grained visual details.
 
 ## How are they used
 
-Embeddings serve as the foundation for DataEval's analysis capabilities during
-both development and deployment phases of your ML lifecycle. The vector
-representations enable geometric operations that reveal patterns, similarities,
-and anomalies in your image datasets that would be impossible to detect from
-raw pixels.
+Several DataEval evaluators operate on embeddings, during both development and deployment phases of the ML
+lifecycle. Embeddings enable geometric operations that can reveal patterns, similarities, and anomalies in image
+datasets that are difficult to detect from raw pixels.
 
 Common applications include:
 
@@ -80,21 +72,18 @@ Common applications include:
 - Drift monitoring: detecting when production data differs systematically
   from training data
 
-Although DataEval can work with raw image data, it is inadvisable to do so.
-DataEval treats embeddings geometrically as vectors in a high-dimensional
-space. Raw image data treated as vectors have much higher dimensionality, and
-furthermore their geometric properties do not map cleanly to perceptual
-properties. Imperceptible differences in pixel data (from e.g. a 1 pixel
-shift, or a slight rescaling or rotation) can result in large measured
-distances. Therefore DataEval strongly recommends that you first convert your
-images to embeddings.
+DataEval can work with raw image data, but raw pixels are not recommended for these tools. DataEval treats
+embeddings geometrically, as vectors in a high-dimensional space. Raw image data treated as vectors have much higher
+dimensionality, and distances in high dimensions can become less discriminating ([Beyer et al., 1999](#ref3)). Their
+geometric properties also do not map closely to perceptual properties. Imperceptible differences in pixel data, such as
+a one-pixel shift or a slight rescaling or rotation, can produce large distances. Convert images to embeddings before
+using these tools.
 
 ## Creating embeddings
 
 Two objects create embeddings. An extractor turns a batch of images into
 vectors. The {class}`.Embeddings` class applies an extractor to a dataset one
-batch at a time, keeps the result, and passes it to any DataEval tool. Every
-example in the documentation uses the same two steps:
+batch at a time, keeps the result, and passes it to any DataEval tool. The two steps look like this:
 
 ```python
 from dataeval import Embeddings
@@ -121,28 +110,28 @@ with PyTorch, with ONNX and with the extractors that need no model.
 | {class}`.BoVWExtractor`    | You are looking for near-duplicates that survived a rotation or a rescale | The `opencv` extra and a call to `fit` before use. No model      |
 
 Flattened pixels are a baseline and not an assessment, because distances between
-raw pixels follow brightness and alignment more than content.
+raw pixels tend to follow brightness and alignment more than content.
 [Validation and trust](ValidationAndTrust.md#extractors-that-embed-the-data)
 lists what each extractor embeds and how each can mislead a metric.
 
 ### Choose a model
 
-If you have a model trained for your task, use it. Its layers have already
-learned the patterns that matter in your data, so its embeddings suit your domain
-and task.
+If you have a model trained for your task, use it. Its layers have learned patterns relevant to that task, so its
+embeddings are more likely to suit your domain and task.
 
 If you do not have a trained model, choose a pre-trained one that was trained
 for a task close to yours. The training objective shapes which patterns the
-embeddings capture. The table shows examples of models for a range of metrics
-and tasks.
+embeddings emphasize. The table lists model types, example models, the tasks their embeddings are commonly used for,
+and the emphasis that follows from the training objective. It is a heuristic and does not rank model types for any
+DataEval evaluator.
 
-| Model type           | Example models                           | Best for these metrics                       | Why                                                                                                      |
-| -------------------- | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Image Classification | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Embeddings emphasize features that distinguish between labeled categories, making class boundaries clear |
-| Object Detection     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Embeddings capture spatial relationships and localized features, ideal when object position matters      |
-| Self-Supervised      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | Embeddings capture general visual patterns without class bias, good for broad visual similarity          |
-| Contrastive Learning | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | Embeddings optimized for distinguishing similar vs. dissimilar pairs, excellent for comparison tasks     |
-| Segmentation         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Embeddings understand detailed spatial structure and boundaries within images                            |
+| Model type           | Example models                           | Typical tasks                                | Typical emphasis                                                                             |
+| -------------------- | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Image classification | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Features that distinguish labeled categories, which can make class boundaries more separable |
+| Object detection     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Spatial relationships and localized features, which matter when object position is relevant  |
+| Self-supervised      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | General visual patterns learned without class labels, used for broad visual similarity       |
+| Contrastive learning | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | An objective that separates similar from dissimilar pairs, which suits comparison tasks      |
+| Segmentation         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Detailed spatial structure and boundaries within images                                      |
 
 ### Select the layer
 
@@ -210,11 +199,10 @@ which returns one array for each class. {class}`.Duplicates`, {class}`.Outliers`
 extractor you give them, so they have the same requirement. Send these extractors
 to a drift detector instead:
 
-- Pass the extractor as the detector's `extractor=`, or call the extractor and
-pass the array it returns. - For {class}`.ClasswiseUncertaintyExtractor`, call
-it, select the array of one class, and give that array to a detector. Do not
-pass it as `extractor=`. Fitting succeeds, because embedding is lazy, and
-`predict` raises a `TypeError`.
+- Pass the extractor as the detector's `extractor=`, or call the extractor and pass the array it returns.
+- For {class}`.ClasswiseUncertaintyExtractor`, call it, select the array of one class, and give that array to a
+  detector. Do not pass it as `extractor=`. Fitting succeeds, because embedding is lazy, and `predict` raises a
+  `TypeError`.
 
 [Validation and trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
 describes what each of these extractors produces.
@@ -225,16 +213,32 @@ Each tool takes embeddings through its own argument.
 [What data does each tool need?](../getting-started/input-requirements.md#how-each-tool-takes-embeddings)
 lists them in one table.
 
+## Interpretation and limitations
+
+An embedding is specific to the extractor that produced it. Distances, neighbors, and clusters describe the geometry of
+that extractor's output space and not a property of the images alone. Two extractors, or two layers of one model, give
+different geometries, so results computed from different extractors are not directly comparable. A distance does not
+state which image property drives it. Two images can be close for visual reasons, such as color and texture, or for
+semantic reasons.
+
+What an embedding preserves depends on the model, its training objective, and the domain it was trained on. An
+extractor trained on one domain can map images from another domain to regions where distance no longer tracks the
+similarity that matters for the task, because models trained on one dataset can transfer poorly to others
+([Torralba & Efros, 2011](#ref4)). A tool that reads embeddings reports a property of the data as seen through the
+extractor. Before interpreting a result, check that the extractor separates the content that matters in the target
+domain. [Validation and trust](ValidationAndTrust.md#extractors-that-embed-the-data) lists what each extractor embeds
+and how each can mislead a metric.
+
 ## Related concept pages
 
-- [Clustering](Clustering.md) — how the data are grouped in the embedding space
-- [Dataset bias and coverage](DatasetBias.md) — how coverage and completeness
+- [Clustering](Clustering.md): how the data are grouped in the embedding space
+- [Dataset bias and coverage](DatasetBias.md): how coverage and completeness
   analyze the embedding space
-- [Distribution shift](DistributionShift.md) — monitoring shifts in the embedding space
-- [Validation and trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers)
-  — every extractor DataEval ships, what each one embeds, and how each can
+- [Distribution shift](DistributionShift.md): monitoring shifts in the embedding space
+- [Validation and trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers):
+  every extractor DataEval ships, what each one embeds, and how each can
   mislead a downstream metric
-- [Acting on results](ActingOnResults.md) — how to interpret and respond to
+- [Acting on results](ActingOnResults.md): how to interpret and respond to
   analyses that rely on embeddings
 
 ## See this in practice
@@ -248,28 +252,28 @@ lists them in one table.
 
 ### Tutorials
 
-- [Identify bias and correlations](../notebooks/tt_identify_bias.py) —
+- [Identify bias and correlations](../notebooks/tt_identify_bias.py):
   acting on balance and diversity findings
-- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py):
   coverage gaps and embedding-space decisions
-- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
+- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py):
   responding to drift detection
-- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —
+- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py):
   responding to OOD detection
 
 ## References
 
-1. Bengio, Y., Courville, A., & Vincent, P. (2013). Representation learning:
+1. [Bengio, Y., Courville, A., & Vincent, P. (2013). Representation learning:
    A review and new perspectives. *IEEE Transactions on Pattern Analysis
-   and Machine Intelligence*, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)
+   and Machine Intelligence*, 35(8), 1798–1828. [paper](https://arxiv.org/abs/1206.5538)]{#ref1}
 
-2. Chen, T., Kornblith, S., Norouzi, M., & Hinton, G. (2020). A simple framework
+2. [Chen, T., Kornblith, S., Norouzi, M., & Hinton, G. (2020). A simple framework
    for contrastive learning of visual representations. *Proceedings of the 37th
-   International Conference on Machine Learning (ICML)*, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)
+   International Conference on Machine Learning (ICML)*, 1597–1607. [paper](https://arxiv.org/abs/2002.05709)]{#ref2}
 
-3. Beyer, K., Goldstein, J., Ramakrishnan, R., & Shaft, U. (1999). When is
+3. [Beyer, K., Goldstein, J., Ramakrishnan, R., & Shaft, U. (1999). When is
    "nearest neighbor" meaningful? *Proceedings of the 7th International Conference
-   on Database Theory (ICDT)*, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)
+   on Database Theory (ICDT)*, 217–235. [paper](https://link.springer.com/chapter/10.1007/3-540-49257-7_15)]{#ref3}
 
-4. Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. *Proceedings
-   of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)
+4. [Torralba, A., & Efros, A. A. (2011). Unbiased look at dataset bias. *Proceedings
+   of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 1521–1528. [paper](https://ieeexplore.ieee.org/document/5995347)]{#ref4}

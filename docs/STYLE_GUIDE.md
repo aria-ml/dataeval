@@ -52,23 +52,27 @@ No page is completely standalone, and every page should be understandable by a r
 
 Rules (review):
 
-- Name the prior read when a page is best understood after another page. Do it at the start of the page. As an
-  alternative, make the introduction say that the page is a spinoff of the other page.
+- Name the prior read when a page is best understood after another page. Do it at the start of the page, with a link
+  and without a clause about the page's reliance on it (see the What to avoid section). As an alternative, make the
+  introduction say that the page is a spinoff of the other page.
 - In a how-to, put the prior read in the lead, where it counts toward the 120 words. In a tutorial, list it under
   `What you will need`.
 
 ## Write the prose
 
-Narrative text is written to the reader in the second person and kept plain. This applies to notebooks, concept pages
-and getting-started pages. It does not loosen the docstring rules in the docstrings section. Pages written before this
-guide may not follow it yet. Bring a page into line when you edit its prose.
+Narrative text is kept plain. Notebooks and getting-started pages are written to the reader in the second person. A
+concept page is written in the scientific register that the Write a concept page section sets, and it speaks to the
+reader only to give practical guidance. The rules in this section apply to every page, except where a rule names the
+pages it covers. They do not loosen the docstring rules in the docstrings section. Pages written before this guide may
+not follow them yet. Bring a page into line when you edit its prose.
 
 ### Voice
 
-- Use the directive voice: "You should check ...", "You will create ...", "You can drop ...". Do not write "Note that
-  one can ...", and do not describe what the library does when the sentence tells the reader to do something.
+- In a notebook or a getting-started page, use the directive voice: "You should check ...", "You will create ...", "You
+  can drop ...". Do not write "Note that one can ...", and do not describe what the library does when the sentence
+  tells the reader to do something. A concept page follows the Write a concept page section instead.
 - Write short declarative sentences. Two plain sentences are better than one sentence with a colon, a dash and a
-  dependent clause.
+  dependent clause. A scientific register does not call for longer sentences, so this rule holds on a concept page too.
 - Write contractions out: "do not", "it is", "you will". A possessive `'s` is not a contraction and stays.
 - Use American spelling. `codespell` is configured to convert British spellings.
 - Say "dataset" and never "corpus". DataEval is a computer-vision library, and "corpus" reads as text terminology. In
@@ -82,6 +86,7 @@ guide may not follow it yet. Bring a page into line when you edit its prose.
 | An em-dash aside or a trailing flourish | Two plain sentences, or cut it |
 | Rhetorical stress: italics for emphasis, bold stress, "exactly", "simply", "genuinely", "quietly", "on your behalf" | Delete the word or the markup |
 | A not-X-but-Y contrast, a one-line closer, a forced triad, filler or sales language | Say the point once. Keep a contrast that carries a real qualification |
+| A clause that says what the page does with a page it links, or what the page is for: "and this page assumes it", "which this page builds on", "stating these is one purpose of this page" | Delete it. A link names the prior read. Say what the reader needs from it only when the page uses a specific term or result of it |
 | A figurative heading, such as a numbered "lens" | A heading that names what the section does |
 | Commented-out code or links left in a notebook | Remove them. Keep a commented alternative only when the text explains it |
 
@@ -207,33 +212,109 @@ Keep a how-to short (review):
 `docs/tests/test_notebook_structure.py` fails on a lead over 120 words, on more than five steps and on a boilerplate or
 teaching heading, and warns on more than 600 words of prose. Review checks the rest.
 
-## Structure a concept page
+## Write a concept page
 
-A concept page explains the motivation, the theory and the validity of a tool. No test reads it, so a reviewer holds it
-to the rules below.
+A concept page explains the motivation, the theory and the validity of a tool. It is a reference, and it reads like the
+user guide of SciPy or scikit-learn: technical, objective and dry. It does not read as a design note, a tutorial or a
+pitch. No test reads it, so a reviewer holds it to the rules below.
 
-Explain a concept neutrally, clearly and directly. Get the reader up to speed on the topic quickly, and give the
-context they need to follow it. Neutral means no sales language. A policymaker is convinced by what a tool claims, the
-scope that claim holds in and its limits, stated plainly.
+Scientific credibility comes from precision, qualification and reproducibility. It does not come from dense language or
+from more mathematics. Keep the technical depth of a page, and apply the rules below to how its claims are worded.
+
+### Register
+
+Rules (review):
+
+- Explain a concept neutrally, clearly and directly. Get the reader up to speed on the topic quickly, and give the
+  context they need to follow it. Neutral means no sales language and no emphatic language. A policymaker is convinced
+  by what a tool claims, the scope that claim holds in and its limits, stated plainly.
+- State what a method computes and what the result supports. Do not argue for the method. Do not write a rhetorical
+  question, a slogan such as "garbage in, garbage out", or a sentence that explains a design choice the way an engineer
+  would in a code review.
+- Use an analogy only when it clarifies a technical point, and say where it stops holding.
+- Do not use the directive voice, or address the reader, to state a scientific fact. Write "DataEval computes ..." or
+  "The statistic is ...". Address the reader only to give practical guidance, as in "Review the flagged samples before
+  removing them."
+- Define a term before the page uses it, and keep the terms of the source literature. When a distinction is subtle,
+  give one representative example.
+- Keep a paragraph to one idea. Use one term, one capitalization and one citation format for a thing on every page.
+- Name an output by what it is: a score, a bound, a p-value, a flag or a determination. Do not call the output of a
+  deterministic rule a "judgment call".
+- Give a heading the words a reader would search for. Write "Effect of bin width on correlation estimates", not "What
+  a coarse cut costs a correlation".
+
+### Claims
+
+Every claim on a concept page is one of the kinds below. Word it as the table shows, and do not word one kind as
+another.
+
+| Kind of claim | Wording |
+| ------------- | ------- |
+| Mathematical guarantee | Under assumptions A and B, the bound guarantees ... |
+| Statistical evidence | The result provides evidence consistent with ... |
+| Heuristic diagnostic | The method flags samples that may ... |
+| Empirical tendency | This often occurs when ... |
+| Implementation behavior | DataEval computes ... |
+| Recommended practice | Review the samples before ... |
+
+Rules (review):
+
+- Do not write "guarantees", "proves", "always", "never" or "strictly" unless the statement establishes an invariant or
+  a mathematical result, and the page states the assumptions it holds under. A non-cryptographic hash can collide, so a
+  matching hash is evidence of identical content and not a guarantee of it.
+- Say what a claim depends on, such as the model, its training objective, the domain or the sample size.
+- Present a property of a dataset as a finding to judge against the operational population, and not as an ideal that
+  every dataset should meet.
+- Distinguish a theoretical property from an empirical observation, and distinguish what DataEval implements from the
+  general method.
+- State the assumptions and limitations of a method where the page describes it.
+
+### Interpretation
+
+Explaining what a number does not establish matters as much as explaining what it measures. For every metric, the page
+answers three questions (review):
+
+1. What does it measure?
+2. What can the result support?
+3. What can it not establish?
+
+A statistic is not a conclusion, and a flagged sample is not an error that must be removed. The decision belongs to
+the reader.
+
+### Structure
 
 Answer these questions in this order (review):
 
-1. What is this page about, at a high level?
+1. What is this page about, at a high level, and what questions does it help answer?
 2. Why does the reader care?
-3. How does it work, conceptually and in theory?
-4. How does DataEval use these concepts?
-5. When should the reader use it?
-6. How does the reader interpret the results?
+3. How does it work, conceptually and in theory? Give the terms, the definitions and the mathematical formulation.
+4. How does DataEval use these concepts? Give the design choices that change the meaning of a result.
+5. How does the reader interpret the results?
+6. What are the assumptions and limits? Give the preconditions, the statistical limits and the failure modes.
+7. When should the reader use it, and where does it fit in a dataset evaluation workflow?
 
-The questions are not fixed headings. Give each section a heading that follows the heading rules. A page written before
-this guide may order its sections differently. Bring it into line when you edit it.
+The questions are not fixed headings. Give each section a heading that follows the heading rules. A short page may
+answer adjacent questions in one section. A page written before this guide may order its sections differently. Bring
+it into line when you edit it.
 
-Focus (review):
+A reader should understand the central concept and what it means in practice within the first few paragraphs. The
+deeper mathematics and the implementation follow. Do not set a word count for a page.
 
-- A concept page focuses on the mathematics and the theory. A tutorial or a how-to focuses on the implementation and on
-  how to interpret the results.
-- Go further into the implementation and the interpretation on a concept page when DataEval's implementation is
-  complicated, and a reader needs more than one example to learn how to read the results.
+### Placement
+
+Put each kind of content where its reader looks for it (review):
+
+| Content | Where it goes |
+| ------- | ------------- |
+| What a metric measures, why it is useful, its mathematical formulation, its assumptions and limits, and how to interpret a result | Concept page |
+| How to run an evaluator, and a worked reading of its output on real data | Tutorial or how-to |
+| Exact parameters, defaults and return types | API reference |
+| Implementation edge cases | API reference, or an advanced explanation |
+
+An implementation choice that changes the meaning of a measurement belongs on the concept page. Binning policy, the
+embedding distance metric and the metadata aggregation level are examples. Go further into the implementation when
+DataEval's implementation is complicated and a reader needs more than one example to learn how to read the results.
+Link to the API reference and do not repeat its parameters.
 
 End a concept page with `Related concept pages`, then `See this in practice` (with `How-to guides` and `Tutorials`
 lists), then `References`, when they apply.

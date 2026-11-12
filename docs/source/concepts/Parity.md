@@ -19,7 +19,7 @@ account for rows grouped into images or sequences.
 
 ### The question
 
-[Binning](Binning.md#a-worked-example-temperature) cuts a temperature factor to
+The worked example in [Choosing bin edges](BinEdges.md#a-worked-example-temperature) cuts a temperature factor to
 answer one question: are pedestrians under-represented in freezing conditions?
 Parity's factor test asks whether the class mix below 0 °C differs from the
 class mix above it. Its cell test, which answers the question as asked, checks
@@ -40,7 +40,7 @@ Cramér's V is 0 and no cell departs from independence, because every class has
 the same small share of night images. For a night mission the dataset may still
 hold too few night images.
 
-DataEval has no metric yet for shortfall against a target distribution or
+DataEval has no metric for shortfall against a target distribution or
 against a minimum count per condition. To check counts against a mission's
 targets, compare them directly, using the `observed` column of
 {attr}`.ParityOutput.cells` or the factor in {class}`.Metadata`.
@@ -64,7 +64,8 @@ measures of how far a cell departs from $E_{ij}$:
   independence, negative for a surplus. It counts rows, and on detection data
   the rows are detections.
 
-Suppose the 400 road-scene images of the Binning example show 120 pedestrians,
+Suppose the 400 road-scene images of the temperature example in
+[Choosing bin edges](BinEdges.md#a-worked-example-temperature) show 120 pedestrians,
 220 vehicles and 60 cyclists, one class per image, and the 103 freezing images
 show 12 pedestrians, 80 vehicles and 11 cyclists. With temperature cut at 0 °C
 and the default thresholds, Parity reports these cells (some columns omitted):
@@ -246,84 +247,29 @@ depend on each other in any way.
 This null is weaker than the permutation null, under which whole groups,
 including their sizes, are exchangeable across levels. Group sizes may
 therefore differ by level, as when one site has crowded scenes. On the last
-design in the table above, 20 images of 20 detections at one level against 380
-single-detection images at the other (the 20×20 versus 380×1 design), the
-grouped test described below rejected 5.3% ± 0.4% of 4,000 simulated null
-datasets at α = 0.05. A permutation-based covariance, which assumes
-exchangeable groups, rejected 38.9%.
+design in the table above (20 images of 20 detections at one level against 380
+single-detection images at the other), a permutation-based covariance, which
+assumes exchangeable groups, rejected 38.9% of the simulated null datasets at
+α = 0.05, against 5.3% for the grouped test described below.
 
 ### Groups, and how they are found
 
-Parity resolves one grouping, the independent sampling unit, for the whole
-call, from the structure of its input. It records where the grouping came from
-in {attr}`~.ParityOutput.group_source` and the level it grouped by in
-{attr}`~.ParityOutput.group_level`:
+Parity resolves one grouping, the independent sampling unit, for the whole call, from the structure of its input. It
+records where the grouping came from in {attr}`~.ParityOutput.group_source` (`"source"`, `"level"`, `"item"`, `"rows"`
+or `"declared"`) and the level it grouped by in {attr}`~.ParityOutput.group_level`. For a {class}`.Metadata` over a
+derived view, such as a `SequenceFrames`, a `DetectionCrops`, a `View` or a {func}`.merge_datasets` of either, rows are
+grouped by the root source item behind them: the video for frames and the image for crops. For any other
+{class}`.Metadata` in which several rows map to one item (detections, frames, tracks), rows are grouped by the dataset
+item: the image for object detection, the sequence for tracking and video. When every row is its own item, as in image
+classification, the groups are the rows and the ungrouped test runs. A custom container that records no structure must
+supply `item_indices` or declare each row independent, and otherwise Parity raises an error, because a missing
+`item_indices` gives no evidence that the rows are independent. The core function {func}`.parity` takes the grouping as
+an argument.
 
-:::{list-table}
-:widths: 38 38 24
-:header-rows: 1
-
-- - Input
-  - Grouped by
-  - `group_source`
-- - A {class}`.Metadata` over a derived view: a `SequenceFrames`, a
-    `DetectionCrops`, a `View` or a {func}`.merge_datasets` of either, or a
-    `View` or merge that repeats items of a plain dataset
-  - The root source item behind each row: the video for frames, the image for
-    crops, the dataset item for a `View` or merge that repeats items
-  - `"source"`, with no `group_level`, when some source item stands behind more
-    than one item; otherwise the rows group as any other {class}`.Metadata`
-- - Any other {class}`.Metadata` whose `item_indices` map several rows to one
-    item, at any view: detections, frames, tracks, or item ids repeated at the
-    item level
-  - The dataset item each row belongs to: the image for object detection, the
-    sequence for tracking and video
-  - `"level"`, with `group_level` naming the item level
-- - A custom container whose `item_indices` (label → item) map several rows to
-    one item
-  - Those item indices
-  - `"item"`
-- - A {class}`.Metadata` or custom container whose `item_indices` are
-    one-to-one with the rows (image classification, a detection dataset viewed
-    at its images, or object detection with one detection per image)
-  - Nothing: each row is its own item, and the ungrouped test runs
-  - `"rows"`
-- - A custom container that records neither, with `assume_independent=True`
-  - Nothing: the caller declares each row independent
-  - `"declared"`
-- - A custom container that records neither, without the declaration
-  - None
-  - raises `ValueError`
-
-:::
-
-Grouping by the dataset item is valid at any level a factor was measured at,
-because every row belongs to a single item. A per-image factor and a
-per-detection factor are tested over the same groups. A factor whose level is
-unknown is also tested over the item groups and does not change how the other
-factors are grouped. Parity raises an error for a {class}`.Metadata` with a
-level above its item level, which no dataset structure produces today, instead
-of guessing which level is independent. It also raises when `item_indices` does
-not hold one entry per row.
-
-If a custom {class}`.MetadataLike` records neither {class}`.Metadata` levels
-nor `item_indices`, Parity raises `ValueError` before computing anything:
-
-```text
-Cannot establish independent sampling units for this metadata. Provide
-`item_indices` (label -> item) or use `Metadata` levels, or pass
-`assume_independent=True` if each row is its own independent item. Row-level
-inference gives invalid p-values when several rows belong to one image or
-sequence.
-```
-
-The {class}`.MetadataLike` protocol documents a missing `item_indices` as one
-label per item. Parity does not apply that default, because a missing
-`item_indices` gives no evidence that the rows are independent. A
-{class}`.Metadata` built from a dataset always records its structure and never
-raises this error. The core function {func}`.parity` takes the grouping as an
-argument: pass either `groups`, one group id per row, or
-`assume_independent=True`. It raises when given neither or both.
+Grouping by the dataset item is valid at any level a factor was measured at, because every row belongs to a single item:
+a per-image factor and a per-detection factor are tested over the same groups. Parity raises an error for a
+{class}`.Metadata` with a level above its item level, which no dataset structure produces today, instead of guessing
+which level is independent.
 
 The grouping records which rows belong together. It cannot show whether the
 groups are independent of each other. Consecutive sequences from one flight,
@@ -356,17 +302,13 @@ Scott is
 
 $$\bar\delta = \frac{\operatorname{tr}(GV)}{\mathrm{df}}$$
 
-$\bar\delta$ is the factor by which grouping inflates the table's variance
-relative to independent rows. It is 1 for independent rows, and 25 when the
-table carries about as much information as $n/25$ independent rows. Parity
-uses $\bar\delta$ as computed and does not floor it at 1. A value below 1
-indicates negative dependence inside groups, for example pairs of detections
-that usually hold one of each class. In a simulation of that case (200 pairs,
-$\bar\delta$ near 0.10, 2,000 null datasets) the test rejected 4.4% at
-α = 0.05. When $\bar\delta < 1$, $n/\bar\delta$ exceeds $n$, so it is a
-computational analog of an effective sample size and cannot be read as a count
-of independent observations. Parity reports $\bar\delta$ as
-`design_effect`.
+$\bar\delta$ is the factor by which grouping inflates the table's variance relative to independent rows. It is 1 for
+independent rows, and 25 when the table carries about as much information as $n/25$ independent rows. Parity uses
+$\bar\delta$ as computed and does not floor it at 1. A value below 1 indicates negative dependence inside groups, for
+example pairs of detections that usually hold one of each class. A simulation of that case (200 pairs, $\bar\delta$ near
+0.10) is in [Parity calibration and power](ParityCalibration.md#factor-test). When $\bar\delta < 1$, $n/\bar\delta$
+exceeds $n$, so it is a computational analog of an effective sample size and cannot be read as a count of independent
+observations. Parity reports $\bar\delta$ as `design_effect`.
 
 #### Effective groups
 
@@ -763,42 +705,13 @@ table where a level of 60 rows holds none of a class that independence expects
 
 ### What the output holds
 
-{attr}`.ParityOutput.factors` has one row per factor, in the metadata's factor
-order, with the columns `status`, `score` (V), `p_value`, `p_value_adjusted`,
-`is_associated`, `has_insufficient_data`, `design_effect`, `effective_groups`,
-`df_num` and `df_den`.
-
-{attr}`.ParityOutput.cells` has one row per factor, observed level and observed
-class, including cells with an observed count of zero, with levels and classes
-decoded to names: $r \cdot K$ rows for a factor with $r$ levels. A level or
-class that never occurs has no row. Parity tests combinations of the levels and
-classes that are present, and a condition missing from the dataset entirely is a
-coverage question (see [What it does not measure](#what-it-does-not-measure)).
-
-Cells are sorted by factor name, then by status in the order
-`underrepresented`, `overrepresented`, `too_thin`, `no_finding`, `untestable`,
-then by deficit, largest first. The order is for reading convenience. It does
-not rank collection priority, since neither deficit nor p-value measures
-collection cost or mission value.
-
-The output also records `test`, `group_source`, `group_level`, `n_rows` and
-`n_groups`.
-
-## When to use it
-
-Use Parity to find where a factor and the class depart from independence, cell
-by cell, with p-values that account for rows grouped into images or sequences.
-Its `underrepresented` cells are collection candidates, and its
-`overrepresented` cells point to possible shortcuts.
-
-Parity reads categorical factors, so continuous factors must be binned first
-(see [Binning](Binning.md)). On grouped data it needs enough independent images
-or sequences at each level: check `effective_groups` and
-`has_insufficient_data` before reading a non-significant result as a negative.
-To compare counts with a mission's targets, see
-[What it does not measure](#what-it-does-not-measure). To test whether two
-datasets share a class distribution, use {func}`.label_parity` (see
-[Label parity](DistributionShift.md#label-parity)).
+{attr}`.ParityOutput.factors` has one row per factor, and {attr}`.ParityOutput.cells` has one row per factor, observed
+level and observed class, including cells with an observed count of zero: $r \cdot K$ rows for a factor with $r$ levels.
+A level or class that never occurs has no row. Parity tests combinations of the levels and classes that are present, and
+a condition missing from the dataset entirely is a coverage question (see [What it does not
+measure](#what-it-does-not-measure)). Cells are sorted by factor name, then by status, then by deficit, largest first.
+The order is for reading convenience and does not rank collection priority, since neither deficit nor p-value measures
+collection cost or mission value. The columns are documented on {class}`.ParityOutput`.
 
 ## Assumptions and their limits
 
@@ -929,189 +842,25 @@ magnitude, and an ordinal trend gains no power from its order.
 
 ## Calibration and power
 
-All rates in this section were measured by simulation. They apply to the
-designs tested and do not establish calibration for other designs.
+Parity's calibration and power were measured by simulation, and the rates apply only to the designs tested.
+[Parity calibration and power](ParityCalibration.md) reports the null scenarios and false-positive rates of the factor
+test and the cell tests, the checks that run in CI, and the power of each test.
 
-### Factor test
+## When to use it
 
-Calibration was measured by simulating null data in the scenarios below. At
-α = 0.05, each false-positive rate is at or below the nominal rate plus Monte
-Carlo error:
+Use Parity to find where a factor and the class depart from independence, cell
+by cell, with p-values that account for rows grouped into images or sequences.
+Its `underrepresented` cells are collection candidates, and its
+`overrepresented` cells point to possible shortcuts.
 
-:::{list-table}
-:widths: 62 18 20
-:header-rows: 1
-
-- - Null scenario
-  - Simulated datasets
-  - False-positive rate
-- - A rare level on 5% of 300 images (about 15), with heavy-tailed detection
-    counts (log-normal(3, 1.5) per image)
-  - 500
-  - 3.0%
-- - A rare level on 2% of 1,000 images, with the same counts
-  - 500
-  - 1.0%
-- - A rare level (20% of 300 images) holding the large images, about 20
-    detections each against about 2
-  - 500
-  - 3.6%
-- - A sequence-level factor, 40 sequences of 50 frames
-  - 2,000
-  - 1.7%
-- - Balanced object detection, 300 images
-  - 500
-  - 3.6%
-- - A rare class in 2 to 10 bursty groups, among 60 or 200 sequences
-  - 400 per design
-  - 0–2%
-- - 20 images of 20 detections at one level, 380 single-detection images at
-    the other
-  - 4,000
-  - 5.3% ± 0.4%
-- - Negative dependence inside groups, design effect near 0.10
-  - 2,000
-  - 4.4%
-
-:::
-
-With few effective groups the test was conservative in every scenario
-evaluated. The grouped test's rates on the four designs of
-[Why rows are not independent](#why-rows-are-not-independent) are in that
-section's table.
-
-### Cell tests
-
-At α = 0.05, the grouped cell tests had false-positive rates of 0–0.2% in six
-simulated small-table scenarios with four classes and rare levels, on
-heavy-tailed images or sequence-level factors.
-
-Excluding the contraindicated case in [A4](#a4-the-grouped-cell-variance-model),
-72 null designs with bursty classes, 500 tables each (100 for the largest),
-stayed within the Monte Carlo band. In 69 of them no table had a flagged cell
-after the adjustment, and in none did more than 1% of tables. Cell
-false-positive rates were 0–0.9%, and 3.3% in a 45×45 control whose factor
-varies by row (nominal 5%). The designs covered:
-
-- per-image factors at 20×20 and 40×40, including levels whose groups differ in
-  size;
-- two-level factors: rare, clustered within images, holding groups ten times
-  larger, or alone bursty, against up to 100 classes;
-- two to six classes, with a rare class held in bursts by 3–6% of images at
-  every level, at 2 to 100 levels;
-- burstiness that differs by level whenever another level shares it: half the
-  levels bursty, two classes bursty at half the levels;
-- a class constant within groups with the factor bursty, and both bursty;
-- classes that burst at some levels only, each shared with another level or
-  class:
-  - blocks of 2 to 10 levels bursting in their own 2 to 10 classes, at 10×10 to
-    40×40;
-  - one level bursting in half the classes and the others in the other half;
-  - bursts wherever the level's and the class's parities match;
-  - a single level bursting in three of 20 classes;
-- sticky sequences and log-normal image sizes, as in
-  [A4](#a4-the-grouped-cell-variance-model).
-
-A 100×100 table over 100,000 images had no flagged cell.
-
-### Checks in CI
-
-CI re-runs eight null designs of the kind in the factor-test calibration table,
-including
-10 sequences, a frame-level factor in multi-object tracking and the 20×20 versus
-380×1 design, with 300 seeded datasets each. It asserts that the factor and
-cell false-positive rates stay at or below α plus three Monte Carlo standard
-errors.
-
-The core tests also re-run eleven null designs with bursty classes, with 40 to
-200 seeded datasets each:
-
-- the 20×20, 40×40 and unequal-size 40×40 tables;
-- the rare clustered two-level factor;
-- the large-group two-level factor, with bursts of 90% and 50% of an image;
-- a rare bursty class among two and among three classes;
-- one level bursting in half the classes and the others in the other half;
-- blocks of two levels bursting in their own two classes, at 20×20 over 2,000
-  images and at 40×40 over 4,000, where each cell holds about 2.5 bursts.
-
-They also run the two-class design with a rare class bursting at one level only
-(the contraindication in [A4](#a4-the-grouped-cell-variance-model)) and assert
-that its false-alarm rate stays below 25%. The measured rate is 11–17%, and the
-sandwich variance alone gives about 18%. The 25% ceiling is a regression guard:
-it fails only if a change makes this case worse than having no floor at all,
-and it makes no calibration claim.
-
-The 20×20 and 40×40 tables also run through the evaluator, 100 and 30 tables
-respectively. The evaluator tests assert that the share of tables with any
-flagged or actionable cell after the adjustment, and the cell false-positive
-rate, stay within the same bound.
-
-### Power
-
-Power depends on the number of independent groups, which is the cost of
-p-values that remain valid under grouping. A dataset of few sequences has
-little power however many frames it holds. Factor-test power at α = 0.05:
-
-:::{list-table}
-:widths: 52 28 20
-:header-rows: 1
-
-- - Planted gap
-  - Size
-  - Power
-- - Object detection: one class at a tenth of its share at a level holding 20%
-    of images, about 5 detections per image
-  - 100 / 300 images
-  - 0.80 / 1.00
-- - Sequences: one class at 0.15 of its share at one of three levels, 50 frames
-    per sequence
-  - 20 / 60 / 200 sequences
-  - 0.02 / 0.83 / 1.00
-
-:::
-
-At 20 sequences the test almost never detects the gap. Read `effective_groups`
-alongside any non-significant result.
-
-In these designs, the gap cell's own test has less power than the factor test
-at small sizes. The variance floor costs power for deficits held by few groups, for two reasons: the
-cluster-model variance does not shrink when a cell is short, and when each level
-holds few bursts, the largest of several noisy per-level and per-class
-correlation estimates widens every cell's reference distribution. Power to find
-the planted gap in its cell (adjusted p ≤ 0.05), with and without the floor:
-
-:::{list-table}
-:widths: 52 24 24
-:header-rows: 1
-
-- - Planted gap
-  - Power
-  - Sandwich variance only
-- - Object-detection gap of the factor-test power table above, 100 / 300
-    images
-  - 0.20 / 1.00
-  - 0.85 / 1.00
-- - Sequence gap of the factor-test power table above, 20 / 60 / 200
-    sequences
-  - 0.00 / 0.08 / 1.00
-  - 0.00 / 0.71 / 1.00
-- - A class at 30% of its share at a small-image level, five levels over 600
-    images, one level holding the large images
-  - 0.14
-  - 0.57
-- - One class at a tenth of its share at one level, 20 levels and 20 bursty
-    classes, 2,000 images
-  - 0.00
-  - not calibrated
-- - The same class at 30% of its share, 20,000 images
-  - 1.00
-  - 1.00
-
-:::
-
-In the 20×20 table over 2,000 images each cell holds about five bursts, and even
-a 90% deficit went undetected. With ten times as many images, or a 10×10 table
-over 2,000 images, the planted deficit was always found.
+Parity reads categorical factors, so continuous factors must be binned first
+(see [Binning](Binning.md)). On grouped data it needs enough independent images
+or sequences at each level: check `effective_groups` and
+`has_insufficient_data` before reading a non-significant result as a negative.
+To compare counts with a mission's targets, see
+[What it does not measure](#what-it-does-not-measure). To test whether two
+datasets share a class distribution, use {func}`.label_parity` (see
+[Label parity](DistributionShift.md#label-parity)).
 
 ## Acting on a result
 

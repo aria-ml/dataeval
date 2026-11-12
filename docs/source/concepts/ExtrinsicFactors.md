@@ -317,50 +317,40 @@ them now means your metadata is ready for them.
 | `latitude`       | Latitude of the sensor (WGS 84)     | decimal degrees               | `sequence`, `unit` | from -90 to 90        |
 | `longitude`      | Longitude of the sensor (WGS 84)    | decimal degrees               | `sequence`, `unit` | from -180 to 180      |
 
-DataEval checks the type, range and level of a known factor. Every value must be a real number (integers count,
-booleans and text do not) within the range above, and the factor must be at one of the listed levels. Missing values
-(`None` or NaN) are not checked; infinity is invalid.
-
-When a column of the dataset's own metadata fails a check, it is held back: it is not a factor, and
-{attr}`.Metadata.unusable` and {attr}`.Metadata.dropped_factors` list it with the reason `invalid_known_factor`. Fix it
-with {meth}`.Metadata.repair`. A column that mixes text and numbers is reported as `mixed_types`, as for any factor.
-A known factor at a level it is not defined at, such as a `frame_rate` given per frame, cannot be repaired, since a
-repair changes values and never their level. Supply it at a listed level instead: fix it at the source, or pass its
-values to {meth}`.Metadata.add_factors` at that level, such as one `frame_rate` per video with `level="sequence"`.
-
-{meth}`.Metadata.add_factors`, {meth}`.Metadata.from_factors`, {meth}`.Metadata.agg` and {meth}`.Metadata.aggregate`
-raise a `ValueError` instead.
+DataEval checks the type, range and level of a known factor. Every value must be a finite real number (integers count;
+booleans and text do not) within the range above, and the factor must be at one of the listed levels. Missing values are
+not checked. A column that fails a check is held back: it is not a factor, and {attr}`.Metadata.unusable` and
+{attr}`.Metadata.dropped_factors` list it with the reason `invalid_known_factor`. {meth}`.Metadata.repair` can fix bad
+values. A known factor at a level it is not defined at, such as a `frame_rate` given per frame, cannot be repaired and
+has to be supplied at a listed level instead, for example one `frame_rate` per video with `level="sequence"`.
 
 Using a known name is a promise that the data follows the definition above. The checks cannot verify units: a
 `timestamp` in milliseconds since the stream started passes them. If a factor means something else, give it a
 different name.
 
 A dataset's reported `video_duration` and `frame_rate` can be checked against the frames themselves.
-{func}`.video_stats` measures both from frame timestamps, and
-`md.add_factors(video_stats(ds), return_collisions=True, collision_tolerance={"video_duration": 0.01})` attaches the
-measured values and returns a report of where they disagree with the reported ones. With the default
-`overwrite=False`, a measured factor whose name the dataset already reports is stored under a new name, such as
-`video_duration_added`. The report holds a {class}`.FactorCollision` for each factor that disagrees on at least one
-video. Here `video_duration` differs when the two values are more than 1% apart, and a reported `frame_rate`, which the
-tolerance does not name, differs on any difference. Each entry's `differing` frame lists those videos by `item_index`,
-with the `existing` value, the `incoming` one and their `relative_difference`. A video without a reported value, or one
-that could not be measured, is not compared.
+{func}`.video_stats` measures both from frame timestamps, and attaching its result with `return_collisions=True` reports
+the videos where the measured values disagree with the reported ones (see {meth}`.Metadata.add_factors`).
 
-A `timestamp` column of ISO 8601 text or of datetimes is held back, and `repair([ParseDateTime("timestamp")])` reads it
-as seconds since the Unix epoch, which passes. A period such as `every="hour"` is not a capture time, and its text labels
-keep the column held back. Give a column you mean to read as periods a different name, such as `capture_time`. With
-{meth}`.Metadata.add_factors` or {meth}`.Metadata.from_factors`, convert datetimes to epoch seconds first, or use
-another name to keep them as datetimes. For a NumPy array, `(stamps - np.datetime64("1970-01-01")) / np.timedelta64(1, "s")`
+A `timestamp` column of ISO 8601 text or of datetimes is held back until it is read as seconds since the Unix epoch,
+which `repair([ParseDateTime("timestamp")])` does. A period such as `every="hour"` is not a capture time. When
+converting a NumPy array of datetimes, use `(stamps - np.datetime64("1970-01-01")) / np.timedelta64(1, "s")`, which
 turns a missing `NaT` into NaN, a missing value. Casting with `astype("int64")` instead turns it into a large negative
 number that passes as a real time.
 
 ## Related concept pages
 
-- [Metadata levels](MetadataLevels.md) — the sequence, unit, track and instance levels, and why a factor is stored once
-at its own level.
-- [Binning](Binning.md) — how continuous factors such as altitude and timestamps are discretized, and how to declare
-cut points that come from the world.
-- [Image statistics](ImageStatistics.md) — factors DataEval can compute from the decoded frames and add to `Metadata` on
-demand, as a complement to the factors on this page.
-- [Acting on results](ActingOnResults.md) — how to diagnose and respond to a correlation between a metadata factor and
-the class label.
+- [Metadata levels](MetadataLevels.md): the sequence, unit, track and instance levels, and why a factor is stored once
+  at its own level
+- [Binning](Binning.md): how continuous factors such as altitude and timestamps are discretized, and how to declare
+  cut points that come from the world
+- [Image statistics](ImageStatistics.md): factors DataEval can compute from the decoded frames and add to `Metadata` on
+  demand, as a complement to the factors on this page
+- [Acting on results](ActingOnResults.md): how to diagnose and respond to a correlation between a metadata factor and
+  the class label
+
+## See this in practice
+
+### How-to guides
+
+- [Wrap video files as a multi-object tracking dataset](../notebooks/h2_wrap_video_files.py)

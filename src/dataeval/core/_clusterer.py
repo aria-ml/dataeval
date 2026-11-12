@@ -689,6 +689,14 @@ def cluster(  # noqa: C901
     P, is less than 500. If flattening a CxHxW image results in a dimension
     larger than 500, then it is recommended to reduce the dimensions.
 
+    HDBSCAN sets ``min_cluster_size`` to ``max(5, n_samples // (n_clusters * 3))`` when
+    ``n_clusters`` is given, and otherwise to 5% of the samples, at least 5 and at most 100.
+    Samples that HDBSCAN labels as noise (-1) are reassigned to their nearest cluster center,
+    so ``clusters`` holds no -1, while ``membership_strengths`` keeps HDBSCAN's own confidence.
+    KMeans uses k-means++ initialization and the global seed from
+    :func:`~dataeval.config.set_seed`, so its assignments are reproducible only when the seed
+    is fixed. When ``n_clusters`` is not given, KMeans uses ``floor(sqrt(n_samples))`` clusters.
+
     References
     ----------
     [1] HDBSCAN documentation.

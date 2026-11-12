@@ -371,10 +371,10 @@ unanchored, then propagates structurally up the hierarchy. Logical / deductive
 ### Confidence and abstention
 
 Correspondences carry a **confidence** $c \in [0,1]$ and a record of the matcher
-that produced them. The cost of error is asymmetric: a false correspondence
-silently misrepresents one side's data as the other, which is worse than
-producing no correspondence at all. Alignment therefore
-favors **precision over recall**: a correspondence below the acceptance
+that produced them. The cost of error is treated as asymmetric: a false correspondence
+misrepresents one side's data as the other without any indication, whereas a
+missing correspondence leaves the concept unaligned for inspection. Alignment
+therefore favors **precision over recall**: a correspondence below the acceptance
 `threshold` is withheld, leaving the concept unaligned for inspection rather
 than committing a likely-wrong mapping. Abstention is the conservative default,
 consistent with the open-world reading of the unaligned set.
@@ -409,7 +409,7 @@ they persist after the label spaces are reconciled.
 ## Validation: checking the ontology artifact
 
 Reconciliation and alignment judge data against an ontology; both presume the
-ontology itself is sound. {func}`.ontology_validation` turns the lens on the
+ontology itself is sound. {func}`.ontology_validation` examines the
 **artifact**, reporting the structural and naming facts that bear on its
 quality, independent of any dataset. An {class}`.Ontology` already guarantees
 the hard invariants at construction (unique ids and an acyclic is-a graph), so
@@ -544,11 +544,11 @@ a model is queried with rather than a fixed integer label map.
 
 ## Related concept pages
 
-- [Data integrity](DataIntegrity.md) — where reconciliation sits among the other
+- [Data integrity](DataIntegrity.md): where reconciliation sits among the other
   label-quality checks (duplicates, outliers, label errors).
-- [Embeddings](Embeddings.md) — the space in which extensional, instance-based
+- [Embeddings](Embeddings.md): the space in which extensional, instance-based
   matching compares concepts.
-- [Distribution shift](DistributionShift.md) and [Divergence](Divergence.md) — the
+- [Distribution shift](DistributionShift.md) and [Divergence](Divergence.md): the
   distributional differences between sources that remain once labels are
   reconciled, and that alignment does not address.
 
@@ -556,18 +556,18 @@ a model is queried with rather than a fixed integer label map.
 
 ### How-to guides
 
-- [Reconcile labels against an ontology](../notebooks/h2_reconcile_labels_ontology.py) —
+- [Reconcile labels against an ontology](../notebooks/h2_reconcile_labels_ontology.py):
   build an ontology, reconcile a dataset's class names, and explore the
   recovered hierarchy.
-- [Align two label spaces](../notebooks/h2_align_label_spaces.py) — map one
+- [Align two label spaces](../notebooks/h2_align_label_spaces.py): map one
   vocabulary onto another, read the typed correspondences, and get a mergeability
   verdict.
-- [Conform and merge datasets with different label vocabularies](../notebooks/h2_conform_and_merge_datasets.py) —
+- [Conform and merge datasets with different label vocabularies](../notebooks/h2_conform_and_merge_datasets.py):
   conforming an incoming dataset to a reference vocabulary and merging the two.
 
 ### Tutorials
 
-- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py) — an ontology, label counts and
+- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py): an ontology, label counts and
   embeddings combined into one per-class gap report.
 
 ## References

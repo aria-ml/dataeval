@@ -54,13 +54,10 @@ predetermined number of clusters. The algorithm proceeds in stages:
    A low membership strength on a sample assigned to a cluster means HDBSCAN
    originally considered it borderline.
 
-`min_cluster_size` is the key hyperparameter. DataEval sets it adaptively:
-
-- if `n_clusters` is provided,
-  `min_cluster_size = max(5, n_samples // (n_clusters * 3))`, meaning smaller
-  clusters are allowed when more clusters are expected;
-- if `n_clusters` is not provided, the default is 5% of the dataset, capped at
-  100: `min_cluster_size = min(100, max(5, (n_samples * 0.05)))`
+`min_cluster_size` is the key hyperparameter. DataEval sets it adaptively from
+the number of samples, or from the expected number of clusters when one is
+given, so that smaller clusters are allowed when more clusters are expected.
+The rules are in the {func}`.cluster` documentation.
 
 HDBSCAN is the default because it handles irregular cluster shapes, varying
 cluster densities, and datasets where the number of clusters is unknown. Its
@@ -73,9 +70,7 @@ iteratively assigning each point to its nearest centroid and recomputing
 centroids. DataEval uses k-means++ initialization to reduce sensitivity to the
 starting configuration.
 
-When `n_clusters` is not specified, the default is $\lfloor\sqrt{n}\rfloor$
-where $n$ is the number of samples. KMeans always assigns every sample to a
-cluster, so there are no outliers. Membership strength is computed from
+KMeans always assigns every sample to a cluster, so there are no outliers. Membership strength is computed from
 normalized distance to the cluster center: points close to their centroid have
 high membership strength; points far from any centroid have low membership
 strength.
@@ -86,25 +81,20 @@ problem) or when cluster shape is expected to be roughly spherical.
 
 KMeans results are not reproducible without fixing the global random seed via
 `dataeval.config.set_seed()`. The k-means++ initialization draws random starting
-centroids; different runs will produce different cluster assignments unless the
-seed is fixed. HDBSCAN does not have this property.
+centroids, so different runs produce different cluster assignments unless the
+seed is fixed, and anything that consumes the assignments inherits that.
+HDBSCAN does not have this property. The
+[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
+how-to covers fixing it.
 
 ## What the ClusterResult contains
 
-| Field                  | Type               | Description                                                  |
-| ---------------------- | ------------------ | ------------------------------------------------------------ |
-| `clusters`             | `NDArray[int64]`   | Cluster assignment for each sample (0-indexed, no -1 values) |
-| `mst`                  | `NDArray[float32]` | MST edge list as (source, target, weight) triples            |
-| `linkage_tree`         | `NDArray[float32]` | Hierarchical linkage array from the MST                      |
-| `membership_strengths` | `NDArray[float32]` | Per-sample cluster membership confidence [0, 1]              |
-| `k_neighbors`          | `NDArray[int64]`   | Indices of up to 25 nearest neighbors per sample             |
-| `k_distances`          | `NDArray[float32]` | Distances to those neighbors                                 |
+{class}`.ClusterResult` holds the cluster assignment of each sample (`clusters`, with no -1 values), the `mst` and
+`linkage_tree` of the embeddings, a per-sample confidence in [0, 1] (`membership_strengths`), and the `k_neighbors` and
+`k_distances` of each sample.
 
-The `membership_strengths` field is the most useful for downstream use. Samples
-with low membership strength are at the boundary of their cluster. They are the
-candidates that {class}`.Duplicates` cluster mode considers semantically
-ambiguous, and they are the samples that {func}`.label_errors` is most likely to
-flag as mislabeled if they are near a different class's cluster.
+Samples with low membership strength are at the boundary of their cluster. They are the candidates that
+{class}`.Duplicates` cluster mode considers semantically ambiguous.
 
 ## Relationship to other evaluators
 
@@ -138,24 +128,16 @@ ranking.
 
 ## Practical considerations
 
-Embedding dimension should be below 500. Clustering in very high-dimensional
-spaces suffers from the curse of dimensionality: distances become increasingly
-uniform, making density estimation unreliable. An embedding above that range
-needs a reduction step, PCA or equivalent, ahead of clustering for the density
-estimate to mean anything.
+Clustering works best on embeddings of fewer than about 500 dimensions. In very
+high-dimensional spaces distances become increasingly uniform, which makes
+density estimation unreliable, and an embedding above that range benefits from a
+reduction step, such as PCA, ahead of clustering.
 
 HDBSCAN's `min_cluster_size` controls granularity. A large value produces fewer,
 larger clusters; a small value produces many small clusters with more samples
 classified as boundary points (low membership strength). On datasets with many
 fine-grained categories, an `n_clusters` hint near the number of classes lands
 in the range where cluster granularity tracks class granularity.
-
-KMeans cluster assignments are not reproducible without a fixed seed.
-Initialization is random, so the same embeddings cluster differently between
-runs, and anything consuming the assignments downstream inherits that. The
-global seed set by `dataeval.config.set_seed` is what pins them; the
-[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
-how-to covers doing it.
 
 Clustering is embedding-dependent. The clusters discovered by either algorithm
 reflect the structure of the embedding space, not ground truth semantic
@@ -195,10 +177,10 @@ into a test report.
 
 ## Related concept pages
 
-- [Data integrity](DataIntegrity.md) — how clustering feeds into Duplicates,
+- [Data integrity](DataIntegrity.md): how clustering feeds into Duplicates,
   Outliers, and label_errors
-- [Embeddings](Embeddings.md) — the representation clustering operates on
-- [Acting on results](ActingOnResults.md) — how to interpret and respond to
+- [Embeddings](Embeddings.md): the representation clustering operates on
+- [Acting on results](ActingOnResults.md): how to interpret and respond to
   cluster-based findings
 
 ## See this in practice
@@ -210,7 +192,7 @@ into a test report.
 
 ### Tutorials
 
-- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py):
   coverage gaps and embedding-space decisions
 
 ## References

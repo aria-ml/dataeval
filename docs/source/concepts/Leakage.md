@@ -2,10 +2,10 @@
 
 # Data leakage
 
-Data leakage is a leading cause of overoptimistic and irreproducible
-machine-learning results. In a survey across 17 scientific fields,
-[Kapoor & Narayanan (2022)](#ref1) found 329 papers whose reported findings did
-not hold up once leakage was corrected. The pattern is consistent: information
+Data leakage is a widespread cause of overoptimistic and irreproducible
+machine-learning results. A survey of ML-based science found 17 fields in which
+leakage errors had been reported, collectively affecting 329 papers
+([Kapoor & Narayanan, 2022](#ref1)). The pattern is consistent: information
 that will not be available about the distribution the model is meant to serve
 contaminates either training or evaluation, the reported metric is inflated, and
 the gap appears only when the model meets new data.
@@ -14,9 +14,8 @@ This page organizes leakage using the taxonomy of
 [Kapoor & Narayanan (2022)](#ref1), which has three top-level categories (L1–L3)
 spanning eight specific failure modes. Several of these types are
 methodological: they are errors in how a pipeline is constructed rather than
-properties of the data. Others are properties of the data itself. The aim here
-is to characterize each failure mode as the taxonomy to build from: what leaks,
-how it inflates the reported metric, and why it matters.
+properties of the data. Others are properties of the data itself. For each failure mode, the page
+describes what leaks, how it inflates the reported metric, and why it matters.
 
 ## What is it
 
@@ -35,8 +34,8 @@ distribution of interest (so its measured performance does not transfer to the
 population the claim is about). Either way the reported metric is systematically
 better than the model's true generalization, because the model has been rewarded
 for a signal that will not exist at inference time. This framing predates them:
-[Kaufman et al. (2012)](#ref2) gave the formative account. Their taxonomy is
-still the most actionable for a data-centric workflow.
+[Kaufman et al. (2012)](#ref2) gave the formative account. This page uses the
+taxonomy of Kapoor and Narayanan.
 
 ## Taxonomy of leakage
 
@@ -80,16 +79,16 @@ Fitting imputation or over/under-sampling on the full dataset before splitting
 how the pipeline is wired, but in some cases they imprint test-set information
 into the training representation. The classic case is an unsupervised transform,
 such as PCA or SVD, fit on the entire dataset and then used as features.
-Accuracy in the transformed space jumps, and the jump is conventionally
-explained away as relief from the curse of dimensionality. The real cause is
-often that the transform's basis was computed with the test set in view, so the
-features encode it, and performance in the transformed space is inflated
-relative to what the raw features legitimately support.
+Accuracy in the transformed space jumps, and the jump is sometimes attributed
+to relief from the curse of dimensionality. A possible cause is that the
+transform's basis was computed with the test set in view, so the features encode
+it, and performance in the transformed space is inflated relative to what the
+raw features legitimately support.
 
 Duplicates (L1.4) are the one L1 failure that is a property of the data rather
 than the pipeline. When the same sample, or a near-identical variant, appears on
 both sides of the split, the held-out set is no longer held out. Exact overlap
-is unambiguous. The harder cases are **near-duplication**, where a crop,
+is the least ambiguous case. The harder cases are **near-duplication**, where a crop,
 rescale, recompression, brightness shift, or rotation of a training image lands
 in the test set and is invisible to byte comparison, and
 **semantic duplication**, where distinct samples depict the same underlying
@@ -112,14 +111,14 @@ the scene during collection, and because those markers tend to appear precisely
 when an operator has already fixed on a target, they are accidentally captured
 as a "feature" of the objects and targets in the scene. A model can learn to
 read the HUD rather than the target itself. The cue vanishes the moment imagery
-is collected without that display, so the measured performance will not
+is collected without that display, so the measured performance may not
 reproduce in real use. Whether a feature is legitimate is a domain-knowledge
 judgment, which is why Kapoor & Narayanan give L2 no sub-categories.
 
 Feasibility and sufficiency are not leakage. Two related conditions are easy to
 misfile here. A task may be hard, meaning the irreducible (Bayes) error is high
 given the features, or the training set may be too small, so that more data
-would still help. Both are real and important, but neither involves information
+would still help. Both limit performance, but neither involves information
 crossing a boundary it should not, so neither is leakage.
 
 (leakage-l3)=
@@ -155,11 +154,13 @@ couples the label with a non-causal attribute, the model learns the attribute.
 If parent-and-child images were collected disproportionately in one store chain,
 a model can "predict" the relationship from the storefront rather than anything
 about the people, and the shortcut evaporates the moment the sampling changes.
-That a test set can look faithful and still be subtly non-representative is not
-hypothetical. [Recht et al. (2019)](#ref5) rebuilt new ImageNet and CIFAR-10
-test sets following the original collection protocols and saw accuracy drop
-11–14 points across a wide range of models. The original sets had drifted from
-the distribution they were assumed to represent.
+A test set can look faithful and still be non-representative.
+[Recht et al. (2019)](#ref5) rebuilt new ImageNet and CIFAR-10 test sets
+following the original collection protocols and saw accuracy drop 11–14 points on
+ImageNet and 3–15 points on CIFAR-10 across a broad range of models. They
+attribute the drop to the new sets containing slightly harder images than the
+original ones, a small difference in distribution between the original and the
+rebuilt test sets.
 
 ## Leakage through repeated evaluation
 
@@ -171,12 +172,12 @@ same holdout and uses the score to choose the next model, a sliver of test-set
 information passes into the modeling process. Over many iterations the holdout
 is, in effect, fit to.
 
-The effect is like tuning a robot batter against a pitcher it never sees, with
-only the score of each at-bat revealed. No pitch is ever observed, yet after
-enough rounds the pattern of scores betrays that the pitcher throws only a
-curveball and a changeup, which is enough to tune against. The hidden
-information leaks through the outcomes alone. Public leaderboards and long-lived
-benchmark test sets behave the same way ([Recht et al., 2019](#ref5)).
+No test sample is ever inspected, yet over many rounds the pattern of scores
+carries information about the test set that can be tuned against. Public
+leaderboards and long-lived benchmark test sets are exposed to the same risk.
+[Recht et al. (2019)](#ref5) tested for it on CIFAR-10 and ImageNet and found
+that the accuracy drop on their newly built test sets was not caused by
+adaptivity.
 
 No static analysis of a dataset can see adaptive overfitting. It is a property
 of the evaluation process, not the data. The mitigations are procedural: limit
@@ -184,12 +185,22 @@ the number of evaluations against any fixed holdout, refresh test sets
 periodically, and budget test-set access deliberately, as in the
 reusable-holdout mechanism of [Dwork et al. (2015)](#ref4).
 
+## Related concept pages
+
+- [Data integrity](DataIntegrity.md): cross-split duplicates and near-duplicates (L1.4)
+- [Dataset bias and coverage](DatasetBias.md): sampling bias and shortcut learning (L3.3)
+- [Distribution shift](DistributionShift.md): a test set drawn from a different distribution (L3)
+
 ## See this in practice
+
+### How-to guides
+
+- [Identify duplicates](../notebooks/h2_deduplicate.py)
 
 ### Tutorials
 
-- [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py) — finding train-test leakage between the
-  sequences of a tracking dataset.
+- [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py): finding train-test leakage between the
+  sequences of a tracking dataset
 
 ## References
 

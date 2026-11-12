@@ -17,15 +17,15 @@ theorems are listed in [the basis of each source](#the-basis-of-each-source).
 
 Terms used on this page, each defined in more depth on the concept page:
 
-- **Envelope:** an upper confidence bound on what any model in a stated class can reach on the data.
-- **Witness:** a lower confidence bound on what one frozen model reaches on the data.
-- **Bound:** one confidence limit on a performance metric, one row of the `bounds` table.
-- **Fit split and audit split:** Feasibility divides the labeled items in half, keeping each group whole. Anything that
+- Envelope: an upper confidence bound on what any model in a stated class can reach on the data.
+- Witness: a lower confidence bound on what one frozen model reaches on the data.
+- Bound: one confidence limit on a performance metric, one row of the `bounds` table.
+- Fit split and audit split: Feasibility divides the labeled items in half, keeping each group whole. Anything that
   is
   fitted (a partition, a built-in model, a score threshold) uses the fit split only. Bounds are computed on the audit
   split, and each independent item in it is an audit unit.
-- **Information scope:** the class of models a bound covers (see [below](#information-scope-which-models-a-bound-covers)).
-- **DFE:** the Detection Feasibility Envelope manuscript, the source of the consensus constructions behind every envelope.
+- Information scope: the class of models a bound covers (see [below](#information-scope-which-models-a-bound-covers)).
+- DFE: the Detection Feasibility Envelope manuscript, the source of the consensus constructions behind every envelope.
 
 ## Read a result
 
@@ -60,23 +60,23 @@ extractor. The other kinds of evidence come from what you pass in.
 
 Practical rules:
 
-- **Put every requirement in one call.** They then share one error budget (see
+- Put every requirement in one call. They then share one error budget (see
   [How the error budget is spent](#how-the-error-budget-is-spent)).
-- **Describe your model.** Pass its class scores or class decisions as `predictions=`, or the model itself as `model=`.
+- Describe your model. Pass its class scores or class decisions as `predictions=`, or the model itself as `model=`.
   DataEval records that it was trained without the audit units and frozen before it scored them, and does not check
   either, so train it on items that are not in the dataset you pass. A `model=` call also needs a batch size, from
   `Feasibility(batch_size=...)` or `dataeval.config.set_batch_size`.
-- **Fold scores when the requirement is coarser than the model.** If a requirement is about a coarser class than the model
+- Fold scores when the requirement is coarser than the model. If a requirement is about a coarser class than the model
   was trained on, relabel the dataset with {class}`.Relabel` and fold the model's scores through the same map with
   `Relabel.fold_scores(scores, view=view)`. Columns of source classes that map to one target class are summed,
   columns of dropped classes are discarded, nothing is renormalized, and with `view` the rows of dropped items are
   removed so the result lines up with the relabeled items.
-- **Freeze other operating points before the call.** Feasibility has no decision threshold of its own and does not search
+- Freeze other operating points before the call. Feasibility has no decision threshold of its own and does not search
   for one on the audit. To judge a different operating point, such as a threshold on one class's score, apply it before
   the call as a complete multiclass policy (the class when its score reaches the threshold, otherwise the highest-scoring
   other class) and pass the resulting decisions. The bounds record that the decisions follow a policy frozen before the
   audit. Each operating point needs its own call, with the error budget split across the planned calls.
-- **Collect repeated labels when ruling out matters.** Without `replicas=` or allowances, every envelope covers only
+- Collect repeated labels when ruling out matters. Without `replicas=` or allowances, every envelope covers only
   `partition_restricted` models, so a `full_input` requirement can be demonstrated but not ruled out.
 
 ## How a determination is made
@@ -151,7 +151,7 @@ does. The justification must come from outside the call: an argument or separate
 one, repeated labels give a `full_input` envelope that needs no allowance. Both allowances are scalars, since a per-cell
 β would refer to the internal partition's cells.
 
-**Witness eligibility.** A witness can demonstrate a requirement only if it belongs to the judged scope's class. The
+Witness eligibility: a witness can demonstrate a requirement only if it belongs to the judged scope's class. The
 built-in witnesses read the representation, so they are eligible at `fixed_representation` and `full_input`. Your model
 may read the whole input, so it is eligible at `full_input` only. No witness is eligible for a `partition_restricted`
 requirement, which only an envelope can decide in this release.
@@ -191,10 +191,10 @@ seed in `result.meta().state`.
 
 ### Local-panel envelopes (`local_panels`)
 
-**What it bounds.** The accuracy, AP, or recall at a false-positive limit that a model in its scope can reach. It needs
+What it bounds: the accuracy, AP, or recall at a false-positive limit that a model in its scope can reach. It needs
 only the dataset's own labels, and it needs embeddings.
 
-**How it is built.** Feasibility fits a k-means partition of the representation on the fit split only, so labels never
+How it is built: Feasibility fits a k-means partition of the representation on the fit split only, so labels never
 enter the partition. Within each cell it draws random disjoint panels of $m$ audit units. On grouped data
 it first draws one item per group, uniformly. The labels of a panel come from different images in one cell, so they are
 draws from the cell's label distribution, and their consensus value lower-bounds the risk of the best single answer for
@@ -208,31 +208,31 @@ where $n_h$ of the $N$ audit units fall in cell $h$, $\bar g_h$ is the mean cons
 a cell without panels), $\beta_h$ is the heterogeneity allowance (0 without one), and $r_1$ and $r_2$ are Hoeffding radii
 for the panels given the cells and for the cell shares. $\ell$ is floored at 0.
 
-- **Accuracy:** the consensus value is the share of a panel's labels outside its most common class. The envelope is
+- Accuracy: the consensus value is the share of a panel's labels outside its most common class. The envelope is
   $1 - \max(0, \ell - \Gamma)$, with $\Gamma$ the information-loss allowance (0 without one).
-- **AP, per class:** the one-vs-rest consensus value is $\min(k/m, \lambda(1 - k/m))$, where $k$ counts the class's labels
+- AP, per class: the one-vs-rest consensus value is $\min(k/m, \lambda(1 - k/m))$, where $k$ counts the class's labels
   in a panel and $\lambda$ is the cost of a false alarm relative to a missed positive. It is pooled at each positive cost
   where it changes slope. Those risk lower bounds and an upper bound on the class's prevalence feed the
   Reid–Williamson (2011) risk-to-AP envelope, an upper bound on any scorer's population AP. Allowances are not applied to
   AP. Macro AP is the mean over every declared class index, so a class absent from the data still counts with its trivial
   bound.
-- **Recall:** see [Recall requirements](#recall-requirements-recall-at-a-false-positive-limit).
+- Recall: see [Recall requirements](#recall-requirements-recall-at-a-false-positive-limit).
 
-**Defaults.** The panel size $m$ is 5, and the partition has 10 cells below 20,000 planned audit units, 30 below 50,000
+Defaults: the panel size $m$ is 5, and the partition has 10 cells below 20,000 planned audit units, 30 below 50,000
 and 300 from 50,000. These are provisional internal settings.
 
-**Unavailable when** the fit split has fewer items than cells (`fit_split_smaller_than_cells`), the audit has fewer than
+Unavailable when the fit split has fewer items than cells (`fit_split_smaller_than_cells`), the audit has fewer than
 2 units (`too_few_units`), or no cell holds $m$ audit units (`no_complete_panel`).
 
-**Assumptions.** The representation was fitted and selected independently of the audit units' labels (declared by you,
+Assumptions: the representation was fitted and selected independently of the audit units' labels (declared by you,
 `representation_independent_of_audit_labels`). β and Γ are supplied by you and assumed, not estimated (`allowance_beta`
 and `allowance_gamma`). On video data, single-frame local panels stay `partition_restricted`.
 
 ### Replica envelopes (`replicas`)
 
-**What it bounds.** The accuracy, AP, or recall at a false-positive limit that any model reading the full input can reach.
+What it bounds: the accuracy, AP, or recall at a false-positive limit that any model reading the full input can reach.
 
-**How it is built.** `replicas=` maps datum ids to extra, independent class labels of those items. Each such item's panel
+How it is built: `replicas=` maps datum ids to extra, independent class labels of those items. Each such item's panel
 is its primary label plus its replicas, so $m_i = 1 + r_i$, and items without replicas are not used. Because a panel holds
 labels of one input, its consensus value lower-bounds the error of the best answer to that input, whatever the model reads.
 The accuracy envelope is one minus a lower bound on the mean consensus value. AP and recall use the cost-weighted
@@ -240,7 +240,7 @@ consensus as local panels do, at the slope-change costs of the most common panel
 (`sequence_mean`) or total (`frame_pooled`) as the observation. A `frame_pooled` accuracy is a ratio of per-group totals,
 bounded with simultaneous numerator and denominator bounds whose support is the declared `max_sequence_length`.
 
-**Assumptions.**
+Assumptions:
 
 - Items with replicas are a random sample of the population, so the envelope describes the population, not only those
   items (`replicas_random_sample`).
@@ -254,29 +254,29 @@ bounded with simultaneous numerator and denominator bounds whose support is the 
 
 ### Built-in witnesses (`knn` and `linear_probe`)
 
-**What it bounds.** A lower bound on the accuracy or AP that a frozen model reaches. For a recall requirement, a lower
+What it bounds: a lower bound on the accuracy or AP that a frozen model reaches. For a recall requirement, a lower
 bound on its recall together with an upper bound on its false-positive rate. Two sources run by default whenever there
 are embeddings: `knn`, a 5-nearest-neighbor classifier, and `linear_probe`, a logistic-regression probe.
 
-**How it is built.** Each model is fitted on the fit split's representation and labels only, then frozen and scored once
+How it is built: each model is fitted on the fit split's representation and labels only, then frozen and scored once
 on the audit split. Accuracy uses each unit's correctness (a group's mean or total on video data). AP for a class uses a
 staircase under the model's precision–recall curve (Davis and Goadrich, 2006): at score thresholds fixed from the fit split,
 it combines a lower bound on true positives and an upper bound on false positives with an upper bound on the
 prevalence. The thresholds are the 5% to 95% quantiles of the fit-split positives' scores when the class's fit-split
 prevalence is below 0.15 and the fit split holds positives, and of all fit-split scores otherwise.
 
-**Unavailable when** a model cannot be fitted on the fit split or cannot score the audit, for example with a single class
+Unavailable when a model cannot be fitted on the fit split or cannot score the audit, for example with a single class
 in the fit split (`witness_not_fitted`).
 
-**Assumptions.** The representation was fitted and selected independently of the audit units' labels (declared by you,
+Assumptions: the representation was fitted and selected independently of the audit units' labels (declared by you,
 `representation_independent_of_audit_labels`), and the model was fitted on the fit split only and frozen before the
 audit.
 
 ### User witnesses (`user_model`)
 
-**What it bounds.** The same quantities as a built-in witness, for your own frozen model.
+What it bounds: the same quantities as a built-in witness, for your own frozen model.
 
-**How to supply it.** `predictions=` is either class scores, shape `(len(dataset), n_classes)`, aligned with the dataset
+How to supply it: `predictions=` is either class scores, shape `(len(dataset), n_classes)`, aligned with the dataset
 and finite, or class decisions: a 1-D integer array with one declared-class index per item. An index outside the declared
 classes is refused, and so is a boolean or float array, which would silently be read as classes 0 and 1. `model=` takes
 a MAITE model in its place. DataEval runs it over the whole dataset in batches of `batch_size`, which you set with
@@ -289,7 +289,7 @@ The scores follow the dataset's declared class order. That is an assumption (`cl
 `model=` brings its own `index2label` in its `metadata`. If both declare one and they differ, the call raises a
 `ValueError`, because DataEval never remaps one to the other.
 
-**Assumptions.** A demonstration assumes the model was trained without the audit units and frozen before scoring them
+Assumptions: a demonstration assumes the model was trained without the audit units and frozen before scoring them
 (`model_independent_of_audit_items`). With class decisions, it adds that the decisions follow a policy frozen before the
 audit.
 
@@ -478,14 +478,14 @@ the [Performance limits](PerformanceLimits.md#limitations) page.
 
 ## Related concept pages
 
-- [Performance limits](PerformanceLimits.md) — what Feasibility answers, why, and how it relates to BER, UAP and
+- [Performance limits](PerformanceLimits.md): what Feasibility answers, why, and how it relates to BER, UAP and
   Sufficiency
-- [Embeddings](Embeddings.md) — the representation that local panels partition and the built-in witnesses read
-- [Acting on results](ActingOnResults.md) — what to do with a non-final determination
+- [Embeddings](Embeddings.md): the representation that local panels partition and the built-in witnesses read
+- [Acting on results](ActingOnResults.md): what to do with a non-final determination
 
 ## See this in practice
 
-- [Assess whether a classification requirement is reachable](../notebooks/tt_assess_ic_feasibility.py) — vehicle type,
+- [Assess whether a classification requirement is reachable](../notebooks/tt_assess_ic_feasibility.py): vehicle type,
   vehicle category and tank recall requirements on MilitaryVehicles, the evidence behind each determination read as a table
   and a chart, and how to change a question the evidence cannot answer
 
