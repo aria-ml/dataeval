@@ -699,7 +699,7 @@ which caveats attach to each evaluator), see
 
 - [Metadata levels](MetadataLevels.md): the level a factor lives at is the level
   its bins are cut at, and why that keeps a bin number the same wherever it is read
-- [Dataset bias and coverage](DatasetBias.md): the evaluators that consume binned
+- [Dataset bias](DatasetBias.md): the evaluators that consume binned
   factors, and what each of them does with the integers
 - [Validation and trust](ValidationAndTrust.md#metadata-binning-a-policy-applied-to-every-factor):
   binning as one entry in the per-evaluator caveat inventory, alongside the

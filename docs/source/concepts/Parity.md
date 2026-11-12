@@ -11,7 +11,7 @@ experimental, and their API may change or be removed in a later release.
 
 {class}`.Balance` measures the same factor–class dependence as a normalized
 mutual information score (see
-[Dataset bias and coverage](DatasetBias.md#measuring-bias-mutual-information-and-evenness)).
+[Dataset bias](DatasetBias.md#measuring-bias-mutual-information-and-evenness)).
 Parity adds a hypothesis test, results for individual cells, and p-values that
 account for rows grouped into images or sequences.
 
@@ -885,9 +885,8 @@ In brief:
 
 ## Related concept pages
 
-- [Dataset bias and coverage](DatasetBias.md) — Balance and Diversity, which
-  score factor–class dependence and sampling evenness, and coverage in
-  embedding space
+- [Dataset bias](DatasetBias.md) — Balance and Diversity, which
+  score factor–class dependence and sampling evenness
 - [Binning](Binning.md) — how continuous factors are cut into the levels
   Parity tests
 - [Metadata levels](MetadataLevels.md) — the item levels Parity groups rows by

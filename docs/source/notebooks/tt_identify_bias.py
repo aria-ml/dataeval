@@ -557,7 +557,7 @@ assert size_diversity["swimmer"] > 0.7
 # %% [markdown]
 # ## Next steps
 #
-# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity
+# - [Dataset bias](../concepts/DatasetBias.md) — Learn about normalized mutual information and diversity
 #   indices for measuring dataset bias.
 # - [Add intrinsic factors to Metadata](./h2_add_intrinsic_factors.py) — Measure brightness, sharpness and other
 #   image statistics and add them to the metadata.

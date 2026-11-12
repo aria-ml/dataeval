@@ -502,7 +502,7 @@ assert all(first[name]["action"] == "augment" for name in thin[:3])
 #
 # - [Ontology](../concepts/Ontology.md) — Learn how hierarchies and taxons organize dataset class labels and target
 #   scopes.
-# - [Dataset bias and coverage](../concepts/DatasetBias.md) — Read about dispersion, isotropy, and representation
+# - [Dataset coverage](../concepts/DatasetCoverage.md) — Read about dispersion, isotropy, and representation
 #   metrics for assessing dataset coverage.
 # - [Assess an unlabeled data space](./tt_assess_data_space.py) — Discover coverage gaps, clusters, and outliers in
 #   unlabeled dataset embeddings.

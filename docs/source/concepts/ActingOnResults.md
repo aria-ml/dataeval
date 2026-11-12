@@ -298,7 +298,7 @@ Read completeness alongside the isotropy score returned by the same call
 before deciding what to collect. Both divide the same effective dimensionality
 $d_\text{eff} = e^H$, completeness by the ambient dimensionality and isotropy by
 the numerical rank, so the pair separates two different shortfalls (see
-[Completeness and isotropy](DatasetBias.md#measuring-coverage-geometry-in-embedding-space)):
+[Completeness and isotropy](DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space)):
 
 - Low completeness, high isotropy: the data occupies a small subspace but fills
   it evenly. The missing variation may be in factors the current collection never
@@ -692,8 +692,8 @@ within the expected envelope or threatens the estimated performance bounds.
   statistics diagnostics measure
 - [Clustering](Clustering.md): the algorithm underlying cluster-based
   Duplicates, Outliers, label_errors, and Prioritize
-- [Dataset bias and coverage](DatasetBias.md): what the bias diagnostics
-  measure
+- [Dataset bias](DatasetBias.md) and [Dataset coverage](DatasetCoverage.md): what the bias and coverage
+  diagnostics measure
 - [Performance limits](PerformanceLimits.md): what BER, UAP, and Sufficiency
   tell you about achievability
 - [Distribution shift](DistributionShift.md): what drift and OOD detection

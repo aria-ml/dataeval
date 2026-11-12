@@ -385,7 +385,7 @@ and the calibrated read is the better one.
 ## Related concept pages
 
 - [Binning](Binning.md): what binning is, how DataEval places the edges, and the limits of the automatic path
-- [Dataset bias and coverage](DatasetBias.md): the evaluators that consume binned factors
+- [Dataset bias](DatasetBias.md): the evaluators that consume binned factors
 - [Parity](Parity.md): the contingency-table test that the temperature example uses
 
 ## See this in practice

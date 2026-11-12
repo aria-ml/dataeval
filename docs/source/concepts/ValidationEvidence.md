@@ -71,7 +71,7 @@ and the extractor in use, and a static table would go stale silently.
 
 ### Dataset bias
 
-See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
+See {doc}`Dataset Bias <DatasetBias>` for what these measure.
 
 :::{list-table}
 :widths: 13 21 15 21 30
@@ -172,7 +172,7 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for what these measure.
 
 ### Dataset scope
 
-See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
+See {doc}`Dataset Coverage <DatasetCoverage>` for coverage, and
 {doc}`Acting on Results <ActingOnResults>` for how to act on a prioritization.
 
 :::{list-table}
@@ -190,7 +190,7 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
     the per-class dispersion, isotropy, and near-duplicate signals it adds are
     DataEval's own. `isotropy` is {func}`.completeness`'s effective-dimension
     estimate applied per class; see that row below for its lineage. See
-    [Measuring coverage](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
+    [Measuring coverage](DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space).
   - Internal only
   - `method="adaptive"` and `num_observations=20` set the radius (the latter is
     Sudman's 20-50 guidance). `percent=0.01` is the fraction reported as
@@ -210,7 +210,7 @@ See {doc}`Dataset Bias and Coverage <DatasetBias>` for coverage, and
     ([Sorscher et al., 2022](https://arxiv.org/abs/2206.14486);
     [Abbas et al., 2024](https://arxiv.org/abs/2401.04578);
     [Zheng et al., 2023](https://arxiv.org/abs/2210.15809)). See
-    [Prioritization](DatasetBias.md#prioritization-as-coverage-driven-data-selection).
+    [Prioritization](DatasetCoverage.md#prioritization-as-coverage-driven-data-selection).
   - Internal only
   - `method="knn"` selects the ranking criterion; `policy="difficulty"` and
     `order="easy_first"` the selection rule on top of it; `num_bins=50` the
@@ -450,14 +450,14 @@ statistical and computational.
 - - {func}`.completeness`
   - Effective dimensionality $d_\text{eff} = e^H$ over the covariance
     eigenvalues: the eigenvalue form of the effective rank of
-    [Roy & Vetterli (2007)](DatasetBias.md#references), also used by
-    [Kim et al. (2023)](DatasetBias.md#references) and
-    [Zhuo et al. (2023)](DatasetBias.md#references), and the entropy-based
+    [Roy & Vetterli (2007)](DatasetCoverage.md#references), also used by
+    [Kim et al. (2023)](DatasetCoverage.md#references) and
+    [Zhuo et al. (2023)](DatasetCoverage.md#references), and the entropy-based
     sibling of the participation ratio
-    ([Gao et al., 2017](DatasetBias.md#references)). All four are cited in the
+    ([Gao et al., 2017](DatasetCoverage.md#references)). All four are cited in the
     docstring. The two normalizations are DataEval's own: $d_\text{eff}/d$
     (completeness) and $d_\text{eff}/r$ (isotropy). See
-    [Completeness and isotropy](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
+    [Completeness and isotropy](DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space).
   - Internal only
   - Measures how the data fills the embedding's dimensions, not whether the
     embedding is semantically right. The two scores are not directly comparable
@@ -468,7 +468,7 @@ statistical and computational.
     [Asudeh et al. (2021)](https://dl.acm.org/doi/abs/10.1145/3448016.3457315),
     with the 20-50 observation guidance from Sudman (1976), both cited in the
     docstrings. See
-    [Measuring coverage](DatasetBias.md#measuring-coverage-geometry-in-embedding-space).
+    [Measuring coverage](DatasetCoverage.md#measuring-coverage-geometry-in-embedding-space).
   - Internal only
   - Undefined below a minimum sample count. The naive and adaptive radii
     answer different questions; they are not interchangeable.

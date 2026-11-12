@@ -596,8 +596,8 @@ embedding space.
 
 All drift detectors require a stable and representative reference dataset. If
 the reference is itself biased or unrepresentative of the operational range, the
-detector will have a miscalibrated baseline. See the [Dataset bias and
-coverage](DatasetBias.md) concept page for guidance on assessing reference
+detector will have a miscalibrated baseline. See the [Dataset bias](DatasetBias.md) and [Dataset
+coverage](DatasetCoverage.md) concept pages for guidance on assessing reference
 quality.
 
 Statistical drift tests produce p-values and not certainties. A very large batch
@@ -685,7 +685,7 @@ To decide what to do after detecting drift or OOD samples, see
   distribution gaps
 - [Data integrity](DataIntegrity.md): when anomalous samples are a
   collection artifact rather than an operational distribution shift
-- [Dataset bias and coverage](DatasetBias.md): when the training reference
+- [Dataset bias](DatasetBias.md) and [Dataset coverage](DatasetCoverage.md): when the training reference
   distribution is itself unrepresentative, drift detection baselines are
   miscalibrated
 - [Performance limits](PerformanceLimits.md): when persistent shift indicates

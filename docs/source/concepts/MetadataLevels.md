@@ -501,7 +501,7 @@ what granularity was this measured?" is a level question.
   does to them, and why the cut points are a choice rather than a detail.
 - [Image statistics](ImageStatistics.md): more factors that can be calculated
   from raw data and added to Metadata on demand.
-- [Dataset bias and coverage](DatasetBias.md): the evaluators that consume
+- [Dataset bias](DatasetBias.md): the evaluators that consume
   {class}`.Metadata`, and where the choice of view changes what they measure.
 - [Ontology](Ontology.md): the other graph, over label concepts rather than
   granularities.

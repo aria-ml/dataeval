@@ -232,7 +232,7 @@ and how each can mislead a metric.
 ## Related concept pages
 
 - [Clustering](Clustering.md): how the data are grouped in the embedding space
-- [Dataset bias and coverage](DatasetBias.md): how coverage and completeness
+- [Dataset coverage](DatasetCoverage.md): how coverage and completeness
   analyze the embedding space
 - [Distribution shift](DistributionShift.md): monitoring shifts in the embedding space
 - [Validation and trust](ValidationAndTrust.md#feature-extractors-a-dependency-of-both-layers):

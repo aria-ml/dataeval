@@ -191,7 +191,7 @@ everywhere (below) still counts, because it was tested.
 
 Levels rare everywhere are not outliers. A class that is rare in every stratum
 is a finding about the dataset's balance (see
-[Dataset bias and coverage](DatasetBias.md)). [Das & Schneider (2007)](#ref3)
+[Dataset bias](DatasetBias.md)). [Das & Schneider (2007)](#ref3)
 make the same argument (a pairing that is rare because both of its parts are
 rare "can be explained") and divide by the marginal frequencies to remove it.
 That correction fails a common video case: with 100 sequences each captured on
