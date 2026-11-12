@@ -13,7 +13,7 @@ dataset inflated with near-duplicates from a single collection event may pass va
 deployed on a different sensor platform or in a different environment. Problems found before training are typically
 less costly to correct than problems found after deployment ([Polyzotis et al., 2017](#ref2)).
 
-## What is it
+## What data integrity is
 
 Data integrity is a property of a dataset assessed along several dimensions, not a single metric. A dataset has high
 integrity when its samples are loadable, non-redundant, within the expected statistical range, and relevant to the
@@ -172,7 +172,10 @@ The **information density** of a training set is the ratio of novel signal to to
 lower it.
 
 Consider a training set of $N$ samples, of which a fraction $r$ are near-duplicates of existing samples. The effective
-number of unique training examples is $N(1 - r)$. The duplicate samples still contribute gradients during training, but
+number of unique training examples is $N(1 - r)$. This is the approximate number
+that remains after deduplication under the chosen similarity criterion and is not
+a statistical effective sample size: dependencies can remain among samples that
+are unique under that criterion. The duplicate samples still contribute gradients during training, but
 those gradients largely repeat information already contributed by the originals. At minimum this wastes compute. For
 near-identical samples it can also bias the gradient toward the over-represented region of the input space, which
 re-weights the loss without the practitioner being aware of it.

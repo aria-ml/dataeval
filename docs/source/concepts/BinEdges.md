@@ -107,9 +107,8 @@ than set by you. Two things follow:
   above freezing" in the spring data. The integer is the same and the meaning is
   not.
 
-The second effect propagates to every downstream score. A {class}`.Diversity` index over a
-three-letter alphabet is not on the same scale as one over a four-letter
-alphabet, and a {class}`.Balance` score that moved between the two collections
+The second effect propagates to every downstream score. A {class}`.Diversity` index over three categories is not on
+the same scale as one over four categories, and a {class}`.Balance` score that moved between the two collections
 may be reporting a change in the road or only a change in where the cuts fell,
 with nothing in either output to tell you which. Anything that reads
 `factor_data` inherits this; {func}`.factor_deviation` and
@@ -123,6 +122,11 @@ comparable across collections because its vocabulary is now fixed by you rather
 than derived per dataset.
 [The bin count is a function of the data, not a setting](Binning.md#the-bin-count-is-a-function-of-the-data-not-a-setting)
 has the measurements behind this.
+
+A cut at a meaningful threshold fixes what the bins mean. It does not show that the sample holds the intended mix of
+conditions. A Parity or Balance result that finds the class independent of the freezing factor describes the
+association in the collected sample. Whether the share of images below freezing is the share that the operation calls
+for is a question about the intended operating population, and the cuts do not answer it.
 
 ### Other externally defined thresholds
 

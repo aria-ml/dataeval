@@ -21,7 +21,7 @@ against it), **alignment** (relating two vocabularies through it), and
 the formal knowledge-representation standards it derives from and the language
 working computer-vision practitioners use day to day.
 
-## What is it
+## What an ontology is
 
 In the formal sense established by [Gruber (1993)](#ref1), an ontology is "an
 explicit specification of a conceptualization", meaning a declared inventory of

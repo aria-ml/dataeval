@@ -4,7 +4,9 @@
 
 This page describes how DataEval measures dataset bias with a dataset's metadata factors and class labels. It covers
 the association between class labels and factors, the evenness of sampling across a factor, the test of that
-association and the correction of an imbalance. It also states what each result does and does not establish.
+association and the correction of an imbalance. It also states what each result does and does not establish. Balance,
+evenness and the association between labels and factors describe the dataset's own sampling. By themselves they do not
+show that the dataset matches the intended operational population, which the practitioner defines.
 
 Dataset readiness assessment considers five properties with respect to a dataset's known factors. Each is judged
 against the operational population and is not an ideal that every dataset must meet.
@@ -307,6 +309,12 @@ datasets.
 For multi-label datasets (object detection, segmentation), images containing
 multiple classes receive a weight derived by aggregating the repeat factors of
 all classes they contain, using either the mean or maximum.
+
+A rebalanced subset serves training and evaluation differently. For training, it changes the class mix that the
+model learns from. For evaluation, the class frequencies set the prevalence that accuracy, precision and similar
+metrics depend on. An unweighted metric on a rebalanced evaluation subset estimates performance under the rebalanced
+mix and not under the operational mix, unless the estimate is weighted back to the operational frequencies or the
+estimand is stated. The composition and the weights of an evaluation set belong to the evaluation protocol.
 
 ## Interpretation
 

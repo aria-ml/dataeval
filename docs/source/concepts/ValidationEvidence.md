@@ -11,7 +11,7 @@ dependencies shared by every evaluator.
 
 ### Data quality
 
-See {doc}`Data Integrity <DataIntegrity>` for what these measure.
+See {doc}`Data integrity <DataIntegrity>` for what these measure.
 
 :::{list-table}
 :widths: 13 21 15 21 30
@@ -71,7 +71,7 @@ and the extractor in use, and a static table would go stale silently.
 
 ### Dataset bias
 
-See {doc}`Dataset Bias <DatasetBias>` for what these measure.
+See {doc}`Dataset bias <DatasetBias>` for what these measure.
 
 :::{list-table}
 :widths: 13 21 15 21 30
@@ -88,16 +88,16 @@ See {doc}`Dataset Bias <DatasetBias>` for what these measure.
     scikit-learn.
   - Delegated (MI estimation); Internal only (normalization)
   - `class_imbalance_threshold=0.3` and `factor_correlation_threshold=0.5`
-    decide what is reported as imbalanced or entangled. `num_neighbors=5` is
-    deprecated and will be removed in v1.2.0: it sets the MI estimator's
-    neighborhood, and every column arriving from a {class}`.Metadata` is already
-    binned and so never reaches the neighbor-based estimator. Setting it warns.
-  - Declares every factor discrete, so the result depends on a binning you may
-    not have chosen. See
+    decide what is reported as imbalanced or entangled. `num_neighbors=5` sets
+    the neighborhood of the estimator that reads measured factor values, and has
+    no effect on a factor read as codes. `factor_source="auto"` chooses, for each
+    factor, between codes and measured values.
+  - A factor whose cut was declared, requested by count or accepted is read as
+    codes, so the result depends on that cut, which you may not have chosen. See
     [Metadata binning](ValidationAndTrust.md#metadata-binning-a-policy-applied-to-every-factor).
-    The class-to-factor values are corrected for chance; the factor-to-factor
-    block is not, so at small n, or with a factor binned into many more bins
-    than the sample supports, that block looks more entangled than it is.
+    A value scored from codes is corrected for chance. A value that reads a
+    measured factor is not, and the `scored_as` column of `factors` records which
+    regime scored each pair.
 - - {class}`.Diversity`
   - Shannon and inverse-Simpson indices
     ([Hill, 1973](DatasetBias.md#references);
@@ -172,8 +172,8 @@ See {doc}`Dataset Bias <DatasetBias>` for what these measure.
 
 ### Dataset scope
 
-See {doc}`Dataset Coverage <DatasetCoverage>` for coverage, and
-{doc}`Acting on Results <ActingOnResults>` for how to act on a prioritization.
+See {doc}`Dataset coverage <DatasetCoverage>` for coverage, and
+{doc}`Acting on results <ActingOnResults>` for how to act on a prioritization.
 
 :::{list-table}
 :widths: 13 21 15 21 30
@@ -232,7 +232,7 @@ See {doc}`Dataset Coverage <DatasetCoverage>` for coverage, and
 
 ### Distribution shift
 
-See {doc}`Distribution Shift <DistributionShift>` for what these measure and
+See {doc}`Distribution shift <DistributionShift>` for what these measure and
 how to choose among them.
 
 :::{list-table}
@@ -354,7 +354,7 @@ shift may be harmless and an undetected one may not be.
 
 ### Performance
 
-See {doc}`Performance Limits <PerformanceLimits>`.
+See {doc}`Performance limits <PerformanceLimits>`.
 
 :::{list-table}
 :widths: 13 21 15 21 30

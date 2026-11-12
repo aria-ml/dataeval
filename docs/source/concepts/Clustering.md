@@ -8,7 +8,7 @@ outputs mean, helps you interpret results from {class}`.Duplicates` (cluster
 mode), {class}`.Outliers` (cluster mode), {func}`.label_errors`, and all five
 methods of {class}`.Prioritize`.
 
-## What is it
+## What clustering is
 
 Clustering partitions a set of embeddings into groups (clusters) such that
 samples within a group are more similar to each other than to samples in other
@@ -52,7 +52,10 @@ predetermined number of clusters. The algorithm proceeds in stages:
    cluster center, so the final `clusters` array contains no -1 values. The
    `membership_strengths` array retains the original HDBSCAN confidence scores.
    A low membership strength on a sample assigned to a cluster means HDBSCAN
-   originally considered it borderline.
+   originally considered it borderline. A `clusters` array without -1 does not
+   show that the data holds no outliers: a reassigned sample carries its label
+   because of its nearest center, and not because it met the density criterion
+   that defines a cluster.
 
 `min_cluster_size` is the key hyperparameter. DataEval sets it adaptively from
 the number of samples, or from the expected number of clusters when one is
@@ -77,7 +80,10 @@ strength.
 
 KMeans is appropriate when you have strong prior knowledge about the number of
 clusters (for example, when it equals the number of classes in a classification
-problem) or when cluster shape is expected to be roughly spherical.
+problem) or when cluster shape is expected to be roughly spherical. Setting
+`n_clusters` to the number of classes is a heuristic and does not make the
+clusters correspond to the class labels. The result depends on the scale of the
+features, the initialization and the density geometry of the embedding.
 
 KMeans results are not reproducible without fixing the global random seed via
 `dataeval.config.set_seed()`. The k-means++ initialization draws random starting

@@ -12,7 +12,10 @@ sees.
 
 This is **distribution shift**: the gap between training distribution and
 operational distribution. It is common, and for systems with long fielded
-lifespans it is a planning assumption.
+lifespans it is a planning assumption. A shift is a difference between the
+data-generating conditions assumed during development and those observed in
+use. A detected difference becomes an operational conclusion only once the
+reference population and the time window are named.
 
 DataEval provides two related but distinct capabilities for managing this gap.
 **Drift detection** operates at the population level: it monitors whether a
@@ -61,15 +64,17 @@ over-predict the previously common class.
 input distribution is stable but the relationship between inputs and labels has
 changed:
 
-$$P_t(X) = P_d(X), \quad P_t(Y \mid X) = P_d(Y \mid X)$$
+$$P_t(X) = P_d(X), \quad P_t(Y \mid X) \neq P_d(Y \mid X)$$
 
-The learned decision boundaries are now wrong for the data they were trained on.
+This condition describes a change in the conditional distribution alone. The learned
+decision boundaries are now wrong for the data they were trained on.
 In long-lifecycle systems, concept drift can arise from changes in the targets
 themselves (a new vehicle variant that resembles an existing class but should be
 classified differently), changes in adversarial behavior, or changes in labeling
 standards.
 
-These three types are not mutually exclusive. Covariate shift can induce label
+These three types are models of shift and not exclusive categories of real
+deployments. Covariate shift can induce label
 shift; real-world shift events often involve all three simultaneously. The
 taxonomy is useful not because real shifts are pure examples of one type, but
 because it identifies what has changed and therefore what can be done about it.
@@ -79,8 +84,11 @@ because it identifies what has changed and therefore what can be done about it.
 Drift detection answers a population-level question: is this batch of incoming
 data drawn from the same distribution as my training data? All of DataEval's
 drift detectors follow the same two-phase pattern: a **fit** phase on reference
-(training) data, followed by repeated **predict** calls on operational batches,
-each returning a p-value and a binary drift flag.
+(training) data, followed by repeated **predict** calls on operational batches.
+Each call returns a drift flag, a distance or test statistic and the threshold it
+was compared against. The detectors built on a hypothesis test also report a
+p-value. {class}`.DriftWasserstein` reports a ratio instead of a p-value, and
+{class}`.DriftDomainClassifier` reports an AUROC.
 
 The choice of detector depends on the data representation and the nature of the
 expected shift. DataEval provides univariate tests for feature-by-feature
@@ -196,10 +204,13 @@ then measure how well it succeeds:
 
 $$\text{DC} = \text{AUROC}\!\left(C(X_\text{ref},\, X_\text{analysis})\right)$$
 
-An AUROC near 0.5 means the classifier cannot tell the two distributions apart:
-no drift. An AUROC approaching 1.0 means the distributions are highly
-distinguishable. DataEval uses LightGBM with stratified k-fold cross-validation
-to prevent overfitting. The domain classifier is particularly effective at
+An AUROC near 0.5 means this classifier could not tell the two datasets apart
+better than chance on these features. That does not rule out a shift in features
+the classifier does not use, or a shift too small to detect at the sample size.
+An AUROC approaching 1.0 means the datasets are highly distinguishable.
+DataEval uses LightGBM with stratified k-fold cross-validation, which limits
+overfitting and does not remove it. The `p_val` entry of the result holds the
+AUROC and is not a p-value. The domain classifier is particularly effective at
 detecting subtle non-linear shifts in joint feature distributions that MMD or
 univariate tests might miss, and it provides an intuitive magnitude score. Its
 cost is computational: it trains multiple classifiers per call.

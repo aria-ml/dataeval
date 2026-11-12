@@ -8,9 +8,10 @@ require. Shannon entropy and a {term}`chi-square test <Chi-Square Test of Indepe
 of bin boundaries affects the resulting distributions and can influence every downstream statistic computed from the
 factor.
 
-DataEval bins by default. {class}`.Metadata` {term}`discretizes <Discretization>` every factor before any evaluator
-reads it, so an evaluator receives integer codes and not altitudes, and the bias and diversity results describe the
-factors as binned.
+DataEval bins by default. {class}`.Metadata` {term}`discretizes <Discretization>` every factor into integer codes. Most
+evaluators read those codes and not altitudes, so their bias and diversity results describe the factors as binned.
+{class}`.Balance` reads the measured values of a factor whose cut nobody chose, as
+[Which consumers require it](#which-consumers-require-it) describes.
 
 This page covers what binning is and how it differs from the relabeling that discrete and categorical factors receive,
 why it matters and which evaluators depend on it, how DataEval places the edges, and how the cut shows up in results.
@@ -311,7 +312,7 @@ reasons: some mathematically, and one only where a cut was chosen.
   - Not applied
   - Both take a plain mapping of factor name to raw array and never touch
     `factor_data`, so they see the values you measured.
-- - {class}`.Outliers` over metadata factors (in development)
+- - {class}`.Outliers` over metadata factors
   - Never applied
   - A threshold over bin codes measures the bin edges, not the values. It
     reads raw values only, and the continuous/discrete heuristic below does

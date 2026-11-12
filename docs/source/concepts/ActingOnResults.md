@@ -35,13 +35,16 @@ D4 variants for rotation/flip invariance, or by cluster-based grouping in
 embedding space), and, for video, `segment`, `aligned`, and `redundant`.
 
 Exact duplicates are the least ambiguous finding, because they need no threshold. An image appearing twice adds no new
-information to training or evaluation. In training data, exact duplicates inflate the effective weight of those
+image content to training or evaluation. In training data, exact duplicates inflate the effective weight of those
 samples during gradient updates. In test data, they introduce data leakage if the duplicate also appears in training.
-Remove all but one instance per exact-match group. The exception is when exact duplicates appear with different labels.
-That is a label error and not a redundancy issue, and it requires human review before any removal. If the dataset
-carries targets, `Duplicates` surfaces this case directly: an exact-match group
-whose `differs_on` contains `"annotation"` is that label-error case, found
-without any manual cross-check.
+Review each exact-match group and apply a documented deduplication policy that fits the role of the dataset. In
+training data, keeping one instance per group removes the redundancy. In a test set, removing instances changes the
+prevalence of the repeated content and can invalidate a fixed evaluation protocol, so keep or account for repeated
+observations that the protocol counts as operational frequency, and remove a copy that also appears in training. The
+exception is when exact duplicates appear with different labels. That is a label error and not a redundancy issue, and
+it requires human review before any removal. If the dataset carries targets, `Duplicates` surfaces this case
+directly: an exact-match group whose `differs_on` contains `"annotation"` is that label-error case, found without any
+manual cross-check.
 
 Near-duplicates call for review. A perceptual hash match indicates that two images are
 visually similar but not pixel-identical, typically the same image with

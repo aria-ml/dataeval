@@ -5,7 +5,7 @@
 This page describes what embeddings are, why DataEval evaluators use them, and how to create them with DataEval's
 extractors.
 
-## What are they
+## What embeddings are
 
 An embedding is a high-dimensional vector representation of an image, produced by a feature extractor, typically a
 trained neural network. Instead of working with raw pixel values, machine learning systems use embeddings as compressed
@@ -15,10 +15,12 @@ domain it was trained on.
 An embedding transforms an image (millions of pixels) into a vector of typically 128 to 2048 dimensions. The
 dimensionality of these vectors affects their capabilities: higher-dimensional embeddings can capture more nuanced
 visual and semantic distinctions, while lower-dimensional embeddings are more efficient to compute and visualize but may
-lose subtle details. With a well-matched extractor, images with similar content map to nearby vectors. How closely that
-holds depends on the extractor and the data.
+lose subtle details. A higher dimension does not make the distinctions an embedding preserves relevant to a task. An
+embedding preserves the distinctions its extractor learned, which need not be the distinctions that matter for the
+mission, the target types, the weather or the sensor. With a well-matched extractor, images with similar content map to
+nearby vectors. How closely that holds depends on the extractor and the data.
 
-## Why are they important
+## Why embeddings matter
 
 Comparing images quantitatively requires a representation in which distance reflects similarity of content. Raw pixel
 operations such as image subtraction are dominated by variations that do not change content: lighting changes, small
@@ -52,7 +54,7 @@ object detection models may emphasize localized features and spatial relationshi
 learning objectives ([Chen et al., 2020](#ref2)) produce embeddings optimized for similarity comparisons, while those
 trained for reconstruction tasks may better preserve fine-grained visual details.
 
-## How are they used
+## How evaluators use embeddings
 
 Several DataEval evaluators operate on embeddings, during both development and deployment phases of the ML
 lifecycle. Embeddings enable geometric operations that can reveal patterns, similarities, and anomalies in image
@@ -215,7 +217,8 @@ lists them in one table.
 
 ## Interpretation and limitations
 
-An embedding is specific to the extractor that produced it. Distances, neighbors, and clusters describe the geometry of
+An embedding is specific to the extractor that produced it, including its checkpoint, its preprocessing and its
+normalization, which are part of the measurement. Distances, neighbors, and clusters describe the geometry of
 that extractor's output space and not a property of the images alone. Two extractors, or two layers of one model, give
 different geometries, so results computed from different extractors are not directly comparable. A distance does not
 state which image property drives it. Two images can be close for visual reasons, such as color and texture, or for

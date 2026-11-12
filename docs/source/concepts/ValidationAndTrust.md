@@ -50,7 +50,8 @@ The library is split into two layers, [Evaluators](#evaluators) and
 modes.
 
 - Core functions ({doc}`dataeval.core <../reference/autoapi/dataeval/core/index>`)
-  are stateless and observe raw data: a bound, a count, a distance,
+  are stateless and observe the data they are given, which can be images, metadata or
+  embeddings: a bound, a count, a distance,
   a distribution, with no threshold, prior, or recommendation attached.
   The trust question is: "is the math right, and do my data satisfy its
   assumptions?"
@@ -232,12 +233,13 @@ Two DataEval runs with different extractors are not comparable.
 
 ## Metadata binning: a policy applied to every factor
 
-Binning is not a preprocessing step, it is a policy choice. Many of the functions
+Binning encodes an analytical policy. Many of the functions
 and classes that consume a {class}`.Metadata` class require factor discretization.
 How the data is discretized matters, and that discretization is a hidden
-policy choice: applied by default, decisive for the data, and recorded nowhere
-in the output. A {class}`.Balance` score
-describes your factors as binned, not your factors. This is the metadata-side
+policy choice: applied by default, decisive for the data, and recorded in the
+output only as a fingerprint. Under the default `factor_source="auto"`, a
+{class}`.Balance` score describes a factor as binned where someone chose or
+accepted its cut, and as measured otherwise. This is the metadata-side
 counterpart to the extractor problem above: where embeddings are the largest
 uncontrolled variable in the geometric half of the library, binning is the
 largest one in the metadata half.
@@ -273,8 +275,8 @@ bear on trusting a result:
 - Missing values get a bin above the observed ones, whose position is an
   artifact of keeping the codes contiguous rather than a statement that missing
   is large. Anything treating a binned factor as ordinal reads that position as
-  a value. {class}`.Balance` does not, since it declares every column discrete,
-  and neither does {class}`.Parity`, whose test is nominal: it reads each code as
+  a value. {class}`.Balance` does not where it reads codes, since it tabulates
+  them as categories, and neither does {class}`.Parity`, whose test is nominal: it reads each code as
   an unordered category, never as a magnitude. For Parity the missing bin is
   still a level, so a factor whose missingness goes with the class shows up as
   an associated missing-value level. Where the missing rate is material, check
@@ -300,11 +302,14 @@ bear on trusting a result:
     coarser bins avoid the sparse cells reported as `too_thin` in
     {attr}`.ParityOutput.cells`, at the cost of resolution.
 - - {class}`.Balance`
-  - Required in practice
-  - It passes `Metadata.factor_data`, which is bin and category indices
-    throughout, so the information lost at the binning step cannot be recovered
-    downstream and nothing in the output says it happened. Binning reaches the
-    three DataFrames unequally: `balance` and `classwise` divide by the class
+  - Applied where a cut was chosen
+  - Under `factor_source="auto"`, a factor whose cut was declared, requested by
+    count or accepted is read from `Metadata.factor_data`, which is bin and
+    category indices, so the information lost at the cut cannot be recovered
+    downstream. A factor whose cut nobody chose is read from its measured
+    values, and the `scored_as` column of `factors` records which regime scored
+    each pair. See [Binning](Binning.md#which-consumers-require-it) for the rule.
+    Binning reaches the three DataFrames unequally: `balance` and `classwise` divide by the class
     label's entropy, which is never binned, so their scores converge as a factor
     is cut more finely; `factors` compares two possibly-binned factors and is
     scored so its denominator no longer grows with a bin count you did not
@@ -338,7 +343,12 @@ bear on trusting a result:
   what they were, and nothing records the extractor at all. Keep
   {meth}`.Metadata.export_encoding`'s descriptor alongside the result for the
   binning; comparability of an embedding-based result still rests entirely on
-  what was recorded outside DataEval.
+  what was recorded outside DataEval. A record that supports an audit of an
+  embedding-based result names the extractor's architecture and version, its
+  checkpoint or an artifact digest, the preprocessing and resizing, the
+  normalization, the random seeds, the sampling unit, the metadata mapping and the
+  DataEval version. A digest detects that an artifact changed and does not
+  reconstruct the environment that produced it.
 - The automatic path announces itself. Structuring raises a `UserWarning`
   naming every factor it binned unasked, because the per-factor WARNING it also
   writes to the `dataeval.metadata` logger is silenced by the `NullHandler`
@@ -356,7 +366,9 @@ These describe DataEval's verification of its own code, not the standing of the
 underlying method in the literature. A method can be well established in the
 literature and still be `Internal only` here: that combination means the theory
 is sound and the implementation has not been checked against a second
-implementation.
+implementation. A level also does not establish external validity: verification
+against constructed inputs and known values does not show that a result is valid for a
+given mission, operating population or embedding extractor.
 
 :::{list-table}
 :widths: 18 82
@@ -710,16 +722,16 @@ a research frontier.
   contraindications of every evaluator and core function
 - {doc}`Embeddings <Embeddings>`: the largest uncontrolled variable in any
   DataEval assessment; read this before trusting any embedding-based result
-- {doc}`Acting on Results <ActingOnResults>`: what to do with a finding, and
+- {doc}`Acting on results <ActingOnResults>`: what to do with a finding, and
   which findings do not warrant action
-- {doc}`Data Integrity <DataIntegrity>`,
-  {doc}`Dataset Bias <DatasetBias>`, {doc}`Dataset Coverage <DatasetCoverage>`,
-  {doc}`Performance Limits <PerformanceLimits>`,
-  {doc}`Distribution Shift <DistributionShift>`,
+- {doc}`Data integrity <DataIntegrity>`,
+  {doc}`Dataset bias <DatasetBias>`, {doc}`Dataset coverage <DatasetCoverage>`,
+  {doc}`Performance limits <PerformanceLimits>`,
+  {doc}`Distribution shift <DistributionShift>`,
   {doc}`Divergence <Divergence>`, {doc}`Clustering <Clustering>`,
   {doc}`Ontology <Ontology>`: the theory behind each feature, with each
   page's own references
-- {doc}`Data Leakage <Leakage>`: why an assessment can be internally valid and
+- {doc}`Data leakage <Leakage>`: why an assessment can be internally valid and
   still not generalize
 
 ## References

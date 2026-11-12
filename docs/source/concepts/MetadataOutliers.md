@@ -168,6 +168,10 @@ the number reported, because it reads directly as "this level occurs in at most
 this share of its stratum". Every row of a level within a stratum shares one
 test, so the unit of the test is the (stratum, level) cell.
 
+The test treats the rows of a stratum as independent draws. Correlated frames, such as a burst from one event, make it
+count one event as several observations, so a bound computed over frames is narrower than the evidence supports. See
+[Limitations](#limitations).
+
 The defaults are rarity $p = 0.05$ at 95 % confidence ($\alpha = 0.05$). The
 confidence level follows the conventional limit used for zero- and
 small-numerator bounds ([Hanley & Lippman-Hand, 1983](#ref2)). The rarity is a

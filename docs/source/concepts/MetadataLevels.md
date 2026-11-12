@@ -12,7 +12,7 @@ readings and an image with one contributes a single reading, so any statistic co
 weighted by detection count. Aggregating fine values up (averaging the box areas per image) removes the individual
 detections as units of analysis.
 
-{class}`.Metadata` avoids the choice. It keeps every fact at the granularity it was measured, in one dataframe with
+{class}`.Metadata` avoids the choice. It keeps every fact at the granularity it was measured, in one data frame with
 rows of several kinds, and records how those kinds relate. Those kinds are called **levels**, and this page explains
 what they are, the graph that connects them, and why much of what {class}`.Metadata` does follows from that graph. The
 behavior of each method is documented on the method; this page covers the ideas behind them.
@@ -135,6 +135,11 @@ Propagation manages the replication problem described at the top of this page an
 factor is replicated when read from detection rows, and its marginal distribution there is weighted by
 detections-per-image. Levels make it possible to read the factor at its own level instead: {meth}`.Metadata.at` reads
 the same factor once per image, and the weighting is gone.
+
+Reading a factor at its own level does not make the rows at a finer level independent observations. Frames that carry
+the value of one video-level source share it, so a significance test or a count over frames treats correlated rows as
+independent. Choose the sampling unit of the analysis and group the rows that belong to one clip, sequence, sensor or
+platform. [Parity](Parity.md#effective-groups) does this with its `groups` argument.
 
 ### Propagation is what lets levels be compared
 

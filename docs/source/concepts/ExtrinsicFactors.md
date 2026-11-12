@@ -37,10 +37,10 @@ Below is a summary of the extrinsic factors recommended for `Metadata`, their le
 | Compression | Codec name                                        | sequence                           | categorical           |
 | Compression | Interlacing                                       | sequence                           | categorical           |
 | Compression | Chroma subsampling and bit depth                  | sequence                           | categorical           |
-| Compression | GOP length                                        | sequence                           | numeric               |
+| Compression | Group-of-pictures (GOP) length                    | sequence                           | numeric               |
 | Compression | Variable GOP                                      | sequence                           | categorical           |
-| Compression | Frame independence (`I`, `P`, `B`)                | unit                               | categorical           |
-| Compression | Level of compression (bits per frame)             | unit                               | numeric               |
+| Compression | Frame prediction type (`I`, `P`, `B`)             | unit                               | categorical           |
+| Compression | Compressed frame size (bits per frame)            | unit                               | numeric               |
 | Platform    | Camera type, platform type                        | sequence                           | categorical           |
 | Platform    | Weather                                           | sequence (static) or unit (moving) | numeric / categorical |
 | Platform    | Location: `latitude`, `longitude`, country, biome | sequence (static) or unit (moving) | numeric / categorical |
@@ -66,8 +66,12 @@ computing.
 | Chroma subsampling and bit depth        | Pixel format, such as `yuv420p` or `yuv422p10le`     | sequence |
 | GOP length                              | Average length of each group of pictures             | sequence |
 | Variable GOP                            | Whether the GOP length varies                        | sequence |
-| Frame independence                      | Frame type: `I`, `P` or `B`                          | unit     |
-| Level of compression                    | Compressed size of each frame, in bits               | unit     |
+| Frame prediction type                   | Frame type: `I`, `P` or `B`                          | unit     |
+| Compressed frame size                   | Size of each compressed frame, in bits               | unit     |
+
+The compressed frame size is a proxy for compression. Scene complexity, resolution, codec and encoder settings
+influence it as well, so it is not a calibrated compression level across cameras and scenes. A `P` or `B` frame is
+predicted from reference frames, and an `I` frame is not.
 
 All of these can be read with `ffprobe`. The helper below is used by the snippets on this page:
 
@@ -97,8 +101,8 @@ Frame type, compressed size, and the GOP statistics derived from them are frame 
 
 ```python
 frames = ffprobe(video, "frame=pict_type,pkt_size", "frames", "v:0")
-frame_type = [f["pict_type"] for f in frames]  # frame independence
-bits_per_frame = [8 * int(f["pkt_size"]) for f in frames]  # level of compression
+frame_type = [f["pict_type"] for f in frames]  # frame prediction type
+bits_per_frame = [8 * int(f["pkt_size"]) for f in frames]  # compressed frame size
 
 i_frames = [i for i, t in enumerate(frame_type) if t == "I"]
 gaps = [b - a for a, b in zip(i_frames, i_frames[1:])]
@@ -196,7 +200,9 @@ lat = None if v in (None, b"\x80\x00\x00\x00") else int.from_bytes(v, "big", sig
 
 :::{important}
 In a MISB-compliant system an item is sent only when its value changes, so not every item appears in every packet. To
-build a per-frame table, carry the last known value forward.
+build a per-frame table, carry the last known value forward. Carry a value forward only within one source and one
+timebase, and not across a gap in the stream. A value carried across either boundary labels frames with a condition
+that was not measured for them.
 :::
 
 ## Time
