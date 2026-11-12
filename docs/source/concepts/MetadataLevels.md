@@ -155,6 +155,14 @@ holds each object's brightness beside the brightness of the scene behind it. Rea
 one value per image, unweighted by detection count. No `instance_background_brightness` factor exists: a detection has
 no background of its own, and DataEval does not copy its image's value into a new instance-level factor.
 
+{func}`.image_stats` returns one row for each image and one for each detection. A statistic that applies to only one
+kind arrives with NaN on the other kind's rows: a background statistic is NaN on every detection row, and a statistic
+of a detection alone is NaN on every full-image row. When
+{meth}`.Metadata.add_factors` splits the result into `unit_<name>` and `instance_<name>`, it drops the half that holds
+no value at all, and it records the dropped name in {attr}`.Metadata.dropped_factors` with the reason
+`no_values_at_level`. An instance-only statistic therefore appears as `instance_<name>` alone, and a background
+statistic as `unit_<name>` alone.
+
 ## Levels in tracking datasets
 
 For image-based tasks the graph is a chain, and the rules above are all there is. Tracking makes it a DAG rather than a
