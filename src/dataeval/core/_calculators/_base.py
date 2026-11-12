@@ -176,6 +176,15 @@ class Calculator(ABC, Generic[TFlag]):
         return needs
 
     @classmethod
+    def flags_with_needs(cls, flags: TFlag) -> TFlag:
+        """Return the subset of `flags` whose statistics read the image's other boxes, so have no value off a box."""
+        kept = type(flags)(0)
+        for flag, handler in cls._handlers_for(flags).items():
+            if handler.needs:
+                kept |= flag
+        return kept
+
+    @classmethod
     def stat_names(cls, flags: TFlag) -> set[str]:
         """Return the statistic names `flags` would produce from this calculator."""
         return {handler.name for handler in cls._handlers_for(flags).values()}

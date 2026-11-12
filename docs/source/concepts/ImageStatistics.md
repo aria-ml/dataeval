@@ -148,22 +148,22 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
-the blur statistics, which are edge widths in pixels. It leaves the pixel statistics, the channel count and the hashes
-alone, so resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing
-at source resolution.
-The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the two overlap
-they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now
-describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
-responses.
+the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
+clipped to the new canvas and those left outside it are dropped. It leaves the pixel statistics, the channel count and
+the hashes alone, so resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than
+hashing at source resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked
+for, and where the two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked.
+The invalidated statistics now describe the transform. [Respond to a
+StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three responses.
 
-The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, because an arbitrary
-transform can change any statistic. {class}`.SelectChannels` with `"gray"` declares the blur statistics too, because a
-luminance mix changes which picture is read. Random transforms are seeded for each datum from the datum's `id`, so the
-view is stable: the statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice
-gives identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its
-sidecar, because provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
-`v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is one more
-reason to prefer the curated operations.
+The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial statistics
+included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"` declares the blur statistics
+too, because a luminance mix changes which picture is read. Random transforms are seeded for each datum from the datum's
+`id`, so the view is stable: the statistics pass, the embedding pass and the duplicates pass see the same pixels, and
+iterating twice gives identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable
+from its sidecar, because provenance records the `repr` of each operation. A curated operation has a `repr` you can
+paste back. A `v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is
+one more reason to prefer the curated operations.
 
 ## Related concept pages
 

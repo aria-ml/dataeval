@@ -149,6 +149,18 @@ class TestQualityGate:
         with pytest.raises(ValueError, match="numeric"):
             QualityGate(stat, min=0.0)
 
+    @pytest.mark.parametrize("stat", ["nn_distance_norm", "box_in_image_fraction"])
+    def test_a_statistic_that_compares_a_box_with_its_peers_is_refused(self, stat):
+        """A gate measures whole frames with no boxes, so such a statistic would read NaN and keep every frame."""
+        _numeric_scalar_stats.cache_clear()
+        try:
+            assert stat not in _numeric_scalar_stats()
+            with pytest.raises(ValueError, match="peers"):
+                QualityGate(stat, min=0.0)
+            assert {"brightness", "contrast", "darkness", "sharpness"} <= set(_numeric_scalar_stats())
+        finally:
+            _numeric_scalar_stats.cache_clear()
+
     def test_the_supported_set_holds_the_visual_scalars(self):
         assert {"brightness", "contrast", "darkness", "sharpness"} <= set(_numeric_scalar_stats())
 

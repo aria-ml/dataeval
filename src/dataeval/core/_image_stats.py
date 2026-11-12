@@ -1004,7 +1004,8 @@ def image_stats(  # noqa: C901
         each box (if per_target=True).
     per_target : bool, default True
         If True and boxes are provided, compute statistics for each bounding box.
-        Has no effect when boxes is None. At least one of per_image, per_target or
+        Has no effect when boxes is None, except that a request for nothing but `ImageStats.SPATIAL` statistics
+        then raises, since they have no box rows to be measured on. At least one of per_image, per_target or
         per_background must be True.
     per_background : bool, default False
         If True and boxes are provided, additionally compute statistics over each
@@ -1022,7 +1023,7 @@ def image_stats(  # noqa: C901
 
         Only :attr:`~dataeval.flags.ImageStats.PIXEL` and
         :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are computed for the
-        background; any hash or dimension statistics in `stats` are computed for the
+        background; any hash, dimension or spatial statistics in `stats` are computed for the
         image and its boxes as usual and skipped for the background, which has no
         meaningful hash and no geometry of its own. The blur statistics are
         skipped for the background too, because their filters would spread the masked
@@ -1131,9 +1132,29 @@ def image_stats(  # noqa: C901
         - invalid_box_count: Sequence[int] - Invalid box counts per image
         - image_count: int - Total number of images processed
         - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
+        - details: Mapping[str, NDArray] - Facts about how the statistics were measured, one value per row of
+          `stats`, present only when a requested statistic reports some. They are not statistics. See
+          :class:`~dataeval.flags.ImageStats` for the spatial ones
 
         Output is sorted by (item_index, box_index) ascending,
         with None values appearing before 0.
+
+    Raises
+    ------
+    ValueError
+        If `labels` is given without `boxes`, a box is not four numbers, or the labels are not one integer per
+        box. Also if `stats` asks only for statistics that compare a box with its peers (`ImageStats.SPATIAL`)
+        and the call measures no box rows, because `boxes` is None and the dataset has none, or `per_target`
+        is False.
+
+    Warns
+    -----
+    UserWarning
+        If `stats` asks for a spatial statistic beside others and the call measures no box rows, so the spatial
+        columns are NaN.
+    ExperimentalWarning
+        Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`) and on the first
+        that includes a spatial one (`ImageStats.SPATIAL`). `ImageStats.ALL` holds both.
 
     Notes
     -----
@@ -1249,6 +1270,20 @@ def image_stats(  # noqa: C901
     ... )
     >>> sorted(stats["stats"])
     ['background_brightness', 'background_fraction', 'brightness']
+
+    Measure how isolated each box is (experimental). The spatial statistics need boxes, so ``per_image=False``
+    returns one row per box:
+
+    >>> found = image_stats(
+    ...     [np.zeros((3, 20, 40))],
+    ...     boxes=[[(0, 0, 10, 10), (30, 0, 40, 10)]],
+    ...     stats=ImageStats.SPATIAL,
+    ...     per_image=False,
+    ... )
+    >>> found["stats"]["nn_distance_norm"].astype(float).round(3).tolist()
+    [2.121, 2.121]
+    >>> found["details"]["nn_distance_norm_target_index"].tolist()
+    [1, 0]
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
@@ -1328,6 +1363,29 @@ def image_stats(  # noqa: C901
     calculators = CalculatorRegistry.get_calculators(whole_flags)
     channel_groups = _resolve_channel_groups(channels or {}, CalculatorRegistry.get_calculators(requested))
 
+    # A statistic that compares a box with its peers has a value only on a box's own row. A call with no box rows would
+    # return those columns as NaN, which reads as a measurement, so a request for nothing else raises. A mixed request
+    # keeps its columns, because the column set depends on the arguments and not on the data, and says what they hold.
+    peer_flags = reduce(
+        or_,
+        (calculator.flags_with_needs(flags) for calculator, flags in CalculatorRegistry.get_calculators(requested)),
+        ImageStats(0),
+    )
+    if peer_flags and not per_target:
+        what = (
+            f"{_flag_names(peer_flags)} compare a box with its peers and so have a value only on a box's own row, "
+            f"and this call measures no box rows"
+        )
+        fix = "Pass boxes= (or an object-detection dataset) and leave per_target=True"
+        if peer_flags == requested:
+            raise ValueError(f"stats asks only for statistics that need box rows: {what}. {fix}.")
+        warnings.warn(
+            f"{what}, so those columns are NaN. {fix}, or drop them from stats: "
+            f"`ImageStats.ALL & ~ImageStats.SPATIAL` leaves them out of `ALL`.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     # Once the request has proved valid, and for the unnamed view and every band group alike (`requested` is their
     # union). The blur flags are outside `VISUAL` and the default, but `ALL` holds them, so a request for `ALL` warns
     # too.
@@ -1338,6 +1396,17 @@ def image_stats(  # noqa: C901
                 "The column names and values may change. "
                 "`ImageStats.ALL` includes the blur statistics, "
                 "and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
+            ),
+        )
+
+    # The SPATIAL flags are outside the default, but `ALL` holds them, so a request for `ALL` warns too.
+    if requested & ImageStats.SPATIAL:
+        warn_experimental_once(
+            "ImageStats.SPATIAL",
+            details=(
+                "The column names and values may change. "
+                "`ImageStats.ALL` includes the SPATIAL statistics, "
+                "and `ImageStats.ALL & ~ImageStats.SPATIAL` leaves them out."
             ),
         )
 

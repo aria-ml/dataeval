@@ -198,10 +198,10 @@ class TestResizeInvalidates:
 
     @pytest.mark.parametrize("mode", ["stretch", "crop"])
     def test_non_pad_modes_declare_the_base_set(self, mode):
-        assert Resize((10, 10), mode=mode).invalidates == self.BASE
+        assert Resize((10, 10), mode=mode).invalidates == self.BASE | ImageStats.SPATIAL
 
     def test_pad_adds_the_padding_sensitive_stats(self):
-        assert Resize((10, 10), mode="pad").invalidates == self.BASE | self.PAD_EXTRA
+        assert Resize((10, 10), mode="pad").invalidates == self.BASE | self.PAD_EXTRA | ImageStats.SPATIAL
 
     def test_zero_fill_pad_also_invalidates_the_mean(self):
         # Letterboxing a 2:1 source into a square canvas with zeros halves PIXEL_MEAN.

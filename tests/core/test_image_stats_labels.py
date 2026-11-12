@@ -115,7 +115,9 @@ def test_a_labels_need_reads_the_datasets_own_labels(declare):
     assert context.labels.tolist() == [7, 8]
 
 
-@pytest.mark.parametrize("legacy", [ImageStats.DIMENSION, ImageStats.ALL], ids=["dimension", "all"])
+@pytest.mark.parametrize(
+    "legacy", [ImageStats.DIMENSION, ImageStats.ALL & ~ImageStats.SPATIAL], ids=["dimension", "all_but_spatial"]
+)
 def test_dataset_labels_are_read_only_for_a_labels_need(declare, monkeypatch, legacy):
     items = [([BOX], [0]), ([BOX], [1])]
     plain = _Dataset(items)

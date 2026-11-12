@@ -126,9 +126,11 @@ class TestCropBoxRewrite:
 
 @pytest.mark.required
 class TestCropInvalidates:
-    EXPECTED = ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH)
+    EXPECTED = (
+        ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH)
+    ) | ImageStats.SPATIAL
 
-    def test_declares_dimension_minus_channels_and_depth(self):
+    def test_declares_dimension_minus_channels_and_depth_and_spatial(self):
         assert Crop((0, 0, 10, 10)).invalidates == self.EXPECTED
 
     def test_channel_count_and_bit_depth_survive_a_crop(self):

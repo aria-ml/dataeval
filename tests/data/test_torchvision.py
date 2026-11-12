@@ -286,7 +286,7 @@ class TestNormalizationGuard:
 @pytest.mark.required
 class TestInvalidates:
     def test_defaults_to_everything(self):
-        assert TorchvisionTransform(object()).invalidates is ImageStats.ALL
+        assert TorchvisionTransform(object()).invalidates == ImageStats.ALL
 
     def test_is_user_narrowable(self):
         op = TorchvisionTransform(object(), invalidates=ImageStats.DIMENSION)

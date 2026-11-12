@@ -552,6 +552,15 @@ statistical and computational.
     a calibrated level of defocus and not a motion blur detector. Noise and JPEG artifacts move it by amounts and in
     directions that depend on the scene, and a soft 8-bit image at low contrast reads sharper than at full contrast. See
     [Blur statistics](BlurStatistics.md).
+- - {func}`.image_stats` (`ImageStats.SPATIAL`)
+  - The geometry of a box against its neighbors and the image: the distance between box centers over the box's own
+    diagonal, and the share of the box inside the image.
+  - Anchored
+  - Experimental: the column names and values may change. Descriptive geometry only: nothing here says the values
+    predict a model's behavior or measure occlusion. The distance is directed and center to center, not a gap. The
+    fraction reads 1.0 on datasets whose annotation tools clip boxes to the image, and after a {class}`.Resize` or
+    {class}`.Crop`. Where another box of the image is corrupt, the distance is computed from the valid boxes and
+    flagged `incomplete_geometry`, so its largest values are the least reliable.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored

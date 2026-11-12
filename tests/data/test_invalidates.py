@@ -3,12 +3,26 @@
 import numpy as np
 import pytest
 
+from dataeval.core import image_stats
 from dataeval.core._image_stats import _unmeasurable_flags
-from dataeval.data import DetectionCrops, Relabel, Resize, SelectChannels, TorchvisionTransform, View
+from dataeval.data import (
+    ClassFilter,
+    Crop,
+    DetectionCrops,
+    Filter,
+    Indices,
+    Relabel,
+    Resize,
+    Reverse,
+    SelectChannels,
+    TorchvisionTransform,
+    View,
+)
 from dataeval.data._invalidates import invalidated_stats
 from dataeval.data._view import Operation
 from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata, ObjectDetectionDatum
+from dataeval.types import SourceIndex
 
 
 class Nop(Operation):
@@ -89,7 +103,7 @@ class TestOperationInvalidatesDeclaration:
         assert Nop().invalidates is ImageStats.NONE
 
     def test_existing_operations_default_to_none(self):
-        assert Relabel({"0": "a"}).invalidates is ImageStats.NONE
+        assert Reverse().invalidates is ImageStats.NONE
 
     def test_property_override_reads_constructor_args(self):
         assert Resizer(None).invalidates is ImageStats.NONE
@@ -196,6 +210,7 @@ class TestBlurIsInvalidated:
     def test_torchvision_default_is_all_and_so_covers_blur(self):
         assert TorchvisionTransform(object()).invalidates == ImageStats.ALL
         assert ImageStats.BLUR in TorchvisionTransform(object()).invalidates
+        assert ImageStats.SPATIAL in TorchvisionTransform(object()).invalidates
 
     def test_every_audit_point_covers_blur(self):
         """One place for the hand-kept list: a new transform or a new check that skips blur fails here.
@@ -209,3 +224,80 @@ class TestBlurIsInvalidated:
         assert ImageStats.BLUR in _unmeasurable_flags(ImageStats.BLUR, None, False)
         view = View(Images(), [Resize((8, 8)), SelectChannels("gray")])
         assert ImageStats.BLUR in invalidated_stats(view)
+
+
+class _EdgeDataset:
+    """One 16x16 image whose one box, (8, 0, 24, 8), lies half outside it."""
+
+    def __init__(self) -> None:
+        self.metadata = DatasetMetadata(id="edge-od", index2label={0: "a"})
+
+    def __len__(self) -> int:
+        return 1
+
+    def __getitem__(self, index: int) -> ObjectDetectionDatum:
+        return np.zeros((3, 16, 16), dtype=np.float32), _ODTarget([[8, 0, 24, 8]], [0]), {"id": index}
+
+
+SPATIAL = ImageStats.SPATIAL
+
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore")
+class TestSpatialDeclarations:
+    """What changes a box or removes its peers makes the SPATIAL statistics describe the operation."""
+
+    @pytest.mark.parametrize("mode", ["stretch", "pad", "crop"])
+    def test_resize_declares_spatial_in_every_mode(self, mode):
+        assert Resize((8, 8), mode=mode).invalidates & SPATIAL == SPATIAL
+
+    def test_crop_declares_spatial(self):
+        assert Crop((0, 0, 8, 8)).invalidates & SPATIAL == SPATIAL
+
+    @pytest.mark.parametrize(
+        "operation",
+        [Filter(classes=[0]), Filter(classes=[0], drop="detections"), ClassFilter([0])],
+        ids=["filter_both", "filter_detections", "class_filter"],
+    )
+    def test_a_filter_that_drops_detections_declares_spatial(self, operation):
+        assert operation.invalidates & SPATIAL == SPATIAL
+
+    @pytest.mark.parametrize(
+        "operation",
+        [Filter(classes=[0], drop="items"), ClassFilter([0], filter_detections=False)],
+        ids=["filter_items", "class_filter_keeping_detections"],
+    )
+    def test_a_filter_that_keeps_every_detection_of_the_items_it_keeps_does_not(self, operation):
+        assert not operation.invalidates & SPATIAL
+
+    def test_indices_that_remove_rows_inside_items_declare_spatial(self):
+        assert Indices([SourceIndex(0, 1)], exclude=True).invalidates & SPATIAL == SPATIAL
+
+    @pytest.mark.parametrize(
+        "operation",
+        [Indices([0, 1], exclude=True), Indices([0, 1]), Indices([SourceIndex(0)], exclude=True)],
+        ids=["whole_items_removed", "items_kept", "item_address_removed"],
+    )
+    def test_indices_that_keep_every_row_of_the_items_they_keep_do_not(self, operation):
+        assert not operation.invalidates & SPATIAL
+
+    def test_relabel_declares_spatial_when_it_drops_detections_and_not_when_it_raises(self):
+        assert Relabel({"0": "a"}).invalidates & SPATIAL == SPATIAL
+        assert not Relabel({"0": "a"}, on_unmatched="raise").invalidates & SPATIAL
+
+    def test_select_channels_does_not(self):
+        assert not SelectChannels("gray").invalidates & SPATIAL
+
+    def test_the_torchvision_default_covers_spatial_and_all(self):
+        declared = TorchvisionTransform(lambda image: image).invalidates
+        assert declared & SPATIAL == SPATIAL
+        assert declared & ImageStats.ALL == ImageStats.ALL
+
+    def test_a_resize_clips_the_box_so_the_fraction_reads_one_afterwards(self):
+        def fraction(data):
+            result = image_stats(data, stats=ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION, per_image=False)
+            return result["stats"]["box_in_image_fraction"].tolist()
+
+        assert fraction(_EdgeDataset()) == [0.5]
+        assert fraction(View(_EdgeDataset(), [Resize((8, 8))])) == [1.0]
+        assert fraction(View(_EdgeDataset(), [Crop((4, 0, 12, 8))])) == [1.0]
