@@ -565,7 +565,10 @@ statistical and computational.
   - Per-track statistics for video sequences.
   - Anchored
   - Assumes track identity is already resolved: detections carrying no track id
-    take no part, and nothing here re-associates them.
+    take no part, and nothing here re-associates them. `max_gap_length` and `net_heading_rad`
+    are tested on constructed tracks only. The heading is that of the chord from the first to
+    the last observed center, so it says nothing about the path and is set by box jitter where
+    a track barely moved.
 - - {func}`.ego_stats`
   - Per-frame camera ego-motion, from a robust affine fit to cheap optical flow,
     with declared roll-ups to the sequence level. See
