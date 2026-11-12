@@ -125,8 +125,10 @@ class Relabel(Operation):
         (an image-classification datum whose class is OOV is dropped; an
         object-detection detection that is OOV is dropped, and an image left with
         no detections is dropped unless ``drop_empty=False``). ``"raise"`` raises if
-        any source class is OOV. ``"drop"`` also declares the spatial statistics
-        (``ImageStats.SPATIAL``) invalidated, since the neighbors of a box can be dropped.
+        any source class is OOV. ``"drop"`` declares the spatial statistics
+        (``ImageStats.SPATIAL``) invalidated, since the neighbors of a box can be dropped, and either value declares
+        the two class statistics (``SPATIAL_MAX_IOU_SAME_CLASS`` and ``SPATIAL_MAX_IOU_OTHER_CLASS``), since a relabel
+        changes which boxes share a class.
     drop_empty : bool, default True
         Whether to drop a *detection* datum with no in-vocabulary detections.
         When ``False``, keep datums that have no detections, or whose detections are
@@ -316,8 +318,12 @@ class Relabel(Operation):
 
     @property
     def invalidates(self) -> ImageStats:
-        """The SPATIAL statistics under ``on_unmatched="drop"``, which removes the detections of unmatched classes."""
-        return ImageStats.SPATIAL if self.on_unmatched == "drop" else ImageStats.NONE
+        """The SPATIAL statistics under ``on_unmatched="drop"``, which removes the detections of unmatched classes.
+
+        Under every ``on_unmatched`` the two class statistics, since a relabel changes which boxes share a class.
+        """
+        classes = ImageStats.SPATIAL_MAX_IOU_SAME_CLASS | ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS
+        return ImageStats.SPATIAL if self.on_unmatched == "drop" else classes
 
     def apply(self, view: View[Any]) -> None:
         # Drop out-of-vocabulary datums (cheap keep-check reads through preceding ops),

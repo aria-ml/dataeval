@@ -130,7 +130,7 @@ directly. This table covers the primary analysis entry points; see the
 | {func}`.ber_knn` / {func}`.ber_mst` | Required{sup}`a` | Required | | | |
 | {func}`.completeness` | Required{sup}`a` | | | | |
 | {func}`.compute_ratios` | Required{sup}`b` | | Required | | |
-| {func}`.image_stats` | Required{sup}`b` | | | | |
+| {func}`.image_stats` | Required{sup}`b` | Optional (spatial class statistics) | | | |
 | {func}`.coverage_adaptive` / {func}`.coverage_naive` | Required{sup}`a` | | | | |
 | {func}`.divergence_fnn` / {func}`.divergence_mst` | Required{sup}`a` | | | | |
 | {func}`.factor_deviation` | | | | Required{sup}`c` | Required{sup}`e` |

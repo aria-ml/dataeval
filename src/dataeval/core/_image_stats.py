@@ -963,7 +963,11 @@ def image_stats(  # noqa: C901
     labels : Iterable[ArrayLike | None] or None, default None
         **Experimental.** One sequence of integer class ids per image, one id per box in that image's `boxes`
         entry, so `boxes` is required. An image with no boxes takes None or an empty sequence. The labels are
-        checked and carried alongside the boxes; no statistic reads them yet.
+        checked and carried alongside the boxes, and the two class statistics of `ImageStats.SPATIAL` read them. Any
+        negative id means the label is missing, which also covers the ignore id a dataset uses, so a negative id cannot
+        be a class. Where `labels` is absent every label is missing: those statistics read NaN where another box
+        overlaps the box, and 0.0 where none does. A dataset supplies its own labels and a floating array of them is
+        read as class ids, a whole number as that id, NaN as missing, and a fractional value raises.
 
         .. versionadded:: 1.3
     stats : ImageStats or Mapping[str | None, ImageStats], default ImageStats.STANDARD | ImageStats.HASH
@@ -1145,16 +1149,21 @@ def image_stats(  # noqa: C901
         If `labels` is given without `boxes`, a box is not four numbers, or the labels are not one integer per
         box. Also if `stats` asks only for statistics that compare a box with its peers (`ImageStats.SPATIAL`)
         and the call measures no box rows, because `boxes` is None and the dataset has none, or `per_target`
-        is False.
+        is False. Also if `stats` asks only for the class statistics (`ImageStats.SPATIAL_MAX_IOU_SAME_CLASS`,
+        `ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS`) and `boxes` is given without `labels`, and if a dataset's
+        labels are floating and hold a value that is not a whole number. A request that holds `ImageStats.ALL`
+        can raise on those labels, since it reads them.
 
     Warns
     -----
     UserWarning
         If `stats` asks for a spatial statistic beside others and the call measures no box rows, so the spatial
-        columns are NaN.
+        columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
+        `labels`, so every label is missing. A request that holds every non-spatial statistic of `ImageStats.ALL`
+        does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
     ExperimentalWarning
-        Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`) and on the first
-        that includes a spatial one (`ImageStats.SPATIAL`). `ImageStats.ALL` holds both.
+        Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
+        `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
 
     Notes
     -----
@@ -1222,6 +1231,10 @@ def image_stats(  # noqa: C901
         presence of data rather than the data, so it is the one statistic that has an
         answer when nothing was measured.
 
+    .. versionadded:: 1.3
+        The spatial statistics, `ImageStats.SPATIAL`, which measure a box against the other boxes of its
+        image and against the image's edges. `ImageStats.ALL` includes them.
+
     Examples
     --------
     Compute the default statistics:
@@ -1271,19 +1284,24 @@ def image_stats(  # noqa: C901
     >>> sorted(stats["stats"])
     ['background_brightness', 'background_fraction', 'brightness']
 
-    Measure how isolated each box is (experimental). The spatial statistics need boxes, so ``per_image=False``
-    returns one row per box:
+    Measure how isolated and how overlapped each box is. The spatial statistics need boxes, so
+    ``per_image=False`` returns one row per box, and the class statistics read `labels`:
 
     >>> found = image_stats(
     ...     [np.zeros((3, 20, 40))],
-    ...     boxes=[[(0, 0, 10, 10), (30, 0, 40, 10)]],
+    ...     boxes=[[(0, 0, 10, 10), (5, 0, 15, 10), (30, 0, 40, 10)]],
+    ...     labels=[[0, 1, 1]],
     ...     stats=ImageStats.SPATIAL,
     ...     per_image=False,
     ... )
     >>> found["stats"]["nn_distance_norm"].astype(float).round(3).tolist()
-    [2.121, 2.121]
-    >>> found["details"]["nn_distance_norm_target_index"].tolist()
-    [1, 0]
+    [0.354, 0.354, 1.768]
+    >>> found["stats"]["covered_fraction"].astype(float).round(3).tolist()
+    [0.5, 0.5, 0.0]
+    >>> found["stats"]["max_iou_other_class"].astype(float).round(3).tolist()
+    [0.333, 0.333, 0.0]
+    >>> found["details"]["max_iou_other_class_target_index"].tolist()
+    [1, 0, -1]
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
@@ -1366,6 +1384,10 @@ def image_stats(  # noqa: C901
     # A statistic that compares a box with its peers has a value only on a box's own row. A call with no box rows would
     # return those columns as NaN, which reads as a measurement, so a request for nothing else raises. A mixed request
     # keeps its columns, because the column set depends on the arguments and not on the data, and says what they hold.
+    # A request that holds every non-spatial statistic of `ALL` asks for everything, so a statistic that cannot be
+    # measured reads NaN without a word, as on any row it cannot measure: `ALL` is what a caller reaches for when it
+    # does not choose, and dataeval-flow does so with `per_target=False`.
+    asks_for_all = (requested & ~ImageStats.SPATIAL) == (ImageStats.ALL & ~ImageStats.SPATIAL)
     peer_flags = reduce(
         or_,
         (calculator.flags_with_needs(flags) for calculator, flags in CalculatorRegistry.get_calculators(requested)),
@@ -1379,12 +1401,37 @@ def image_stats(  # noqa: C901
         fix = "Pass boxes= (or an object-detection dataset) and leave per_target=True"
         if peer_flags == requested:
             raise ValueError(f"stats asks only for statistics that need box rows: {what}. {fix}.")
-        warnings.warn(
-            f"{what}, so those columns are NaN. {fix}, or drop them from stats: "
-            f"`ImageStats.ALL & ~ImageStats.SPATIAL` leaves them out of `ALL`.",
-            UserWarning,
-            stacklevel=2,
+        if not asks_for_all:
+            warnings.warn(
+                f"{what}, so those columns are NaN. {fix}, or drop them from stats.", UserWarning, stacklevel=2
+            )
+
+    # Explicit boxes with no labels leave every label missing, which a statistic that compares classes reads as unknown.
+    # A request for nothing else could say nothing, so it raises. Otherwise the columns are kept, as for no box rows,
+    # and said once, except for a request that asks for everything. Where no box rows are measured the warning above
+    # has already spoken, so this one does not repeat it. A dataset supplies its own labels, so it never reaches here.
+    if boxes is not None and labels is None:
+        label_flags = reduce(
+            or_,
+            (
+                calculator.flags_with_needs(flags, ContextNeed.LABELS)
+                for calculator, flags in CalculatorRegistry.get_calculators(requested)
+            ),
+            ImageStats(0),
         )
+        if label_flags and label_flags == requested:
+            raise ValueError(
+                "a selected statistic compares boxes by class, so pass labels= alongside boxes=, or leave boxes= unset "
+                "and let the dataset supply both."
+            )
+        if label_flags and per_target and not asks_for_all:
+            warnings.warn(
+                f"{_flag_names(label_flags)} compare a box with the class of its peers, and this call passes boxes= "
+                f"without labels=, so every label is missing: those columns are NaN where a peer overlaps the box and "
+                f"0.0 where none does. Pass labels=, or drop them from stats.",
+                UserWarning,
+                stacklevel=2,
+            )
 
     # Once the request has proved valid, and for the unnamed view and every band group alike (`requested` is their
     # union). The blur flags are outside `VISUAL` and the default, but `ALL` holds them, so a request for `ALL` warns
@@ -1396,17 +1443,6 @@ def image_stats(  # noqa: C901
                 "The column names and values may change. "
                 "`ImageStats.ALL` includes the blur statistics, "
                 "and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
-            ),
-        )
-
-    # The SPATIAL flags are outside the default, but `ALL` holds them, so a request for `ALL` warns too.
-    if requested & ImageStats.SPATIAL:
-        warn_experimental_once(
-            "ImageStats.SPATIAL",
-            details=(
-                "The column names and values may change. "
-                "`ImageStats.ALL` includes the SPATIAL statistics, "
-                "and `ImageStats.ALL & ~ImageStats.SPATIAL` leaves them out."
             ),
         )
 
@@ -1510,12 +1546,6 @@ def image_stats(  # noqa: C901
         ),
         ContextNeed.NONE,
     )
-    if ContextNeed.LABELS in needs and boxes is not None and labels is None:
-        raise ValueError(
-            "a selected statistic compares boxes by class, so pass labels= alongside boxes=, or leave boxes= unset "
-            "and let the dataset supply both."
-        )
-
     # Said once per datum that trips it, aggregated with the rest. Only the unnamed view is
     # at risk, and only for the statistics no group answers in its place — naming bands
     # settles the question for a statistic some group also measures, but a mapping can name
@@ -1579,7 +1609,7 @@ def image_stats(  # noqa: C901
         if not isinstance(data, Dataset)
         else (_unzip_annotations(data, per_target=False)[0], boxes)
         if boxes is not None
-        else _unzip_annotations(data, per_target=needs_boxes, with_labels=ContextNeed.LABELS in needs)
+        else _unzip_annotations(data, per_target=needs_boxes, with_labels=ContextNeed.LABELS in needs and per_target)
     )
 
     # Build description for progress bar

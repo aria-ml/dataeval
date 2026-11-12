@@ -547,11 +547,8 @@ Experimental ⚠️ (API may change or be removed):
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
-- {func}`.image_stats` with any `ImageStats.SPATIAL` flag (`SPATIAL_NN_DISTANCE_NORM`, `SPATIAL_BOX_IN_IMAGE_FRACTION`)
-  raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process. `ImageStats.ALL`
-  includes the group and the default of {func}`.image_stats` does not, so a default call never raises it.
-- {func}`.image_stats` with the `labels` keyword. The keyword may change. It raises no warning, and no statistic reads
-  it yet.
+- {func}`.image_stats` with the `labels` keyword. The keyword may change. It raises no warning. The two class
+  statistics of `ImageStats.SPATIAL` read it, and no other statistic does.
 - {func}`.hash_neighbors` with the `partition` argument or the `k` argument
   raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call
   that passes each in a process. Every other use of {func}`.hash_neighbors` is

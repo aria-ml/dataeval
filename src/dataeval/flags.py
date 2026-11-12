@@ -94,28 +94,59 @@ class ImageStats(Flag):
     - `HASH_PHASH_D4` : Perceptual hash with D4 symmetry (rotation/flip invariant)
     - `HASH_DHASH_D4` : Difference hash with D4 symmetry (rotation/flip invariant)
 
-    Spatial Statistics (experimental, so names and values may change; one box measured against the other boxes of its
-    image and against the image's edges, so they need boxes and are NaN on an image's own row):
+    Spatial Statistics (one box measured against the other boxes of its image and against the image's edges, so they
+    need boxes and are NaN on an image's own row):
 
     - `SPATIAL_NN_DISTANCE_NORM` : Distance from the box's center to the center of its nearest other box, over the
       box's own diagonal. It is directed, since each box divides by its own diagonal, and it is center to center,
       not the gap between boxes. It reads the boxes as given, not clipped to the image
     - `SPATIAL_BOX_IN_IMAGE_FRACTION` : The share of the box's area that lies inside the image, in (0, 1]. It is
-      always 1.0 on datasets whose annotation tools clip boxes to the image
+      always 1.0 on datasets whose annotation tools clip boxes to the image. It reads the boxes as given
+    - `SPATIAL_COVERED_FRACTION` : The share of the box's area that the other boxes of the image cover, in [0, 1],
+      counting boxes that overlap each other once: ``area(box ∩ union of the other boxes) / area(box)``, over boxes
+      of every class. It measures geometric coverage by annotated boxes, not the probability that the object is
+      occluded, and an object nobody annotated covers nothing. 0.0 for a box that nothing overlaps. It reads the boxes
+      clipped to the image, and is exact up to floating-point rounding. It is NaN, with the reason `too_many_overlaps`,
+      for a box that more than 1,000 other boxes overlap, since the union takes memory that grows with the square of
+      that number. That limit is provisional, and the other statistics are not affected by it
+    - `SPATIAL_MAX_IOU_SAME_CLASS` : The largest intersection over union of the box with another box of its class, 0.0
+      when none overlaps it. It reads the boxes clipped to the image
+    - `SPATIAL_MAX_IOU_OTHER_CLASS` : The largest intersection over union of the box with a box of another class, 0.0
+      when none overlaps it. A large value is one box lying on another of a different class. That is either two
+      objects, such as a rider on a bicycle, or two annotations of one object, which can be a conflicting label. It
+      reads the boxes clipped to the image
 
-    A box is a neighbor when it has positive area, finite ordered edges and part of it inside the image. A request
-    that includes a spatial statistic also returns details, in the result's ``details``, one value per row:
+    The two class statistics read class labels, which a dataset supplies and `image_stats` takes through its `labels`
+    keyword. Any negative id is a missing label, and every label is missing where none are given. The class of a box
+    that overlaps this one is then unknown, and so is whether it is a rival: where such a box overlaps more than the
+    largest known overlap, the statistic is NaN with the reason `missing_labels`, since that box may be the true
+    maximum. The statistic does not guess.
+
+    A box is another box's peer when it has positive area, finite ordered edges and part of it inside the image; the
+    nearest peer is the neighbor. A request that includes a spatial statistic also returns details, in the result's
+    ``details``, one value per row:
 
     - `spatial_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image,
       has reversed edges or is not finite (read from the coordinates as given, so a reversed box is `invalid_box`
       here though `DIMENSION_INVALID_BOX` is False for it, unless the box is a `BoundingBox`, whose constructor has
       already swapped its edges); `incomplete_geometry`, when another box of the image is
-      reversed or not finite, so a nearer neighbor may exist that could not be placed (the value is still computed
-      from the valid boxes, and the largest `SPATIAL_NN_DISTANCE_NORM` values are then the least reliable); or
-      `not_applicable`, on an image's own row
+      reversed or not finite, so a box that could not be placed may be nearer to this one or may overlap it (the value
+      is still computed from the valid boxes; the largest `SPATIAL_NN_DISTANCE_NORM` values may then be too large, and
+      the overlap statistics too small); or `not_applicable`, on an image's own row
     - `nn_distance_norm_target_index` : The nearest neighbor's index among the image's boxes, -1 for none. On equal
       distances the lowest index is nearest
     - `nn_distance_norm_reason` : `no_neighbor` when the status is `ok` and no other valid box exists, else empty
+    - `spatial_peer_count`, `spatial_skipped_count` : With the covered fraction or either class statistic, the number
+      of valid peers the box was compared with and the number of boxes left out for having zero area or lying
+      entirely outside the image. A box that is reversed or not finite is in neither count, since it sets the status.
+      -1 where the box is not measured
+    - `max_iou_same_class_target_index`, `max_iou_other_class_target_index` : The peer that attains the maximum, by its
+      index among the image's boxes, -1 where there is none (the maximum is 0.0 or NaN). On equal values the lowest
+      index
+    - `max_iou_other_class_label` : That peer's class id, -1 for none
+    - `max_iou_same_class_reason`, `max_iou_other_class_reason` : `missing_labels` when the value is NaN for want of
+      labels, else empty
+    - `covered_fraction_reason` : `too_many_overlaps` when the value is NaN for that reason, else empty
 
     Convenience Groups
     ------------------
@@ -145,23 +176,28 @@ class ImageStats(Flag):
     - `NO_HASH` : The same set as `STANDARD`, under its v1.2 name
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
-    - `SPATIAL` : The two spatial statistics (experimental). In no other group. They need boxes, and are NaN on every
-      other row
+    - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
+      two class statistics also read labels
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
-    - `ALL` : Every statistic in this release, including the experimental blur and spatial statistics. A later
-      release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must not
-      change
+    - `ALL` : Every statistic in this release, including the experimental blur statistics and the spatial statistics.
+      A later release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must
+      not change
 
     Notes
     -----
     Some statistics have dependencies on others, the dependencies will be added
     automatically during processing.
 
+    .. versionadded:: 1.3
+        The `SPATIAL` statistics.
+
     ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL`` is what `ALL` held in v1.2. The `SPATIAL` statistics
-    need box rows, so a request for `ALL` with no box rows returns their columns as NaN and warns.
+    need box rows, so a request for `ALL` with no box rows returns their columns as NaN, without a warning, as a
+    statistic reads NaN on any row it cannot measure. Any other request that holds them and measures no box rows warns,
+    or raises when it holds nothing else.
 
     Examples
     --------
@@ -234,6 +270,9 @@ class ImageStats(Flag):
     # Appended after the blur flags so that no existing flag value moves
     SPATIAL_NN_DISTANCE_NORM = auto()
     SPATIAL_BOX_IN_IMAGE_FRACTION = auto()
+    SPATIAL_COVERED_FRACTION = auto()
+    SPATIAL_MAX_IOU_SAME_CLASS = auto()
+    SPATIAL_MAX_IOU_OTHER_CLASS = auto()
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
@@ -279,7 +318,13 @@ class ImageStats(Flag):
     BLUR = VISUAL_BLUR | VISUAL_BLUR_DIRECTIONALITY
 
     # Compares a box with the other boxes of its image, so it has a value only on a box's own row
-    SPATIAL = SPATIAL_NN_DISTANCE_NORM | SPATIAL_BOX_IN_IMAGE_FRACTION
+    SPATIAL = (
+        SPATIAL_NN_DISTANCE_NORM
+        | SPATIAL_BOX_IN_IMAGE_FRACTION
+        | SPATIAL_COVERED_FRACTION
+        | SPATIAL_MAX_IOU_SAME_CLASS
+        | SPATIAL_MAX_IOU_OTHER_CLASS
+    )
 
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR

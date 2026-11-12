@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from typing import Any
 
 import numpy as np
@@ -140,6 +141,140 @@ def test_dataset_labels_are_read_only_for_a_labels_need(declare, monkeypatch, le
     # Runtime protocol checks may read the attribute too on some Pythons; a labels need adds exactly one read each.
     assert context_only.label_reads == plain.label_reads
     assert with_labels.label_reads - context_only.label_reads == len(items)
+
+
+def label_warnings(record):
+    return [w for w in record if "without labels=" in str(w.message)]
+
+
+def test_a_labels_need_beside_other_statistics_warns_once_when_boxes_come_without_labels(declare):
+    declare(ContextNeed.LABELS)
+
+    with pytest.warns(UserWarning, match=r"DIMENSION_WIDTH compare a box with the class of its peers") as record:
+        image_stats(images(1), boxes=[[BOX]], stats=WIDTH | ImageStats.PIXEL_MEAN)
+
+    assert len(label_warnings(record)) == 1
+    assert "labels=" in str(label_warnings(record)[0].message).rsplit("Pass", maxsplit=1)[-1]
+
+
+def test_a_labels_need_is_silent_for_all_for_labels_and_for_a_dataset(declare):
+    declare(ContextNeed.LABELS)
+    for call in (
+        lambda: image_stats(images(1), boxes=[[BOX]], stats=ImageStats.ALL),  # asks for everything
+        lambda: image_stats(images(1), boxes=[[BOX]], labels=[[0]], stats=WIDTH | ImageStats.PIXEL_MEAN),
+        lambda: image_stats(_Dataset([([BOX], [0])]), stats=WIDTH | ImageStats.PIXEL_MEAN),
+        lambda: image_stats(images(1), boxes=[[BOX]], stats=ImageStats.PIXEL_MEAN),  # no labels need at all
+    ):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            call()
+
+
+def test_without_box_rows_the_no_box_rows_warning_is_the_only_one(declare):
+    declare(ContextNeed.LABELS)
+
+    with pytest.warns(UserWarning, match=r"box rows") as record:
+        image_stats(images(1), boxes=[[BOX]], stats=WIDTH | ImageStats.PIXEL_MEAN, per_target=False)
+
+    assert not label_warnings(record)
+    assert len([w for w in record if issubclass(w.category, UserWarning)]) == 1
+
+
+def test_no_labels_are_read_or_checked_when_no_box_row_is_measured():
+    items = [([BOX, (20, 2, 30, 12)], np.asarray([0.5, 1.0]))]  # 0.5 is not a class id, and nothing here uses it
+    baseline, everything = _Dataset(items), _Dataset(items)
+
+    image_stats(baseline, stats=ImageStats.DIMENSION, per_target=False, per_background=True)
+    image_stats(everything, stats=ImageStats.ALL, per_target=False, per_background=True)
+
+    assert everything.label_reads == baseline.label_reads
+
+
+def test_flags_with_needs_narrows_by_the_need(monkeypatch):
+    height = ImageStats.DIMENSION_HEIGHT
+    original = DimensionStatCalculator.get_handlers
+
+    def patched(self):
+        handlers = original(self)
+        handlers[WIDTH] = handlers[WIDTH]._replace(needs=ContextNeed.LABELS)
+        handlers[height] = handlers[height]._replace(needs=ContextNeed.CONTEXT)
+        return handlers
+
+    monkeypatch.setattr(DimensionStatCalculator, "get_handlers", patched)
+    flags = WIDTH | height | ImageStats.DIMENSION_CHANNELS
+
+    assert DimensionStatCalculator.flags_with_needs(flags) == WIDTH | height
+    assert DimensionStatCalculator.flags_with_needs(flags, ContextNeed.LABELS) == WIDTH
+    assert DimensionStatCalculator.flags_with_needs(flags, ContextNeed.CONTEXT) == height
+
+
+def dataset_labels(declare, labels):
+    """The labels a dataset's one image hands a statistic that declares a labels need, as the context holds them."""
+    seen = declare(ContextNeed.LABELS)
+    image_stats(_Dataset([([BOX, (20, 2, 30, 12)], labels)]), stats=WIDTH)
+    context = seen[0][0]
+    assert context is not None
+    return context.labels
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.float16])
+def test_a_datasets_whole_number_float_labels_are_class_ids(declare, dtype):
+    labels = dataset_labels(declare, np.asarray([3, 0], dtype=dtype))
+
+    assert labels is not None
+    assert labels.dtype == np.int64
+    assert labels.tolist() == [3, 0]
+
+
+@pytest.mark.parametrize("missing", [NAN, INF, -INF])
+def test_a_datasets_nonfinite_float_label_is_missing(declare, missing):
+    labels = dataset_labels(declare, np.asarray([missing, 1.0], dtype=np.float32))
+
+    assert labels is not None
+    assert labels.tolist() == [-1, 1]
+
+
+@pytest.mark.parametrize("bad", [1.5, 1e30, -2.0000001])
+def test_a_datasets_fractional_or_huge_float_label_raises_and_names_the_box(declare, bad):
+    declare(ContextNeed.LABELS)
+
+    with pytest.raises(ValueError, match=r"image 0, box 1: class ids must be whole numbers"):
+        image_stats(_Dataset([([BOX, (20, 2, 30, 12)], np.asarray([0.0, bad]))]), stats=WIDTH)
+
+
+def test_a_datasets_integer_labels_are_untouched_and_other_shapes_still_raise(declare):
+    labels = dataset_labels(declare, np.asarray([3, 0], dtype=np.uint8))
+    assert labels is not None
+    assert labels.tolist() == [3, 0]
+
+    with pytest.raises(ValueError, match=r"image 0: labels holds 1 class ids for 2 boxes"):
+        image_stats(_Dataset([([BOX, (20, 2, 30, 12)], np.asarray([1.0]))]), stats=WIDTH)
+    with pytest.raises(ValueError, match=r"image 0: labels must be a 1-D sequence"):
+        image_stats(_Dataset([([BOX, (20, 2, 30, 12)], np.asarray([[1.0], [2.0]]))]), stats=WIDTH)
+
+
+def test_explicit_float_labels_stay_strict(declare):
+    declare(ContextNeed.LABELS)
+
+    with pytest.raises(ValueError, match="must be integer class ids, got dtype float64"):
+        image_stats(images(1), boxes=[[BOX]], labels=[[1.0]], stats=WIDTH)
+
+
+def test_only_a_class_statistic_reads_a_datasets_labels():
+    items = [([BOX, (6, 2, 16, 12)], [0, 1]), ([BOX], [0])]
+    geometry_flags = (
+        ImageStats.SPATIAL_NN_DISTANCE_NORM
+        | ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION
+        | ImageStats.SPATIAL_COVERED_FRACTION
+    )
+    baseline, geometry, classes = _Dataset(items), _Dataset(items), _Dataset(items)
+
+    image_stats(baseline, stats=ImageStats.DIMENSION)
+    image_stats(geometry, stats=geometry_flags)
+    image_stats(classes, stats=ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS)
+
+    assert geometry.label_reads == baseline.label_reads
+    assert classes.label_reads - baseline.label_reads == len(items)
 
 
 def test_labels_length_and_alignment():
