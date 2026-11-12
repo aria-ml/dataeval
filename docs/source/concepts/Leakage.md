@@ -17,7 +17,7 @@ methodological: they are errors in how a pipeline is constructed rather than
 properties of the data. Others are properties of the data itself. For each failure mode, the page
 describes what leaks, how it inflates the reported metric, and why it matters.
 
-## What is it
+## What data leakage is
 
 Supervised learning rests on an assumption: that the training and test
 partitions are drawn independently from the same distribution $P(X, Y)$ over an
@@ -25,7 +25,12 @@ input space $\mathcal{X}$ and label space $\mathcal{Y}$, and that this
 distribution matches the one the model will face in deployment, the
 **distribution of interest**. Every performance number a team reports, such as
 validation accuracy, held-out mAP or a passing acceptance test, is only
-meaningful to the extent that this assumption holds.
+meaningful to the extent that this assumption holds. A test estimate applies to the
+population and the sampling protocol that define the test set. A time-forward,
+group-held-out or stress-test evaluation can be rigorous without drawing its test
+set from the training distribution or matching deployment. Leakage compromises the
+independence of the estimate, and a mismatch with deployment limits how far the
+estimate transfers.
 
 [Kapoor & Narayanan (2022)](#ref1) frame leakage as a violation along two axes:
 either the training and test sets are not cleanly separated (so the model sees
@@ -94,6 +99,12 @@ in the test set and is invisible to byte comparison, and
 **semantic duplication**, where distinct samples depict the same underlying
 content. Cross-split duplicates of any kind are direct contamination of the
 boundary.
+
+Separating samples is also not the same as separating sources. Frames of one video,
+images of one subject or tiles of one scene that fall in different partitions share
+content that no hash comparison flags, so the unit of separation is the video, the
+subject or the scene and not the frame. The `split_on` argument of
+{func}`.split_dataset` keeps the rows that share a factor value in one partition.
 
 One caveat the L1 framing alone misses: clean separation is not only about
 disjoint samples but about temporal ordering. A split that is sample-disjoint

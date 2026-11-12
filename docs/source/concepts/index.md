@@ -1,21 +1,19 @@
 # Explanations
 
-These pages explain what DataEval's evaluators measure, the theory each rests on and when to apply it. A page often
-covers several evaluators that work together. The pages are grouped by the question they help answer, from the
-measurements and metadata that evaluators read to the interpretation of their results.
+These pages explain what DataEval's evaluators measure, the theory underlying each evaluator and when to apply it. A
+page often covers several evaluators that work together. The pages are grouped by the question they help answer, from
+the measurements and metadata that evaluators read to the interpretation of their results.
 
-## Measuring the data
+## Image measurements
 
-The statistics, representations and groupings that evaluators compute from images.
+Statistics that evaluators compute directly from images.
 
 :::{toctree}
-:caption: Measuring the data
+:caption: Image measurements
 :hidden:
 
 ImageStatistics
 BlurStatistics
-Embeddings
-Clustering
 :::
 
 :::{list-table}
@@ -28,6 +26,26 @@ Clustering
     compared across a dataset.
 - - [](BlurStatistics.md)
   - How blur is measured as edge width in pixels for images and videos, and the limits of that measurement.
+
+:::
+
+## Representations and groupings
+
+Learned representations of images, and the groups that evaluators form from those representations.
+
+:::{toctree}
+:caption: Representations and groupings
+:hidden:
+
+Embeddings
+Clustering
+:::
+
+:::{list-table}
+:width: 100%
+:widths: 30 70
+:header-rows: 0
+
 - - [](Embeddings.md)
   - What embeddings are, why evaluators use them and how to create them with extractors.
 - - [](Clustering.md)
@@ -101,7 +119,8 @@ Leakage
 
 ## Bias and coverage
 
-Whether a dataset represents the conditions that a model will encounter.
+Evidence on how the sampled data compare with the intended operational conditions, and on which conditions may be
+underrepresented.
 
 :::{toctree}
 :caption: Bias and coverage
@@ -119,11 +138,11 @@ ParityCalibration
 :header-rows: 0
 
 - - [](DatasetBias.md)
-  - How the association between class labels and metadata factors and the evenness of sampling are measured, and how an
-    imbalance is corrected.
+  - How the association between class labels and metadata factors and the evenness of sampling are measured, what those
+    measures say about the intended operational population, and how an imbalance is addressed.
 - - [](DatasetCoverage.md)
-  - How coverage and completeness describe the way a dataset occupies the embedding space, and how samples are
-    prioritized to fill a gap.
+  - How coverage and completeness describe the way a dataset occupies the embedding space, what that says about the
+    conditions the dataset represents, and how samples are prioritized to fill a gap.
 - - [](Parity.md)
   - Tests of whether metadata factors are associated with class labels, for each factor and for each combination of a
     level and a class.
@@ -150,8 +169,8 @@ FeasibilityEvidence
 :header-rows: 0
 
 - - [](PerformanceLimits.md)
-  - Whether a performance requirement is out of reach on the data, whether a model has shown that it is reachable and
-    where additional samples stop helping.
+  - Whether a performance requirement is achievable with the available data, whether a specified model has shown that it
+    is, and when additional similar samples yield diminishing returns.
 - - [](FeasibilityEvidence.md)
   - How to supply evidence to {class}`.Feasibility`, how each kind of evidence is built and how it becomes a
     determination.
@@ -160,7 +179,7 @@ FeasibilityEvidence
 
 ## Shift between datasets
 
-Differences between the data that a model was trained on and the data that it meets.
+Differences between the data that a model was trained on and the operational or evaluation data that it encounters.
 
 :::{toctree}
 :caption: Shift between datasets

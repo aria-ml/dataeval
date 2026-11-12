@@ -14,16 +14,15 @@ dataset readiness properties, of which covered and complete are two, and describ
 
 ## What coverage is
 
-Coverage is a geometric concept. It describes how well a dataset populates the
-relevant regions of the {term}`embedding <Embeddings>` space, the
-high-dimensional space in which a model represents the data.
+Coverage is the extent to which a dataset includes the conditions, combinations and variations that are relevant to its
+intended use. DataEval currently measures it with proxies in the {term}`embedding <Embeddings>` space, the
+high-dimensional space in which a model represents the data. These proxies describe how well a dataset populates the
+regions of that space. They do not guarantee that the operational scenarios are covered: a scenario can be absent while
+the embeddings nearby are dense, and an unusual region of the space can be irrelevant to the operation.
 
-A dataset with high coverage has samples distributed across the full range of
-conditions the model will encounter in deployment. A dataset with poor coverage
-has dense clusters in some regions and empty regions ("cold spots") elsewhere. A
-model trained on low-coverage data can perform well on inputs that resemble the
-dense regions and poorly on inputs that fall in the cold spots, regardless of
-how many total samples the dataset contains.
+A dataset with dense clusters in some regions and empty regions ("cold spots") elsewhere has poor coverage in this
+sense. A model trained on low-coverage data can perform well on inputs that resemble the dense regions and poorly on
+inputs that fall in the cold spots, regardless of how many total samples the dataset contains.
 
 Coverage is not determined by sample count. A dataset of 100,000 images collected
 from a single afternoon at a single location may have far worse coverage of the
@@ -215,7 +214,11 @@ population, so none establishes that a dataset is unrepresentative in that sense
   that an operational condition is missing, because both work in the embedding space of one feature extractor.
 - Completeness reports the ratio of effective to total embedding dimensions, and isotropy reports the evenness of
   variance across the occupied dimensions. A low completeness is consistent with data confined to a lower-dimensional
-  subspace. It does not identify which conditions are absent.
+  subspace. It does not identify which conditions are absent, and it is not the fraction of operational scenarios that
+  the dataset covers.
+- Prioritization returns an ordering of samples under the chosen policy. A rank is not an estimate of risk. When the
+  top percent of the ranking is selected, the size of the selection is set by that percentage, so it is not an observed
+  rate of missing data.
 
 To decide what to do after finding gaps in coverage, see
 [Dataset bias and coverage findings](ActingOnResults.md#dataset-bias-and-coverage-findings) in Acting on results.

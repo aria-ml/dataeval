@@ -15,7 +15,7 @@ The column names and values may change, and for videos so may the `blur_samples`
 
 ## Why measure the width of edges
 
-`sharpness` measures how strong the edges in a picture are. It is the spread of a 3x3 edge filter, so it moves with the
+`sharpness` measures how strong the edges in a picture are. It is the spread of a 3 × 3 edge filter, so it moves with the
 contrast of the scene and with noise, and it cannot say how soft a lens is. The blur statistics measure the **edge
 width**, the number of pixels an edge takes to go from dark to light.
 
@@ -40,6 +40,11 @@ an image and one for a video:
 | `blur_directionality` | `VISUAL_BLUR_DIRECTIONALITY` | The absolute value of the base-2 logarithm of the median width of edges with a horizontal gradient over the median width of edges with a vertical gradient. It is 0 when the two agree and 1 when one is twice the other. |
 | `blur_level` | `BLUR_LEVEL` | For a video, the median of `blur` over the sampled frames. |
 
+`blur` describes the widths of the sharpest detected edges and is not a severity score for the whole image. An edge
+width depends on the content of the scene and on how the edges are detected, so a comparison of `blur` between images of
+different resolution, texture or processing mixes those differences with blur. Compare images of similar resolution and
+content.
+
 ## Request the statistics in DataEval
 
 ### Request the image statistics
@@ -53,8 +58,8 @@ image_stats(images, stats=ImageStats.BLUR)
 Outliers(flags=ImageStats.VISUAL | ImageStats.BLUR).evaluate(images)
 ```
 
-Cost is the reason the default leaves them out. On one machine (32 cores, under WSL2), `blur` on a 1280x720 frame took
-about 0.1 s against about 5 ms for `sharpness`. A 3840x2160 frame took about 1.3 s and allocated a peak of about
+Cost is the reason the default leaves them out. On one machine (32 cores, under WSL2), `blur` on a 1280 × 720 frame took
+about 0.1 s against about 5 ms for `sharpness`. A 3840 × 2160 frame took about 1.3 s and allocated a peak of about
 800 MiB. Each figure is one frame at that size, so read it as an order of magnitude and not as a benchmark. The image
 path does not cap the size of an image, so time a sample before you request blur for a dataset of large frames.
 
@@ -113,8 +118,8 @@ pixel, a bounding box past the border and data with no value range do not apply 
 ### What moves the values
 
 The table reports the range over each of two sets of three frames from VisDrone and Wikimedia Commons drone clips. Set
-(a) was reduced to 1280x720 by area averaging, degraded as 8-bit RGB and read by `image_stats`. Set (b) was reduced to a
-short side of 720, converted to Rec. 601 luma as float32, degraded and read by the core function behind `image_stats`.
+(a) was reduced to 1280 × 720 by area averaging, degraded as 8-bit RGB and read by `image_stats`. Set (b) was reduced
+to a short side of 720, converted to Rec. 601 luma as float32, degraded and read by the core function behind `image_stats`.
 The 8-bit contrast, `sharpness` and half-size figures above are from set (a). The sets differ in frames and in
 pipeline, so their numbers are not interchangeable, and the cause of the gaps was not traced.
 
@@ -154,7 +159,7 @@ clips, `blur_level` ran from 0.618 to 0.785.
 
 - With the blur added at the decoded size, `blur_level` rose at every step from sigma 0 to 3 on all 11 clips. A blurred
   clip read higher than a different clean clip in 86 of 110 pairs at sigma 1, 109 at sigma 2 and 110 at sigma 3. At
-  every sigma the closest pair involved the 3840x2160 clip, where sigma 1 at the decoded size is about 0.33 pixel after
+  every sigma the closest pair involved the 3840 × 2160 clip, where sigma 1 at the decoded size is about 0.33 pixel after
   the shrink.
 - With the blur added after the shrink, so sigma is in measured pixels, a blurred clip read higher than a different
   clean clip in all 330 pairs. `blur_level` rose at every step on only 8 of 11 clips and fell from sigma 2 to 3 on the
@@ -169,7 +174,7 @@ clips, `blur_level` ran from 0.618 to 0.785.
 
 ### Limits of the measurement
 
-- A smooth float image with no real edge can still read a finite `blur`. A 1024x1024 float32 diagonal ramp read 0.87.
+- A smooth float image with no real edge can still read a finite `blur`. A 1024 × 1024 float32 diagonal ramp read 0.87.
 - A video is measured at the size of its first frame. A sampled frame of any other size is left out of the median and
   logged, once for each size.
 - The edge width measurement stops at ties in the gradient. A noise-free step edge reads 0.71, and so does the same step
@@ -179,7 +184,7 @@ clips, `blur_level` ran from 0.618 to 0.785.
 ### Soft 8-bit images at low contrast
 
 A soft 8-bit image at low contrast reads sharper than the same image at full contrast. The check blurred each of three
-1280x720 frames with a Gaussian, scaled the contrast about mid-gray, rounded the result to 8 bits and read it with
+1280 × 720 frames with a Gaussian, scaled the contrast about mid-gray, rounded the result to 8 bits and read it with
 `image_stats`. The table gives the range over the three frames of the change in `blur`.
 
 | Gaussian blur before the contrast change | Contrast halved | Contrast quartered |

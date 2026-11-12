@@ -8,7 +8,7 @@ hypothesis? That answer suits continuous monitoring, where a clear signal to act
 on is needed. It does not say how far apart two datasets are, or whether the gap
 is growing over time.
 
-HP divergence addresses that question. It is a nonparametric, quantitative
+Henze–Penrose (HP) divergence addresses that question. It is a nonparametric, quantitative
 measure of distributional distance: a number on a scale from 0 to 1, and not a
 hypothesis test. It suits characterizing, comparing and tracking the magnitude of
 a distributional difference, and not only detecting its presence.
@@ -22,7 +22,7 @@ in their feature space. The scale is fixed:
 - 1: the two datasets are completely separable, with no overlap between their
   distributions
 
-Unlike formal drift tests, which return a p-value and a binary flag, HP
+Unlike a drift test, which returns a flag at a threshold, HP
 divergence returns a single continuous score that can be tracked across
 time, compared across dataset pairs, or used as an input to downstream
 decision logic.
@@ -32,10 +32,10 @@ decision logic.
 HP divergence is defined as:
 
 $$
-D_p(f_0, f_1) = \frac{1}{4pq} \int \frac{(pf_0(x) - qf_1(x))^2}{pf_0(x) + qf_1(x)} \, dx - (p - q)^2
+D_p(f_0, f_1) = \frac{1}{4pq} \left[ \int \frac{(pf_0(x) - qf_1(x))^2}{pf_0(x) + qf_1(x)} \, dx - (p - q)^2 \right]
 $$
 
-with $0 \leq p \leq 1$ and $q = 1 - p$, where $f_0$ and $f_1$ are the
+with $0 < p < 1$ and $q = 1 - p$, where $f_0$ and $f_1$ are the
 probability density functions of the two datasets and $p$, $q$ are their
 mixing weights.
 
@@ -100,6 +100,14 @@ space, HP divergence is only as informative as the embedding is discriminative.
 A divergence near 0 in a poor embedding does not confirm distributional
 similarity. It may reflect the embedding's failure to represent the relevant
 variation.
+
+Distance and reliability: a low divergence in the chosen feature space does not
+establish that a model is reliable on the second dataset, or that the second
+dataset covers the operational conditions. A high divergence shows that the two
+distributions differ. A change in the mixture proportions of conditions that
+both datasets contain raises it as well as a condition that only one dataset
+contains. A check of the model's performance on labeled data from the second
+dataset is a separate measurement.
 
 No significance threshold: HP divergence does not produce a p-value. There is no
 established threshold above which divergence is "too high." Interpretation

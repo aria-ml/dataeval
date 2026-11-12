@@ -9,7 +9,7 @@ parameters are in {func}`~dataeval.core.image_stats`, and the full statistic lis
 ## Raw values and visual interpretation
 
 A **pixel statistic** reduces the values as they were stored. `PIXEL_MEAN` on a
-16-bit image is a mean of numbers that run to 65535, because that is what the file
+16-bit image is a mean of values that can range from 0 to 65,535, because that is what the file
 contains. It describes the data.
 
 A **visual statistic** approximates how the image looks to a person. `VISUAL_BRIGHTNESS`
@@ -18,7 +18,9 @@ sensor's units. A visual statistic therefore first resolves the image's **full-s
 reference** (what counts as white) and reports against the 0–255 display range.
 
 That difference is why the same picture, stored four ways, gives the same value for each
-of the three visual statistics shown:
+of the three visual statistics shown. Here `brightness` is the lower quartile of the display
+values and `darkness` is the upper quartile, so `darkness` is the larger of the two and rises
+as the image gets brighter:
 
 | Encoding | `brightness` | `darkness` | `sharpness` |
 | --- | --- | --- | --- |
@@ -50,16 +52,24 @@ The reference is not the image's brightest pixel. Normalizing each image against
 photograph of a night sky and one of a beach to the same full scale, so brightness values would not be comparable
 across images.
 
-Instead the reference is **decoded** from the data's encoding where one exists, because integer image formats use
-power-of-two ranges:
+Instead the reference is **decoded** where an encoding exists, because integer image formats use power-of-two
+ranges:
 
 | Input | Reference |
 | --- | --- |
-| `uint8` | 255 |
-| `uint16` holding a 12-bit sensor's output | 4095 |
-| `uint16` holding 16-bit output | 65535 |
+| Integer, largest value 2 to 255, such as `uint8` | 255 |
+| Integer, largest value 256 to 4095, such as a 12-bit sensor's output in `uint16` | 4095 |
+| Integer, largest value 4096 to 65535, such as 16-bit output | 65535 |
 | `float` within [0, 1] | 1.0 (already normalized) |
 | `float` within [0, 255] | 255 (an 8-bit image in a float array) |
+
+For an integer array, DataEval reads the smallest of 1, 8, 12, 16 and 32 bits whose range holds the array's largest
+value, so the reference follows the dtype only through that value. Two frames from one sensor are read against different
+references when their brightest pixels fall in different ranges, and a `uint16` frame with no value above 255 is read as
+8-bit. The array's dtype does not record how a sensor's output was scaled: a 12-bit output shifted into the high bits of
+a `uint16` has a largest value above 4095 and is read as 16-bit. Check the acquisition scaling and any clipping before
+comparing intensity statistics across images, and declare the interval with `value_range` when it is known, as the next
+section describes.
 
 Two of these are float conventions and not encodings. They are recognized because they are two common ways an image
 arrives as a float array: a `ToTensor`-style pipeline produces the first, and a resize or other interpolation produces
@@ -172,7 +182,7 @@ The blur statistics, `blur` and `blur_directionality`, measure the width of edge
 A transform can be placed in the view or in the extractor, and choosing the wrong placement fails silently. Model
 preprocessing placed in the view is seen by every evaluator: {class}`.Outliers` then reports brightness and contrast on
 ImageNet-normalized tensors, which do not describe the data. Dataset-defining manipulation placed in the extractor is
-seen only by the embeddings: if 512x512 tiles are what ships, the statistics still describe source-resolution imagery,
+seen only by the embeddings: if 512 × 512 tiles are what ships, the statistics still describe source-resolution imagery,
 which does not ship.
 
 Two questions place a transform. Does an evaluator that never touches your model need to see it? If so, it belongs in

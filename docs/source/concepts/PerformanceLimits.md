@@ -4,11 +4,12 @@
 
 Before investing in model architecture, hyperparameter tuning, or additional data collection, it is useful to
 establish what performance a dataset can support. Performance limits analysis addresses three questions: is a
-performance requirement out of reach on this data, has some model already shown that it is reachable, and where do
-additional samples stop producing meaningful improvement? {class}`.Feasibility` answers the first two with finite-sample
-bounds and records the evidence behind each answer. The BER estimators estimate the first asymptotically for
-classification, UAP shows what one crop classifier reaches on correctly localized detection boxes, and
-{class}`.Sufficiency` answers the third.
+performance requirement out of reach on this data, has some model already shown that it is reachable, and when do
+additional similar samples show diminishing improvement under the sampling regime tested? {class}`.Feasibility`
+answers the first two with finite-sample bounds and records the evidence behind each answer. The BER estimators
+estimate the first asymptotically for classification, UAP shows what one crop classifier reaches on correctly
+localized detection boxes, and {class}`.Sufficiency` answers the third. Sufficiency also supports the choice among
+candidate models under a fixed amount of data, as [When to use it](#when-to-use-it) describes.
 
 These limits inform program decisions under the assumptions of each method. If a lower bound on the irreducible error
 exceeds the allowance of an operational accuracy requirement, the requirement is out of reach for the models that bound
@@ -494,6 +495,14 @@ accuracy directly into a required sample count. The forward projection
 (`project`) is the primary tool for the second case: it shows where the learning
 curve is headed and whether the current trajectory will reach the operational
 requirement.
+
+Sufficiency also supports model selection under a fixed amount of data. An evaluator takes one model and training
+procedure, so running one for each candidate model family on the same data gives learning curves that can be compared
+at the available training-set size, without assuming that more data will be collected. The comparison needs the same
+evaluation data for every candidate and enough runs to show the variation between them. A projection beyond the
+available size remains conditional on the fitted power law and on additional samples resembling the existing ones. A
+new sample that targets a missing failure mode can improve a model that the curve of the existing data shows as
+saturated.
 
 ## Related concept pages
 

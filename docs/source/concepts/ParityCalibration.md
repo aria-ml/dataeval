@@ -5,7 +5,9 @@
 false-positive rates of the two tests, the checks that run in CI, and the power of each test.
 
 All rates on this page were measured by simulation. They apply to the designs tested
-and do not establish calibration for other designs.
+and do not establish calibration for other designs. The nominal false-positive rate does
+not hold in every design: a class that bursts at one level only is a contraindication, and
+its measured false-alarm rate was 11–17% (see [A4](Parity.md#a4-the-grouped-cell-variance-model)).
 
 ## Factor test
 

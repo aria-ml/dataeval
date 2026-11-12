@@ -64,6 +64,10 @@ measures of how far a cell departs from $E_{ij}$:
   independence, negative for a surplus. It counts rows, and on detection data
   the rows are detections.
 
+A cell flagged `underrepresented` is short of the independence model for the class and factor margins of the sampled
+rows. It is not necessarily short relative to the operating environment, where a class can be legitimately associated
+with a factor, such as a class that occurs mostly in snow.
+
 Suppose the 400 road-scene images of the temperature example in
 [Choosing bin edges](BinEdges.md#a-worked-example-temperature) show 120 pedestrians,
 220 vehicles and 60 cyclists, one class per image, and the 103 freezing images
