@@ -81,45 +81,13 @@ On the same machine as the image timing, a `BLUR` request took 4.9 s to 25.6 s o
 decoding included, and about 0.11 s to 0.15 s per measured frame beyond decoding. The 3,033-frame clip measured 166
 frames, and 38 counted. Read these as an order of magnitude.
 
-## When to use the statistics
-
-Use the statistics to rank images of one resolution against each other, to rank videos of one frame size against each
-other and to compare a dataset with itself. [What moves the values of a video](#what-moves-the-values-of-a-video) gives
-the limits for videos. Do not read a `blur` or `blur_level` value as a calibrated level of defocus.
-[How far the evidence goes](#how-far-the-evidence-goes) gives the scope of the evidence behind this use.
-
-### Compare only at one resolution
-
-An edge width is in pixels of the image as it arrives, so the same scene at half the size has narrower edges, and
-values from images of different resolutions do not compare. On three frames blurred with a Gaussian of sigma 3 pixels,
-halving the width and height of the frame moved `blur` from between 1.40 and 1.60 to between 1.03 and 1.07. Measure at
-one resolution, and do not put a {class}`.Resize` in front of the statistic. A resize declares the blur statistics as
-invalidated.
-[Transforms and the statistics they invalidate](ImageStatistics.md#transforms-and-the-statistics-they-invalidate)
-describes the declarations.
-
-{func}`.image_stats` warns once per call when blur is requested on images of more than one size. {class}`.Outliers`
-makes one call for each dataset it is given, so datasets that each hold one size but differ from each other do not
-warn.
-
-A video frame is shrunk by area averaging to a short side of 720 pixels before it is measured, and never enlarged, so
-videos with a short side of 720 or more are measured at one scale. The video check could not test whether videos of
-different native sizes then compare. A video below 720 is measured at its own size, and its values compare only with
-those of videos measured at that size. {func}`.video_stats` likewise warns once per call when blur is requested and its
-videos are measured at more than one short side. The size of 720 is provisional. It is the scale at which the image
-evidence was gathered, and a sweep did not choose it.
-
-### Blur that changes within a video
-
-`blur_level` does not say how much the blur varies within a video. Measure the frames with {func}`.image_stats` and
-`ImageStats.VISUAL_BLUR`, and roll up the per-frame `blur` of each video with `std` or `variability`, as
-[Volatility and drift of a per-frame statistic](MetadataLevels.md#volatility-and-drift-of-a-per-frame-statistic)
-shows for brightness. This recipe was not run on blur. The roll-up reads a NaN `blur` as missing and answers missing for
-a video with any frame missing, unless you lower its `min_coverage`. The video path shrinks a frame above a short side
-of 720 and reads luma, where `image_stats` keeps the size and averages the bands, so above that size the per-frame
-values are on another scale, and for a color frame they differ from `blur_level` even at the same size.
-
 ## Reading the values
+
+A `blur` or `blur_level` value is an edge width in pixels at the resolution it was measured at. It supports ranking
+images of one resolution, or videos of one frame size, against each other. It does not establish a calibrated level of
+defocus, and values from different resolutions do not compare. A change in the value does not identify its cause: noise
+and JPEG compression also move it, and `blur` cannot tell them apart from a focus defect. The subsections give the
+cases where a value is NaN, what moves it, and where the measurement stops.
 
 ### Where the values are NaN
 
@@ -221,12 +189,12 @@ A soft 8-bit image at low contrast reads sharper than the same image at full con
 | Sigma 2 | -15.5% to -1.5% | -26.1% to -5.9% |
 | Sigma 3 | -37.1% to -13.5% | -45.4% to -30.3% |
 
-The first two rows show that at sigma 1 or less the width barely depends on contrast. For float input it barely depends
-on contrast: on one frame, the same halving kept in float32 moved `blur` by 0.01% at sigma 2 and at sigma 3,
-against -5.2% and -32.5% after rounding to 8 bits. That claim rests on one soft frame and the three frames of set (b)
-with no added blur. Why rounding to 8 bits moves the edge width this far was not traced. The evidence is three frames
-and a synthetic change of contrast. Until it is traced, compare the `blur` of soft 8-bit images only against images of
-similar contrast.
+At sigma 1 or less (the first two rows), the width barely depends on contrast. For float input the width also barely
+depends on contrast: on one frame, the same halving kept in float32 moved `blur` by 0.01% at sigma 2 and at sigma 3,
+against -5.2% and -32.5% after rounding to 8 bits. The float result rests on one soft frame and the three frames of set
+(b) with no added blur. Why rounding to 8 bits moves the edge width this far was not traced, and the evidence is three
+frames and a synthetic change of contrast. Until it is traced, compare the `blur` of soft 8-bit images only against
+images of similar contrast.
 
 ### How far the evidence goes
 
@@ -238,21 +206,59 @@ first, so they are simulated small videos. The evidence holds no blur rated by p
 real defect. Values were measured on one machine and were not compared across machines, between a CPU and a GPU, or
 across library versions. A second run of the video check gave identical saved outputs apart from the timings.
 
+## When to use the statistics
+
+Use the statistics to rank images of one resolution against each other, to rank videos of one frame size against each
+other and to compare a dataset with itself. [What moves the values of a video](#what-moves-the-values-of-a-video) gives
+the limits for videos. Do not read a `blur` or `blur_level` value as a calibrated level of defocus.
+[How far the evidence goes](#how-far-the-evidence-goes) gives the scope of the evidence behind this use.
+
+### Compare only at one resolution
+
+An edge width is in pixels of the image as it arrives, so the same scene at half the size has narrower edges, and
+values from images of different resolutions do not compare. On three frames blurred with a Gaussian of sigma 3 pixels,
+halving the width and height of the frame moved `blur` from between 1.40 and 1.60 to between 1.03 and 1.07. Measure at
+one resolution, and do not put a {class}`.Resize` in front of the statistic. A resize declares the blur statistics as
+invalidated.
+[Transforms and the statistics they invalidate](ImageStatistics.md#transforms-and-the-statistics-they-invalidate)
+describes the declarations.
+
+{func}`.image_stats` warns once per call when blur is requested on images of more than one size. {class}`.Outliers`
+makes one call for each dataset it is given, so datasets that each hold one size but differ from each other do not
+warn.
+
+A video frame is shrunk by area averaging to a short side of 720 pixels before it is measured, and never enlarged, so
+videos with a short side of 720 or more are measured at one scale. The video check could not test whether videos of
+different native sizes then compare. A video below 720 is measured at its own size, and its values compare only with
+those of videos measured at that size. {func}`.video_stats` likewise warns once per call when blur is requested and its
+videos are measured at more than one short side. The size of 720 is provisional. It is the scale at which the image
+evidence was gathered, and a sweep did not choose it.
+
+### Blur that changes within a video
+
+`blur_level` does not say how much the blur varies within a video. Measure the frames with {func}`.image_stats` and
+`ImageStats.VISUAL_BLUR`, and roll up the per-frame `blur` of each video with `std` or `variability`, as
+[Volatility and drift of a per-frame statistic](MetadataLevels.md#volatility-and-drift-of-a-per-frame-statistic)
+shows for brightness. This recipe was not run on blur. The roll-up reads a NaN `blur` as missing and answers missing for
+a video with any frame missing, unless you lower its `min_coverage`. The video path shrinks a frame above a short side
+of 720 and reads luma, where `image_stats` keeps the size and averages the bands, so above that size the per-frame
+values are on another scale, and for a color frame they differ from `blur_level` even at the same size.
+
 ## Related concept pages
 
-- [Image statistics](ImageStatistics.md) describes the pixel and visual statistics, the value range and the transforms
-  that invalidate statistics.
-- [Data integrity](DataIntegrity.md) describes the evaluators these statistics feed.
-- [Metadata levels](MetadataLevels.md) describes how a per-frame statistic is rolled up to each video.
-- [Stability status](ValidationAndTrust.md#stability-status) in Validation and trust lists the blur statistics among
-  the experimental features.
+- [Image statistics](ImageStatistics.md): the pixel and visual statistics, the value range and the transforms that
+  invalidate statistics
+- [Data integrity](DataIntegrity.md): the evaluators these statistics feed
+- [Metadata levels](MetadataLevels.md): how a per-frame statistic is rolled up to each video
+- [Validation and trust](ValidationAndTrust.md#stability-status): the experimental features, including the blur
+  statistics
 
 ## See this in practice
 
 ### How-to guides
 
-- [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows what an operation invalidates and
-  the three ways to respond.
+- [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates and the
+  three ways to respond
 
 ## References
 

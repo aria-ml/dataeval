@@ -6,20 +6,20 @@ A model trained and validated on one dataset is deployed into a world that does
 not hold still. Operational environments shift: seasons change, sensors degrade,
 mission parameters evolve, target populations shift. When the statistical
 properties of data encountered during deployment diverge from the properties of
-training data, model performance degrades. The model's learned decision
+training data, model performance can degrade. The model's learned decision
 boundaries were optimized for a distribution that no longer describes what it
 sees.
 
 This is **distribution shift**: the gap between training distribution and
-operational distribution. It is not a rare edge case. For systems with long
-fielded lifespans, it is a planning assumption.
+operational distribution. It is common, and for systems with long fielded
+lifespans it is a planning assumption.
 
 DataEval provides two related but distinct capabilities for managing this gap.
 **Drift detection** operates at the population level: it monitors whether a
 batch of incoming data as a whole is statistically consistent with the training
 reference. **Out-of-distribution (OOD) detection** operates at the instance
 level: it scores individual samples for how anomalous they are relative to what
-the model was trained on. Both are necessary; neither is sufficient alone.
+the model was trained on. The two are complementary.
 
 ## Taxonomy of shift
 
@@ -592,38 +592,6 @@ anomalies are semantically coherent images of unseen object types that an
 autoencoder can reconstruct plausibly and that are not spatially distant in
 embedding space.
 
-## When to use it
-
-Drift detection should begin as soon as a model enters operational deployment.
-Every batch of data the model processes is a candidate for drift monitoring. The
-monitoring cadence depends on operational tempo: for high-throughput real-time
-systems, monitoring may run on statistical samples; for batch processing
-systems, each batch should be tested.
-
-For choosing among drift detectors: start with a univariate test (KS as a
-baseline) on pre-computed embedding dimensions or image statistics for
-computational efficiency. Add MMD or the domain classifier when embedding-space
-correlations are important or when univariate tests fail to detect known drift.
-Add uncertainty-based detection when you have a deployed classifier and want a
-label-free signal of how its confidence changes, next to a feature-based
-detector. Check what the monitor flags against degraded labeled images before
-you rely on it.
-
-OOD detection is most valuable at two points: during post-training data
-ingestion (to flag anomalous samples before they reach a model) and during
-operational monitoring (to identify individual predictions that should be
-flagged for human review because the input is outside the training
-distribution). Reconstruction-based detection is preferred when the reference
-data has complex structure that must be learned and when feature-level
-localization is needed. Distance-based detection is preferred for fast
-deployment, frequent reference updates, or when high-quality pre-trained
-embeddings are available. The domain classifier is preferred when anomalies are
-semantically coherent samples of unseen types that neither reconstruction error
-nor embedding distance readily separates.
-
-To better understand what to do after detecting drift or OOD samples, review the
-[Distribution Shift section in the Acting on Results explanation page](ActingOnResults.md#distribution-shift-findings).
-
 ## Limitations
 
 All drift detectors require a stable and representative reference dataset. If
@@ -632,13 +600,13 @@ detector will have a miscalibrated baseline. See the [Dataset bias and
 coverage](DatasetBias.md) concept page for guidance on assessing reference
 quality.
 
-Statistical drift tests produce p-values, not certainties. A very large batch
-will produce statistically significant drift detections for differences that
+Statistical drift tests produce p-values and not certainties. A very large batch
+can produce statistically significant drift detections for differences that
 have no practical impact on model performance: the tests become sensitive to
 trivial distributional variation at scale. Conversely, small batches reduce
 statistical power and may miss real shift. The operational significance of a
-drift detection always requires judgment about the magnitude and nature of the
-shift, not just the p-value.
+drift detection depends on the magnitude and nature of the shift, not only on
+the p-value.
 
 The tests read each row as an independent sample. Frames of one video share a
 scene and a camera, so a few videos presented frame by frame look like many
@@ -677,18 +645,50 @@ points become increasingly uniform, reducing the discriminability of the OOD
 score. Dimensionality reduction before KNN scoring may be necessary for very
 high-dimensional embeddings.
 
+## When to use it
+
+Drift detection should begin as soon as a model enters operational deployment.
+Every batch of data the model processes is a candidate for drift monitoring. The
+monitoring cadence depends on operational tempo: for high-throughput real-time
+systems, monitoring may run on statistical samples; for batch processing
+systems, each batch should be tested.
+
+For choosing among drift detectors: start with a univariate test (KS as a
+baseline) on pre-computed embedding dimensions or image statistics for
+computational efficiency. Add MMD or the domain classifier when embedding-space
+correlations are important or when univariate tests fail to detect known drift.
+Add uncertainty-based detection when you have a deployed classifier and want a
+label-free signal of how its confidence changes, next to a feature-based
+detector. Check what the monitor flags against degraded labeled images before
+you rely on it.
+
+OOD detection is useful at two points: during post-training data
+ingestion (to flag anomalous samples before they reach a model) and during
+operational monitoring (to identify individual predictions that should be
+flagged for human review because the input is outside the training
+distribution). Reconstruction-based detection is preferred when the reference
+data has complex structure that must be learned and when feature-level
+localization is needed. Distance-based detection is preferred for fast
+deployment, frequent reference updates, or when high-quality pre-trained
+embeddings are available. The domain classifier is preferred when anomalies are
+semantically coherent samples of unseen types that neither reconstruction error
+nor embedding distance readily separates.
+
+To decide what to do after detecting drift or OOD samples, see
+[Distribution shift findings](ActingOnResults.md#distribution-shift-findings) in Acting on results.
+
 ## Related concept pages
 
-- [Embeddings](Embeddings.md) — the representation space that MMD, domain
+- [Embeddings](Embeddings.md): the representation space that MMD, domain
   classifier, distance-based OOD, and uncertainty-based drift all operate in
-- [Divergence](Divergence.md) — the quantitative distance metric measuring
+- [Divergence](Divergence.md): the quantitative distance metric measuring
   distribution gaps
-- [Data integrity](DataIntegrity.md) — when anomalous samples are a
+- [Data integrity](DataIntegrity.md): when anomalous samples are a
   collection artifact rather than an operational distribution shift
-- [Dataset bias and coverage](DatasetBias.md) — when the training reference
+- [Dataset bias and coverage](DatasetBias.md): when the training reference
   distribution is itself unrepresentative, drift detection baselines are
   miscalibrated
-- [Performance limits](PerformanceLimits.md) — when persistent shift indicates
+- [Performance limits](PerformanceLimits.md): when persistent shift indicates
   the model must be retrained rather than monitored
 
 ## See this in practice
@@ -702,12 +702,12 @@ high-dimensional embeddings.
 
 ### Tutorials
 
-- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py) —
+- [Monitor shifts in operational data](../notebooks/tt_monitor_shift.py):
   end-to-end walkthrough of drift detection on operational data
-- [Detect drift with prediction uncertainty](../notebooks/tt_detect_drift_with_uncertainty.py) —
+- [Detect drift with prediction uncertainty](../notebooks/tt_detect_drift_with_uncertainty.py):
   monitoring a classifier's own uncertainty with a KS test, and checking what the
   monitor can and cannot see
-- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py) —
+- [Identify out-of-distribution samples](../notebooks/tt_identify_ood_samples.py):
   comparison of reconstruction and distance-based OOD detection methods
 
 ## References

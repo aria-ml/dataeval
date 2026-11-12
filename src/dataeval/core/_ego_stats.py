@@ -1316,6 +1316,15 @@ def ego_stats(
 
     >>> metadata.agg("unit", "sequence", pl.col("ego_trusted").mean().alias("trusted_frac"))  # doctest: +SKIP
 
+    **Sequence roll-ups.** The result declares 11 roll-ups from frame to sequence, which
+    :meth:`~dataeval.Metadata.add_factors` applies by default. ``pan_speed``, ``zoom_rate``,
+    ``roll_rate``, ``shear_rate``, ``mover_frac`` and ``mover_speed`` roll up by median
+    (``pan_speed_median``, and so on). ``pan_x`` and ``pan_y`` roll up by variability
+    (``pan_x_variability``, ``pan_y_variability``), ``zoom_rate`` and ``roll_rate`` by the sum
+    of their absolute values (``zoom_rate_excursion``, ``roll_rate_excursion``), and ``motion``
+    by mode (``motion_mode``). A sequence answers only when at least a quarter of its frames
+    carry a trusted reading, and is null otherwise.
+
     **Units.** ``zoom_rate``, ``roll_rate`` and ``shear_rate`` are per-frame rates and do
     not change with resolution, so they are comparable across differently sized sequences.
     ``pan_speed`` and ``mover_speed`` are pixels per frame in the full resolution of the pair

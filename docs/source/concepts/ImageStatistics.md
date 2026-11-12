@@ -1,10 +1,10 @@
 # Image statistics
 
-`image_stats` measures four families of statistics about an image (pixel, visual,
-dimension, and hash), plus the experimental [blur statistics](BlurStatistics.md). Two of
-the families, pixel and visual, answer fundamentally different kinds of questions.
-Knowing which is which is the difference between a number you can compare across a
-dataset and one you cannot.
+{func}`.image_stats` measures four families of statistics about an image (pixel, visual, dimension, and hash), plus
+the experimental [blur statistics](BlurStatistics.md). Two of the families, pixel and visual, answer different kinds of
+questions, and the distinction determines whether a value can be compared across a dataset. The flags and their
+parameters are in {func}`~dataeval.core.image_stats`, and the full statistic list is in
+{class}`~dataeval.flags.ImageStats`.
 
 ## Raw values and visual interpretation
 
@@ -12,14 +12,13 @@ A **pixel statistic** reduces the values as they were stored. `PIXEL_MEAN` on a
 16-bit image is a mean of numbers that run to 65535, because that is what the file
 contains. It describes the data.
 
-A **visual statistic** stands in for how the image looks to a person.
-`VISUAL_BRIGHTNESS` is a claim about appearance, and appearance is a position between
-black and white rather than a value in whatever units the sensor wrote. So a visual
-statistic first resolves the image's **full-scale reference** (what counts as white)
-and reports against the 0–255 display range.
+A **visual statistic** approximates how the image looks to a person. `VISUAL_BRIGHTNESS`
+describes appearance, which is a position between black and white and not a value in the
+sensor's units. A visual statistic therefore first resolves the image's **full-scale
+reference** (what counts as white) and reports against the 0–255 display range.
 
-That single difference is why the same picture, handed over four ways, reads
-identically to every visual statistic:
+That difference is why the same picture, stored four ways, gives the same value for each
+of the three visual statistics shown:
 
 | Encoding | `brightness` | `darkness` | `sharpness` |
 | --- | --- | --- | --- |
@@ -28,25 +27,26 @@ identically to every visual statistic:
 | `float` in [0, 1] | 61.0 | 191.0 | 112.11 |
 | `float` in [0, 255] | 61.0 | 191.0 | 112.11 |
 
-and why its pixel statistics do not:
+and why its pixel statistics differ:
 
 | Encoding | `mean` | `std` |
 | --- | --- | --- |
 | `uint8` | 126.88 | 75.42 |
 | `uint16` (the same values ×257) | 32607.54 | 19382.91 |
 
-Neither table is wrong. They answer different questions. "Is this image dark?" is a
-visual question and has one answer. "What is the mean of these values?" is a question
-about the data and has two, because there are two sets of values.
+Both tables are correct and describe different properties. Visual statistics characterize normalized appearance, and
+pixel statistics characterize the stored values. "Is this image dark?" is a question about appearance and has one
+answer. "What is the mean of these values?" is a question about the data and has two answers, because there are two
+sets of values.
 
 ## Where the reference comes from
 
-The reference is not the image's brightest pixel. Reading it off the data would mean
-every image is normalized against its own maximum, so a photograph of a night sky and
-one of a beach would both report mid-gray, the opposite of comparable.
+The reference is not the image's brightest pixel. Normalizing each image against its own maximum would bring a
+photograph of a night sky and one of a beach to the same full scale, so brightness values would not be comparable
+across images.
 
-Instead it is **decoded** where the data carries an encoding, because integer image
-formats are power-of-two:
+Instead the reference is **decoded** from the data's encoding where one exists, because integer image formats use
+power-of-two ranges:
 
 | Input | Reference |
 | --- | --- |
@@ -56,9 +56,9 @@ formats are power-of-two:
 | `float` within [0, 1] | 1.0 (already normalized) |
 | `float` within [0, 255] | 255 (an 8-bit image in a float array) |
 
-Two of those are float conventions rather than encodings, and they are recognized
-because they are the two ordinary ways an ordinary image arrives: a `ToTensor`-style
-pipeline produces the first, a resize or any interpolation produces the second.
+Two of these are float conventions and not encodings. They are recognized because they are two common ways an image
+arrives as a float array: a `ToTensor`-style pipeline produces the first, and a resize or other interpolation produces
+the second.
 
 ## When there is no reference
 
@@ -67,10 +67,9 @@ in Celsius, a 16-bit band holding physical units: the dynamic range of these is 
 property of the sensor, not of a file format, and nothing about the array reveals it.
 There is no encoding to decode.
 
-For that data, visual statistics report NaN. Not an error: "how bright is this
-elevation map" is a question with no answer, and NaN is how a statistic says so. Pixel
-statistics (and other statistics that do not rely on an interval) are unaffected,
-because the mean of a temperature band is a perfectly good mean.
+For that data, visual statistics report NaN. This is not an error: "how bright is this elevation map" has no answer,
+and NaN represents an unknown value. Pixel statistics (and other statistics that do not rely on an interval) are
+unaffected, because the mean of a temperature band is a valid mean.
 
 Declare the interval to get a reading back:
 
@@ -87,9 +86,9 @@ which is a request to divide by a range that does not exist.
 
 When this happens, a warning names `value_range`, because an all-NaN column is easy to miss.
 
-## Which statistics care about scale at all
+## Statistics that depend on scale
 
-Fewer than you might expect. Of the pixel family, only three change when the values
+Few statistics depend on scale. Of the pixel family, only three change when the values
 are rescaled:
 
 | Changes with scale | Already scale-free |
@@ -102,23 +101,21 @@ are rescaled:
 the same reference the visual family uses, which makes a pixel distribution comparable
 across bit depths.
 
-It does not touch visual statistics, which already are scaled.
+It does not change visual statistics, which are already scaled to the display range.
 
 ## Choosing between them
 
-Reach for a visual statistic when the question is about appearance and you want one
-answer across a mixed dataset, such as which images are unusually dark, which are
-blurry, or whether the test set is shot in different lighting than the train set.
+Use a visual statistic when the question is about appearance and you want one answer across a mixed dataset, such as
+which images are unusually dark, which are blurry, or whether the test set is shot in different lighting than the train
+set.
 
-Reach for a pixel statistic when the question is about the values themselves, such as
-what fraction of this band is saturated, how much information this image carries, or
-whether there are NaNs. Where the dataset is uniformly encoded, which is the usual
-case, its raw values are already comparable and nothing extra is needed.
+Use a pixel statistic when the question is about the values themselves, such as what fraction of this band is
+saturated, how much information this image carries, or whether there are NaNs. Where the dataset is uniformly encoded,
+which is common, its raw values are already comparable and nothing extra is needed.
 
 Where a dataset mixes encodings and you want comparable pixel distributions, pass
-`normalize_pixel_values=True`. But consider whether `VISUAL_BRIGHTNESS` is the
-statistic you actually wanted; a normalized `PIXEL_MEAN` is often a less direct route
-to the same question.
+`normalize_pixel_values=True`. Check whether `VISUAL_BRIGHTNESS` answers the question
+more directly; a normalized `PIXEL_MEAN` is often a less direct route to the same result.
 
 ## Blur statistics
 
@@ -128,16 +125,17 @@ The blur statistics, `blur` and `blur_directionality`, measure the width of edge
 
 ## Transforms and the statistics they invalidate
 
-A transform has two possible homes, and choosing the wrong one fails silently. If you put model preprocessing in the
-view, every evaluator sees it: {class}`.Outliers` reports brightness and contrast on ImageNet-normalized tensors, which
-are not numbers about your data. If you put dataset-defining manipulation in the extractor, only the embeddings see it:
-if 512x512 tiles are what ships, your statistics still describe source-resolution imagery that does not.
+A transform can be placed in the view or in the extractor, and choosing the wrong placement fails silently. Model
+preprocessing placed in the view is seen by every evaluator: {class}`.Outliers` then reports brightness and contrast on
+ImageNet-normalized tensors, which do not describe the data. Dataset-defining manipulation placed in the extractor is
+seen only by the embeddings: if 512x512 tiles are what ships, the statistics still describe source-resolution imagery,
+which does not ship.
 
 Two questions place a transform. Does an evaluator that never touches your model need to see it? If so, it belongs in
 the {class}`.View`, and if not, in the extractor's `transforms=`. Is it deterministic, with an unambiguous rewrite of
 the targets? If so, use a curated operation, and if not, {class}`.TorchvisionTransform`.
 
-| Kind | Example | Home |
+| Kind | Example | Placement |
 | --- | --- | --- |
 | Model-input adaptation | resize-to-224, ImageNet normalize, dtype cast | the extractor's `transforms=` |
 | Dataset definition | crop out a HUD, downsample to the deployed resolution, band selection | {class}`.Resize`, {class}`.Crop` and {class}`.SelectChannels` in a view |
@@ -151,32 +149,32 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
 the blur statistics, which are edge widths in pixels. It leaves the pixel statistics, the channel count and the hashes
-alone, so resize-then-hash is a better near-duplicate check across heterogeneous source resolutions, not a worse one.
+alone, so resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing
+at source resolution.
 The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the two overlap
 they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now
 describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
 responses.
 
 The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, because an arbitrary
-transform can move anything. {class}`.SelectChannels` with `"gray"` declares the blur statistics too, because a
+transform can change any statistic. {class}`.SelectChannels` with `"gray"` declares the blur statistics too, because a
 luminance mix changes which picture is read. Random transforms are seeded for each datum from the datum's `id`, so the
 view is stable: the statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice
 gives identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its
 sidecar, because provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
-`v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. That is the last
+`v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is one more
 reason to prefer the curated operations.
 
-## See also
+## Related concept pages
 
-- {doc}`DataIntegrity` — the evaluators these statistics feed
-- {func}`~dataeval.core.image_stats` — the flags and their parameters
-- {class}`~dataeval.flags.ImageStats` — the full statistic list
+- [Data integrity](DataIntegrity.md): the evaluators these statistics feed
+- [Blur statistics](BlurStatistics.md): the experimental edge-width statistics
 
 ## See this in practice
 
 ### How-to guides
 
-- [Measure named groups of channels](../notebooks/h2_measure_channel_groups.py) — naming groups of bands so
-  that each group is measured separately.
-- [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) — what an operation invalidates
-  and the three ways to respond.
+- [Measure named groups of channels](../notebooks/h2_measure_channel_groups.py): naming groups of bands so
+  that each group is measured separately
+- [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates
+  and the three ways to respond

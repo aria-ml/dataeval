@@ -621,6 +621,14 @@ class Metadata(Array, FeatureExtractor):
     from factor values triggers binning. Nothing is computed at construction time, so
     an unbound instance is cheap to build and reuse.
 
+    On tracking datasets, structuring also records per-track factors. ``track_length`` counts
+    a track's observations and ``frame_span`` counts the frames from its first to its last
+    inclusive, so they differ when the track has gaps. ``duration_s`` is the elapsed time over
+    the same span, and is recorded for a track whose first and last frames both declare a
+    timestamp. ``track_length`` and ``frame_span`` equal ``n_appearances`` and
+    ``track_duration`` from :func:`~dataeval.core.track_stats`, so attaching that result adds
+    columns metadata already has.
+
     Example
     -------
     Using as a feature extractor with drift detection:

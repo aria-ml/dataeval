@@ -2,29 +2,25 @@
 
 # Dataset bias and coverage
 
-A model is only as good as the data it learned from. Two distinct but related
-problems determine whether a dataset will produce a model that generalizes to
-its operational environment: **bias**, where the statistical properties of the
-training set systematically misrepresent the real-world distribution, and
-**coverage**, where the dataset fails to populate enough of the relevant feature
-space for the model to perform reliably across the conditions it will encounter.
+Two related problems affect whether a dataset produces a model that generalizes to its operational environment:
+**bias**, where the statistical properties of the training set systematically misrepresent the real-world distribution,
+and **coverage**, where the dataset fails to populate enough of the relevant feature space for the model to perform
+reliably across the conditions it will encounter.
 
-These are not the same problem and they do not have the same solution, but they
-often co-occur. A dataset collected exclusively from a single sensor platform in
-fair-weather conditions may be both biased (overrepresenting those conditions
-relative to the operational environment) and lacking in coverage (leaving large
-regions of the feature space, such as night, rain, and alternative sensor
-modalities, entirely empty). Understanding the distinction, and measuring both,
-is a core part of dataset readiness assessment for AI development.
+These problems differ, and they do not have the same solution, but they often co-occur. A dataset collected
+exclusively from a single sensor platform in fair-weather conditions may be both biased (overrepresenting those
+conditions relative to the operational environment) and lacking in coverage (leaving large regions of the feature
+space, such as night, rain, and alternative sensor modalities, empty). Both are assessed as part of dataset readiness
+for AI development.
 
-A dataset that is ready for training should satisfy five properties with respect
-to its known factors:
+Dataset readiness assessment considers five properties with respect to a dataset's known factors. Each is judged
+against the operational population and is not an ideal that every dataset must meet.
 
-- Balanced: class labels are statistically independent of metadata factors; no
-  condition, sensor, or context is systematically associated with a particular
-  class.
-- Covered: samples populate the relevant regions of the feature space; there are
-  no gaps the model will encounter in deployment but has never seen in training.
+- Balanced: class labels are statistically independent of metadata factors, so that no condition, sensor, or context
+  is systematically associated with a particular class. Independence is a reference point and not a requirement: an
+  association that also holds in the operational population is not by itself evidence of bias.
+- Covered: samples populate the relevant regions of the feature space, leaving no gap that the model will encounter in
+  deployment but has not seen in training.
 - Complete: the dataset spans the full dimensionality of the embedding space;
   samples are not so similar to each other that they effectively occupy only a
   fraction of the representational capacity available.
@@ -35,42 +31,38 @@ to its known factors:
   off-domain images, misassigned sources, or annotation artifacts that introduce
   class structure the model should not learn.
 
-The tools described in this page address each of these properties directly.
-Balance and Diversity assess whether the dataset is balanced, and
-[Parity](Parity.md) tests it for each factor level and class. Coverage and
-Completeness assess whether it is covered and complete. Representativeness and
-relevance are assessed through the combination of metadata analysis and the
-domain context the practitioner brings to interpreting the results.
+The tools described on this page assess the first three properties. Balance and Diversity assess whether the dataset
+is balanced, and [Parity](Parity.md) tests it for each factor level and class. Coverage and Completeness assess whether
+it is covered and complete. No tool on this page computes representativeness or relevance. They are judged by combining
+metadata analysis with the operational context that the practitioner supplies.
 
 ## What they are
 
 ### Bias
 
-Dataset bias occurs when a systematic property of how data was collected or
-labeled causes the training distribution to diverge from the true operational
-distribution in a way that will predictably harm model performance.
+Dataset bias occurs when a systematic property of how data was collected or labeled causes the training distribution
+to diverge from the true operational distribution in a way that can reduce model performance on that distribution.
 
-The key word is systematic. Random noise in a large dataset averages out. Bias
-does not: it pushes the model's decision boundaries in a consistent direction,
-producing a model that performs well on data that resembles the training set and
-fails on data that does not.
+Bias is systematic. Random noise in a large dataset tends to average out, whereas bias shifts the model's decision
+boundaries in a consistent direction. A model trained on biased data can perform well on data that resembles the
+training set and poorly on data that does not.
 
 [Friedman & Nissenbaum (1996)](#ref2) grouped bias into: pre-existing bias
 (inherited from social or institutional practice), technical bias (introduced by
 design choices in the system), and emergent bias (arising from deployment in a
 context the system was not designed for). This is a useful framework for
-understanding the origins of bias. However, to better understand where in the
-data pipeline the bias entered, a more actionable distinction is:
+describing the origins of bias. This page uses a distinction based on where in the
+data pipeline the bias entered:
 
 **Sampling bias** arises when the mechanism of data collection systematically
 favors certain conditions over others. A dataset assembled from a single proving
-ground, a single sensor platform, or a single collection window will oversample
-those conditions and undersample everything else, not because of any flaw in
-what was labeled, but because of what was collected in the first place.
-[Torralba & Efros (2011)](#ref11) showed that this effect is pervasive across
+ground, a single sensor platform, or a single collection window can oversample
+those conditions and undersample everything else, because of what was collected
+and not because of any flaw in what was labeled.
+[Torralba & Efros (2011)](#ref11) showed that this effect appears across
 widely used benchmark datasets: classifiers trained on one dataset perform well
-within it but transfer poorly to others, because the collection conditions
-themselves are a latent variable the model has learned to exploit.
+within it but transfer poorly to others. This is consistent with the collection
+conditions acting as a latent variable that the model exploits.
 
 **Representation bias** is the distributional consequence of sampling choices,
 but it is distinct enough to treat separately because it can arise without any
@@ -79,47 +71,46 @@ under-represented because the target phenomenon is rare, because collection
 constraints limited access, or because systematic gaps in what was deemed worth
 collecting were never recognized as gaps. A dataset can be sampled correctly
 from a convenience population and still be unrepresentative of the operational
-distribution. [Fabbrizzi et al. (2022)](#ref1) survey the full taxonomy of
+distribution. [Fabbrizzi et al. (2022)](#ref1) survey a taxonomy of
 representation gaps in visual datasets and document how frequently they appear
 even in widely used benchmarks. [Merler et al. (2019)](#ref7) illustrate the
 downstream consequences in face recognition, where representation gaps across
-demographic groups produced systematic performance disparities invisible to
-aggregate accuracy metrics.
+demographic groups produced systematic performance disparities that aggregate
+accuracy metrics can hide.
 
 **Label bias** arises when the annotation process introduces systematic errors.
 Human annotators may apply labels inconsistently across classes, across
 annotators, or across contextual conditions. When certain classes are
 consistently annotated more carefully than others, or when annotator
 disagreement correlates with a metadata factor (time of day, image quality,
-object size), the learned decision boundary reflects annotation practice rather
-than ground truth.
+object size), the learned decision boundary can reflect annotation practice and not
+ground truth.
 
 Any form or combination of bias can produce **shortcut learning** in the trained
 model. When a metadata factor, such as background environment, sensor platform,
 weather condition, or time of day, is consistently associated with a class label
 in training data, the model can achieve low training loss by learning the
 metadata correlation rather than the intended feature.
-[Geirhos et al. (2020)](#ref3) provide the canonical treatment of this failure
-mode in computer vision, with the well-known example of models that classify
-"cow" by detecting grass rather than the animal. In real world datasets,
-analogous shortcuts are common: target detection models that learn sensor
-platform as a proxy for target class, or that perform well only in the lighting
-conditions of the original collection campaign.
+[Geirhos et al. (2020)](#ref3) treat this failure mode in computer vision, with
+the example of models that classify "cow" by detecting grass rather than the
+animal. In real world datasets, analogous shortcuts can occur: target detection
+models that learn sensor platform as a proxy for target class, or that perform
+well only in the lighting conditions of the original collection campaign.
 
 ### Coverage
 
 Coverage is a geometric concept. It describes how well a dataset populates the
 relevant regions of the {term}`embedding <Embeddings>` space, the
-high-dimensional representation space in which the model "sees" the data.
+high-dimensional space in which a model represents the data.
 
 A dataset with high coverage has samples distributed across the full range of
 conditions the model will encounter in deployment. A dataset with poor coverage
 has dense clusters in some regions and empty regions ("cold spots") elsewhere. A
-model trained on low-coverage data performs well on inputs that resemble the
+model trained on low-coverage data can perform well on inputs that resemble the
 dense regions and poorly on inputs that fall in the cold spots, regardless of
 how many total samples the dataset contains.
 
-Coverage and sample count are independent. A dataset of 100,000 images collected
+Coverage is not determined by sample count. A dataset of 100,000 images collected
 from a single afternoon at a single location may have far worse coverage of the
 operational distribution than a dataset of 5,000 images deliberately collected
 across diverse conditions, sensors, times, and environments.
@@ -132,29 +123,24 @@ represents while still being incomplete (collapsed into a lower-dimensional
 subspace) if the collected samples are too similar to each other in their
 high-level features.
 
-Consider a vehicle detection dataset assembled from three collection campaigns:
-urban daylight, suburban daylight, and rural daylight. A coverage analysis might
-show that the data adequately populate the embedding regions corresponding to
-each of those three conditions, with no cold spots within them. But a
-completeness analysis would reveal that all three campaigns share the same
-sensor, lighting band, and weather profile, so the dataset's embeddings collapse
-into a narrow subspace. Night conditions, adverse weather, and alternative
-sensor modalities are not merely undersampled; they are entirely absent from the
-space the dataset spans. A model trained on this dataset would have high
-confidence in the represented conditions and no meaningful representation of
-anything outside them, a failure that neither sample count nor
-within-distribution coverage metrics would surface.
+Consider a hypothetical vehicle detection dataset assembled from three collection campaigns: urban daylight,
+suburban daylight, and rural daylight. A coverage analysis could show that the data populate the embedding regions
+corresponding to each of those three conditions, with no cold spots within them. A completeness analysis could show
+that the embeddings occupy a narrow subspace, because all three campaigns share the same sensor, lighting band, and
+weather profile. Night conditions, adverse weather, and alternative sensor modalities would then be absent from the
+space the dataset spans and not only undersampled. A model trained on this dataset can be expected to perform well in
+the represented conditions and to have no basis for performance outside them. Neither sample count nor
+within-distribution coverage would indicate this.
 
 ## Theory
 
 ### Measuring bias: mutual information and evenness
 
-{class}`.Balance` and {class}`.Diversity` both measure bias through the lens of
-metadata, the contextual variables attached to each sample (sensor platform,
-weather, time of day, location, annotator ID, and so on). The fundamental
-question they answer is: are class labels independent of these factors?
+{class}`.Balance` and {class}`.Diversity` measure bias using metadata, the contextual variables attached to each
+sample (sensor platform, weather, time of day, location, annotator ID, and so on). Balance tests whether class labels
+are independent of these factors. Diversity measures how evenly samples are spread across the values of each factor.
 
-**Balance** measures the statistical dependence between class labels and
+Balance measures the statistical dependence between class labels and
 metadata factors or two metadata factors using
 {term}`mutual information (MI) <Mutual Information (MI)>`. Mutual information
 quantifies how much knowing one variable reduces uncertainty about another:
@@ -166,7 +152,7 @@ factor. When $Y$ and $M$ are independent, $I(Y; M) = 0$. When knowing $M$ comple
 determines $Y$, $I(Y; M)$ equals the entropy of $Y$.
 
 Raw MI values are difficult to interpret, so DataEval provides normalized MI
-(NMI), a value guaranteed to be between 0 and 1. The type of normalization that
+(NMI), a value between 0 and 1. The type of normalization that
 DataEval applies depends on the type of data passed in.
 
 If both factors are unbinned discrete factors, then DataEval divides by the
@@ -181,11 +167,10 @@ if and only if either factor determines the other.
 If one factor is unbinned discrete and the other continuous, DataEval normalizes
 by the entropy of the discrete variable.
 
-If neither variable is unbinned discrete &emdash i.e., if both are continuous or
-binned discrete or one of each &emdash the mutual information is not bounded and
-cannot be normalized, so DataEval returns a transformation of the MI onto the
-interval [0, 1]. (In the case of two random normal variables, this transformed MI
-is their correlation coefficient. See [Linfoot (1957)](#ref13))
+If neither variable is unbinned discrete (that is, both are continuous, both are binned discrete, or one of each),
+the mutual information is not bounded and cannot be normalized, so DataEval returns a transformation of the MI onto the
+interval [0, 1]. For two jointly normal variables, the transformed value is the square of their correlation
+coefficient ([Linfoot, 1957](#ref13)).
 
 Between the class label and a factor the question is directed (how much of the
 class label does this factor account for), and every factor is measured against
@@ -198,13 +183,13 @@ comparable to each other, so the result can be read as a ranking of the factors.
 Dividing each factor by its own entropy instead would reward a factor for having
 few categories rather than for being informative: a coarse grouping of the class
 label reaches 1.0 under the minimum while accounting for only a fraction of what
-the class label tells you, and would outrank a factor that explains more.
+the class label conveys, and would outrank a factor that explains more.
 
 The correction below is subtracted from the denominator as well, and it grows
 with a factor's cardinality, so the denominator is not identical across factors.
 The effect is small over the range a binned factor occupies and grows from
-there, which means the ranking is dependable between factors of comparable width
-and scores a very wide factor conservatively rather than generously.
+there, which means the ranking holds between factors of comparable width and a
+very wide factor receives a lower score than an uncorrected measure would give.
 
 $\mathbb{E}[I(Y; M)]$ is the mutual information expected under a random
 assignment holding the same margins, and subtracting it corrects for chance.
@@ -213,18 +198,19 @@ categories even when the two variables are independent: every extra category is
 another opportunity for the counts to line up by luck, and with finite data some
 of them do. Uncorrected, an identifier column taking a distinct value per sample
 can outrank a genuine effect. With the correction an unrelated factor scores
-near zero whatever its cardinality, while an informative one is barely touched.
-The same correction is applied between two metadata factors, over the smaller of
-their two entropies rather than the class entropy. Without it, a factor binned
-finely enough reports a correlation with everything it is measured against.
-[Vinh et al. (2010)](#ref12) provide a comprehensive analysis of normalization
-schemes for information-theoretic association measures, including their behavior
-under chance and the conditions under which each is most appropriate.
+near zero regardless of its cardinality, and the score of an informative factor
+changes little. The correction can make the numerator negative for an unrelated
+pair, and the reported value is clipped to [0, 1]. The same correction is
+applied between two metadata factors, over the smaller of their two entropies
+rather than the class entropy. Without it, a factor binned finely enough can
+report a correlation with everything it is measured against.
+[Vinh et al. (2010)](#ref12) analyze normalization schemes for
+information-theoretic association measures, including their behavior under
+chance and the conditions under which each is most appropriate.
 
-Values close to 1 indicate high dependence; values close to 0 indicate near-
-independence. When one variable has zero entropy (a degenerate factor that takes
-a single value), DataEval correctly sets the mutual info and its normalized
-value to zero as well.
+Values close to 1 indicate high dependence; values close to 0 indicate near-independence. When one variable has zero
+entropy (a degenerate factor that takes a single value), DataEval sets the mutual information and its normalized value
+to zero.
 
 {class}`.Balance` computes NMI at two levels. The **global** output measures the
 dependence between each metadata factor and the class labels across the full
@@ -245,7 +231,7 @@ from scikit-learn for both discrete and continuous metadata factors, falling
 back to KNN-based estimation ([Kraskov et al., 2004](#ref6);
 [Ross, 2014](#ref8)) for continuous variables. DataEval infers discreteness from
 the proportion of unique values in a factor. Discreteness is a statement about a
-factor's support rather than a promise that the support is small, so a numeric
+factor's support and does not imply that the support is small, so a numeric
 factor that reads as discrete but takes more distinct values than the sample can
 fill, such as pixel areas, timestamps, or a non-reserved identifier-like column,
 is binned as well, against the same budget a histogram would use. Without that,
@@ -265,7 +251,7 @@ the class entropy and an inter-factor value is a share of the smaller of two
 factor entropies, so compare values within a table rather than between them.
 ```
 
-**Diversity** measures the evenness of sampling across each metadata factor,
+Diversity measures the evenness of sampling across each metadata factor,
 independently of class labels. Where Balance asks "is class label correlated
 with this factor?", Diversity asks "are samples spread uniformly across this
 factor's values?"
@@ -295,8 +281,8 @@ default is Simpson.
 
 Diversity is computed both globally across the full dataset and classwise within
 each class. Low classwise diversity for a particular class and factor (for
-example, all "aircraft" samples collected at the same location) is a direct
-indicator of collection bias for that class.
+example, all "aircraft" samples collected at the same location) can indicate
+collection bias for that class.
 
 ### Testing association: Parity
 
@@ -314,8 +300,8 @@ described on the [Parity](Parity.md) page.
 Coverage analysis works in {term}`embedding <Embeddings>` space. Images are
 first projected into a compact vector representation using a pre-trained feature
 extractor, so that geometric distance between vectors corresponds to perceptual
-or semantic similarity between images. Coverage then asks: given this geometry,
-which images are in well-populated regions of the space, and which are isolated?
+or semantic similarity between images. Coverage then identifies which images are
+in well-populated regions of the space and which are isolated.
 
 DataEval provides two coverage algorithms.
 
@@ -335,14 +321,14 @@ requirement or it does not.
 radius for each sample is the distance to its $k$-th nearest neighbor. The
 adaptive threshold is set so that a specified percentage of samples (those with
 the largest critical value radii) are classified as uncovered. This approach is
-more robust when embeddings are not uniformly distributed across the unit
-hypercube, which is almost always the case in practice. The adaptive method
-identifies the most isolated samples relative to the actual distribution of the
-data, rather than against a theoretical uniform baseline.
+better suited to embeddings that are not uniformly distributed across the unit
+hypercube, which is typical of embeddings from a trained feature extractor. The
+adaptive method identifies the most isolated samples relative to the actual
+distribution of the data, and not against a theoretical uniform baseline.
 
 Both methods are based on [Ting et al. (2022)](#ref10).
 
-**Completeness** measures dimensional utilization of the embedding space using
+Completeness measures dimensional utilization of the embedding space using
 eigenvalue entropy. The embedding matrix is rank-normalized before
 decomposition: each column is replaced by its within-column rank, scaled to the
 interval $(-\frac{1}{2}, \frac{1}{2})$. This makes the metric invariant to
@@ -369,9 +355,8 @@ $\text{completeness} = \frac{d_\text{eff}}{d}$
 
 A completeness score of 1.0 means the dataset uses all available embedding
 dimensions equally. A low completeness score means the dataset is effectively
-collapsed into a lower-dimensional subspace: the samples are too similar to each
-other in high-level structure to provide diverse training signal across the full
-capacity of the embedding model.
+confined to a lower-dimensional subspace. This is consistent with samples that
+are similar to each other in high-level structure.
 
 **Isotropy** measures how evenly the data spans the dimensions it actually
 occupies. Rather than comparing effective dimensionality to the full ambient
@@ -402,8 +387,8 @@ many dimensions but with variance concentrated in a few).
 
 Both metrics rest on the effective dimensionality $d_\text{eff} = e^H$, where
 $H$ is the Shannon entropy of the covariance eigenvalues normalized to sum to
-one. This estimator is novel in this exact form but not unprecedented: it is
-closely related to the **effective rank** of [Roy & Vetterli (2007)](#ref14),
+one. This estimator is not taken from a single source. It is closely related to
+the **effective rank** of [Roy & Vetterli (2007)](#ref14),
 which applies the same $e^H$ construction to the normalized singular values.
 Taking the entropy over eigenvalues instead makes $d_\text{eff}$ the exponential
 of the von Neumann entropy of the trace-normalized covariance matrix, the form
@@ -442,10 +427,10 @@ neighbor. Each signal has a flag in the same table. `is_clustered` is true when
 than one.
 
 The defaults are 0.5 for both factors and 0.1 for the threshold. They are
-conservative. At these values a flag means that the class has collapsed, and a
-class a little below its peers is not flagged. You can tighten a factor to catch
-a partial collapse when your classes are of similar size, because isotropy rises
-with class size. A flag is null when it cannot judge, which happens when the
+conservative. At these values a flag is consistent with a class that has
+collapsed, and a class a little below its peers is not flagged. You can tighten
+a factor to catch a partial collapse when your classes are of similar size,
+because isotropy rises with class size. A flag is null when it cannot judge, which happens when the
 class is too small to measure or when the median it is compared with is zero.
 The defaults are tuned for the deep embeddings of a pretrained extractor. On an
 embedding of fewer than about 8 dimensions, healthy classes can have a
@@ -491,12 +476,72 @@ embedding space, the regions that coverage analysis flags as uncovered. The full
 treatment of Prioritization, including policy selection and ordering, is in the
 [Acting on results](ActingOnResults.md) concept page.
 
+## Interpretation
+
+Each measure describes the dataset's own statistics. None of them compares the dataset with the operational
+population, so none establishes that a dataset is biased or unrepresentative in that sense.
+
+- Balance reports normalized mutual information between each metadata factor and the class label. A value near 1
+  indicates that the factor accounts for much of the class label's entropy, and a value near 0 indicates
+  near-independence. The value measures association. It does not establish that the association is a defect, that it
+  is causal, or that a trained model uses it. Compare values within a table and not between the class-to-factor and
+  inter-factor tables.
+- Diversity reports the evenness of sampling across the values of each factor. A low value indicates that samples
+  concentrate in a few values. Whether that departs from the operational distribution depends on the operational
+  distribution, which Diversity does not measure.
+- Coverage identifies the samples that are isolated relative to a radius. The naive radius assumes a uniform
+  distribution across the unit hypercube. The adaptive radius is set so that a specified percentage of samples is
+  uncovered, so it flags that percentage by construction and ranks isolation within the dataset. Neither establishes
+  that an operational condition is missing, because both work in the embedding space of one feature extractor.
+- Completeness reports the ratio of effective to total embedding dimensions, and isotropy reports the evenness of
+  variance across the occupied dimensions. A low completeness is consistent with data confined to a lower-dimensional
+  subspace. It does not identify which conditions are absent.
+
+To decide what to do after assessing for bias, see
+[Dataset bias and coverage findings](ActingOnResults.md#dataset-bias-and-coverage-findings) in Acting on results.
+
+## Limitations
+
+Mutual information estimates from {class}`.Balance` depend on a random seed and
+are consistent to $O(10^{-4})$ but not identical across runs without fixing the
+seed. See the
+[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
+how-to for an example of how to set and use seeds in DataEval. For continuous
+metadata factors, KNN-based MI estimation introduces additional variance that
+falls as the number of neighbors $k$ grows, but a $k$ that is large relative to
+sample count inflates the estimate for a factor associated with the class.
+
+All coverage and completeness analyses are contingent on embedding quality. The
+same data projected through a weak or domain-inappropriate feature extractor
+can produce coverage and completeness scores that reflect the extractor's
+limitations and not the data's properties. Before interpreting coverage
+results, verify that the chosen embedding model produces meaningful geometric
+structure for the target domain (see the [Embeddings](Embeddings.md) concept
+page). An additional concern is that pretrained feature extractors can
+themselves carry biases absorbed during pretraining: systematic geometric
+distortions that cause certain groups or conditions to cluster more tightly or
+more loosely than their true diversity warrants.
+[Steed & Caliskan (2021)](#ref9) demonstrate that representations learned
+through unsupervised pretraining encode human-like social biases. Such biases
+may carry into coverage and completeness assessments.
+
+Balance and Diversity measure the potential for shortcut learning and sampling
+bias. They do not measure whether a trained model has actually learned a
+shortcut. A high NMI between a metadata factor and a class label is a signal to
+investigate, not a guarantee that the model will exploit the correlation.
+Conversely, a low NMI does not rule out shortcuts that operate below the
+resolution of the available metadata.
+
+Parity is experimental. Its p-values depend on independent groups and enough
+effective groups at each level; see
+[Assumptions and their limits](Parity.md#assumptions-and-their-limits).
+
 ## When to use it
 
 Balance and Diversity should be run on any dataset before training begins,
 provided metadata is available. They are most valuable when the dataset was
 assembled from heterogeneous collection events or merged from multiple sources,
-because those are the conditions most likely to produce systematic
+because those conditions can produce systematic
 metadata-class correlations. They are also useful before constructing
 train/validation/test splits, since split quality depends on metadata
 distributions being comparable across splits.
@@ -516,65 +561,26 @@ collection campaign.
 Completeness is most useful as a quick signal on whether a dataset's embedding
 structure is degenerate, that is, whether the collected samples are so similar
 to each other that they effectively span only a fraction of the embedding space.
-A very low completeness score is a flag that the dataset lacks diversity in its
+A very low completeness score can indicate that the dataset lacks diversity in its
 high-level features, even if sample count is high.
 
 ClassBalance is a remediation tool, not a diagnostic. Use it after Balance or
-Diversity analysis has confirmed imbalance, to construct a training or
+Diversity analysis has identified imbalance, to construct a training or
 evaluation subset that corrects for it.
-
-To better understand what to do after assessing for bias, review the
-[Dataset Bias and Coverage section in the Acting on Results explanation page](ActingOnResults.md#dataset-bias-and-coverage-findings).
-
-## Limitations
-
-Mutual information estimates from {class}`.Balance` depend on a random seed and
-are consistent to $O(10^{-4})$ but not identical across runs without fixing the
-seed. See the
-[Configuring the seed](../notebooks/h2_configure_defaults.py#set-the-seed)
-how-to for an example of how to set and use seeds in DataEval. For continuous
-metadata factors, KNN-based MI estimation introduces additional variance that
-falls as the number of neighbors $k$ grows, but a $k$ that is large relative to
-sample count inflates the estimate for a factor associated with the class.
-
-All coverage and completeness analyses are contingent on embedding quality. The
-same data projected through a weak or domain-inappropriate feature extractor
-will produce coverage and completeness scores that reflect the extractor's
-limitations rather than the data's properties. Before interpreting coverage
-results, verify that the chosen embedding model produces meaningful geometric
-structure for the target domain (see the [Embeddings](Embeddings.md) concept
-page). An additional concern is that pretrained feature extractors can
-themselves carry biases absorbed during pretraining: systematic geometric
-distortions that cause certain groups or conditions to cluster more tightly or
-more loosely than their true diversity warrants.
-[Steed & Caliskan (2021)](#ref9) demonstrate that representations learned
-through unsupervised pretraining encode human-like social biases, which can
-propagate silently into coverage and completeness assessments downstream.
-
-Balance and Diversity measure the potential for shortcut learning and sampling
-bias. They do not measure whether a trained model has actually learned a
-shortcut. A high NMI between a metadata factor and a class label is a signal to
-investigate, not a guarantee that the model will exploit the correlation.
-Conversely, a low NMI does not rule out shortcuts that operate below the
-resolution of the available metadata.
-
-Parity is experimental. Its p-values depend on independent groups and enough
-effective groups at each level; see
-[Assumptions and their limits](Parity.md#assumptions-and-their-limits).
 
 ## Related concept pages
 
-- [Parity](Parity.md) — the hypothesis test of factor–class association, with
+- [Parity](Parity.md): the hypothesis test of factor–class association, with
   results for each factor level and class
-- [Binning](Binning.md) — Balance, Diversity and Parity all read binned factors,
+- [Binning](Binning.md): Balance, Diversity and Parity all read binned factors,
   so the cut points decide what these evaluators can see
-- [Embeddings](Embeddings.md) — understanding the representation space that
+- [Embeddings](Embeddings.md): understanding the representation space that
   coverage and completeness operate in
-- [Data integrity](DataIntegrity.md) — when your data has sample-level quality
+- [Data integrity](DataIntegrity.md): when your data has sample-level quality
   problems rather than population-level bias
-- [Performance limits](PerformanceLimits.md) — when bias and coverage problems
+- [Performance limits](PerformanceLimits.md): when bias and coverage problems
   have been addressed but performance is still bounded by the task itself
-- [Acting on results](ActingOnResults.md) — how to use Prioritization to close
+- [Acting on results](ActingOnResults.md): how to use Prioritization to close
   coverage gaps through targeted data collection
 
 ## See this in practice
@@ -590,18 +596,17 @@ effective groups at each level; see
 
 ### Tutorials
 
-- [Identify bias and correlations](../notebooks/tt_identify_bias.py) — end-to-end
+- [Identify bias and correlations](../notebooks/tt_identify_bias.py): end-to-end
   walkthrough of balance and diversity analysis on a realistic dataset
-- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py) —
+- [Assess an unlabeled data space](../notebooks/tt_assess_data_space.py):
   coverage and completeness analysis in practice
-- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py) — label-space and embedding-space
+- [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py): label-space and embedding-space
   gaps in a labeled dataset
 
 ## References
 
 1. [Fabbrizzi, S., Papadopoulos, S., Ntoutsi, E., & Kompatsiaris, I. (2022). A
    survey on bias in visual datasets. *Computer Vision and Image Understanding*,
-
    223, 103552. [paper](https://doi.org/10.1016/j.cviu.2022.103552)]{#ref1}
 
 2. [Friedman, B., & Nissenbaum, H. (1996). Bias in computer systems. *ACM
@@ -650,9 +655,9 @@ effective groups at each level; see
     correction for chance. *Journal of Machine Learning Research*, 11,
     2837–2854. [paper](https://jmlr.org/papers/v11/vinh10a.html)]{#ref12}
 
-13. [Linfoot, E.H. (1957). "An Informational Measure of Correlation."
-    Information and Control, 1(1), 85-89.
-    [paper]<https://www.sciencedirect.com/science/article/pii/S001999585790116X>]{#ref13}
+13. [Linfoot, E. H. (1957). An informational measure of correlation.
+    *Information and Control*, 1(1), 85–89.
+    [paper](https://www.sciencedirect.com/science/article/pii/S001999585790116X)]{#ref13}
 
 14. [Roy, O., & Vetterli, M. (2007). The effective rank: A measure of effective
     dimensionality. *Proceedings of the 15th European Signal Processing

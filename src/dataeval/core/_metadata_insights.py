@@ -103,7 +103,10 @@ def factor_deviation(  # noqa: C901
     Notes
     -----
     1. At least 3 reference samples are needed for meaningful deviation calculation
-    2. Deviations are calculated as scaled distance from reference median
+    2. Deviations are calculated as scaled distance from reference median. The scale differs on each
+       side: a value above the median is divided by the median of the reference's positive deviations,
+       and a value below it by the absolute median of its negative deviations. A side of the reference
+       with no values, or with a median deviation of zero, uses a scale of 1
     3. Each dictionary contains all factors for a single test sample
     4. The order of dictionaries in the result matches the order of indices in the input
 

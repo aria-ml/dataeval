@@ -17,7 +17,7 @@
 # # Specify custom statistics on object detection datasets
 #
 # When you analyze an object detection dataset, you often need
-# [image statistics](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary) at three granularities:
+# [image statistics](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks) at three granularities:
 # whole images, individual bounding boxes, and the background that no box covers. {func}`.image_stats` with
 # {class}`.ImageStats` flags measures each region, and {class}`.Metadata` places every value on the row it describes.
 #
@@ -92,7 +92,7 @@ print(f"Computed statistics: {sorted(results_background['stats'])}")
 # dimension flag is skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest. A
 # background statistic measured over a few percent of an image is unreliable, and where boxes cover an image entirely
 # every background statistic for it is NaN. See
-# [Data integrity](../concepts/DataIntegrity.md#image-statistics-as-a-linting-vocabulary).
+# [Data integrity](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks).
 
 # %%
 # The result spans image rows and target rows; only the image rows carry a background, so the

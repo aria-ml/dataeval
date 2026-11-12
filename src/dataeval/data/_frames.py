@@ -331,6 +331,12 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     nothing in DataEval consumes a sample weight yet, so an unweighted read of a thinned view
     describes *distinct content* rather than the source stream.
 
+    **Roll-ups over a thinned view.** A per-frame factor measured on a thinned view is null on
+    the frames the selector skipped, and a roll-up answers null for a video with any frame
+    unmeasured unless its ``min_coverage`` is lowered. For instance,
+    ``Aggregator("variability", "unit", "sequence", ("brightness",), min_coverage=0.0)`` reads
+    the measured frames.
+
     ``frames_represented`` is exact source-frame mass. Every frame a selector drops is either
     *represented* by a kept frame, as a thinning selector's are, or *excluded*, as a filter's are
     (:attr:`~dataeval.data.FrameSelector.excludes`). Per sequence, the kept frames'
