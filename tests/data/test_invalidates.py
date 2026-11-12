@@ -281,9 +281,13 @@ class TestSpatialDeclarations:
     def test_indices_that_keep_every_row_of_the_items_they_keep_do_not(self, operation):
         assert not operation.invalidates & SPATIAL
 
-    def test_relabel_declares_spatial_when_it_drops_detections_and_not_when_it_raises(self):
+    def test_relabel_declares_the_group_when_it_drops_detections_and_the_class_statistics_always(self):
+        classes = ImageStats.SPATIAL_MAX_IOU_SAME_CLASS | ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS
+
         assert Relabel({"0": "a"}).invalidates & SPATIAL == SPATIAL
-        assert not Relabel({"0": "a"}, on_unmatched="raise").invalidates & SPATIAL
+        # A relabel changes which boxes share a class, so these two describe another vocabulary even when no box is
+        # dropped; the geometry of a box and of its peers is unchanged.
+        assert Relabel({"0": "a"}, on_unmatched="raise").invalidates == classes
 
     def test_select_channels_does_not(self):
         assert not SelectChannels("gray").invalidates & SPATIAL

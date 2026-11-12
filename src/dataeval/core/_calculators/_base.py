@@ -176,11 +176,16 @@ class Calculator(ABC, Generic[TFlag]):
         return needs
 
     @classmethod
-    def flags_with_needs(cls, flags: TFlag) -> TFlag:
-        """Return the subset of `flags` whose statistics read the image's other boxes, so have no value off a box."""
+    def flags_with_needs(cls, flags: TFlag, need: ContextNeed = ContextNeed.CONTEXT | ContextNeed.LABELS) -> TFlag:
+        """
+        Return the subset of `flags` whose statistics declare any of `need`, by default any.
+
+        A statistic that declares a need reads the image's other boxes, so has no value off a box. Pass
+        ``ContextNeed.LABELS`` for the ones that also read class labels.
+        """
         kept = type(flags)(0)
         for flag, handler in cls._handlers_for(flags).items():
-            if handler.needs:
+            if handler.needs & need:
                 kept |= flag
         return kept
 

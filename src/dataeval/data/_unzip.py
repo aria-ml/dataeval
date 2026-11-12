@@ -48,6 +48,30 @@ def _reject_tracking(dataset: Dataset[Any], per_target: bool) -> None:
         )
 
 
+def _dataset_labels(labels: Any, item: int) -> NDArray[Any]:
+    """
+    Read one image's labels from a dataset, taking a floating array as class ids.
+
+    A dataset supplies its own labels, so its caller cannot cast them. A one-dimensional floating array is read as
+    follows: a finite whole number is that class id, and a nonfinite entry, which is how a float array says "unlabeled",
+    is -1, the missing label. A finite entry that is not a whole number within the ``int64`` range is not a class id
+    and raises. Any other array is returned as it is, so a wrong length or dimension is still refused by
+    ``build_annotations``, which also keeps an explicit ``labels=`` strict.
+    """
+    array = as_numpy(labels)
+    if array.ndim != 1 or array.dtype.kind != "f":
+        return array
+    finite = np.isfinite(array)
+    bad = finite & ((array != np.round(array)) | (np.abs(array) >= 2.0**63))
+    if bad.any():
+        box = int(np.flatnonzero(bad)[0])
+        raise ValueError(
+            f"image {item}, box {box}: class ids must be whole numbers within the int64 range, got {array[box]!r}; "
+            "a nonfinite label is read as missing."
+        )
+    return np.where(finite, array, -1).astype(np.int64)
+
+
 def _unzip_annotations(
     dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]],
     per_target: bool,
@@ -67,7 +91,8 @@ def _unzip_annotations(
     per_target : bool
         If True, extract each image's annotations.
     with_labels : bool, default False
-        If True, also read each target's labels. Left False, the labels are never read.
+        If True, also read each target's labels, a floating array as class ids (see ``_dataset_labels``). Left
+        False, the labels are never read.
 
     Returns
     -------
@@ -92,7 +117,7 @@ def _unzip_annotations(
             image = np.asarray(unwrap_image(d))
             if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-                labels = as_numpy(d[1].labels) if with_labels else None
+                labels = _dataset_labels(d[1].labels, i) if with_labels else None
                 annotations = build_annotations(boxes, image.shape, i, labels)
             else:
                 annotations = None
