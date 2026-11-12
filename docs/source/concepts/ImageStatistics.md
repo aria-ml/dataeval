@@ -36,8 +36,13 @@ and why its pixel statistics differ:
 
 Both tables are correct and describe different properties. Visual statistics characterize normalized appearance, and
 pixel statistics characterize the stored values. "Is this image dark?" is a question about appearance and has one
-answer. "What is the mean of these values?" is a question about the data and has two answers, because there are two
-sets of values.
+answer however the picture is stored. "What is the mean of these values?" is a question about the data and has two
+answers, because there are two sets of values.
+
+Scaling to the display range removes differences of encoding only. It is a linear map of the reference interval onto
+0–255, so it does not undo a sensor's response curve, a gamma or a gain. A visual statistic therefore cannot separate a
+difference in the scene from a difference in the camera, and a comparison across sensors or exposure settings includes
+both.
 
 ## Where the reference comes from
 
@@ -103,15 +108,54 @@ across bit depths.
 
 It does not change visual statistics, which are already scaled to the display range.
 
+## Definitions of selected statistics
+
+Each row below states what {func}`.image_stats` computes for a statistic whose name does not give its definition.
+
+:::{list-table}
+:widths: 28 72
+:header-rows: 1
+
+- - Statistic
+  - What it measures
+- - `VISUAL_BRIGHTNESS`
+  - The 25th percentile of the display values, which is the lower quartile.
+- - `VISUAL_DARKNESS`
+  - The 75th percentile of the display values, which is the upper quartile. It is at least `VISUAL_BRIGHTNESS` and
+    rises as the image gets brighter. The picture in the first table above reads 61 for brightness and 191 for
+    darkness.
+- - `VISUAL_CONTRAST`
+  - The range of the five reported percentiles (0, 25, 50, 75 and 100) divided by their mean: (max − min) / mean. The
+    result has no units. The range runs from the darkest pixel to the brightest, so one extreme pixel raises it.
+- - `PIXEL_ENTROPY`
+  - The Shannon entropy, in nats, of the 256-bin histogram of the pixel values. It describes how the values spread
+    across their range. Rearranging the pixels leaves it unchanged, so it does not measure texture.
+- - `PIXEL_KURTOSIS`
+  - Excess kurtosis, the fourth standardized moment minus 3, so a normal distribution of values reads 0.
+- - `DIMENSION_ASPECT_RATIO`
+  - 1 − short side / long side of the box. The value is positive for a box wider than it is tall and negative for a
+    taller box. A square reads 0, a 2:1 box 0.5 and a 1:2 box −0.5, and every value lies between −1 and 1.
+- - `DIMENSION_DISTANCE_EDGE`
+  - The smallest of the four absolute gaps between the box and the image edges, in pixels. The value is unsigned, so a
+    box that extends past an edge reads as a positive distance, as one inside the image does, and the value does not
+    say whether the box lies inside.
+- - Background statistics (the `background_` prefix)
+  - The same statistics measured over the pixels outside every annotated box. The boxes are unioned, so the values
+    describe the scene. See
+    [Image statistics in integrity checks](DataIntegrity.md#image-statistics-in-integrity-checks).
+
+:::
+
 ## Choosing between them
 
-Use a visual statistic when the question is about appearance and you want one answer across a mixed dataset, such as
-which images are unusually dark, which are blurry, or whether the test set is shot in different lighting than the train
-set.
+Use a visual statistic when the question is about appearance and you want one answer across a dataset that mixes
+encodings, such as which images are unusually dark, which are blurry, or whether the test set is shot in different
+lighting than the train set. Where the images come from different sensors, a difference may come from the camera as well
+as the scene, as described above.
 
-Use a pixel statistic when the question is about the values themselves, such as what fraction of this band is
-saturated, how much information this image carries, or whether there are NaNs. Where the dataset is uniformly encoded,
-which is common, its raw values are already comparable and nothing extra is needed.
+Use a pixel statistic when the question is about the values themselves, such as what fraction of the values are zero,
+how widely they spread across their range, or whether there are NaNs. Where the dataset is uniformly encoded, which is
+common, its raw values are already comparable and nothing extra is needed.
 
 Where a dataset mixes encodings and you want comparable pixel distributions, pass
 `normalize_pixel_values=True`. Check whether `VISUAL_BRIGHTNESS` answers the question

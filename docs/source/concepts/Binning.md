@@ -271,7 +271,7 @@ How much each point matters depends on the consumer.
 ### Which consumers require it
 
 Not every consumer needs binning, and the ones that do need it for different
-reasons: most of them mathematically, one as a consequence of what it is handed.
+reasons: some mathematically, and one only where a cut was chosen.
 
 :::{list-table}
 :widths: 26 18 56
@@ -298,13 +298,14 @@ reasons: most of them mathematically, one as a consequence of what it is handed.
     each group is split as one unit, so the split fractions count groups, not
     images.
 - - {class}`.Balance`
-  - Required in practice
-  - It reads `factor_data`, which is bin and category indices throughout, so the
-    contingency-table estimator runs on every factor, at whatever resolution the
-    binning upstream produced. What `Balance` forwards is not which estimator to
-    use (that is read from the column's values) but whether each factor's set of
-    values is its own or an artifact of the cuts, which decides how the
-    `factors` DataFrame is normalized. See
+  - Only for a cut somebody chose
+  - It reads each factor either as codes (bin and category indices) or as the
+    measured values, as `factor_source` selects, and `"auto"` is the default.
+    A cut that was declared, requested by count or accepted is read as codes,
+    and a contingency table runs over those bins. A factor whose cut nobody
+    chose is read from its measured values, which go to a neighbor-based
+    estimator that has no bins and is not corrected for chance. A category is
+    always read as codes. See
     [below](BinEdges.md#binning-reaches-the-three-outputs-differently).
 - - {func}`.factor_deviation`, {func}`.factor_predictors`
   - Not applied
@@ -319,12 +320,13 @@ reasons: most of them mathematically, one as a consequence of what it is handed.
     [Outlier detection over annotation and metadata factors](DataIntegrity.md#outlier-detection-over-annotation-and-metadata-factors).
 :::
 
-The `Balance` row is a property of what it passes, not of the estimator it
-calls. {func}`.mutual_info` given raw values still routes the measured columns
-to the neighbor-based estimator; the resolution was set upstream in
-`factor_data`. One visible consequence: `Balance.num_neighbors` tunes a
-neighborhood only the measured path consults, which `Balance` does not produce.
-It is deprecated for that reason and warns when set.
+The estimator that handles a column depends on the column's own values: integral
+values are codes and are tabulated, and anything with a fractional part was
+measured and goes to the neighbor-based estimator. `Balance.num_neighbors` tunes
+that estimator, so it has an effect only on the measured columns. With
+`factor_source="coded"`, which reproduces the behavior of releases before 1.1, no
+column reaches the estimator and `num_neighbors` has no effect. With `"values"`
+every factor is read from its measured values and every declared cut is ignored.
 
 ## How DataEval bins
 

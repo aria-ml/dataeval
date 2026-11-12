@@ -134,6 +134,34 @@ within-distribution coverage would indicate this.
 
 ## Theory
 
+### Five questions about factors and classes
+
+An analysis of a dataset's known factors addresses one of five questions. The table gives the tool for each.
+
+:::{list-table}
+:widths: 24 76
+:header-rows: 1
+
+- - Question
+  - Where it is answered
+- - Class association: does a factor tell you the class?
+  - The `balance` table of {class}`.Balance`, which scores each factor against the class label, and {class}`.Parity` ⚠️,
+    which tests each factor and each combination of a level and a class.
+- - Within-class sampling: within one class, are the factor's values sampled evenly?
+  - The `classwise` tables of Balance and {class}`.Diversity`, and the cells of Parity.
+- - Operational mismatch: do the dataset's factors match the conditions of deployment?
+  - None of these tools. They read one dataset, and the comparison needs the operational values. See
+    [Distribution shift](DistributionShift.md).
+- - Confounds: is an association with the class shared with another factor?
+  - The `factors` table of Balance, which scores each pair of factors. It does not say which of two associated factors
+    the class depends on.
+- - Missingness: is a factor unrecorded for some rows, and does that track the class?
+  - A missing value in a binned factor gets a bin of its own, so missingness that tracks the class shows as
+    association with that level. See
+    [Missing values get a bin with a position but no meaning](Binning.md#missing-values-get-a-bin-with-a-position-but-no-meaning).
+
+:::
+
 ### Measuring bias: mutual information and evenness
 
 {class}`.Balance` and {class}`.Diversity` measure bias using metadata, the contextual variables attached to each
@@ -225,12 +253,14 @@ between metadata factors themselves. Highly correlated factors (for example, if
 location and sensor platform are nearly perfectly associated) provide redundant
 information and complicate the interpretation of individual factor effects.
 
-MI is computed differently depending on whether variables are discrete or
-continuous. For categorical class labels, DataEval uses `mutual_info_classif`
-from scikit-learn for both discrete and continuous metadata factors, falling
-back to KNN-based estimation ([Kraskov et al., 2004](#ref6);
-[Ross, 2014](#ref8)) for continuous variables. DataEval infers discreteness from
-the proportion of unique values in a factor. Discreteness is a statement about a
+MI is computed differently for a factor read as codes and for one read as measured values, and
+{class}`.Balance` can read either. Codes, which are bin and category indices, are tabulated and corrected for chance.
+Measured values go to the neighbor-based estimators of scikit-learn ([Kraskov et al., 2004](#ref6);
+[Ross, 2014](#ref8)), which need no bins and are not corrected for chance.
+`factor_source` selects the reading. Its default, `"auto"`, reads a factor as codes where someone chose its cut and as
+measured values otherwise, and always reads a category as codes. The `scored_as` column of `factors` records the regime
+of each pair, and [Choosing bin edges](BinEdges.md#binning-reaches-the-three-outputs-differently) compares them.
+DataEval infers discreteness from the proportion of unique values in a factor. Discreteness is a statement about a
 factor's support and does not imply that the support is small, so a numeric
 factor that reads as discrete but takes more distinct values than the sample can
 fill, such as pixel areas, timestamps, or a non-reserved identifier-like column,
@@ -531,6 +561,19 @@ shortcut. A high NMI between a metadata factor and a class label is a signal to
 investigate, not a guarantee that the model will exploit the correlation.
 Conversely, a low NMI does not rule out shortcuts that operate below the
 resolution of the available metadata.
+
+Rows are not independent observations. Balance and Diversity count each row of the level they read as one observation.
+At the detection level, a factor measured once for each image is copied onto each of its detections, so its
+distribution is weighted by detections per image. Reading the factor at its own level, with {meth}`.Metadata.at`,
+removes the weighting (see [Propagation](MetadataLevels.md#propagation-values-move-down-never-up)). The rows of one
+track share an object, its scene and usually its class, so they carry less information than their number suggests.
+Balance corrects its chance level for the repeated rows of a factor defined at a coarser level, and Parity groups rows
+by item (see [Why rows are not independent](Parity.md#why-rows-are-not-independent)).
+
+Scores from two datasets compare only when both were cut at the same edges, and each dataset otherwise derives its own
+from its own values. Pass the first dataset's {meth}`.Metadata.encoding` mapping, or the descriptor that
+{meth}`.Metadata.export_encoding` writes, as `encoding=` to the second. Two results with the same `encoding_digest`
+were encoded identically. See [Control and reuse a factor's binning](../notebooks/h2_control_factor_binning.py).
 
 Parity is experimental. Its p-values depend on independent groups and enough
 effective groups at each level; see
