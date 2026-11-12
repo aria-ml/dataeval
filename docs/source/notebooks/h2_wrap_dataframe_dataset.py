@@ -38,8 +38,6 @@ except Exception:
 
 # %%
 import tempfile
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -50,7 +48,6 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from dataeval import Metadata
-from dataeval.bias import Balance
 from dataeval.protocols import AnnotatedDataset, DatasetMetadata, DatumMetadata
 
 # %% tags=["hide-input"]
@@ -107,7 +104,9 @@ catalog.head()
 # The adapter returns an `(image, target, datum_metadata)` tuple for each item. The image is a channels-first
 # `(C, H, W)` array, the target is the one-hot label, and the datum metadata is a dict that must contain an `id`. The
 # `metadata` property describes the dataset as a whole, including the `index2label` mapping. The parts that do not
-# depend on the task sit in a base class, which the detection adapter below reuses.
+# depend on the task sit in a base class, which the detection adapter below reuses. The `_image` method decodes the file
+# on every read. To skip the decode in an analysis that never uses the pixels, see
+# [Defer image and video decoding](./h2_defer_decoding.py).
 
 
 # %%
@@ -241,91 +240,9 @@ print(
 # to box. For a catalog that does not store `(x0, y0, x1, y1)`, {class}`.BoundingBox` converts `xywh`, `cxcywh` and
 # YOLO-normalized boxes.
 
-# %% [markdown]
-# ## Defer image decoding
-#
-# Decoding an image costs far more than reading its label, and {class}`.Metadata` and the bias evaluators never read the
-# pixels. Return a `LazyArray` from `_image` instead. It satisfies the {class}`.Array` protocol, reads its shape from
-# the file header, and decodes only on the first numpy access.
-
-
-# %%
-def read_shape(path: str) -> tuple[int, ...]:
-    """Read (3, H, W) from the image header without decoding the pixels."""
-    with Image.open(path) as im:
-        width, height = im.size
-    return (3, height, width)
-
-
-class LazyArray:
-    """An image file that is decoded on first numpy access and cached."""
-
-    def __init__(
-        self,
-        path: str,
-        loader: Callable[[str], NDArray[Any]],
-        shape_loader: Callable[[str], tuple[int, ...]],
-    ) -> None:
-        self._path, self._loader, self._shape_loader = path, loader, shape_loader
-        self._array: NDArray[Any] | None = None
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return self._array.shape if self._array is not None else self._shape_loader(self._path)
-
-    @property
-    def ndim(self) -> int:
-        return len(self.shape)
-
-    def __array__(self, dtype: Any = None, copy: bool | None = None) -> NDArray[Any]:
-        if self._array is None:
-            self._array = self._loader(self._path)
-        return self._array if dtype is None else self._array.astype(dtype)
-
-    def __getitem__(self, key: Any) -> Any:
-        return np.asarray(self)[key]
-
-    def __iter__(self):
-        return iter(np.asarray(self))
-
-    def __len__(self) -> int:
-        return self.shape[0]
-
-
-class LazyICDataset(DataFrameICDataset):
-    def _image(self, path: str) -> LazyArray:
-        return LazyArray(path, load_chw, read_shape)
-
-
-# %% [markdown]
-# Time a metadata bias pass over the 300 images with eager and with lazy loading. The same override works on the
-# detection adapter.
-
-
-# %%
-def time_metadata_pass(dataset: DataFrameICDataset) -> float:
-    start = time.perf_counter()
-    Balance().evaluate(Metadata(dataset))
-    return time.perf_counter() - start
-
-
-eager_seconds = time_metadata_pass(DataFrameICDataset(catalog, index2label, ["weather"]))
-lazy_seconds = time_metadata_pass(LazyICDataset(catalog, index2label, ["weather"]))
-
-print(f"Eager (decodes every image): {eager_seconds * 1000:7.1f} ms")
-print(f"Lazy  (decodes none):        {lazy_seconds * 1000:7.1f} ms")
-
-# %% [markdown]
-# The lazy pass decodes nothing, because the images are only the discarded first element of each datum tuple. An
-# analysis that does read the array, such as {func}`.image_stats`, triggers the decode and works unchanged. The
-# downloadable datasets in [`maite-datasets`](https://github.com/aria-ml/maite-datasets) accept `lazy=True`, so build
-# the proxy yourself only for a custom dataset.
-
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
-from dataeval.core import image_stats
-from dataeval.flags import ImageStats
-from dataeval.protocols import Array, ObjectDetectionTarget
+from dataeval.protocols import ObjectDetectionTarget
 
 image, target, datum_metadata = dataset[0]
 assert isinstance(dataset, AnnotatedDataset)
@@ -344,14 +261,6 @@ occlusion = od_datum.get("occlusion")
 assert occlusion is not None
 assert len(occlusion) == len(od_target.labels)
 assert set(od_metadata.factor_names) == {"weather", "occlusion"}
-
-lazy_dataset = LazyICDataset(catalog, index2label, ["weather"])
-lazy_image = lazy_dataset[0][0]
-assert isinstance(lazy_image, Array)
-assert lazy_image.shape == (3, 256, 256)
-assert np.array_equal(np.asarray(lazy_image), image)
-assert image_stats(lazy_dataset, stats=ImageStats.PIXEL, normalize_pixel_values=False)["image_count"] == len(catalog)
-assert lazy_seconds < eager_seconds
 
 # %% [markdown]
 # ## Next steps

@@ -211,7 +211,6 @@ What a result supports, and how much evidence stands behind it.
 
 ActingOnResults
 ValidationAndTrust
-ValidationEvidence
 :::
 
 :::{list-table}
@@ -223,8 +222,5 @@ ValidationEvidence
   - How each category of DataEval output maps to decisions and to the actions available.
 - - [](ValidationAndTrust.md)
   - The assumptions behind each evaluator, the levels of validation evidence and the known gaps in that evidence.
-- - [](ValidationEvidence.md)
-  - For each evaluator and core function, the basis of its evidence, its validation level, its policy levers and its
-    contraindications.
 
 :::

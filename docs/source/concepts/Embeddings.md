@@ -95,59 +95,26 @@ extractor = TorchExtractor(model, transforms=transforms, layer_name="avgpool")
 embeddings = Embeddings(dataset, extractor=extractor, batch_size=64)
 ```
 
-Pass the dataset first and everything else by keyword. `Embeddings` computes the
-vectors when you first use them and keeps them, so build one `Embeddings` object
-for each dataset and give it to every tool that needs it. Call
-`np.asarray(embeddings)` when you need a plain array.
-[Create embeddings](../notebooks/h2_create_embeddings.py) runs this recipe
-with PyTorch, with ONNX and with the extractors that need no model.
-
-### Choose an extractor
-
-| Extractor                  | Use it when                                                               | What it needs                                                    |
-| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| {class}`.TorchExtractor`   | You have a PyTorch model, either your own or a pre-trained one            | The model, its preprocessing as `transforms`, and a `layer_name` |
-| {class}`.OnnxExtractor`    | You have an ONNX model, or you want to run a model without PyTorch        | The `onnx` extra and an `output_name`                            |
-| {class}`.FlattenExtractor` | You want a baseline, or the images are small, such as thumbnails          | Images of one shape. No model                                    |
-| {class}`.BoVWExtractor`    | You are looking for near-duplicates that survived a rotation or a rescale | The `opencv` extra and a call to `fit` before use. No model      |
-
-Flattened pixels are a baseline and not an assessment, because distances between
-raw pixels tend to follow brightness and alignment more than content.
-[Validation and trust](ValidationAndTrust.md#extractors-that-embed-the-data)
-lists what each extractor embeds and how each can mislead a metric.
+`Embeddings` computes the vectors when you first use them and keeps them, so build one `Embeddings` object for each
+dataset and give it to every tool that needs it.
+[Create embeddings](../notebooks/h2_create_embeddings.py) runs this recipe with PyTorch, with ONNX and with the
+extractors that need no model.
+[Validation and trust](ValidationAndTrust.md#extractors-that-embed-the-data) lists what each extractor embeds and how
+each can mislead a metric.
 
 ### Choose a model
 
 If you have a model trained for your task, use it. Its layers have learned patterns relevant to that task, so its
 embeddings are more likely to suit your domain and task.
 
-If you do not have a trained model, choose a pre-trained one that was trained
-for a task close to yours. The training objective shapes which patterns the
-embeddings emphasize. The table lists model types, example models, the tasks their embeddings are commonly used for,
-and the emphasis that follows from the training objective. It is a heuristic and does not rank model types for any
-DataEval evaluator.
-
-| Model type           | Example models                           | Typical tasks                                | Typical emphasis                                                                             |
-| -------------------- | ---------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| Image classification | ResNet, EfficientNet, Vision Transformer | BER, Class Balance, Outlier Detection        | Features that distinguish labeled categories, which can make class boundaries more separable |
-| Object detection     | YOLO, R-CNN variants, DETR               | Spatial Drift, Localization Quality          | Spatial relationships and localized features, which matter when object position is relevant  |
-| Self-supervised      | DINO, MAE, SimCLR                        | Drift, Prioritization, Duplicate Detection   | General visual patterns learned without class labels, used for broad visual similarity       |
-| Contrastive learning | CLIP, SwAV, MoCo                         | Similarity Search, Nearest Neighbor Analysis | An objective that separates similar from dissimilar pairs, which suits comparison tasks      |
-| Segmentation         | U-Net, Mask R-CNN, DeepLab               | Fine-grained Analysis, Pixel-level Quality   | Detailed spatial structure and boundaries within images                                      |
+If you do not have a trained model, choose a pre-trained one that was trained for a task close to yours. The training
+objective shapes which patterns the embeddings emphasize, and the embeddings describe the data as that model sees it.
 
 ### Select the layer
 
-A classifier ends in a layer that outputs class scores, and class scores are not
-image features. Select the layer before the classifier.
-
-- With {class}`.TorchExtractor`, name the layer in `layer_name`. Without it, the
-  extractor returns the model output, which for ResNet18 is 1000 ImageNet class
-  scores and not image features. `avgpool` is the layer before the classifier of
-  a torchvision ResNet.
-- With {class}`.OnnxExtractor`, call
-  {func}`~dataeval.utils.onnx.to_encoding_model` on the exported model. It finds
-  the layer before the classifier and returns a model that outputs it, together
-  with the layer name to give to `output_name`.
+A classifier ends in a layer that outputs class scores, and class scores are not image features. Select the layer
+before the classifier: name it in `layer_name` for {class}`.TorchExtractor`, or call
+{func}`~dataeval.utils.onnx.to_encoding_model` on the exported model for {class}`.OnnxExtractor`.
 
 ### Put model preprocessing in the extractor
 
@@ -163,57 +130,23 @@ The same rule settles a case that looks like a view operation. A model that need
 dataset needs that conversion in `transforms=`. In the view, {class}`.SelectChannels` would state that your grayscale
 dataset is an RGB dataset, and `channels` would describe the model's input layer.
 
-### Set the batch size
-
-`Embeddings` raises a `ValueError` when it finds no batch size in its own
-argument, in the extractor or in {func}`dataeval.config.set_batch_size`. Pass
-`batch_size=` every time, so the value is visible where you use it.
-
-The value on `Embeddings` is how many images are loaded, embedded and stored in
-one step. {class}`.TorchExtractor` and {class}`.OnnxExtractor` have a
-`batch_size` of their own, which is how many images go through the model in one
-forward pass. When both are set, the smaller value limits the forward pass. Set
-the extractor value only to bound the memory of a GPU. Neither value changes the
-embeddings except for differences in the last digits, which come from
-floating-point rounding.
-
-### Store large embeddings on disk
-
-By default `Embeddings` keeps the vectors in memory. Pass `path=` to let it use a
-memory-mapped file at that location when the embeddings would take more than
-`memory_threshold` of the available memory. The default threshold is 0.8. When
-the embeddings fit in memory, no file is written.
-
 ### Keep one row for each item
 
-`Embeddings` stores one row for each dataset item, in order. It counts the rows
-of every batch and raises an error when the extractor returns a different number
-of rows, or returns a dictionary instead of an array. The count cannot show that
-each row belongs to the image at the same position, so check the extractor and
-not only the error.
+`Embeddings` stores one row for each dataset item, in order, and raises an error when the extractor returns a different
+number of rows. The count cannot show that each row belongs to the image at the same position, so check the extractor
+and not only the error.
 
-An extractor that returns one row for each detection does not meet this
-requirement. That includes {class}`.ScoresExtractor` around a detection model,
-{class}`.DetectionGeometryExtractor`, and {class}`.TorchExtractor` with
-`postprocess_fn`. The same holds for {class}`.ClasswiseUncertaintyExtractor`,
-which returns one array for each class. {class}`.Duplicates`, {class}`.Outliers`,
-{class}`.Coverage` and {class}`.Prioritize` build an `Embeddings` from the
-extractor you give them, so they have the same requirement. Send these extractors
-to a drift detector instead:
-
-- Pass the extractor as the detector's `extractor=`, or call the extractor and pass the array it returns.
-- For {class}`.ClasswiseUncertaintyExtractor`, call it, select the array of one class, and give that array to a
-  detector. Do not pass it as `extractor=`. Fitting succeeds, because embedding is lazy, and `predict` raises a
-  `TypeError`.
+An extractor that returns one row for each detection or for each class does not meet this requirement. That includes
+{class}`.ScoresExtractor` around a detection model, {class}`.DetectionGeometryExtractor`,
+{class}`.TorchExtractor` with `postprocess_fn` and {class}`.ClasswiseUncertaintyExtractor`.
+{class}`.Duplicates`, {class}`.Outliers`, {class}`.Coverage` and {class}`.Prioritize` build an `Embeddings` from the
+extractor you give them, so they have the same requirement. Send these extractors to a drift detector instead, as the
+detector's `extractor=` or as the array the extractor returns. For {class}`.ClasswiseUncertaintyExtractor`, call it,
+select the array of one class, and give that array to a detector. Passing it as `extractor=` fits without an error,
+because embedding is lazy, and `predict` raises a `TypeError`.
 
 [Validation and trust](ValidationAndTrust.md#extractors-that-embed-a-models-predictions)
 describes what each of these extractors produces.
-
-### Give the embeddings to a tool
-
-Each tool takes embeddings through its own argument.
-[What data does each tool need?](../getting-started/input-requirements.md#how-each-tool-takes-embeddings)
-lists them in one table.
 
 ## Interpretation and limitations
 
