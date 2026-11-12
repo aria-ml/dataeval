@@ -24,7 +24,8 @@ v1.1
     invalidated. Experimental spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors. `Duplicates`
     searches videos with long static stretches for shared segments with experimental `hash_neighbors` arguments
     `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames
-    and exact repeats.
+    and exact repeats, and `track_stats` returns two more columns, the longest gap and the net heading of a
+    track.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the

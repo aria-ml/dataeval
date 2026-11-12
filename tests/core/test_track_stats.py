@@ -69,11 +69,18 @@ ALL_FIELDS = (
     "jitter_rate",
     "entry_at_edge",
     "exit_at_edge",
+    "max_gap_length",
+    "net_heading_rad",
 )
 
 # ``item_index`` says which sequence a row came from, so it is present only when a whole
 # dataset was measured. The type declares it; a single sequence's result does not carry it.
 DATASET_FIELDS = (*ALL_FIELDS, "item_index")
+
+
+def box_at(cx: float, cy: float) -> list[float]:
+    """A 2x2 box whose center is (cx, cy), so a track's centers can be written down directly."""
+    return [cx - 1, cy - 1, cx + 1, cy + 1]
 
 
 class TestCenters:
@@ -684,3 +691,151 @@ class TestAttachingToMetadata:
         column = md._store.frame("track")["entry_at_edge"]
         assert column.to_list() == [None, None]
         assert column.null_count() == len(column), "an Object column would break binning"
+
+
+def _one(centers, frames=None):
+    """Measure one track through its box centers."""
+    frames = list(range(len(centers))) if frames is None else frames
+    track = make_track([box_at(*c) for c in centers], frames)
+    return track_stats({0: track})["stats"]
+
+
+@pytest.mark.required
+class TestMaxGapLength:
+    """The longest run of frames in which a track is absent between two observations."""
+
+    @pytest.mark.parametrize(
+        ("frames", "expected"),
+        [
+            pytest.param([0, 1, 2, 3], 0, id="contiguous"),
+            pytest.param([0, 2, 3], 1, id="one gap"),
+            pytest.param([0, 2, 6, 7, 10], 3, id="several gaps, the longest is not first or last"),
+            pytest.param([0, 299], 298, id="two observations far apart"),
+            pytest.param([4], 0, id="single observation"),
+            pytest.param(
+                [0, 0, 1],
+                0,
+                id="two detections in one frame leave no gap",
+                # The step speed this track gets divides by a zero frame step, in code this column does not touch.
+                marks=pytest.mark.filterwarnings("ignore:invalid value encountered in divide:RuntimeWarning"),
+            ),
+        ],
+    )
+    def test_longest_run_of_absent_frames(self, frames, expected):
+        stats = _one([(0, 0)] * len(frames), frames)
+        assert stats["max_gap_length"] == [expected]
+        assert isinstance(stats["max_gap_length"][0], int)
+
+    def test_a_single_gap_is_the_whole_gap_total(self):
+        stats = _one([(0, 0)] * 3, [0, 1, 6])
+        assert stats["max_gap_length"] == stats["total_gap_length"] == [4]
+
+    def test_is_the_longest_of_the_gaps_the_total_adds_up(self):
+        """Gaps of 1 and 3 frames: the total counts both, the maximum only the longer."""
+        stats = _one([(0, 0)] * 5, [0, 2, 3, 7, 8])
+        assert stats["n_gaps"] == [2]
+        assert stats["total_gap_length"] == [4]
+        assert stats["max_gap_length"] == [3]
+
+
+@pytest.mark.required
+class TestNetHeading:
+    """Direction of the straight line from the first to the last observed center, image axes."""
+
+    @pytest.mark.parametrize(
+        ("end", "expected"),
+        [
+            pytest.param((10, 0), 0.0, id="right"),
+            pytest.param((0, 10), np.pi / 2, id="down is positive, clockwise on the image"),
+            pytest.param((-10, 0), np.pi, id="left"),
+            pytest.param((0, -10), -np.pi / 2, id="up"),
+            pytest.param((10, 10), np.pi / 4, id="down and right"),
+            pytest.param((-10, -10), -3 * np.pi / 4, id="up and left"),
+            pytest.param((-10, 10), 3 * np.pi / 4, id="down and left"),
+        ],
+    )
+    def test_clockwise_directions(self, end, expected):
+        assert _one([(0, 0), end])["net_heading_rad"] == [pytest.approx(expected)]
+
+    def test_only_the_endpoints_set_the_heading(self):
+        """A detour through the middle changes the path, not the chord."""
+        gapped = _one([(0, 0), (100, 0), (10, 10)], frames=[0, 5, 9])
+        assert gapped["net_heading_rad"] == [pytest.approx(np.pi / 4)]
+
+    def test_a_leftward_track_reads_pi_not_minus_pi(self):
+        """A signed zero in the vertical difference must not flip the sign of the heading."""
+        boxes = [[-0.0, -0.0, -0.0, -0.0], [-10.0, -0.0, -10.0, -0.0]]
+        stats = track_stats({0: make_track(boxes, [0, 1])})["stats"]
+        assert stats["net_heading_rad"] == [np.pi]
+
+    @pytest.mark.parametrize(
+        "centers",
+        [
+            pytest.param([(5, 5)], id="single observation"),
+            pytest.param([(5, 5), (5, 5)], id="stationary"),
+            pytest.param([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)], id="closed loop"),
+            pytest.param([(3, 3), (30, -4), (3, 3)], id="out and back"),
+            pytest.param([(0, 0), (np.nan, 4)], id="not a number at the end"),
+            pytest.param([(np.nan, 4), (0, 0)], id="not a number at the start"),
+        ],
+    )
+    def test_undefined_is_nan(self, centers):
+        assert np.isnan(_one(centers)["net_heading_rad"][0])
+
+    def test_an_infinite_endpoint_is_nan(self):
+        from dataeval.core._track_stats import _compute_net_heading
+
+        assert np.isnan(_compute_net_heading(np.array([[0.0, 0.0], [np.inf, 0.0]])))
+        assert np.isnan(_compute_net_heading(np.array([[np.inf, 0.0], [np.inf, 0.0]])))
+
+    def test_an_almost_closed_loop_still_has_a_chord(self):
+        loop = [(0, 0), (10, 0), (10, 10), (0, 10), (0, 1)]
+        assert _one(loop)["net_heading_rad"] == [pytest.approx(np.pi / 2)]
+
+    def test_the_path_weighted_resultant_of_the_steps_is_the_heading_and_the_straightness(self):
+        """What the docstring says: step headings weighted by step length point along the chord, and the
+        length of that resultant, over the total weight, is the straightness index."""
+        rng = np.random.default_rng(0)
+        centers = np.cumsum(rng.normal(size=(40, 2)) * 5 + [2.0, 1.0], axis=0)
+        stats = _one([tuple(c) for c in centers])
+
+        steps = np.diff(centers, axis=0)
+        lengths = np.linalg.norm(steps, axis=1)
+        unit = steps / lengths[:, None]
+        resultant = (unit * lengths[:, None]).sum(axis=0) / lengths.sum()
+
+        assert np.hypot(*resultant) == pytest.approx(stats["straightness_index"][0])
+        assert np.arctan2(resultant[1], resultant[0]) == pytest.approx(stats["net_heading_rad"][0])
+
+
+@pytest.mark.required
+class TestColumnsOverDatasets:
+    """Both columns come with every result, at one entry per track, and attach like any other factor."""
+
+    @staticmethod
+    def _dataset(shapes):
+        from tests.metadata.test_structurers import _mot_dataset
+
+        return _mot_dataset(shapes)
+
+    def test_every_column_has_one_entry_per_track(self):
+        """Metadata.add_factors rejects a column whose length differs from the others."""
+        stats = track_stats(self._dataset([[[5, 9], [5]], [[7]]]))["stats"]
+        assert {len(values) for values in cast("Mapping[str, Sequence[Any]]", stats).values()} == {3}
+
+    def test_an_empty_dataset_answers_with_both_columns(self):
+        stats = track_stats(self._dataset([]))["stats"]
+        assert stats["max_gap_length"] == []
+        assert stats["net_heading_rad"] == []
+
+    def test_the_result_attaches_to_metadata(self):
+        from dataeval import Metadata
+
+        dataset = self._dataset([[[5, 9], [5]], [[7], [3, 7]]])
+        metadata = Metadata(dataset)
+        metadata._structure()
+
+        metadata.add_factors(track_stats(dataset), level="track", key="track_id")
+
+        assert {"max_gap_length", "net_heading_rad"} <= set(metadata.factor_names)
+        assert not [name for name in metadata.factor_names if name.endswith("_added")]

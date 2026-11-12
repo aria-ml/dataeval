@@ -109,6 +109,24 @@ class TrackFactors(TypedDict):
         True when the track's last bounding box touches or crosses the
         frame border (within ``edge_threshold`` pixels on any side), and
         None when the frame dimensions are unknown, as for ``entry_at_edge``.
+    max_gap_length : Sequence[int]
+        The longest run of consecutive frames between a track's first and last
+        appearance in which the track ID is absent. Zero for a contiguous track
+        and for a single observation. ``total_gap_length`` adds the runs up, so
+        this one tells a track with one long absence from a track with many short
+        ones.
+    net_heading_rad : Sequence[float]
+        Direction in radians of the straight line from the first to the last
+        observed box center, ``atan2(dy, dx)``, in (-pi, pi]. The axes are the
+        image's: 0 points right and +y is down, so a positive angle turns clockwise
+        as the image is displayed. NaN for fewer than two observations, a center
+        that is not finite, and zero net displacement. It is the direction of the
+        chord and says nothing about the path, so condition any analysis of
+        headings on ``net_displacement``: where a track barely moved, the heading
+        is set by box jitter. Summing each step's unit heading weighted by the
+        step's length gives the net displacement vector, so that path-weighted
+        resultant points along this heading, and its length divided by the path
+        length is ``straightness_index``.
 
     Notes
     -----
@@ -146,6 +164,8 @@ class TrackFactors(TypedDict):
     jitter_rate: Sequence[float]
     entry_at_edge: Sequence[bool | None]
     exit_at_edge: Sequence[bool | None]
+    max_gap_length: Sequence[int]
+    net_heading_rad: Sequence[float]
 
 
 TrackStatsResult: TypeAlias = FactorResult[TrackFactors]
@@ -218,6 +238,25 @@ def _compute_gaps(
         return 0, 0
     diffs = np.diff(frames)
     return int(np.sum(diffs > 1)), duration - tl
+
+
+def _compute_max_gap_length(frames: np.ndarray) -> int:
+    """Longest run of absent frames between two consecutive observations, 0 below two observations."""
+    if len(frames) < 2:
+        return 0
+    # Clamped at 0 so a frame observed twice (a difference of 0) is no gap.
+    return max(int(np.max(np.diff(frames))) - 1, 0)
+
+
+def _compute_net_heading(ctrs: np.ndarray) -> float:
+    """Direction in radians from the first to the last center, NaN where there is none to give."""
+    if len(ctrs) < 2 or not np.isfinite(ctrs[[0, -1]]).all():
+        return np.nan
+    dx, dy = ctrs[-1] - ctrs[0]
+    if dx == 0.0 and dy == 0.0:
+        return np.nan
+    # `+ 0.0` turns a negative zero into a positive one, which would otherwise read a leftward heading as -pi.
+    return float(np.arctan2(dy + 0.0, dx))
 
 
 def _compute_step_speeds(
@@ -428,6 +467,8 @@ def _track_stats_for_sequence(
     jitter_rate: list[float] = []
     entry_at_edge: list[bool | None] = []
     exit_at_edge: list[bool | None] = []
+    max_gap_length: list[int] = []
+    net_heading_rad: list[float] = []
 
     if has_frame_dims and edge_threshold >= min(_frame_width, _frame_height) / 2:
         _logger.warning(
@@ -459,6 +500,7 @@ def _track_stats_for_sequence(
         n_gaps.append(gaps)
         total_gap_length.append(gap_len)
         gap_fraction.append(gap_len / duration)
+        max_gap_length.append(_compute_max_gap_length(frames))
 
         delta_pos, step_speeds = _compute_step_speeds(ctrs, frames, tl)
 
@@ -468,6 +510,7 @@ def _track_stats_for_sequence(
 
         net_disp = float(np.linalg.norm(ctrs[-1] - ctrs[0]))
         net_displacement.append(net_disp)
+        net_heading_rad.append(_compute_net_heading(ctrs))
 
         straightness_index.append(_compute_straightness(net_disp, delta_pos, tl))
         jitter_rate.append(_compute_jitter_rate(step_speeds, tl, jitter_min_frames, jitter_fc))
@@ -496,6 +539,8 @@ def _track_stats_for_sequence(
             jitter_rate=jitter_rate,
             entry_at_edge=entry_at_edge,
             exit_at_edge=exit_at_edge,
+            max_gap_length=max_gap_length,
+            net_heading_rad=net_heading_rad,
         ),
         categorical=("labels",),
     )
