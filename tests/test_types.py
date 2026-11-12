@@ -11,6 +11,7 @@ from typing import Any, get_args
 import numpy as np
 import polars as pl
 import pytest
+from pydantic import ValidationError
 
 from dataeval.types import (
     DataFrameOutput,
@@ -33,6 +34,7 @@ from dataeval.types._factors import (
     _relink,
     _validate_acyclic,
 )
+from dataeval.types._stats_config import ImageStatsConfig, SurroundConfig
 from dataeval.types._target import detection_count, detection_score, own_class_scores, track_ids_of
 from dataeval.types._track import frame_size
 
@@ -966,3 +968,79 @@ class TestOwnClassScores:
         recorded = detection_score(self._target(np.array([[np.nan, 0.5]])), 0, 0)
         assert recorded is not None
         assert np.isnan(recorded)
+
+
+@pytest.mark.required
+class TestStatsConfig:
+    """Settings for the new statistics refuse what a numeric field would otherwise reinterpret in silence."""
+
+    @pytest.mark.parametrize("value", [True, 0, -1, 3.0, "3"])
+    def test_a_count_refuses_what_is_not_a_positive_int(self, value: Any):
+        with pytest.raises(ValidationError, match="min_pixels"):
+            SurroundConfig(min_pixels=value)
+
+    @pytest.mark.parametrize("value", [True, "1.5", float("nan"), float("inf"), float("-inf"), 0, -0.5])
+    def test_a_float_refuses_a_bool_a_string_a_nonfinite_and_a_nonpositive_value(self, value: Any):
+        with pytest.raises(ValidationError, match="padding"):
+            SurroundConfig(padding=value)
+
+    @pytest.mark.parametrize("name", ["min_target_valid_fraction", "intensity_floor"])
+    @pytest.mark.parametrize("value", [-0.1, 1.1, True, float("nan")])
+    def test_a_fraction_refuses_a_value_outside_zero_to_one(self, name: str, value: Any):
+        with pytest.raises(ValidationError, match=name):
+            SurroundConfig(**{name: value})
+
+    def test_an_unknown_field_is_refused_at_every_level(self):
+        with pytest.raises(ValidationError, match="width"):
+            SurroundConfig(width=0.5)  # pyright: ignore[reportCallIssue]
+        with pytest.raises(ValidationError, match="ring"):
+            ImageStatsConfig(ring=SurroundConfig())  # pyright: ignore[reportCallIssue]
+
+    def test_an_int_is_accepted_for_a_float_field_and_stored_as_a_float(self):
+        config = SurroundConfig(padding=1, min_target_valid_fraction=1, intensity_floor=0)
+        assert (config.padding, config.min_target_valid_fraction, config.intensity_floor) == (1.0, 1.0, 0.0)
+        assert all(isinstance(v, float) for v in (config.padding, config.min_target_valid_fraction))
+
+    @pytest.mark.parametrize("value", [np.int64(4), np.uint8(4), np.int32(4)])
+    def test_a_numpy_integer_is_accepted_for_a_count_and_stored_as_an_int(self, value: Any):
+        config = SurroundConfig(min_pixels=value)
+        assert config.min_pixels == 4
+        assert type(config.min_pixels) is int
+
+    def test_a_numpy_float_is_accepted_for_a_float_field_and_stored_as_a_float(self):
+        # Pyright types the annotation as `float`, which an `np.float32` is not; the config takes it at runtime.
+        config = SurroundConfig(padding=np.float32(0.5))  # pyright: ignore[reportArgumentType]
+        assert config.padding == 0.5
+        assert type(config.padding) is float
+
+    def test_a_numpy_bool_is_as_refused_as_a_bool(self):
+        with pytest.raises(ValidationError, match="min_pixels"):
+            SurroundConfig(min_pixels=np.True_)  # pyright: ignore[reportArgumentType]
+        with pytest.raises(ValidationError, match="padding"):
+            SurroundConfig(padding=np.True_)  # pyright: ignore[reportArgumentType]
+
+    def test_a_numpy_float_with_an_integral_value_is_still_not_a_count(self):
+        with pytest.raises(ValidationError, match="min_pixels"):
+            SurroundConfig(min_pixels=np.float64(3.0))  # pyright: ignore[reportArgumentType]
+
+    def test_the_defaults_are_the_documented_ones(self):
+        surround = SurroundConfig()
+        assert surround.padding == 0.25
+        assert surround.min_pixels == 32
+        assert surround.min_target_valid_fraction == 0.90
+        assert surround.intensity_floor == 1 / 255
+        assert ImageStatsConfig().surround == surround
+        assert ImageStatsConfig(surround=SurroundConfig(padding=0.5)).surround.padding == 0.5
+
+    def test_a_config_is_immutable(self):
+        config = SurroundConfig()
+        with pytest.raises(ValidationError, match="frozen"):
+            config.padding = 0.5  # pyright: ignore[reportAttributeAccessIssue]
+        with pytest.raises(ValidationError, match="frozen"):
+            ImageStatsConfig().surround = config  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_a_nested_section_that_skipped_validation_is_refused(self):
+        """`model_construct` stores what it is given, so the enclosing config has to check it again."""
+        unchecked = SurroundConfig.model_construct(min_pixels=-5)
+        with pytest.raises(ValidationError, match="min_pixels"):
+            ImageStatsConfig(surround=unchecked)
