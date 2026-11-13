@@ -95,10 +95,12 @@ def test_columns_and_values():
 
 
 def test_blur_is_in_all_and_in_no_smaller_group():
-    """`ALL` holds blur, and every statistic: `SPATIAL` too. `BASIC` and `Outliers`' groups do not hold blur."""
+    """`ALL` holds blur and every other statistic, `SPATIAL` and `CONTEXT` too; the smaller groups hold no blur."""
     assert ImageStats.BLUR in ImageStats.ALL
-    assert ImageStats.ALL == ImageStats.STANDARD | ImageStats.HASH | ImageStats.BLUR | ImageStats.SPATIAL
-    v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION
+    assert ImageStats.ALL == (
+        ImageStats.STANDARD | ImageStats.HASH | ImageStats.BLUR | ImageStats.SPATIAL | ImageStats.CONTEXT
+    )
+    v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT
     assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
     assert ~ImageStats.ALL == ImageStats.NONE
     for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.STANDARD, ImageStats.BASIC):
@@ -131,6 +133,7 @@ def test_all_is_spelled_from_the_families():
         | ImageStats.BLUR
         | ImageStats.SPATIAL
         | ImageStats.PIXEL_SATURATION
+        | ImageStats.CONTEXT
     )
     assert families == ImageStats.ALL
 
@@ -183,18 +186,18 @@ def test_a_bare_call_equals_the_v12_set_with_no_blur_and_no_warning(fresh_proces
 def test_all_returns_the_blur_columns_and_warns(fresh_process):
     """The default leaves blur out, but a request for `ALL` is a request for it, so it warns like any blur flag.
 
-    The spatial statistics need boxes and have their own tests, so they are left out here. `ALL` holds the saturation
-    statistic too, so its column comes with the rest.
+    The spatial and context statistics need boxes and have their own tests, so they are left out here. `ALL` holds the
+    saturation statistic too, so its column comes with the rest.
     """
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental"):
-        stats = image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL)["stats"]
+        stats = image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.CONTEXT)["stats"]
 
     assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturation"}
 
 
 def test_the_experimental_warning_names_the_complement_as_the_way_out(fresh_process):
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental") as record:
-        image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL)
+        image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.CONTEXT)
 
     message = str(record[0].message)
     assert WAY_OUT in message

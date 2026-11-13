@@ -200,8 +200,9 @@ class Filter(Operation):
     **The vocabulary is unchanged**, so a filtered view keeps every class index; :class:`Relabel` compacts it. The
     detections left behind are renumbered from 0, as after :class:`Indices`.
 
-    **It declares the spatial statistics invalidated** (``ImageStats.SPATIAL``) unless ``drop="items"``, because
-    removing detections removes the neighbors a box is measured against, and a target then reads as isolated.
+    **It declares the spatial and surround statistics invalidated** (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``)
+    unless ``drop="items"``, because removing detections removes the neighbors a box is measured against, and a target
+    then reads as isolated, with their pixels back in its surround.
 
     **An empty result warns**, naming the predicate; a non-empty one logs what it kept on the ``dataeval`` logger at
     INFO.
@@ -253,8 +254,8 @@ class Filter(Operation):
 
     @property
     def invalidates(self) -> ImageStats:
-        """The SPATIAL statistics when detections are removed, since a target then reads as isolated."""
-        return ImageStats.NONE if self.drop == "items" else ImageStats.SPATIAL
+        """The SPATIAL and CONTEXT statistics when detections are removed, since a target then reads as isolated."""
+        return ImageStats.NONE if self.drop == "items" else ImageStats.SPATIAL | ImageStats.CONTEXT
 
     def _repr_overrides(self) -> dict[str, str]:
         # The default repr of a polars expression carries a memory address, which would make repr(view) differ run to

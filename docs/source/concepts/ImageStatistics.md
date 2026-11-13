@@ -151,6 +151,12 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
   - The smallest of the four absolute gaps between the box and the image edges, in pixels. The value is unsigned, so a
     box that extends past an edge reads as a positive distance, as one inside the image does, and the value does not
     say whether the box lies inside.
+- - `CONTEXT_SURROUND_MEAN` and `CONTEXT_SURROUND_STD`
+  - The mean and the population standard deviation of the intensity of the pixels around a box: a frame a quarter of the
+    box's width and height wide, less the box and less every other valid box. Intensity is the value mapped to [0, 1]
+    from the image's interval and averaged over the channels, and a pixel counts only if every channel lies in the
+    interval. This reads one box's own neighborhood, where the `background_` prefix below pools the pixels outside every
+    box over the whole image, and an object that no box annotates stays in the neighborhood.
 - - Background statistics (the `background_` prefix)
   - The same statistics measured over the pixels outside every annotated box. The boxes are unioned, so the values
     describe the scene. See
@@ -224,19 +230,20 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
 the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
-clipped to the new canvas and those left outside it are dropped, and the saturation statistic, because a resize returns
-floats, which have no dtype endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
+clipped to the new canvas and those left outside it are dropped, the surround statistics, because the ring around a box
+is made of interpolated pixels, and the saturation statistic, because a resize returns floats, which have no dtype
+endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
 resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source
 resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the
 two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated
 statistics now describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows
 the three responses.
 
-The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial and saturation
-statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"` declares
-the blur and saturation statistics too, because a luminance mix changes which picture is read. Random transforms are
-seeded for each datum from the datum's `id`, so the view is stable: the statistics pass, the embedding pass and the
-duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built through
+The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, surround and
+saturation statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"`
+declares the blur, saturation and surround statistics too, because a luminance mix changes which picture is read. Random
+transforms are seeded for each datum from the datum's `id`, so the view is stable: the statistics pass, the embedding
+pass and the duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built through
 {class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because provenance records the `repr` of
 each operation. A curated operation has a `repr` you can paste back. A `v2.Compose([...])` has a multi-line `repr`, and
 a lambda inside one records nothing recoverable. This is one more reason to prefer the curated operations.

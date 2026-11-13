@@ -140,8 +140,8 @@ class TestImageStatsDetails:
 
     @pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")  # ALL holds the blur flags
     def test_legacy_calls_produce_neither_field(self):
-        # `ALL` also holds the SPATIAL and SATURATION flags, which report details; a legacy call is `ALL` without them
-        legacy = ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION
+        # `ALL` also holds the SPATIAL, SATURATION and CONTEXT flags, which report details; a legacy call omits them
+        legacy = ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT
         result = image_stats(IMAGES, boxes=BOXES, stats=legacy, per_background=True)
         assert "details" not in result
         assert "measurement_specs" not in result

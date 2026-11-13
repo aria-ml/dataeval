@@ -183,13 +183,14 @@ class TestSelectChannelsInvalidates:
 
     def test_gray_also_invalidates_pixel_and_visual_stats(self):
         # A luminance mix moves PIXEL_MEAN and every visual statistic, the blur ones included, and a mix of channels
-        # is not at the saturation endpoint where one channel was.
+        # is not at the saturation endpoint where one channel was, nor the channel mean the surround statistics read.
         expected = (
             ImageStats.DIMENSION_CHANNELS
             | ImageStats.PIXEL
             | ImageStats.VISUAL
             | ImageStats.BLUR
             | ImageStats.PIXEL_SATURATION
+            | ImageStats.CONTEXT
         )
         assert SelectChannels("gray").invalidates == expected
 

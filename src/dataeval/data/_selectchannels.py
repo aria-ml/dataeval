@@ -99,7 +99,8 @@ class SelectChannels(Operation):
     ``"gray"`` is different, and is the clearest illustration of why ``invalidates`` is
     computed per-instance rather than fixed per-class. A luminance mix is a new pixel
     value at every position, so it moves every pixel and visual statistic, the blur
-    statistics included, and it is not at a saturation endpoint where one channel was --
+    statistics included, and it is not at a saturation endpoint where one channel was, and
+    it is not the mean over the channels that the surround statistics read --
     all of which the ``"gray"`` form therefore declares.
 
     Examples
@@ -135,7 +136,13 @@ class SelectChannels(Operation):
         if self._invalidates is not None:
             return self._invalidates
         if self.channels == "gray":
-            return ImageStats.DIMENSION_CHANNELS | ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.BLUR
+            return (
+                ImageStats.DIMENSION_CHANNELS
+                | ImageStats.PIXEL
+                | ImageStats.VISUAL
+                | ImageStats.BLUR
+                | ImageStats.CONTEXT
+            )
         return ImageStats.DIMENSION_CHANNELS
 
     def apply(self, view: View[Any]) -> None:

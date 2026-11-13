@@ -128,7 +128,7 @@ def test_all_still_warns_about_blur_and_never_names_spatial(fresh_process):
 @pytest.mark.parametrize(
     "group",
     [
-        ImageStats.ALL & ~ImageStats.SPATIAL,
+        ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.CONTEXT,
         ImageStats.STANDARD,
         ImageStats.BASIC,
         ImageStats.DIMENSION,

@@ -1,7 +1,7 @@
 __all__ = []
 
 import warnings
-from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
 from functools import partial, reduce
@@ -39,7 +39,7 @@ from dataeval.protocols import (
     _is_protocol_instance,
 )
 from dataeval.types import FactorLevel, MeasurementSpec, SourceIndex
-from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig
+from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig, SurroundConfig
 from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils._mask import VALUE_RANGE_KEY
@@ -756,6 +756,7 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
         | ImageStats.VISUAL
         | ImageStats.BLUR
         | ImageStats.DIMENSION_DEPTH
+        | ImageStats.CONTEXT
     )
     if normalize_pixel_values:
         needs_range |= flags & ImageStats.PIXEL
@@ -1037,15 +1038,39 @@ def _measurement_specs(plan: BatchPlan) -> dict[str, MeasurementSpec]:
     }
 
 
-def _saturation_settings(atol: Any) -> ImageStatsConfig:
-    """Check the saturation keyword and bundle it, naming the keyword rather than the settings field.
+def _checked(build: Callable[[], Any], keyword: str, expected: str, value: Any) -> Any:
+    """Build one section of the settings, naming the keyword and what it must be where the value is refused.
 
     `ValidationError` names a field of a private model, which is not what the caller wrote.
     """
     try:
-        return ImageStatsConfig(saturation=SaturationConfig(atol=atol))
+        return build()
     except ValidationError:
-        raise ValueError(f"saturation_atol must be a finite number of 0 or more, got {atol!r}.") from None
+        raise ValueError(f"{keyword} must be {expected}, got {value!r}.") from None
+
+
+def _settings(saturation_atol: Any, surround_padding: Any, surround_min_pixels: Any) -> ImageStatsConfig:
+    """Check the keywords that set up a statistic and bundle them, each on its own so the error names the keyword."""
+    saturation = _checked(
+        lambda: SaturationConfig(atol=saturation_atol),
+        "saturation_atol",
+        "a finite number of 0 or more",
+        saturation_atol,
+    )
+    _checked(
+        lambda: SurroundConfig(padding=surround_padding),
+        "surround_padding",
+        "a finite number greater than 0",
+        surround_padding,
+    )
+    _checked(
+        lambda: SurroundConfig(min_pixels=surround_min_pixels),
+        "surround_min_pixels",
+        "a whole number of 1 or more",
+        surround_min_pixels,
+    )
+    surround = SurroundConfig(padding=surround_padding, min_pixels=surround_min_pixels)
+    return ImageStatsConfig(saturation=saturation, surround=surround)
 
 
 def image_stats(  # noqa: C901
@@ -1061,6 +1086,8 @@ def image_stats(  # noqa: C901
     normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
     saturation_atol: float = 0.0,
+    surround_padding: float = 0.25,
+    surround_min_pixels: int = 32,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
@@ -1263,6 +1290,19 @@ def image_stats(  # noqa: C901
         ``PIXEL_SATURATION``.
 
         .. versionadded:: 1.3
+    surround_padding : float, default 0.25
+        How far the surround of a box reaches past it, as a share of the box's own width and of its height, greater
+        than 0. The default and the default of `surround_min_pixels` are the choice of the issue that added the
+        statistic and no study picked them, so they are provisional. Checked on every call, and ignored, with a warning,
+        when `stats` requests no `ImageStats.CONTEXT` statistic. Recorded in `measurement_specs`.
+
+        .. versionadded:: 1.3
+    surround_min_pixels : int, default 32
+        The fewest measurable surround pixels a box needs for `surround_mean` and `surround_std` to have a value, a
+        whole number of 1 or more. A box with fewer reads NaN with the status `insufficient_support`, so a small box
+        can fall under the default. Checked, ignored and recorded as `surround_padding` is.
+
+        .. versionadded:: 1.3
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -1279,9 +1319,9 @@ def image_stats(  # noqa: C901
         - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
         - details: Mapping[str, NDArray] - Facts about how the statistics were measured, one value per row of
           `stats`, present only when a requested statistic reports some. They are not statistics. See
-          :class:`~dataeval.flags.ImageStats` for the spatial and saturation ones
+          :class:`~dataeval.flags.ImageStats` for the spatial, saturation and context ones
         - measurement_specs: Mapping[str, MeasurementSpec] - What each column that depends on a setting was measured
-          with, present only when a requested statistic records some, as saturation does.
+          with, present only when a requested statistic records some, as saturation and the surround statistics do.
           :func:`~dataeval.core.combine_stats_results` refuses results whose specs differ
 
         Output is sorted by (item_index, box_index) ascending,
@@ -1291,25 +1331,28 @@ def image_stats(  # noqa: C901
     ------
     ValueError
         If `labels` is given without `boxes`, a box is not four numbers, or the labels are not one integer per
-        box. Also if `stats` asks only for statistics that compare a box with its peers (`ImageStats.SPATIAL`)
-        and the call measures no box rows, because `boxes` is None and the dataset has none, or `per_target`
-        is False. Also if `stats` asks only for the class statistics (`ImageStats.SPATIAL_MAX_IOU_SAME_CLASS`,
+        box. Also if `stats` asks only for statistics that need box rows, which compare a box with its peers
+        (`ImageStats.SPATIAL`) or read the pixels around it (`ImageStats.CONTEXT`), and the call measures no box
+        rows, because `boxes` is None and the dataset has none, or `per_target` is False. Also if `stats` asks only for
+        the class statistics (`ImageStats.SPATIAL_MAX_IOU_SAME_CLASS`,
         `ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS`) and `boxes` is given without `labels`, and if a dataset's
         labels are floating and hold a value that is not a whole number. A request that holds `ImageStats.ALL`
         can raise on those labels, since it reads them.
-        Also if `saturation_atol` is not a finite number of 0 or more, whether or not `stats` requests saturation, or if
-        the datum metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a
-        range.
+        Also if `saturation_atol` is not a finite number of 0 or more, `surround_padding` not a finite number greater
+        than 0, or `surround_min_pixels` not a whole number of 1 or more, whether or not `stats` requests the statistic
+        they set up, or if the datum metadata's `value_range` of an image is not a finite, ordered pair while a
+        requested statistic reads a range.
 
     Warns
     -----
     UserWarning
-        If `stats` asks for a spatial statistic beside others and the call measures no box rows, so the spatial
+        If `stats` asks for a spatial or context statistic beside others and the call measures no box rows, so those
         columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
-        `labels`, so every label is missing. A request that holds every non-spatial statistic of `ImageStats.ALL`
-        does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
-        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`, so
-        the setting is ignored.
+        `labels`, so every label is missing. A request that holds every statistic of `ImageStats.ALL` that needs no
+        box does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
+        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`,
+        so the setting is ignored, and a fourth for `surround_padding` or `surround_min_pixels` given a value other
+        than its default when `stats` requests no `ImageStats.CONTEXT` statistic.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
@@ -1469,6 +1512,24 @@ def image_stats(  # noqa: C901
     ...         return pixels, np.array([1.0]), {"id": i, "value_range": (0, 4095)}
     >>> image_stats(Sensor(), stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
     [1.0]
+
+    Measure the intensity around a box. The surround is a frame around it, a quarter of the box's size wide by default,
+    less the box and every other valid box. Here the box is 0.8 against a ring of 0.2, and a ring of 16 pixels needs
+    ``surround_min_pixels`` of 16 or less to count:
+
+    >>> picture = np.full((1, 10, 10), 0.2)
+    >>> picture[0, 3:6, 3:6] = 0.8
+    >>> ringed = image_stats(
+    ...     [picture],
+    ...     boxes=[[(3, 3, 6, 6)]],
+    ...     stats=ImageStats.CONTEXT,
+    ...     per_image=False,
+    ...     surround_min_pixels=16,
+    ... )
+    >>> round(float(ringed["stats"]["surround_mean"][0]), 3)
+    0.2
+    >>> ringed["details"]["context_status"].tolist(), ringed["details"]["surround_candidate_pixels"].tolist()
+    (['ok'], [16])
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
@@ -1513,7 +1574,7 @@ def image_stats(  # noqa: C901
 
     # Checked before any image is read, and whether or not the statistic is requested, so a bad value never waits for
     # the first image that would have used it.
-    settings = _saturation_settings(saturation_atol)
+    settings = _settings(saturation_atol, surround_padding, surround_min_pixels)
 
     if channels is True:
         # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
@@ -1559,17 +1620,42 @@ def image_stats(  # noqa: C901
             UserWarning,
             stacklevel=2,
         )
+    unused = [
+        name
+        for name, value, default in (
+            ("surround_padding", surround_padding, SurroundConfig().padding),
+            ("surround_min_pixels", surround_min_pixels, SurroundConfig().min_pixels),
+        )
+        if value != default
+    ]
+    if unused and not requested & ImageStats.CONTEXT:
+        warnings.warn(
+            f"{' and '.join(unused)} {'is' if len(unused) == 1 else 'are'} ignored, because "
+            f"{'it sets' if len(unused) == 1 else 'they set'} up `ImageStats.CONTEXT` and stats does not request it. "
+            "Add `ImageStats.CONTEXT` to stats, or drop it.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     calculators = CalculatorRegistry.get_calculators(whole_flags)
     channel_groups = _resolve_channel_groups(channels or {}, CalculatorRegistry.get_calculators(requested))
 
-    # A statistic that compares a box with its peers has a value only on a box's own row. A call with no box rows would
-    # return those columns as NaN, which reads as a measurement, so a request for nothing else raises. A mixed request
-    # keeps its columns, because the column set depends on the arguments and not on the data, and says what they hold.
-    # A request that holds every non-spatial statistic of `ALL` asks for everything, so a statistic that cannot be
-    # measured reads NaN without a word, as on any row it cannot measure: `ALL` is what a caller reaches for when it
-    # does not choose, and dataeval-flow does so with `per_target=False`.
-    asks_for_all = (requested & ~ImageStats.SPATIAL) == (ImageStats.ALL & ~ImageStats.SPATIAL)
+    # A statistic that reads a box's peers or its surround has a value only on a box's own row. A call with no box rows
+    # would return those columns as NaN, which reads as a measurement, so a request for nothing else raises. A mixed
+    # request keeps its columns, because the column set depends on the arguments and not on the data, and says what they
+    # hold. A request that holds every statistic of `ALL` that needs no box asks for everything, so a statistic that
+    # cannot be measured reads NaN without a word, as on any row it cannot measure: `ALL` is what a caller reaches for
+    # when it does not choose, and dataeval-flow does so with `per_target=False`. What needs a box is read from the
+    # statistics' own declarations, so the next family that needs one cannot be missed here.
+    needs_box = reduce(
+        or_,
+        (
+            calculator.flags_with_needs(flags)
+            for calculator, flags in CalculatorRegistry.get_calculators(ImageStats.ALL)
+        ),
+        ImageStats(0),
+    )
+    asks_for_all = (requested & ~needs_box) == (ImageStats.ALL & ~needs_box)
     peer_flags = reduce(
         or_,
         (calculator.flags_with_needs(flags) for calculator, flags in CalculatorRegistry.get_calculators(requested)),
@@ -1577,8 +1663,8 @@ def image_stats(  # noqa: C901
     )
     if peer_flags and not per_target:
         what = (
-            f"{_flag_names(peer_flags)} compare a box with its peers and so have a value only on a box's own row, "
-            f"and this call measures no box rows"
+            f"{_flag_names(peer_flags)} compare a box with its peers or read the pixels around it, so they have a "
+            f"value only on a box's own row, and this call measures no box rows"
         )
         fix = "Pass boxes= (or an object-detection dataset) and leave per_target=True"
         if peer_flags == requested:
@@ -1736,7 +1822,9 @@ def image_stats(  # noqa: C901
     # test only while every group was handed the same flags.
     # Rendered here rather than in the worker: the answer is the same for every datum.
     covered = reduce(or_, band_flags.values(), ImageStats(0))
-    wide_band_names = _flag_names(whole_flags & (ImageStats.VISUAL | ImageStats.BLUR | ImageStats.HASH) & ~covered)
+    wide_band_names = _flag_names(
+        whole_flags & (ImageStats.VISUAL | ImageStats.BLUR | ImageStats.HASH | ImageStats.CONTEXT) & ~covered
+    )
 
     # Statistics that go NaN for want of an interval, named per view: the unnamed one is
     # measured against the whole datum's range, each group against its own.

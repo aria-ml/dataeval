@@ -512,6 +512,23 @@ statistical and computational.
     inspected, so the run does not show that the largest other-class overlap finds label conflicts. Boxes that mark
     areas the annotators skipped, passed as a class, raised the covered fraction of the ordinary boxes, so drop them
     first.
+- - {func}`.image_stats` (`ImageStats.CONTEXT`)
+  - The intensity of the pixels around a box: the mean and the population standard deviation, over a frame a quarter of
+    the box's width and height wide, less the box and less every other valid box, with the intensity mapped to [0, 1]
+    from the image's interval and averaged over the channels.
+  - Anchored (hand-computed fixtures for the overlap, the edge and the encodings; a per-pixel check written from the
+    same definition, so not independent of it, agrees on 200 awkward boxes; constructed images only, plus a run on the
+    real boxes of one aerial dataset that counts the statuses and times the statistic, and checks no value)
+  - Descriptive only: the values do not say whether a target is camouflaged or in clutter, which are the readings built
+    on them. An object that no box annotates counts as surround. A box that contains another box's window, such as an
+    area marked as ignored, leaves that box no surround, so it reads `insufficient_support`, and a small box can fall
+    under the 32-pixel floor at the defaults. On the 114,133 boxes of VisDrone2019-MOT validation that are not ignored
+    regions, 373 read `insufficient_support`: 257 had nothing left of their surround after the other boxes, and 116 had
+    fewer than 32 measurable pixels left. With the ignored regions kept as a class, 818 of 118,127 did, 686 of them with
+    nothing left. A box near the image edge reads from a ring that the edge has cut. An image of integers with no
+    declared range is read against the interval its own maximum decodes to, so compare images only where the range is
+    declared. The intensity is a mean over the channels, so hue does not show in it. The padding of a quarter and the
+    floor of 32 pixels were chosen by no study.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
