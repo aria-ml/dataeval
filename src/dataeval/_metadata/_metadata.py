@@ -625,9 +625,14 @@ class Metadata(Array, FeatureExtractor):
     a track's observations and ``frame_span`` counts the frames from its first to its last
     inclusive, so they differ when the track has gaps. ``duration_s`` is the elapsed time over
     the same span, and is recorded for a track whose first and last frames both declare a
-    timestamp. ``track_length`` and ``frame_span`` equal ``n_appearances`` and
-    ``track_duration`` from :func:`~dataeval.core.track_stats`, so attaching that result adds
-    columns metadata already has.
+    timestamp. ``track_length`` equals ``n_appearances`` from :func:`~dataeval.core.track_stats`,
+    and ``frame_span`` equals its ``track_duration`` when ``frame_index`` is the frame's decode
+    position, so attaching that result adds columns metadata already has. A stream whose
+    ``frame_index`` skips frames or does not start at its position makes the second pair differ:
+    ``frame_span`` counts in the stream's own numbers and ``track_duration`` in decode order.
+
+    A track id given to two detections in one frame is refused with a ``ValueError``: one id
+    names one object per frame. ``-1`` marks a detection no tracker linked and may repeat.
 
     Example
     -------

@@ -243,7 +243,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         """Derive per-track factors: how long each track is, and how far it spans.
 
         ``track_length`` counts observations; ``frame_span`` counts frames from first to
-        last inclusive. They differ exactly when a track has gaps, which makes the pair
+        last inclusive. They differ when a track has gaps, which makes the pair
         more informative than either alone. ``duration_s`` is the elapsed time over the
         same span, and is recorded per track: a track whose first or last frame declared no
         timestamp has no duration — the span runs past the readings, so how far is not
@@ -253,12 +253,15 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         default the frame timings are subject to.
 
         These two are the same quantities :func:`~dataeval.core.track_stats` returns as
-        ``n_appearances`` and ``track_duration``: ``track_length == n_appearances`` and
-        ``frame_span == track_duration``. These are canonical for metadata, because they
-        are accumulated during the structuring walk and so cost nothing;
-        ``track_stats`` keeps its own names for standalone use. Attaching that result
-        with ``add_factors(..., key="track_id")`` therefore brings two columns metadata
-        already has, under other names.
+        ``n_appearances`` and ``track_duration``: ``track_length == n_appearances`` always, and
+        ``frame_span == track_duration`` whenever the stream's ``frame_index`` is the frame's
+        decode position. ``frame_span`` counts in the stream's own numbers, which a stream
+        that skips frames does not keep consecutive, while ``track_duration`` counts decode
+        positions because a bare tracking target carries no frame numbers. These are
+        canonical for metadata, because they are accumulated during the structuring walk and
+        so cost nothing; ``track_stats`` keeps its own names for standalone use. Attaching
+        that result with ``add_factors(..., key="track_id")`` therefore brings two columns
+        metadata already has, under other names.
 
         ``agg("instance", "track", pl.len())`` computes ``track_length`` a third way and
         is *not* the route to prefer, for the same reason: the walk has already counted

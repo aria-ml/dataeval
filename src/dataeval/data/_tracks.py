@@ -9,7 +9,7 @@ import numpy as np
 from dataeval._log import get_logger
 from dataeval.protocols import Dataset, MultiobjectTrackingDataset, MultiobjectTrackingTarget, _is_protocol_instance
 from dataeval.types import Track
-from dataeval.types._target import own_class_scores
+from dataeval.types._target import detection_count, own_class_scores, refuse_repeated_track_ids, track_ids_of
 
 _logger = get_logger(__name__)
 
@@ -37,12 +37,12 @@ def _build_tracks(tracking_target: MultiobjectTrackingTarget) -> Mapping[int, Tr
 
     untracked = 0
     for frame_idx, frame_target in enumerate(tracking_target.frame_tracks):
-        # A frame holds as many detections as it has labels, and one holding none is
-        # allowed to carry no ``track_ids`` at all — which is what the structuring walk
-        # behind :class:`~dataeval.Metadata` allows, so refusing it here would reject a
-        # target that metadata accepts.
-        count = len(np.asarray(frame_target.labels).reshape(-1))
-        track_ids = np.asarray(getattr(frame_target, "track_ids", ())).reshape(-1)[:count] if count else np.empty(0)
+        # Read as the structuring walk behind :class:`~dataeval.Metadata` reads them: a frame
+        # holds as many detections as it has labels, one holding none may carry no
+        # ``track_ids`` at all, and a short array leaves the rest untracked.
+        count = detection_count(frame_target)
+        track_ids = track_ids_of(frame_target, count)
+        refuse_repeated_track_ids(track_ids, f"frame {frame_idx}")
         # Selected up front rather than skipped inside the loop, so the walk below sees
         # only detections that belong to a track.
         tracked = np.flatnonzero(track_ids >= 0)
@@ -94,6 +94,12 @@ def build_tracks(
     Mapping[int, Track] or Mapping[str, Mapping[int, Track]]
         If source is a target, returns mapping of track ID to Track.
         If source is a dataset, returns mapping of sequence ID to track mappings.
+
+    Raises
+    ------
+    ValueError
+        When a frame gives one track id to two detections. One id names one object per
+        frame; ``-1`` marks a detection no tracker linked and may repeat.
 
     Notes
     -----

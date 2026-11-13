@@ -221,6 +221,15 @@ def _at_edge(box: np.ndarray, frame_w: int, frame_h: int, threshold: float) -> b
     )
 
 
+def _require_advancing(track_id: int, frames: np.ndarray) -> None:
+    """Refuse a track that holds two observations of one frame, or holds them out of order."""
+    if np.any(np.diff(frames) <= 0):
+        raise ValueError(
+            f"Track {track_id}: frame_indices must be strictly increasing, one observation per frame in frame "
+            "order. A step of zero or fewer frames has no speed.",
+        )
+
+
 def _compute_appearances_and_duration(
     frames: np.ndarray,
 ) -> tuple[int, int]:
@@ -244,8 +253,7 @@ def _compute_max_gap_length(frames: np.ndarray) -> int:
     """Longest run of absent frames between two consecutive observations, 0 below two observations."""
     if len(frames) < 2:
         return 0
-    # Clamped at 0 so a frame observed twice (a difference of 0) is no gap.
-    return max(int(np.max(np.diff(frames))) - 1, 0)
+    return int(np.max(np.diff(frames))) - 1
 
 
 def _compute_net_heading(ctrs: np.ndarray) -> float:
@@ -483,6 +491,7 @@ def _track_stats_for_sequence(
 
         if len(frames) == 0:
             continue
+        _require_advancing(tid, frames)
         track_ids.append(tid)
 
         label, confidence, score = _label_score_stats(track.labels, track.scores)
@@ -672,7 +681,8 @@ def track_stats(
     Raises
     ------
     ValueError
-        When frame dimensions are not positive.
+        When frame dimensions are not positive, or when a track's ``frame_indices`` do not
+        strictly increase: a step of zero or fewer frames has no speed.
     TypeError
         When `source` is neither a track mapping nor a tracking dataset.
 
@@ -687,6 +697,9 @@ def track_stats(
     ``n_appearances`` is ``track_length`` and ``track_duration`` is ``frame_span``, both
     accumulated during structuring. Attaching the whole result therefore brings duplicates
     of those two; drop them from the mapping to leave metadata's own in place.
+    ``track_duration`` counts decode positions while ``frame_span`` counts the stream's own
+    frame numbers, so the two differ for a stream whose ``frame_index`` skips frames or does
+    not start at its position.
     """
     if frame_width is not None and frame_width <= 0:
         raise ValueError(f"frame_width must be positive, got {frame_width}")

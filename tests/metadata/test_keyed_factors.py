@@ -11,8 +11,9 @@ import polars as pl
 import pytest
 
 from dataeval import Metadata
+from dataeval.core import track_stats
 from dataeval.exceptions import ShapeMismatchError
-from tests.metadata.test_structurers import _mot_dataset
+from tests.metadata.test_structurers import _Frame, _mot_dataset
 
 
 def _tracking(shapes):
@@ -222,6 +223,22 @@ class TestTrackStatsEquivalences:
         # Track 5 appears in all three frames; track 9 in the first and last, with a gap.
         assert frame["track_length"].to_list() == [3, 2]
         assert frame["frame_span"].to_list() == [3, 3]
+
+    def test_frame_span_is_in_the_streams_numbering_and_track_duration_in_decode_order(self):
+        """They agree when ``frame_index`` is the decode position and part where a stream skips frames."""
+        positional = _mot_dataset([[[5], [5]]])
+        assert Metadata(positional).rows_at("track")["frame_span"].to_list() == [2]
+        assert track_stats(positional)["stats"]["track_duration"] == [2]
+
+        skipping = _mot_dataset([[[5], [5]]])
+        skipping.data[0][0], skipping.data[0][1] = _Frame(100), _Frame(104)
+        assert Metadata(skipping).rows_at("track")["frame_span"].to_list() == [5]
+        assert track_stats(skipping)["stats"]["track_duration"] == [2]
+
+    def test_a_track_id_repeated_within_a_frame_is_refused(self):
+        """The same rule ``build_tracks`` applies, so the two agree on what a track is."""
+        with pytest.raises(ValueError, match=r"Track id 5 is given to 2 detections in frame 1 of item 0"):
+            _tracking([[[5], [5, 5]]])
 
     def test_they_are_present_without_any_keyed_write(self):
         """``track_stats``' n_appearances and track_duration would only duplicate these."""

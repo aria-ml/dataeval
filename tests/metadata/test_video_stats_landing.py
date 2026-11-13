@@ -329,7 +329,8 @@ class TestTheRoundTripSurvivesTheOperations:
 class TestTheProducerShouldNotRecomputeThese:
     """Two per-track quantities the structuring walk already derives — FE-9 issue 9.3.
 
-    ``track_length == n_appearances`` and ``frame_span == track_duration``. A video
+    ``track_length == n_appearances``, and ``frame_span == track_duration`` for a stream
+    numbered by position. A video
     statistic duplicating one of these is duplicating it, not adding to it.
     """
 

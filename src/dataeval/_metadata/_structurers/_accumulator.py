@@ -9,6 +9,7 @@ from typing import Any
 from numpy.typing import NDArray
 
 from dataeval._metadata._structurers._frames import FrameRows
+from dataeval.types._target import refuse_repeated_track_ids
 
 
 @dataclass
@@ -100,6 +101,7 @@ class MOTAccumulator:
         for it — a singleton track would be a track the data says does not exist, and would
         skew every per-track statistic toward length one.
         """
+        refuse_repeated_track_ids(rows.track_ids, f"frame {rows.frame_index} of item {item}")
         for track_id in rows.track_ids.tolist():
             if track_id < 0:
                 self.instance_track_pos.append(-1)

@@ -152,6 +152,38 @@ def track_ids_of(target: Any, count: int) -> NDArray[np.intp]:
     return np.concatenate([values, np.full(count - len(values), -1, dtype=np.intp)])
 
 
+def refuse_repeated_track_ids(ids: NDArray[np.intp], where: str) -> None:
+    """Raise when one track id is given to two detections in the same frame.
+
+    A tracker gives each id to one object per frame. A frame carrying an id twice is a dataset
+    bug, not a track with two boxes: every per-track quantity that steps from one observation
+    to the next would divide by a step of zero frames. Raised rather than absorbed for the
+    same reason a frame-count mismatch is — dropping either box would pick one at random — and
+    shared so that :func:`~dataeval.data.build_tracks` and the structuring walk behind
+    :class:`~dataeval.Metadata` agree on what a track is. ``-1`` marks a detection no tracker
+    linked and may repeat freely.
+
+    Parameters
+    ----------
+    ids : NDArray[np.intp]
+        One frame's track ids, as :func:`track_ids_of` read them.
+    where : str
+        Names the frame in the error message.
+
+    Raises
+    ------
+    ValueError
+        When a non-negative id appears more than once in ``ids``.
+    """
+    values, counts = np.unique(ids[ids >= 0], return_counts=True)
+    if (repeated := np.flatnonzero(counts > 1)).size:
+        first = repeated[0]
+        raise ValueError(
+            f"Track id {values[first]} is given to {counts[first]} detections in {where}; one id names one "
+            "object per frame. Give the extra detections ids of their own, or -1 to leave them untracked.",
+        )
+
+
 def detection_score(target: Any, index: int, label: int) -> float | None:
     """Read one detection's confidence, from either score layout a target may carry.
 

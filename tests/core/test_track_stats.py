@@ -194,6 +194,16 @@ class TestComputeStepSpeeds:
         assert delta_pos.shape == (0, 2)
 
 
+class TestTrackFramesMustAdvance:
+    """A step of zero or fewer frames has no speed, so a track whose frames do not advance is refused."""
+
+    @pytest.mark.parametrize("frames", [[0, 0, 1], [0, 2, 1]], ids=["repeated", "out-of-order"])
+    def test_a_track_whose_frames_do_not_strictly_increase_is_refused(self, frames):
+        track = make_track([box_at(0, 0), box_at(3, 0), box_at(6, 0)], frames, track_id=7)
+        with pytest.raises(ValueError, match=r"Track 7: frame_indices must be strictly increasing"):
+            track_stats({7: track})
+
+
 class TestComputeSpeedStats:
     """Tests for ``_compute_speed_stats``."""
 
@@ -712,13 +722,6 @@ class TestMaxGapLength:
             pytest.param([0, 2, 6, 7, 10], 3, id="several gaps, the longest is not first or last"),
             pytest.param([0, 299], 298, id="two observations far apart"),
             pytest.param([4], 0, id="single observation"),
-            pytest.param(
-                [0, 0, 1],
-                0,
-                id="two detections in one frame leave no gap",
-                # The step speed this track gets divides by a zero frame step, in code this column does not touch.
-                marks=pytest.mark.filterwarnings("ignore:invalid value encountered in divide:RuntimeWarning"),
-            ),
         ],
     )
     def test_longest_run_of_absent_frames(self, frames, expected):
