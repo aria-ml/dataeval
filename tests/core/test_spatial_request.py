@@ -138,7 +138,17 @@ def test_all_still_warns_about_blur_and_never_names_spatial(fresh_process):
         ImageStats.HASH,
         ImageStats.BLUR,
     ],
-    ids=["all_but_spatial", "standard", "basic", "dimension", "dimension_box", "pixel", "visual", "hash", "blur"],
+    ids=[
+        "all_but_spatial",
+        "standard",
+        "basic",
+        "dimension",
+        "dimension_box",
+        "pixel",
+        "visual",
+        "hash",
+        "blur",
+    ],
 )
 def test_every_group_without_spatial_is_unchanged(monkeypatch, group, source):
     def refuse(*args: Any, **kwargs: Any) -> None:
@@ -153,7 +163,8 @@ def test_every_group_without_spatial_is_unchanged(monkeypatch, group, source):
     else:
         result = image_stats(images(2), stats=group)
 
-    assert "details" not in result
+    # `PIXEL` holds saturation, which reports details of its own; no other group reports any.
+    assert all(name.startswith("saturation_") for name in result.get("details", {}))
     assert not SPATIAL_NAMES & set(result["stats"])
 
 

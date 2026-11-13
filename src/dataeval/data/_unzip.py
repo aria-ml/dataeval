@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import numpy as np
@@ -12,6 +12,7 @@ from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, Dataset, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
 from dataeval.utils._annotations import Annotations, build_annotations
 from dataeval.utils._array import as_numpy
+from dataeval.utils._mask import VALUE_RANGE_KEY
 from dataeval.utils.data import unwrap_image, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
 
@@ -76,13 +77,13 @@ def _unzip_annotations(
     dataset: Dataset[Any] | Dataset[tuple[Any, Any, Any]],
     per_target: bool,
     with_labels: bool = False,
-) -> tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None]:
+) -> tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None, Iterator[Any]]:
     """
-    Unzip a dataset into image and annotation iterators, keeping each box's coordinates as given.
+    Unzip a dataset into image, annotation and declared-range iterators, keeping each box's coordinates as given.
 
     The shared body of :func:`unzip_dataset`, which returns only the converted boxes. This one returns the whole
     ``Annotations`` for each image, with its raw coordinates and, when `with_labels`,
-    its labels.
+    its labels, and what each image's own metadata holds under ``value_range``, unchecked, or None.
 
     Parameters
     ----------
@@ -96,8 +97,9 @@ def _unzip_annotations(
 
     Returns
     -------
-    tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None]
-        Two iterators, one of images and one of annotations, which is None when `per_target` is False.
+    tuple[Iterator[NDArray[Any]], Iterator[Annotations | None] | None, Iterator[Any]]
+        Three iterators: images, annotations, which is None when `per_target` is False, and the raw ``value_range`` of
+        each image's metadata.
     """
     from itertools import tee
 
@@ -111,9 +113,13 @@ def _unzip_annotations(
 
     _reject_tracking(dataset, per_target)
 
-    def _generate_pairs() -> Iterator[tuple[NDArray[Any], Annotations | None]]:
+    def _generate_pairs() -> Iterator[tuple[NDArray[Any], Annotations | None, Any]]:
         for i in range(len(dataset)):
             d = dataset[i]
+            # From the item already read, so no item is loaded twice. Unchecked here: only a statistic that reads a
+            # range needs it to be a pair, and a dataset that holds another value under the key is fine for the rest.
+            meta = d[2] if isinstance(d, tuple) and len(d) == 3 else None
+            declared = meta.get(VALUE_RANGE_KEY) if isinstance(meta, Mapping) else None
             image = np.asarray(unwrap_image(d))
             if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
@@ -121,16 +127,17 @@ def _unzip_annotations(
                 annotations = build_annotations(boxes, image.shape, i, labels)
             else:
                 annotations = None
-            yield image, annotations
+            yield image, annotations, declared
 
-    # Create two independent iterators from the generator
-    iter1, iter2 = tee(_generate_pairs(), 2)
+    # Create three independent iterators from the generator
+    iter1, iter2, iter3 = tee(_generate_pairs(), 3)
 
-    # Extract images and annotations separately
-    images_iter = _SizedIterator((pair[0] for pair in iter1), len(dataset))
-    annotations_iter = (pair[1] for pair in iter2) if per_target else None
+    # Extract images, annotations and declared ranges separately
+    images_iter = _SizedIterator((item[0] for item in iter1), len(dataset))
+    annotations_iter = (item[1] for item in iter2) if per_target else None
+    ranges_iter = (item[2] for item in iter3)
 
-    return images_iter, annotations_iter
+    return images_iter, annotations_iter, ranges_iter
 
 
 def unzip_dataset(
@@ -154,6 +161,6 @@ def unzip_dataset(
     tuple[Iterator[NDArray[Any]], Iterator[list[BoundingBox] | None] | None]
         Two iterators, one for images and one for targets.
     """
-    images, annotations = _unzip_annotations(dataset, per_target)
+    images, annotations, _ = _unzip_annotations(dataset, per_target)
     targets = None if annotations is None else (a.boxes if a is not None else None for a in annotations)
     return images, targets

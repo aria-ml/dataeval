@@ -5,12 +5,13 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass
 from enum import Flag
 from functools import partial, reduce
-from itertools import zip_longest
+from itertools import chain, repeat, zip_longest
 from operator import or_
 from typing import Any, cast, get_args
 
 import numpy as np
 from numpy.typing import NDArray
+from pydantic import ValidationError
 
 # Import calculators to trigger auto-registration
 import dataeval.core._calculators._register  # noqa: F401
@@ -37,9 +38,11 @@ from dataeval.protocols import (
     ProgressCallback,
     _is_protocol_instance,
 )
-from dataeval.types import FactorLevel, SourceIndex
+from dataeval.types import FactorLevel, MeasurementSpec, SourceIndex
+from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig
 from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
 from dataeval.utils._internal import PoolWrapper
+from dataeval.utils._mask import VALUE_RANGE_KEY
 from dataeval.utils.preprocessing import (
     _UNKNOWN_RANGE,
     BoundingBox,
@@ -195,10 +198,16 @@ class BatchPlan:
     per_background: bool
     background_calculators: Sequence[tuple[type[Any], Flag]]
     declared_range: tuple[float, float] | None
+    reads_range: bool
     band_plans: Mapping[str, BandPlan]
     wide_band_names: str
     unmeasurable_names: str
     needs: ContextNeed
+    settings: ImageStatsConfig
+
+
+_Item = tuple[int, NDArray[Any], Annotations | None, tuple[float, float] | None]
+"""One image as the worker receives it: index, pixels, annotations, and the range its metadata declares if read."""
 
 
 @dataclass
@@ -224,6 +233,7 @@ def _collect_calculator_stats(
     *,
     context: AnnotationContext | None = None,
     focal: int | None = None,
+    settings: ImageStatsConfig | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -250,6 +260,9 @@ def _collect_calculator_stats(
         The same object for every row and view of one datum.
     focal : int or None, default None
         Index of `box` among the datum's boxes, or None on the datum's own row.
+    settings : ImageStatsConfig or None, default None
+        The call's validated settings, handed to the cache for the statistics that take them. The documented
+        defaults when None.
 
     Returns
     -------
@@ -273,6 +286,7 @@ def _collect_calculator_stats(
         bands=bands,
         context=context,
         focal=focal,
+        settings=settings,
     )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor)
@@ -332,6 +346,7 @@ def _collect_band_stats(
     view: ViewKind = ViewKind.BAND,
     context: AnnotationContext | None = None,
     focal: int | None = None,
+    settings: ImageStatsConfig | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """Run one named band group as its own view of the datum.
 
@@ -353,6 +368,7 @@ def _collect_band_stats(
         bands=bands,
         context=context,
         focal=focal,
+        settings=settings,
     )
 
 
@@ -406,7 +422,7 @@ def _pad_missing_stats(results: list["DatumResult"], empty_values_map: dict[str,
 
 
 def _compute_batch(  # noqa: C901
-    args: tuple[int, NDArray[Any], Annotations | None],
+    args: "_Item",
     plan: BatchPlan,
 ) -> DatumBatchResult:
     # Bound to locals rather than read through `plan.` at each use: this body runs once per
@@ -417,12 +433,15 @@ def _compute_batch(  # noqa: C901
     normalize_pixel_values = plan.normalize_pixel_values
     per_background = plan.per_background
     background_calculators = plan.background_calculators
-    declared_range = plan.declared_range
     band_plans = plan.band_plans
     wide_band_names = plan.wide_band_names
     unmeasurable_names = plan.unmeasurable_names
+    settings = plan.settings
 
-    i, datum, annotations = args
+    i, datum, annotations, metadata_range = args
+    # The call's own declaration beats the image's. `_enumerate_datum` has checked the image's and passes it on only
+    # where a requested statistic reads a range and the call declared none.
+    declared_range = plan.declared_range if metadata_range is None else metadata_range
     boxes = annotations.boxes if annotations is not None else None
     results: list[DatumResult] = []
     box_count = 0
@@ -454,6 +473,15 @@ def _compute_batch(  # noqa: C901
     # about and never asked for this view at all, and one unmeasurable datum should not
     # end a run over a hundred thousand. Said rather than silent, because an all-NaN
     # column is otherwise easy to miss.
+    # A declaration is a claim, and one the data contradicts reads as a measurement. Said once per image, in words that
+    # carry no numbers so that the aggregation below lists the images. A channel group's own range is not checked.
+    # ponytail: one min/max pass over the datum, for a declared range only; a group's range would need one per group.
+    if plan.reads_range and declared_range is not None and datum.size and _leaves(datum, declared_range):
+        warnings_list.append(
+            f"{i}: values fall outside the declared value range, so the statistics that read it clip or exclude "
+            f"them. Widen value_range to cover the data, or drop a declaration the data contradicts."
+        )
+
     if unmeasurable_names and not value_range.is_known:
         warnings_list.append(
             f"{i}: no value range could be established, so {unmeasurable_names} are NaN. Float data spanning "
@@ -546,6 +574,7 @@ def _compute_batch(  # noqa: C901
                 value_range=value_range,
                 context=context,
                 focal=i_b,
+                settings=settings,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -570,6 +599,7 @@ def _compute_batch(  # noqa: C901
                     prefix="",
                     context=context,
                     focal=i_b,
+                    settings=settings,
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -591,6 +621,7 @@ def _compute_batch(  # noqa: C901
                 view=ViewKind.MASK,
                 context=context,
                 focal=i_b,
+                settings=settings,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -624,6 +655,7 @@ def _compute_batch(  # noqa: C901
                     view=ViewKind.MASK | ViewKind.BAND,
                     context=context,
                     focal=i_b,
+                    settings=settings,
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -727,7 +759,15 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
     )
     if normalize_pixel_values:
         needs_range |= flags & ImageStats.PIXEL
-    return needs_range & ~ImageStats.PIXEL_MISSING
+    return needs_range & ~(ImageStats.PIXEL_MISSING | ImageStats.PIXEL_SATURATION)
+
+
+def _reads_a_range(whole_flags: Flag, group_flags: Mapping[str, Flag], normalize_pixel_values: bool) -> bool:
+    """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy."""
+    return any(
+        _unmeasurable_flags(flags, None, normalize_pixel_values) or flags & ImageStats.PIXEL_SATURATION
+        for flags in (whole_flags, *group_flags.values())
+    )
 
 
 def _names(keys: Iterable[Any]) -> str:
@@ -830,17 +870,52 @@ def _annotate(
     return build_annotations(cast("Iterable[BoxLike] | None", box), shape, index, labels)
 
 
+def _metadata_range(raw: Any, i: int) -> tuple[float, float]:
+    """Check one image's declared range, naming the image and the key where it is not a finite, ordered pair."""
+    try:
+        if isinstance(raw, str | bytes):
+            raise ValueError(raw)
+        return _validate_declared_range(raw)
+    except ValueError as e:
+        raise ValueError(
+            f"image {i}: the datum metadata '{VALUE_RANGE_KEY}' must be a finite, ordered (low, high) pair of numbers, "
+            f"got {raw!r}. Fix or remove the key, or pass value_range= to declare one range for the whole call."
+        ) from e
+
+
+def _leaves(datum: NDArray[Any], declared: tuple[float, float]) -> bool:
+    """Whether any value of the datum lies outside the declared interval; NaN is not a value."""
+    return bool(np.fmin.reduce(datum, axis=None) < declared[0] or np.fmax.reduce(datum, axis=None) > declared[1])
+
+
+def _declared(i: int, raw: Any) -> tuple[float, float] | None:
+    """Return the checked range of one image, or None where its metadata declared none or was not read."""
+    if raw is None:
+        return None
+    declared = _metadata_range(raw, i)
+    warn_experimental_once("value_range in datum metadata", details="The key and the shape of its value may change.")
+    return declared
+
+
 def _enumerate_datum(
     images: Iterable[ArrayLike],
     boxes: Iterable[Iterable[BoxLike] | Annotations | None] | None,
     labels: Iterable[ArrayLike | None] | None = None,
-) -> Iterator[tuple[int, NDArray[Any], Annotations | None]]:
+    value_ranges: Iterable[Any] | None = None,
+) -> Iterator[_Item]:
+    """Pair each image with its boxes and with the range its own metadata declares, checked, or None.
+
+    `value_ranges` is None wherever no statistic would read a declared range, so a stranger value under the key is then
+    never looked at. It comes from the same items as the images, so its length is not one of those checked.
+    """
+    # Padded with None, so that a short range iterator can never end the loop before the length check has run.
+    ranges = repeat(None) if value_ranges is None else chain(value_ranges, repeat(None))
     if boxes is None:
-        for i, image in enumerate(images):
-            yield i, np.asarray(image), None
+        for i, (image, raw) in enumerate(zip(images, ranges, strict=False)):
+            yield i, np.asarray(image), None, _declared(i, raw)
         return
     sources = {"images": images, "boxes": boxes, **({} if labels is None else {"labels": labels})}
-    for i, entries in enumerate(zip_longest(*sources.values(), fillvalue=_END)):
+    for i, (entries, raw) in enumerate(zip(zip_longest(*sources.values(), fillvalue=_END), ranges, strict=False)):
         _refuse_ragged(dict(zip(sources, entries, strict=True)), i)
         image, box, *label = entries
         np_image = np.asarray(image)
@@ -848,13 +923,11 @@ def _enumerate_datum(
             i,
             np_image,
             _annotate(cast("Iterable[BoxLike] | Annotations | None", box), tuple(label), np_image.shape, i),
+            _declared(i, raw),
         )
 
 
-def _noting_sizes(
-    datum: Iterator[tuple[int, NDArray[Any], Annotations | None]],
-    sizes: set[tuple[int, ...]],
-) -> Iterator[tuple[int, NDArray[Any], Annotations | None]]:
+def _noting_sizes(datum: Iterator[_Item], sizes: set[tuple[int, ...]]) -> Iterator[_Item]:
     """Pass each datum on unchanged, adding the (H, W) of every image that has a picture to `sizes`."""
     for item in datum:
         if item[1].ndim >= 2:
@@ -934,6 +1007,47 @@ def _aggregate_batch(
     warning_list.extend(result.warnings_list)
 
 
+def _measurement_specs(plan: BatchPlan) -> dict[str, MeasurementSpec]:
+    """Return what each column the call's calculators describe was measured with, under the column's own name.
+
+    One pass over the same views `_compute_batch` walks, so a column is named as it is there: the unprefixed view, the
+    background, each band group, and each band group's background. A band group is measured against its own declared
+    range where it has one.
+    """
+    views: list[tuple[str, ViewKind, Sequence[tuple[type[Any], Flag]], tuple[float, float] | None]] = [
+        ("", ViewKind.WHOLE, plan.calculators, plan.declared_range),
+    ]
+    if plan.per_background:
+        views.append((BACKGROUND_PREFIX, ViewKind.MASK, plan.background_calculators, plan.declared_range))
+    for name, band in plan.band_plans.items():
+        declared = band.value_range or plan.declared_range
+        views.append((f"{name}_", ViewKind.BAND, band.calculators, declared))
+        if plan.per_background and band.background_calculators:
+            views.append((
+                f"{BACKGROUND_PREFIX}{name}_",
+                ViewKind.MASK | ViewKind.BAND,
+                band.background_calculators,
+                declared,
+            ))
+    return {
+        f"{prefix}{name}": spec
+        for prefix, view, calculators, declared in views
+        for calculator, flags in calculators
+        for name, spec in calculator.measurement_specs(flags, view, plan.settings, declared).items()
+    }
+
+
+def _saturation_settings(atol: Any) -> ImageStatsConfig:
+    """Check the saturation keyword and bundle it, naming the keyword rather than the settings field.
+
+    `ValidationError` names a field of a private model, which is not what the caller wrote.
+    """
+    try:
+        return ImageStatsConfig(saturation=SaturationConfig(atol=atol))
+    except ValidationError:
+        raise ValueError(f"saturation_atol must be a finite number of 0 or more, got {atol!r}.") from None
+
+
 def image_stats(  # noqa: C901
     data: Iterable[ArrayLike] | ImageDataset,
     *,
@@ -946,6 +1060,7 @@ def image_stats(  # noqa: C901
     channels: Mapping[str, ChannelGroupLike] | None = None,
     normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
+    saturation_atol: float = 0.0,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
@@ -1025,8 +1140,8 @@ def image_stats(  # noqa: C901
         background statistic measured over a few percent of an image is noise wearing
         a measurement's clothes.
 
-        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and
-        :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are computed for the
+        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are
+        computed for the
         background; any hash, dimension or spatial statistics in `stats` are computed for the
         image and its boxes as usual and skipped for the background, which has no
         meaningful hash and no geometry of its own. The blur statistics are
@@ -1119,9 +1234,35 @@ def image_stats(  # noqa: C901
         A statistic that does not need an interval is unaffected: an unnormalized mean of
         physical values is a perfectly good mean.
 
-        A declaration applies to every image in `data` and implies no bit depth.
+        A dataset can declare the interval image by image instead, as a ``(low, high)`` pair under ``value_range`` in
+        each datum's metadata, so one collection can hold sensors of different depths. It is read when a requested
+        statistic reads an interval, and a pair that is not finite and ordered raises, naming the image. This argument
+        beats every image's metadata, and a channel group's own `value_range` beats both. An iterable of arrays has no
+        metadata.
+
+        **Experimental.** The metadata key and the shape of its value may change, and the first declaration read
+        raises an ``ExperimentalWarning``. It is a claim about the pixels, so a
+        :class:`~dataeval.data.TorchvisionTransform` that rescales an image drops it from that datum,
+        :class:`~dataeval.Metadata` does not read it as a factor, and a declared range that the values leave is logged,
+        naming the images, for any statistic that reads it.
+
+        A declaration of ``(0, 2**n - 1)`` on integer data reports ``n`` as its
+        :attr:`~dataeval.flags.ImageStats.DIMENSION_DEPTH`, for the depths the decoder reports (1, 8, 12, 16 and 32).
+        Any other declaration implies no depth.
 
         .. versionadded:: 1.1
+        .. versionchanged:: 1.3
+            Also read from each datum's metadata, and names a depth for ``(0, 2**n - 1)`` on integer data.
+    saturation_atol : float, default 0.0
+        How far from the endpoint a value may sit and still count as saturated, at least 0. The default is exact
+        equality, which a float image that went through arithmetic rarely meets, so set a tolerance for one. The
+        endpoint is the upper bound of the declared `value_range`, else the maximum of an unsigned integer dtype of 32
+        bits or fewer, or 1 for Boolean data, else it is unknown and the statistic is NaN. It is never read from the
+        data, so 12-bit data stored in ``uint16`` is measured against 65535 unless its range is declared as
+        ``(0, 4095)``. The value is checked on every call, and ignored, with a warning, when `stats` does not request
+        ``SATURATION``.
+
+        .. versionadded:: 1.3
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -1138,7 +1279,10 @@ def image_stats(  # noqa: C901
         - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
         - details: Mapping[str, NDArray] - Facts about how the statistics were measured, one value per row of
           `stats`, present only when a requested statistic reports some. They are not statistics. See
-          :class:`~dataeval.flags.ImageStats` for the spatial ones
+          :class:`~dataeval.flags.ImageStats` for the spatial and saturation ones
+        - measurement_specs: Mapping[str, MeasurementSpec] - What each column that depends on a setting was measured
+          with, present only when a requested statistic records some, as saturation does.
+          :func:`~dataeval.core.combine_stats_results` refuses results whose specs differ
 
         Output is sorted by (item_index, box_index) ascending,
         with None values appearing before 0.
@@ -1153,6 +1297,9 @@ def image_stats(  # noqa: C901
         `ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS`) and `boxes` is given without `labels`, and if a dataset's
         labels are floating and hold a value that is not a whole number. A request that holds `ImageStats.ALL`
         can raise on those labels, since it reads them.
+        Also if `saturation_atol` is not a finite number of 0 or more, whether or not `stats` requests saturation, or if
+        the datum metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a
+        range.
 
     Warns
     -----
@@ -1161,6 +1308,8 @@ def image_stats(  # noqa: C901
         columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
         `labels`, so every label is missing. A request that holds every non-spatial statistic of `ImageStats.ALL`
         does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
+        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.SATURATION`, so the
+        setting is ignored.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
@@ -1302,6 +1451,24 @@ def image_stats(  # noqa: C901
     [0.333, 0.333, 0.0]
     >>> found["details"]["max_iou_other_class_target_index"].tolist()
     [1, 0, -1]
+
+    Measure the share of values at a clipping endpoint. The endpoint is never read from the data, so values that fill
+    12 bits and sit in a ``uint16`` array are measured against 65535 until the range is stated, here in the datum's
+    metadata:
+
+    >>> pixels = np.full((1, 4, 4), 4095, dtype=np.uint16)
+    >>> image_stats([pixels], stats=ImageStats.SATURATION)["stats"]["saturation"].tolist()
+    [0.0]
+    >>> class Sensor:
+    ...     metadata = {"id": "sensor"}
+    ...
+    ...     def __len__(self):
+    ...         return 1
+    ...
+    ...     def __getitem__(self, i):
+    ...         return pixels, np.array([1.0]), {"id": i, "value_range": (0, 4095)}
+    >>> image_stats(Sensor(), stats=ImageStats.SATURATION)["stats"]["saturation"].tolist()
+    [1.0]
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
@@ -1344,6 +1511,10 @@ def image_stats(  # noqa: C901
     if not per_image and not per_target and not per_background:
         raise ValueError("At least one of 'per_image', 'per_target' or 'per_background' must be True")
 
+    # Checked before any image is read, and whether or not the statistic is requested, so a bad value never waits for
+    # the first image that would have used it.
+    settings = _saturation_settings(saturation_atol)
+
     if channels is True:
         # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
         # bool reaches `.items()` and reports itself as an AttributeError naming neither the
@@ -1374,6 +1545,17 @@ def image_stats(  # noqa: C901
             "stats requests no statistics, so every row will be returned with no columns. "
             "ImageStats.NONE, an empty mapping and {None: ImageStats.NONE} all mean this — "
             "name the statistics you want, or drop the image_stats call.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    # A setting that sets up a statistic the request leaves out is probably a flag forgotten, not a setting wanted.
+    # `requested` is the union over the unnamed view and every band group, so a mapping that asks only a group for
+    # SATURATION is using it.
+    if not requested & ImageStats.PIXEL_SATURATION and saturation_atol != 0:
+        warnings.warn(
+            "saturation_atol is ignored, because it sets up `ImageStats.SATURATION` and stats does not request it. "
+            "Add `ImageStats.SATURATION` to stats, or drop it.",
             UserWarning,
             stacklevel=2,
         )
@@ -1604,13 +1786,21 @@ def image_stats(  # noqa: C901
     # object-detection shaped when asked for targets, so requesting a background over a
     # plain image dataset must not send it looking for boxes that cannot be there.
     needs_boxes = (per_target or per_background) and has_boxes
-    images, box_entries = (
-        (data, boxes)
-        if not isinstance(data, Dataset)
-        else (_unzip_annotations(data, per_target=False)[0], boxes)
-        if boxes is not None
-        else _unzip_annotations(data, per_target=needs_boxes, with_labels=ContextNeed.LABELS in needs and per_target)
-    )
+    ranges: Iterable[Any] | None = None
+    if isinstance(data, Dataset):
+        images, annotations, ranges = _unzip_annotations(
+            data,
+            per_target=needs_boxes and boxes is None,
+            with_labels=ContextNeed.LABELS in needs and per_target and boxes is None,
+        )
+        box_entries = boxes if boxes is not None else annotations
+    else:
+        images, box_entries = data, boxes
+    # An image's own declared range is read only where it can matter: a dataset has it, the call did not declare one
+    # that beats it, and a requested statistic reads a range. Otherwise the key is never looked at, so a dataset that
+    # holds something else under it still runs, and the iterator is dropped without being consumed.
+    if value_range is not None or not _reads_a_range(whole_flags, group_flags, normalize_pixel_values):
+        ranges = None
 
     # Build description for progress bar
     calculator_names = [c[0].__name__.removesuffix("Calculator") for c in calculators]
@@ -1619,31 +1809,29 @@ def image_stats(  # noqa: C901
     # An edge width is in pixels at the image's own size, so the blur columns say nothing across sizes. The sizes are
     # noted where this process walks the images, which holds on the pool path too: the pool takes its tasks from this
     # generator in a thread of this process. A request with no blur flag does not wrap it.
-    datum = _enumerate_datum(images, box_entries, labels)
+    datum = _enumerate_datum(images, box_entries, labels, ranges)
     sizes: set[tuple[int, ...]] = set()
     if requested & ImageStats.BLUR:
         datum = _noting_sizes(datum, sizes)
 
+    plan = BatchPlan(
+        calculators=calculators,
+        per_image=per_image,
+        per_target=per_target,
+        normalize_pixel_values=normalize_pixel_values,
+        per_background=per_background,
+        background_calculators=background_calculators,
+        declared_range=value_range,
+        reads_range=_reads_a_range(whole_flags, group_flags, normalize_pixel_values),
+        band_plans=band_plans,
+        wide_band_names=wide_band_names,
+        unmeasurable_names=unmeasurable_names,
+        needs=needs,
+        settings=settings,
+    )
+
     with PoolWrapper(processes=get_max_processes()) as p:
-        for result in p.imap_unordered(
-            partial(
-                _compute_batch,
-                plan=BatchPlan(
-                    calculators=calculators,
-                    per_image=per_image,
-                    per_target=per_target,
-                    normalize_pixel_values=normalize_pixel_values,
-                    per_background=per_background,
-                    background_calculators=background_calculators,
-                    declared_range=value_range,
-                    band_plans=band_plans,
-                    wide_band_names=wide_band_names,
-                    unmeasurable_names=unmeasurable_names,
-                    needs=needs,
-                ),
-            ),
-            datum,
-        ):
+        for result in p.imap_unordered(partial(_compute_batch, plan=plan), datum):
             _aggregate_batch(
                 result,
                 source_indices,
@@ -1704,4 +1892,7 @@ def image_stats(  # noqa: C901
     # exactly the keys it always has.
     if sorted_details:
         result["details"] = sorted_details
+    # Only for the columns the result holds: a call that measured no unprefixed row has no spec for one.
+    if specs := {name: spec for name, spec in _measurement_specs(plan).items() if name in sorted_aggregated_stats}:
+        result["measurement_specs"] = specs
     return result

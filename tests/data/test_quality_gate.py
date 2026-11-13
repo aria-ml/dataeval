@@ -161,6 +161,16 @@ class TestQualityGate:
         finally:
             _numeric_scalar_stats.cache_clear()
 
+    def test_saturation_is_refused_because_a_gate_has_no_way_to_give_it_an_endpoint(self):
+        """Its endpoint is a keyword of `image_stats`, so a gate would read the dtype rail or NaN and say nothing."""
+        _numeric_scalar_stats.cache_clear()
+        try:
+            assert "saturation" not in _numeric_scalar_stats()
+            with pytest.raises(ValueError, match="endpoint"):
+                QualityGate("saturation", min=0.0)
+        finally:
+            _numeric_scalar_stats.cache_clear()
+
     def test_the_supported_set_holds_the_visual_scalars(self):
         assert {"brightness", "contrast", "darkness", "sharpness"} <= set(_numeric_scalar_stats())
 

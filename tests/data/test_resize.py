@@ -181,7 +181,12 @@ class TestResizePadFill:
 
 @pytest.mark.required
 class TestResizeInvalidates:
-    BASE = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.VISUAL_SHARPNESS | ImageStats.BLUR
+    BASE = (
+        (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
+        | ImageStats.VISUAL_SHARPNESS
+        | ImageStats.BLUR
+        | ImageStats.SATURATION
+    )
     PAD_EXTRA = (
         ImageStats.PIXEL_ZEROS
         | ImageStats.PIXEL_HISTOGRAM
@@ -231,8 +236,10 @@ class TestResizeInvalidates:
         # Bilinear resize promotes uint8 to float.
         assert Resize((10, 10), mode=mode).invalidates & ImageStats.DIMENSION_DEPTH
 
-    def test_stretch_does_not_invalidate_pixel_stats(self):
-        assert not Resize((10, 10), mode="stretch").invalidates & ImageStats.PIXEL
+    def test_stretch_does_not_invalidate_the_pixel_distribution(self):
+        # Saturation is in `PIXEL` and a resize does invalidate it, so it is the one pixel statistic left out.
+        assert not Resize((10, 10), mode="stretch").invalidates & ImageStats.PIXEL & ~ImageStats.SATURATION
+        assert Resize((10, 10), mode="stretch").invalidates & ImageStats.SATURATION
 
     def test_constructor_override_replaces_the_computed_value(self):
         op = Resize((10, 10), mode="pad", invalidates=ImageStats.HASH)

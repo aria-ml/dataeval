@@ -1,15 +1,69 @@
 __all__ = []
 
 from functools import cached_property
-from typing import Any
+from typing import Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._calculators._base import ALL_VIEWS, Calculator, Handler
+from dataeval.core._calculators._base import ALL_VIEWS, Calculator, Handler, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
+from dataeval.types import MeasurementSpec
+
+
+class _Saturation(NamedTuple):
+    """One view's saturation reading and the facts that say how it was measured."""
+
+    status: str
+    saturation: float
+    valid_fraction: float
+    above_range_fraction: float
+    upper: float
+    rule: str
+
+
+def _finite(image: NDArray[Any]) -> tuple[NDArray[np.bool_] | None, int]:
+    """Return which values of `image` are finite, and how many.
+
+    An integer or Boolean view holds no NaN or infinity, so every value is finite and there is nothing to scan: the mask
+    is None.
+    """
+    if not np.issubdtype(image.dtype, np.inexact):
+        return None, image.size
+    mask = np.isfinite(image)
+    return mask, int(np.count_nonzero(mask))
+
+
+def _status(has_pixels: bool, finite: int, endpoint: tuple[float, str] | None) -> str:
+    """Name why a view has no reading, or ``ok``: no pixels, then no finite value, then no endpoint."""
+    if not has_pixels:
+        return "empty_region"
+    if finite == 0:
+        return "no_finite_values"
+    return "ok" if endpoint is not None else "unknown_upper"
+
+
+def _counts_at(
+    image: NDArray[Any],
+    finite_mask: NDArray[np.bool_] | None,
+    dtype: np.dtype[Any],
+    upper: float,
+    atol: float,
+) -> tuple[int, int]:
+    """Count the values within `atol` of `upper`, and the finite ones above that band.
+
+    One comparison against Python floats for every dtype, which makes no float copy of an integer view. For a float
+    datum the thresholds are rounded to its own dtype: a 3-D float32 datum reaches here as float64 and a 2-D one as
+    float32, so a threshold left as given would match one and miss the other.
+    """
+    low, high = upper - atol, upper + atol
+    if dtype.kind == "f":
+        with np.errstate(over="ignore"):
+            low, high = float(dtype.type(low)), float(dtype.type(high))
+    above = (image > high) if finite_mask is None else (image > high) & finite_mask
+    return int(np.count_nonzero((image >= low) & (image <= high))), int(np.count_nonzero(above))
 
 
 @CalculatorRegistry.register(ImageStats)
@@ -215,6 +269,92 @@ class PixelStatCalculator(Calculator[ImageStats]):
         # would answer a question nobody asked.
         return self._as_fraction(np.count_nonzero(self.cache.image == 0))
 
+    def _endpoint(self) -> tuple[float, str] | None:
+        """Return the clipping endpoint and what supplied it, or None when nothing did.
+
+        In the order the statistic defines: a range declared for this view, by the call, a channel group or the image's
+        own metadata, then the maximum of the datum's unsigned integer dtype, 1 for a Boolean one. Never the observed
+        maximum, and never `value_range` when it was decoded from the data, which would read 12-bit values in uint16 as
+        4095 and so call a clipped image unclipped, or the reverse.
+        """
+        if self.cache.has_declared_range:
+            return float(self.cache.value_range.pmax), "declared"
+        dtype = self.cache.raw.dtype
+        if dtype.kind == "b":
+            return 1.0, "dtype"
+        # ponytail: uint64 is counted in float64, which cannot tell values within 2**11 of its maximum apart, so it has
+        # no dtype endpoint. No sensor writes it. Upgrade is an integer comparison path for that dtype.
+        if dtype.kind == "u" and dtype.itemsize <= 4:
+            return float(np.iinfo(dtype).max), "dtype"
+        return None
+
+    @cached_property
+    def _saturation(self) -> _Saturation:
+        """Read the view once, for both the statistic and the details that describe it."""
+        image = self.cache.image
+        finite_mask, finite = _finite(image)
+        positions = image.size - self.cache.excluded_total
+        valid = finite / positions if positions > 0 else np.nan
+        endpoint = self._endpoint()
+        upper, rule = endpoint or (np.nan, "")
+        status = _status(self.cache.has_pixels, finite, endpoint)
+        if status != "ok":
+            return _Saturation(status, np.nan, valid, np.nan, upper, rule)
+        saturated, above = _counts_at(
+            image, finite_mask, self.cache.raw.dtype, upper, self.cache.settings.saturation.atol
+        )
+        return _Saturation(status, saturated / finite, valid, above / finite, upper, rule)
+
+    @classmethod
+    def measurement_specs(
+        cls,
+        flags: ImageStats,
+        view: ViewKind,
+        settings: Any,
+        declared_range: tuple[float, float] | None,
+    ) -> dict[str, MeasurementSpec]:
+        """Record the saturation setting and the range the call or a channel group declared.
+
+        Without a declared range the endpoint is left to each image, from its own metadata or its dtype. ponytail: that
+        endpoint differs between images, and between a uint8 and a uint16 collection, while the spec reads the same
+        for all of them, since the per-row endpoint is in the details, which are not compared when results are
+        combined. Upgrade is recording what each image declared, which would refuse any two collections that differ.
+        """
+        if not flags & ImageStats.PIXEL_SATURATION:
+            return {}
+        saturation = settings.saturation
+        if declared_range is not None:
+            policy, declared = "declared", declared_range
+        else:
+            policy, declared = "inferred", None
+        return {
+            "saturation": MeasurementSpec(
+                algorithm="saturation",
+                version="1",
+                units="fraction",
+                region="background" if ViewKind.MASK in view else "pixels",
+                config={"atol": saturation.atol},
+                range_policy=policy,
+                declared_range=declared,
+            )
+        }
+
+    def _saturation_fraction(self) -> list[float]:
+        return [self._saturation.saturation]
+
+    def details(self, flags: ImageStats, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:  # noqa: ARG002
+        """Say how the saturation was measured, when it was asked for."""
+        if not flags & ImageStats.PIXEL_SATURATION:
+            return {}
+        reading = self._saturation
+        return {
+            "saturation_status": [reading.status],
+            "saturation_valid_fraction": [reading.valid_fraction],
+            "saturation_above_range_fraction": [reading.above_range_fraction],
+            "saturation_upper": [reading.upper],
+            "saturation_upper_rule": [reading.rule],
+        }
+
     def _histogram(self) -> list[Any]:
         # As _entropy: an all-zero histogram over unmeasured data would read as a real
         # distribution rather than an absent one.
@@ -226,6 +366,10 @@ class PixelStatCalculator(Calculator[ImageStats]):
         """Return empty values for pixel statistics."""
         return {
             "histogram": [np.nan] * 256,  # Histogram with 256 bins
+            # A row that does not measure it, such as a box row of a background pass, has no status and no rule. Without
+            # a string default the padded column would hold the text 'nan'.
+            "saturation_status": "",
+            "saturation_upper_rule": "",
         }
 
     def get_handlers(self) -> dict[ImageStats, Handler]:
@@ -245,4 +389,5 @@ class PixelStatCalculator(Calculator[ImageStats]):
             ImageStats.PIXEL_MISSING: Handler("missing", self._missing, ALL_VIEWS),
             ImageStats.PIXEL_ZEROS: Handler("zeros", self._zeros, ALL_VIEWS),
             ImageStats.PIXEL_HISTOGRAM: Handler("histogram", self._histogram, ALL_VIEWS),
+            ImageStats.PIXEL_SATURATION: Handler("saturation", self._saturation_fraction, ALL_VIEWS),
         }

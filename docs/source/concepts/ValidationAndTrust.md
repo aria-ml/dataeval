@@ -548,6 +548,10 @@ Experimental ⚠️ (API may change or be removed):
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
 - {func}`.image_stats` with the `labels` keyword. The keyword may change. It raises no warning. The two class
   statistics of `ImageStats.SPATIAL` read it, and no other statistic does.
+- The `value_range` key of a datum's metadata, which declares the interval an image's values occupy. It is read by
+  {func}`.image_stats`, and so by {class}`.Outliers` and {class}`.Duplicates`, and raises
+  {class}`~dataeval.exceptions.ExperimentalWarning` the first time a declaration is read in a process. The key and the
+  shape of its value may change. The `value_range=` argument of {func}`.image_stats` is stable.
 - {func}`.hash_neighbors` with the `partition` argument or the `k` argument
   raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call
   that passes each in a process. Every other use of {func}`.hash_neighbors` is

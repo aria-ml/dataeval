@@ -38,23 +38,24 @@ COLUMNS = ("blur", "blur_directionality")
 # The sentence both warnings end on, which names the way to keep the v1.2 columns.
 WAY_OUT = "`ImageStats.ALL` includes the blur statistics, and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
 
-# Recorded from `main` before the blur flags, in the order a bare `image_stats` call returns them.
+# Recorded from `main` before the blur flags, in the order a bare `image_stats` call returns them, and with the
+# `saturation` that v1.3 added to `PIXEL` after the histogram.
 DEFAULT_COLUMNS = """
     offset_x offset_y width height channels size aspect_ratio depth center distance_center distance_edge invalid_box
     rel_offset_x rel_offset_y rel_width rel_height rel_size rel_distance_center rel_distance_edge
-    xxhash phash dhash phash_d4 dhash_d4 mean std var skew kurtosis entropy missing zeros histogram
+    xxhash phash dhash phash_d4 dhash_d4 mean std var skew kurtosis entropy missing zeros histogram saturation
     brightness contrast darkness sharpness percentiles
 """
 # The ten columns of `ImageStats.BASIC`, which the docs promise to change only after a deprecation and a migration note.
 BASIC_COLUMNS = "aspect_ratio brightness channels contrast height mean sharpness std var width"
 OUTLIERS_COLUMNS = "item_index metric_name metric_value direction bound percentile population_mean population_std"
 POPULATION_COLUMNS = "level metric_name method population n judged reason"
-# The 33 columns of `ImageStats.STANDARD` (PIXEL | VISUAL | DIMENSION), which a default `Outliers` run computes: the
-# ones it can judge and the ones it cannot.
+# The 34 columns of `ImageStats.STANDARD` (PIXEL | VISUAL | DIMENSION), which a default `Outliers` run computes: the
+# ones it can judge and the ones it cannot. v1.3 added `saturation` to the 33 of v1.2.
 STANDARD_COLUMNS = """
     aspect_ratio brightness center channels contrast darkness depth distance_center distance_edge entropy height
     histogram invalid_box kurtosis mean missing offset_x offset_y percentiles rel_distance_center rel_distance_edge
-    rel_height rel_offset_x rel_offset_y rel_size rel_width sharpness size skew std var width zeros
+    rel_height rel_offset_x rel_offset_y rel_size rel_width saturation sharpness size skew std var width zeros
 """
 
 
@@ -94,10 +95,11 @@ def test_columns_and_values():
 
 
 def test_blur_is_in_all_and_in_no_smaller_group():
-    """`ALL` holds blur, and every statistic: `SPATIAL` too. `BASIC` and `Outliers`' groups do not."""
+    """`ALL` holds blur, and every statistic: `SPATIAL` too. `BASIC` and `Outliers`' groups do not hold blur."""
     assert ImageStats.BLUR in ImageStats.ALL
     assert ImageStats.ALL == ImageStats.STANDARD | ImageStats.HASH | ImageStats.BLUR | ImageStats.SPATIAL
-    assert ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL == ImageStats.STANDARD | ImageStats.HASH
+    v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.SATURATION
+    assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.SATURATION
     assert ~ImageStats.ALL == ImageStats.NONE
     for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.STANDARD, ImageStats.BASIC):
         assert not ImageStats.BLUR & group
@@ -128,12 +130,15 @@ def test_all_is_spelled_from_the_families():
         | ImageStats.HASH
         | ImageStats.BLUR
         | ImageStats.SPATIAL
+        | ImageStats.SATURATION
     )
     assert families == ImageStats.ALL
 
 
 def test_standard_columns_are_a_promise():
-    """The 33 names of `ImageStats.STANDARD` are a promise: they change only after a deprecation and a migration note.
+    """The 34 names of `ImageStats.STANDARD` are a promise: they change only after a deprecation and a migration note.
+
+    They are the 33 of v1.2 and `saturation`, which v1.3 added to `PIXEL` before `STANDARD` was released.
 
     A statistic added to `PIXEL`, `VISUAL` or `DIMENSION` makes this test fail. An enum group cannot warn at import, so
     the person who trips it decides: keep the new flag out of `STANDARD` by redefining it, for example
@@ -178,12 +183,13 @@ def test_a_bare_call_equals_the_v12_set_with_no_blur_and_no_warning(fresh_proces
 def test_all_returns_the_blur_columns_and_warns(fresh_process):
     """The default leaves blur out, but a request for `ALL` is a request for it, so it warns like any blur flag.
 
-    The spatial statistics need boxes and have their own tests, so they are left out here.
+    The spatial statistics need boxes and have their own tests, so they are left out here. `ALL` holds the saturation
+    statistic too, so its column comes with the rest.
     """
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental"):
         stats = image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL)["stats"]
 
-    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS)
+    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturation"}
 
 
 def test_the_experimental_warning_names_the_complement_as_the_way_out(fresh_process):

@@ -148,6 +148,35 @@ class ImageStats(Flag):
       labels, else empty
     - `covered_fraction_reason` : `too_many_overlaps` when the value is NaN for that reason, else empty
 
+    Saturation Statistic (the share of values at a clipping endpoint, in `PIXEL`; `SATURATION` is another spelling of
+    the member `PIXEL_SATURATION`):
+
+    - `PIXEL_SATURATION` : The share of finite raw values that sit at the endpoint, within `saturation_atol`. It counts
+      channel values, not spatial pixels, so an image clipped in one channel of three reads 1/3. The endpoint is never
+      read from the data. It is the upper bound of a declared `value_range`, as :func:`~dataeval.core.image_stats`
+      resolves one for each image, else the maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean
+      data, else it is unknown and the value is NaN. Data of 12 bits stored in uint16 therefore reads against 65535
+      unless its range is declared as ``(0, 4095)``. Finite values above the endpoint stay in the denominator and are
+      not counted
+
+    A request that includes it also returns details, in the result's ``details``, one value per row, named with a band
+    group's name in front when the row is a band group's:
+
+    - `saturation_status` : `ok`; `unknown_upper`, when no endpoint resolved; `no_finite_values`, when the view holds
+      no finite value; or `empty_region`, when it holds no position of the datum, as for a box outside the image or a
+      band group the datum cannot supply. The value is NaN unless the status is `ok`
+    - `saturation_valid_fraction` : The finite values over the positions of the view
+    - `saturation_above_range_fraction` : The finite values above the endpoint plus `saturation_atol`, over the finite
+      values
+    - `saturation_upper` : The endpoint used, NaN when none resolved
+    - `saturation_upper_rule` : What supplied it, `declared` or `dtype`, and empty when none did
+
+    The result's ``measurement_specs`` records `saturation_atol` and a range that the call or a channel group declared,
+    so `combine_stats_results` refuses results measured with different ones. A range an image's own metadata declares
+    and the endpoint a dtype supplies are in the details, which are not compared, so a collection of ``uint8`` images
+    and a collection of ``uint16`` ones still combine. `QualityGate` does not accept it, since a gate measures frames
+    with no datum metadata to declare a range in.
+
     Convenience Groups
     ------------------
     Sub-groups:
@@ -167,13 +196,13 @@ class ImageStats(Flag):
     Full Categories:
 
     - `NONE` : No statistics
-    - `PIXEL` : All pixel statistics
+    - `PIXEL` : All pixel statistics, including `SATURATION`
     - `VISUAL` : All visual statistics, except the blur statistics (`BLUR`)
     - `DIMENSION` : All dimension statistics
     - `STANDARD` : The pixel, visual and dimension statistics (`PIXEL`, `VISUAL` and `DIMENSION`), with no hashes and
       no blur. Its columns change only after a deprecation and a migration note. `image_stats` computes it plus `HASH`
       when given no `stats`, and `HASH` can gain members. `Duplicates` needs the hashes, so add `HASH` for it
-    - `NO_HASH` : The same set as `STANDARD`, under its v1.2 name
+    - `NO_HASH` : The same set as `STANDARD`, under the name v1.2 gave it, so v1.3 added `SATURATION` to it too
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
     - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
@@ -194,10 +223,10 @@ class ImageStats(Flag):
     .. versionadded:: 1.3
         The `SPATIAL` statistics.
 
-    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL`` is what `ALL` held in v1.2. The `SPATIAL` statistics
-    need box rows, so a request for `ALL` with no box rows returns their columns as NaN, without a warning, as a
-    statistic reads NaN on any row it cannot measure. Any other request that holds them and measures no box rows warns,
-    or raises when it holds nothing else.
+    What `ALL` held in v1.2 is ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.SATURATION``.
+    The `SPATIAL` statistics need box rows, so a request for `ALL` with no box rows returns their columns as NaN,
+    without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds them and
+    measures no box rows warns, or raises when it holds nothing else.
 
     Examples
     --------
@@ -274,6 +303,13 @@ class ImageStats(Flag):
     SPATIAL_MAX_IOU_SAME_CLASS = auto()
     SPATIAL_MAX_IOU_OTHER_CLASS = auto()
 
+    # ===== SATURATION =====
+    # Appended after the spatial flags so that no existing flag value moves. Named for the pixel calculator that
+    # computes it, which is the `<FAMILY>_<STATISTIC>` shape every reader of a flag's name relies on. `SATURATION` is
+    # the spelling the docs use.
+    PIXEL_SATURATION = auto()
+    SATURATION = PIXEL_SATURATION
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -286,6 +322,7 @@ class ImageStats(Flag):
         | PIXEL_MISSING
         | PIXEL_ZEROS
         | PIXEL_HISTOGRAM
+        | PIXEL_SATURATION
     )
 
     VISUAL = VISUAL_BRIGHTNESS | VISUAL_CONTRAST | VISUAL_DARKNESS | VISUAL_SHARPNESS | VISUAL_PERCENTILES

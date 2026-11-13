@@ -14,9 +14,15 @@ from dataeval._metadata._structurers._base import Structurer
 from dataeval._metadata._structurers._data import StructuredData
 from dataeval._metadata._structurers._reserved import ID_KEY, safe_column_name
 from dataeval.protocols import AnnotatedDataset, DatumMetadata, ProgressCallback
+from dataeval.utils._mask import IMAGE_KEYS
 from dataeval.utils._merge import _merge, sorted_drop_reasons
 
 _logger = get_logger(__name__)
+
+
+def _without_declarations(mapping: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Return the datum's metadata without the keys DataEval reads as a declaration about the image."""
+    return {k: v for k, v in mapping.items() if k not in IMAGE_KEYS} if IMAGE_KEYS & mapping.keys() else mapping
 
 
 class DatasetStructurer(Structurer, ABC):
@@ -108,6 +114,9 @@ class DatasetStructurer(Structurer, ABC):
             wrote them, since nobody has yet said how they should be read — and the
             flattened key each renamed column had, keyed by column.
         """
+        # The keys DataEval reads as a declaration about the image are not observations: a `(low, high)` pair would
+        # become a factor on an object-detection dataset whose images hold exactly two boxes. `raw` keeps them.
+        raw = [_without_declarations(mapping) for mapping in raw]
         merged, dropped, unusable = _merge(
             list(raw),
             ignore_lists,

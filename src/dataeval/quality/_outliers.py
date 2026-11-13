@@ -3052,6 +3052,9 @@ class Outliers(Evaluator):
             A plain array or list of image arrays also structurally satisfies
             :class:`~dataeval.protocols.Dataset` and is accepted directly.
 
+            A tuple's metadata may declare the interval its image's values occupy, as a ``(low, high)`` pair under
+            ``value_range`` (experimental); :func:`~dataeval.core.image_stats` says what reads it.
+
             A multi-object-tracking dataset is measured frame by frame, every frame, and judged in
             video terms: its videos, frames, tracks and detections (see `levels`). To measure fewer
             frames, pass a :class:`~dataeval.data.SequenceFrames` whose selector chooses them, such

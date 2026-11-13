@@ -5,7 +5,7 @@ __all__ = []
 from typing import Any, ClassVar
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, PositiveFloat, PositiveInt, field_validator
+from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveFloat, PositiveInt, field_validator
 
 from dataeval.types._config import UnitInterval
 
@@ -61,6 +61,19 @@ class SurroundConfig(StrictConfig):
     intensity_floor: UnitInterval = 1 / 255
 
 
+class SaturationConfig(StrictConfig):
+    """
+    Settings for the saturation statistic.
+
+    Attributes
+    ----------
+    atol : float, default 0.0
+        How far from the endpoint a value may sit and still count as saturated. At least 0.
+    """
+
+    atol: NonNegativeFloat = 0.0
+
+
 class ImageStatsConfig(StrictConfig):
     """
     Settings for the statistics of :func:`~dataeval.core.image_stats` that take them.
@@ -72,6 +85,9 @@ class ImageStatsConfig(StrictConfig):
     ----------
     surround : SurroundConfig, default SurroundConfig()
         Settings for the surround of a box.
+    saturation : SaturationConfig, default SaturationConfig()
+        Settings for the saturation statistic.
     """
 
     surround: SurroundConfig = SurroundConfig()
+    saturation: SaturationConfig = SaturationConfig()

@@ -5,6 +5,8 @@ from collections.abc import Callable
 from enum import Flag, auto
 from typing import Any, Generic, NamedTuple, TypeVar
 
+from dataeval.types import MeasurementSpec
+
 TFlag = TypeVar("TFlag", bound=Flag)
 
 
@@ -193,6 +195,39 @@ class Calculator(ABC, Generic[TFlag]):
     def stat_names(cls, flags: TFlag) -> set[str]:
         """Return the statistic names `flags` would produce from this calculator."""
         return {handler.name for handler in cls._handlers_for(flags).values()}
+
+    @classmethod
+    def measurement_specs(
+        cls,
+        flags: TFlag,  # noqa: ARG003
+        view: ViewKind,  # noqa: ARG003
+        settings: Any,  # noqa: ARG003
+        declared_range: tuple[float, float] | None,  # noqa: ARG003
+    ) -> dict[str, MeasurementSpec]:
+        """
+        Return what the statistics `flags` select were measured with, by statistic name.
+
+        A pure function of the call's arguments, so it is asked once before any datum is read rather than once per
+        row. Empty by default: a statistic whose value depends on a setting records it, and only a calculator with one
+        overrides this. The caller puts the view's prefix on each name, as it does for the statistic.
+
+        Parameters
+        ----------
+        flags : Flag
+            The requested flags, already narrowed to this calculator and to `view`.
+        view : ViewKind
+            The view the statistics are measured over.
+        settings : Any
+            The call's validated settings.
+        declared_range : tuple[float, float] or None
+            The value range the caller declared for this view, if any.
+
+        Returns
+        -------
+        dict[str, MeasurementSpec]
+            A spec for each statistic name that has one.
+        """
+        return {}
 
     @abstractmethod
     def get_handlers(self) -> dict[TFlag, Handler]:

@@ -93,7 +93,9 @@ image_stats(elevation_data, stats=ImageStats.VISUAL, value_range=(-2000.0, 2000.
 ```
 
 A declaration says "these are physical values spanning this range." It implies no bit
-depth, so `DIMENSION_DEPTH` reports NaN for such data whether or not you declare one.
+depth, so `DIMENSION_DEPTH` reports NaN for such data, except for integer data declared as `(0, 2**n - 1)`, which
+reports `n`. A dataset can declare the interval for each image, as a `(low, high)` pair under `value_range` in the
+datum's metadata, and {func}`~dataeval.core.image_stats` gives the order when more than one is declared.
 
 Pixel statistics that need an interval also answer NaN: `PIXEL_HISTOGRAM`,
 `PIXEL_ENTROPY`, and the rest of the statistics under `normalize_pixel_values=True`,
@@ -110,7 +112,7 @@ are rescaled:
 | --- | --- |
 | `mean`, `std`, `var` | `skew`, `kurtosis` (standardized moments) |
 | | `entropy`, `histogram` (binned over the reference either way) |
-| | `missing`, `zeros` (counts) |
+| | `missing`, `zeros`, `saturation` (counts) |
 
 `normalize_pixel_values=True` exists for those three, and only for them. It divides by
 the same reference the visual family uses, which makes a pixel distribution comparable
@@ -163,13 +165,32 @@ encodings, such as which images are unusually dark, which are blurry, or whether
 lighting than the train set. Where the images come from different sensors, a difference may come from the camera as well
 as the scene, as described above.
 
-Use a pixel statistic when the question is about the values themselves, such as what fraction of the values are zero,
-how widely they spread across their range, or whether there are NaNs. Where the dataset is uniformly encoded, which is
-common, its raw values are already comparable and nothing extra is needed.
+Use a pixel statistic when the question is about the values themselves, such as what fraction of the values are zero or
+[saturated](#saturation-at-a-clipping-endpoint), how widely they spread across their range, or whether there are NaNs.
+Where the dataset is uniformly encoded, which is common, its raw values are already comparable and nothing extra is
+needed.
 
 Where a dataset mixes encodings and you want comparable pixel distributions, pass
 `normalize_pixel_values=True`. Check whether `VISUAL_BRIGHTNESS` answers the question
 more directly; a normalized `PIXEL_MEAN` is often a less direct route to the same result.
+
+## Saturation at a clipping endpoint
+
+`ImageStats.SATURATION` is a pixel statistic: the share of finite raw values that lie within a tolerance of a clipping
+endpoint. It counts channel values as stored, and not pixels or colors, so an RGB image clipped in one channel reads
+1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. Measure the color bands as a named
+[group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values above
+the endpoint stay in the denominator, are not counted as saturated, and are reported separately.
+
+DataEval does not decode the endpoint from the data. It is the upper bound of the declared `value_range`, then the
+maximum of an unsigned integer dtype, and the value is NaN when none applies. A depth decoded from the data depends on
+the data's own maximum, so one sensor's images could be read against different endpoints. Twelve-bit data stored in
+`uint16`, which the table above decodes as 4095 for scaling, is therefore measured against 65535 and reads 0.0 unless
+its range is declared as `(0, 4095)`.
+
+A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
+floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the
+endpoint, and `saturation_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
 
 ## Blur statistics
 
@@ -203,21 +224,22 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
 the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
-clipped to the new canvas and those left outside it are dropped. It leaves the pixel statistics, the channel count and
-the hashes alone, so resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than
-hashing at source resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked
-for, and where the two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked.
-The invalidated statistics now describe the transform. [Respond to a
-StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three responses.
+clipped to the new canvas and those left outside it are dropped, and the saturation statistic, because a resize returns
+floats, which have no dtype endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
+resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source
+resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the
+two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated
+statistics now describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows
+the three responses.
 
-The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial statistics
-included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"` declares the blur statistics
-too, because a luminance mix changes which picture is read. Random transforms are seeded for each datum from the datum's
-`id`, so the view is stable: the statistics pass, the embedding pass and the duplicates pass see the same pixels, and
-iterating twice gives identical bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable
-from its sidecar, because provenance records the `repr` of each operation. A curated operation has a `repr` you can
-paste back. A `v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is
-one more reason to prefer the curated operations.
+The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial and saturation
+statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"` declares
+the blur and saturation statistics too, because a luminance mix changes which picture is read. Random transforms are
+seeded for each datum from the datum's `id`, so the view is stable: the statistics pass, the embedding pass and the
+duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built through
+{class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because provenance records the `repr` of
+each operation. A curated operation has a `repr` you can paste back. A `v2.Compose([...])` has a multi-line `repr`, and
+a lambda inside one records nothing recoverable. This is one more reason to prefer the curated operations.
 
 ## Related concept pages
 
