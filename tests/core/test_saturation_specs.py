@@ -18,12 +18,12 @@ pytestmark = pytest.mark.required
 def specs_of(images: list[np.ndarray], **kw: Any) -> dict[str, MeasurementSpec]:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        result = image_stats(images, stats=kw.pop("stats", ImageStats.SATURATION), **kw)
+        result = image_stats(images, stats=kw.pop("stats", ImageStats.PIXEL_SATURATION), **kw)
     return dict(result.get("measurement_specs", {}))
 
 
 def run(images: Any, **kw: Any) -> Any:
-    return image_stats(images, stats=ImageStats.SATURATION, **kw)
+    return image_stats(images, stats=ImageStats.PIXEL_SATURATION, **kw)
 
 
 U8 = [np.full((3, 6, 6), 255, dtype=np.uint8)]
@@ -81,7 +81,9 @@ class TestRecorded:
         assert specs["background_nir_saturation"].region == "background"
 
     def test_only_the_columns_the_result_holds_have_a_spec(self):
-        specs = specs_of(U8, stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.SATURATION}, channels={"nir": 1})
+        specs = specs_of(
+            U8, stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.PIXEL_SATURATION}, channels={"nir": 1}
+        )
         assert set(specs) == {"nir_saturation"}
 
     def test_a_spec_serializes_and_rebuilds_equal(self):

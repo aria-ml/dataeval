@@ -185,7 +185,7 @@ class TestResizeInvalidates:
         (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
         | ImageStats.VISUAL_SHARPNESS
         | ImageStats.BLUR
-        | ImageStats.SATURATION
+        | ImageStats.PIXEL_SATURATION
     )
     PAD_EXTRA = (
         ImageStats.PIXEL_ZEROS
@@ -238,8 +238,8 @@ class TestResizeInvalidates:
 
     def test_stretch_does_not_invalidate_the_pixel_distribution(self):
         # Saturation is in `PIXEL` and a resize does invalidate it, so it is the one pixel statistic left out.
-        assert not Resize((10, 10), mode="stretch").invalidates & ImageStats.PIXEL & ~ImageStats.SATURATION
-        assert Resize((10, 10), mode="stretch").invalidates & ImageStats.SATURATION
+        assert not Resize((10, 10), mode="stretch").invalidates & ImageStats.PIXEL & ~ImageStats.PIXEL_SATURATION
+        assert Resize((10, 10), mode="stretch").invalidates & ImageStats.PIXEL_SATURATION
 
     def test_constructor_override_replaces_the_computed_value(self):
         op = Resize((10, 10), mode="pad", invalidates=ImageStats.HASH)

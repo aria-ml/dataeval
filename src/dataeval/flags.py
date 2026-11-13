@@ -34,8 +34,8 @@ class ImageStats(Flag):
     - `PIXEL_MISSING` : Fraction of missing/NaN pixels
     - `PIXEL_ZEROS` : Fraction of zero pixels
     - `PIXEL_HISTOGRAM` : 256-bin histogram of pixel values
-    - `PIXEL_SATURATION` : Share of values at a clipping endpoint, also spelled `SATURATION`; its endpoint, details and
-      limits are under Saturation Statistic below
+    - `PIXEL_SATURATION` : Share of values at a clipping endpoint; its endpoint, details and limits are under
+      Saturation Statistic below
 
     Visual Statistics (read against the 0-255 display range; NaN without a reference):
 
@@ -150,8 +150,7 @@ class ImageStats(Flag):
       labels, else empty
     - `covered_fraction_reason` : `too_many_overlaps` when the value is NaN for that reason, else empty
 
-    Saturation Statistic (the share of values at a clipping endpoint, in `PIXEL`; `SATURATION` is another spelling of
-    the member `PIXEL_SATURATION`):
+    Saturation Statistic (the share of values at a clipping endpoint, in `PIXEL`):
 
     - `PIXEL_SATURATION` : The share of finite raw values that sit at the endpoint, within `saturation_atol`. It counts
       channel values, not spatial pixels, so an image clipped in one channel of three reads 1/3. The endpoint is never
@@ -198,13 +197,13 @@ class ImageStats(Flag):
     Full Categories:
 
     - `NONE` : No statistics
-    - `PIXEL` : All pixel statistics, including `SATURATION`
+    - `PIXEL` : All pixel statistics, including `PIXEL_SATURATION`
     - `VISUAL` : All visual statistics, except the blur statistics (`BLUR`)
     - `DIMENSION` : All dimension statistics
     - `STANDARD` : The pixel, visual and dimension statistics (`PIXEL`, `VISUAL` and `DIMENSION`), with no hashes and
       no blur. Its columns change only after a deprecation and a migration note. `image_stats` computes it plus `HASH`
       when given no `stats`, and `HASH` can gain members. `Duplicates` needs the hashes, so add `HASH` for it
-    - `NO_HASH` : The same set as `STANDARD`, under the name v1.2 gave it, so v1.3 added `SATURATION` to it too
+    - `NO_HASH` : The same set as `STANDARD`, under the name v1.2 gave it, so v1.3 added `PIXEL_SATURATION` to it too
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
     - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
@@ -225,7 +224,8 @@ class ImageStats(Flag):
     .. versionadded:: 1.3
         The `SPATIAL` statistics.
 
-    What `ALL` held in v1.2 is ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.SATURATION``.
+    What `ALL` held in v1.2 is
+    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION``.
     The `SPATIAL` statistics need box rows, so a request for `ALL` with no box rows returns their columns as NaN,
     without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds them and
     measures no box rows warns, or raises when it holds nothing else.
@@ -307,10 +307,8 @@ class ImageStats(Flag):
 
     # ===== SATURATION =====
     # Appended after the spatial flags so that no existing flag value moves. Named for the pixel calculator that
-    # computes it, which is the `<FAMILY>_<STATISTIC>` shape every reader of a flag's name relies on. `SATURATION` is
-    # the spelling the docs use.
+    # computes it, which is the `<FAMILY>_<STATISTIC>` shape every reader of a flag's name relies on.
     PIXEL_SATURATION = auto()
-    SATURATION = PIXEL_SATURATION
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups

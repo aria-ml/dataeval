@@ -10,7 +10,7 @@ from dataeval.quality._shared import checked_compute_stats
 
 pytestmark = pytest.mark.required
 
-SATURATION = ImageStats.SATURATION
+SATURATION = ImageStats.PIXEL_SATURATION
 
 
 class TestDeclarations:

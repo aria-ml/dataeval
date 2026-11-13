@@ -112,12 +112,12 @@ print("extractor produces:", tuple(np.asarray(embedding).shape), "-- normalized,
 # If the resize is part of the dataset definition, drop the statistics it invalidates and keep the rest. The default
 # resize declares as invalidated the dimension statistics (except the channel count), sharpness, the blur statistics,
 # the spatial statistics and saturation. It does not declare the other pixel statistics or the hashes, so
-# `flags=ImageStats.PIXEL & ~ImageStats.SATURATION` runs without a warning.
+# `flags=ImageStats.PIXEL & ~ImageStats.PIXEL_SATURATION` runs without a warning.
 
 # %%
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
-    Outliers(flags=ImageStats.PIXEL & ~ImageStats.SATURATION).evaluate(deployed)
+    Outliers(flags=ImageStats.PIXEL & ~ImageStats.PIXEL_SATURATION).evaluate(deployed)
 
 pixel_warnings = [w.category.__name__ for w in caught if "Invalidated" in w.category.__name__]
 print("warnings:", pixel_warnings)

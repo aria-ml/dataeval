@@ -189,7 +189,7 @@ class TestSelectChannelsInvalidates:
             | ImageStats.PIXEL
             | ImageStats.VISUAL
             | ImageStats.BLUR
-            | ImageStats.SATURATION
+            | ImageStats.PIXEL_SATURATION
         )
         assert SelectChannels("gray").invalidates == expected
 

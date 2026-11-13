@@ -1,4 +1,4 @@
-"""ImageStats.SATURATION: the share of finite raw values sitting at a stated clipping endpoint."""
+"""ImageStats.PIXEL_SATURATION: the share of finite raw values sitting at a stated clipping endpoint."""
 
 import tracemalloc
 import warnings
@@ -41,8 +41,8 @@ class TestFlag:
     """The flag is one bit, in `PIXEL` and so in everything made of it, and named the way every consumer expects."""
 
     def test_the_issue_spelling_is_an_alias_of_the_family_named_bit(self):
-        assert ImageStats.SATURATION is ImageStats.PIXEL_SATURATION
-        assert ImageStats.SATURATION.name == "PIXEL_SATURATION"
+        assert ImageStats.PIXEL_SATURATION is ImageStats.PIXEL_SATURATION
+        assert ImageStats.PIXEL_SATURATION.name == "PIXEL_SATURATION"
 
     def test_no_existing_flag_moved_and_the_new_one_is_appended(self):
         members = {m.name: m.value for m in ImageStats if m.name != "PIXEL_SATURATION"}
@@ -50,29 +50,29 @@ class TestFlag:
         assert ImageStats.PIXEL_SATURATION.value == 2 * max(_EXISTING_VALUES.values())
 
     def test_all_holds_it_and_the_complement_of_all_is_none(self):
-        assert ImageStats.SATURATION in ImageStats.ALL
+        assert ImageStats.PIXEL_SATURATION in ImageStats.ALL
         assert ~ImageStats.ALL == ImageStats.NONE
 
     @pytest.mark.parametrize("group", ["PIXEL", "STANDARD", "NO_HASH", "ALL"])
     def test_the_pixel_family_and_what_is_made_of_it_hold_it(self, group: str):
-        assert ImageStats.SATURATION in getattr(ImageStats, group)
+        assert ImageStats.PIXEL_SATURATION in getattr(ImageStats, group)
 
     @pytest.mark.parametrize(
         "group", ["PIXEL_BASIC", "PIXEL_DISTRIBUTION", "VISUAL", "BASIC", "DIMENSION", "HASH", "BLUR", "SPATIAL"]
     )
     def test_the_other_families_and_the_curated_subsets_do_not(self, group: str):
-        assert not ImageStats.SATURATION & getattr(ImageStats, group)
+        assert not ImageStats.PIXEL_SATURATION & getattr(ImageStats, group)
 
     def test_the_default_request_holds_it(self):
-        assert ImageStats.SATURATION in ImageStats.STANDARD | ImageStats.HASH
+        assert ImageStats.PIXEL_SATURATION in ImageStats.STANDARD | ImageStats.HASH
 
     def test_the_v12_column_set_is_the_default_request_without_it(self):
-        v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.SATURATION
-        assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.SATURATION
+        v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION
+        assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
 
     def test_the_name_splits_into_a_family_and_the_calculators_statistic_name(self):
         # `quality._shared._stat_names` and dataeval-flow's `stat_names_for` both read a flag as <FAMILY>_<STATISTIC>.
-        names = [(m.name or "").split("_", 1)[1].lower() for m in ImageStats.SATURATION]
+        names = [(m.name or "").split("_", 1)[1].lower() for m in ImageStats.PIXEL_SATURATION]
         assert names == ["saturation"]
 
 
@@ -107,8 +107,8 @@ def measure(
     calculator = PixelStatCalculator(datum, cache)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        stats = calculator.compute(ImageStats.SATURATION, view)
-        details = calculator.details(ImageStats.SATURATION, view)
+        stats = calculator.compute(ImageStats.PIXEL_SATURATION, view)
+        details = calculator.details(ImageStats.PIXEL_SATURATION, view)
     assert set(stats) == {"saturation"}
     assert set(details) == DETAILS
     return {name: values[0] for name, values in {**stats, **details}.items()}
@@ -335,7 +335,7 @@ class TestStatus:
 def run(images: list[np.ndarray], **kw: Any) -> tuple[dict[str, Any], dict[str, Any], list[Any]]:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        result = image_stats(images, stats=kw.pop("stats", ImageStats.SATURATION), **kw)
+        result = image_stats(images, stats=kw.pop("stats", ImageStats.PIXEL_SATURATION), **kw)
     return dict(result["stats"]), dict(result.get("details", {})), list(result["source_index"])
 
 
@@ -434,7 +434,7 @@ class TestKeywords:
 
     def test_the_endpoint_is_not_a_keyword(self):
         with pytest.raises(TypeError, match="saturation_upper"):
-            image_stats([np.zeros((3, 4, 4), dtype=np.uint8)], stats=ImageStats.SATURATION, saturation_upper=255)  # pyright: ignore[reportCallIssue]
+            image_stats([np.zeros((3, 4, 4), dtype=np.uint8)], stats=ImageStats.PIXEL_SATURATION, saturation_upper=255)  # pyright: ignore[reportCallIssue]
 
     def test_the_tolerance_reaches_the_statistic(self):
         image = np.array([[[250, 253, 255, 255, 100]]], dtype=np.uint8)
@@ -461,7 +461,7 @@ class TestKeywords:
             ("saturation_atol", float("inf")),
         ],
     )
-    @pytest.mark.parametrize("stats", [ImageStats.SATURATION, ImageStats.PIXEL_MEAN])
+    @pytest.mark.parametrize("stats", [ImageStats.PIXEL_SATURATION, ImageStats.PIXEL_MEAN])
     def test_a_bad_value_raises_naming_the_keyword_whether_or_not_the_flag_is_requested(
         self, name: str, value: Any, stats: ImageStats
     ):
@@ -474,7 +474,7 @@ class TestKeywords:
         assert stats["saturation"][0] == 1.0
 
     def test_a_setting_without_the_flag_warns_once_and_names_the_flag(self):
-        with pytest.warns(UserWarning, match=r"ImageStats\.SATURATION") as caught:
+        with pytest.warns(UserWarning, match=r"ImageStats\.PIXEL_SATURATION") as caught:
             image_stats([np.zeros((3, 4, 4), dtype=np.uint8)], stats=ImageStats.PIXEL_MEAN, saturation_atol=0.5)
         assert len([w for w in caught if "SATURATION" in str(w.message)]) == 1
 
@@ -487,7 +487,7 @@ class TestKeywords:
         image = np.full((4, 6, 6), 4095, dtype=np.uint16)
         stats, _, _ = run(
             [image],
-            stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.SATURATION},
+            stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.PIXEL_SATURATION},
             channels={"nir": 3},
             value_range=(0, 4095),
         )

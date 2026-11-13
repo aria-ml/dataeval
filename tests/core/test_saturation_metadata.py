@@ -35,7 +35,7 @@ class Sensors:
 
 
 def read(data: Any, **kw: Any) -> tuple[list[float], list[float], list[str]]:
-    result = image_stats(data, stats=kw.pop("stats", ImageStats.SATURATION), **kw)
+    result = image_stats(data, stats=kw.pop("stats", ImageStats.PIXEL_SATURATION), **kw)
     details = result.get("details", {})
     return (
         np.asarray(result["stats"]["saturation"]).tolist(),
@@ -68,7 +68,7 @@ class TestTheEndpointComesFromTheImage:
 
     def test_a_channel_groups_own_range_beats_both(self):
         data = Sensors([np.full((2, 4, 4), 4095, dtype=np.uint16)], [{"value_range": (0, 65535)}])
-        stats = {None: ImageStats.SATURATION, "nir": ImageStats.SATURATION}
+        stats = {None: ImageStats.PIXEL_SATURATION, "nir": ImageStats.PIXEL_SATURATION}
         result = image_stats(data, stats=stats, channels={"nir": ChannelGroup(1, value_range=(0, 4095))})
         assert result["stats"]["saturation"].tolist() == [0.0]
         assert result["stats"]["nir_saturation"].tolist() == [1.0]

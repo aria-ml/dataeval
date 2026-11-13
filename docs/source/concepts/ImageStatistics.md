@@ -176,7 +176,7 @@ more directly; a normalized `PIXEL_MEAN` is often a less direct route to the sam
 
 ## Saturation at a clipping endpoint
 
-`ImageStats.SATURATION` is a pixel statistic: the share of finite raw values that lie within a tolerance of a clipping
+`ImageStats.PIXEL_SATURATION` is a pixel statistic: the share of finite raw values that lie within a tolerance of a clipping
 endpoint. It counts channel values as stored, and not pixels or colors, so an RGB image clipped in one channel reads
 1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. Measure the color bands as a named
 [group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values above

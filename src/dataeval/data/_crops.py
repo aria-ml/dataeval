@@ -379,7 +379,7 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     # sat at a saturation endpoint. A class attribute rather than a property because it does not vary with the
     # constructor arguments: every crop policy invalidates the same set, so `square="off"`, which does not resize, is
     # declared conservatively.
-    invalidates: ImageStats = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.SATURATION
+    invalidates: ImageStats = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.PIXEL_SATURATION
 
     @requires_maite_dataset("dataset", expected="object_detection")
     def __init__(

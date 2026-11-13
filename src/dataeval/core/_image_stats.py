@@ -1260,7 +1260,7 @@ def image_stats(  # noqa: C901
         bits or fewer, or 1 for Boolean data, else it is unknown and the statistic is NaN. It is never read from the
         data, so 12-bit data stored in ``uint16`` is measured against 65535 unless its range is declared as
         ``(0, 4095)``. The value is checked on every call, and ignored, with a warning, when `stats` does not request
-        ``SATURATION``.
+        ``PIXEL_SATURATION``.
 
         .. versionadded:: 1.3
     progress_callback : ProgressCallback or None, default None
@@ -1308,8 +1308,8 @@ def image_stats(  # noqa: C901
         columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
         `labels`, so every label is missing. A request that holds every non-spatial statistic of `ImageStats.ALL`
         does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
-        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.SATURATION`, so the
-        setting is ignored.
+        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`, so
+        the setting is ignored.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
@@ -1457,7 +1457,7 @@ def image_stats(  # noqa: C901
     metadata:
 
     >>> pixels = np.full((1, 4, 4), 4095, dtype=np.uint16)
-    >>> image_stats([pixels], stats=ImageStats.SATURATION)["stats"]["saturation"].tolist()
+    >>> image_stats([pixels], stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
     [0.0]
     >>> class Sensor:
     ...     metadata = {"id": "sensor"}
@@ -1467,7 +1467,7 @@ def image_stats(  # noqa: C901
     ...
     ...     def __getitem__(self, i):
     ...         return pixels, np.array([1.0]), {"id": i, "value_range": (0, 4095)}
-    >>> image_stats(Sensor(), stats=ImageStats.SATURATION)["stats"]["saturation"].tolist()
+    >>> image_stats(Sensor(), stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
     [1.0]
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
@@ -1551,11 +1551,11 @@ def image_stats(  # noqa: C901
 
     # A setting that sets up a statistic the request leaves out is probably a flag forgotten, not a setting wanted.
     # `requested` is the union over the unnamed view and every band group, so a mapping that asks only a group for
-    # SATURATION is using it.
+    # PIXEL_SATURATION is using it.
     if not requested & ImageStats.PIXEL_SATURATION and saturation_atol != 0:
         warnings.warn(
-            "saturation_atol is ignored, because it sets up `ImageStats.SATURATION` and stats does not request it. "
-            "Add `ImageStats.SATURATION` to stats, or drop it.",
+            "saturation_atol is ignored, because it sets up `ImageStats.PIXEL_SATURATION` and stats does not request "
+            "it. Add `ImageStats.PIXEL_SATURATION` to stats, or drop it.",
             UserWarning,
             stacklevel=2,
         )

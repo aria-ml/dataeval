@@ -138,7 +138,7 @@ class TestInvalidatedStats:
 class TestInvalidatedStatsCrossesNonViewBarrier:
     def test_crops_declares_dimension_except_channels_and_saturation(self):
         # Every datum is cropped and resized, and a resize moves the values that sat at a saturation endpoint.
-        expected = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.SATURATION
+        expected = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.PIXEL_SATURATION
         assert DetectionCrops.invalidates == expected
         assert invalidated_stats(DetectionCrops(_ODDataset())) == expected
 
