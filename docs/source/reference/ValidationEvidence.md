@@ -493,7 +493,11 @@ statistical and computational.
     diagonal, the share of the box inside the image, the share the other boxes cover, and the largest overlap with a
     box of the same class and of another.
   - Anchored (hand-computed fixtures; the union is also compared with a raster reference written for the tests, which
-    is not independent of it; constructed boxes only, no real annotations)
+    is not independent of it. A run on the 118,127 real boxes of one aerial dataset, VisDrone2019-MOT validation, with
+    a stand-in picture of the real shape for each frame, gave no NaN, no invalid box and no warning. The overlaps
+    agreed with a brute-force calculation to 3e-8, and the covered fraction agreed with a sampled-grid estimate to
+    0.011 at most. That estimate was written by the statistic's author, so it checks the arithmetic and not the
+    definition, and the run has no ground truth for what the statistics are used for)
   - Descriptive geometry only: the values do not predict a model's behavior or measure occlusion. Boxes are
     rectangles, and an object nobody annotated covers nothing, so the covered fraction and the overlaps describe
     annotated boxes and not objects. The distance is directed and center to center, not a gap. The fraction reads 1.0
@@ -501,7 +505,13 @@ statistical and computational.
     class overlaps read labels, and where a missing label could hide the largest overlap the value is NaN, which is
     not a guess. Where another box of the image is corrupt, every value is computed from the valid boxes and flagged
     `incomplete_geometry`, so the largest distances are the least reliable and the covered fraction and the overlaps
-    can be too small.
+    can be too small. On that aerial footage the covered fraction ran opposite to the dataset's own `occlusion` field (a
+    mean of 0.11 on the boxes the field marks 1 and 0.38 on those it marks 0), and the export does not document that
+    field, so do not read the covered fraction as occlusion. Most of the highest other-class overlaps paired a person
+    class with a bicycle or motor class, which the class names suggest is a rider on the vehicle. No image was
+    inspected, so the run does not show that the largest other-class overlap finds label conflicts. Boxes that mark
+    areas the annotators skipped, passed as a class, raised the covered fraction of the ordinary boxes, so drop them
+    first.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
