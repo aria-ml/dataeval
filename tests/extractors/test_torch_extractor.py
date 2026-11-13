@@ -276,3 +276,53 @@ class TestTorchExtractorProtocol:
         extractor = TorchExtractor(model)
         assert isinstance(extractor, FeatureExtractor)
         assert callable(extractor)
+
+
+@pytest.mark.required
+class TestImagesOnAnAcceleratorWithACpuExtractor:
+    """A batch on an accelerator that a CPU extractor runs is copied to the host: say so once, and say how to stop it.
+
+    A `meta` tensor stands in for a CUDA one on a CPU-only runner. The last test runs the real thing, and skips
+    without a GPU.
+    """
+
+    @staticmethod
+    def _copy_warnings(caplog) -> list[str]:
+        return [r.getMessage() for r in caplog.records if "copied to the host" in r.getMessage()]
+
+    def test_warns_once_and_names_the_fix(self, caplog):
+        extractor = TorchExtractor(torch.nn.Flatten(), device="cpu")
+        batch = torch.zeros(2, 3, 4, 4, device="meta")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            extractor._warn_if_pulled_to_cpu(batch)
+            extractor._warn_if_pulled_to_cpu(batch)
+        (message,) = self._copy_warnings(caplog)
+        assert "device='meta'" in message
+        assert "set_device('meta')" in message
+
+    def test_images_on_the_cpu_do_not_warn(self, caplog):
+        extractor = TorchExtractor(torch.nn.Flatten(), device="cpu")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            extractor._warn_if_pulled_to_cpu(torch.zeros(2, 3, 4, 4))
+        assert not self._copy_warnings(caplog)
+
+    def test_an_extractor_on_the_images_device_does_not_warn(self, caplog):
+        extractor = TorchExtractor(torch.nn.Flatten(), device="meta")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            extractor._warn_if_pulled_to_cpu(torch.zeros(2, 3, 4, 4, device="meta"))
+        assert not self._copy_warnings(caplog)
+
+    @pytest.mark.cuda
+    def test_cuda_images_warn_once_across_calls_and_not_with_device_set(self, caplog):
+        if not torch.cuda.is_available():
+            pytest.skip("CUDA not available")
+        images = [torch.zeros(3, 8, 8, device="cuda") for _ in range(4)]
+        cpu_extractor = TorchExtractor(torch.nn.Flatten(), device="cpu")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            cpu_extractor(images)
+            cpu_extractor(images)
+        assert len(self._copy_warnings(caplog)) == 1
+        caplog.clear()
+        with caplog.at_level("WARNING", logger="dataeval"):
+            TorchExtractor(torch.nn.Flatten(), device="cuda")(images)
+        assert not self._copy_warnings(caplog)

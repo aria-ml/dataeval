@@ -48,6 +48,25 @@ def get_valid_layer(layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
     return modules_dict[layer_name]
 
 
+def warn_if_pulled_to_cpu(name: str, batch: torch.Tensor, device: torch.device) -> bool:
+    """Warn that data on an accelerator is copied to an extractor that runs on the CPU, and return whether it warned.
+
+    Shared by every torch-backed extractor, each keeping its own flag so that it warns once. The default device is the
+    CPU, so a dataset that lands its data on a GPU meets this without ever passing ``device=``.
+    """
+    if device.type != "cpu" or batch.device.type == "cpu":
+        return False
+    _logger.warning(
+        "%s: the input is on %s but the extractor runs on the CPU, so it is copied to the host before every forward "
+        "pass. Pass device=%r, or call dataeval.config.set_device(%r), to run the model where the input is.",
+        name,
+        batch.device,
+        str(batch.device),
+        str(batch.device),
+    )
+    return True
+
+
 class TorchExtractor(ReprMixin):
     """
     Extracts embeddings from a PyTorch model, with optional intermediate layer hooking.
@@ -68,7 +87,11 @@ class TorchExtractor(ReprMixin):
     transforms : Transform or Sequence[Transform] or None, default None
         Preprocessing transforms to apply before encoding. When None, uses raw images.
     device : DeviceLike or None, default None
-        Device for computation. When None, uses DataEval's configured device.
+        Device for computation. When None, uses the device set with
+        :func:`~dataeval.config.set_device`, otherwise PyTorch's default device, which is the CPU
+        unless you changed it. The model is moved to this device, and each batch of images is
+        copied to it, so images on a GPU are copied back to the host unless ``device`` names
+        that GPU. A warning says so the first time it happens.
     layer_name : str or None, default None
         Layer to extract embeddings from. When None, uses model output.
     use_output : bool, default True
@@ -138,6 +161,7 @@ class TorchExtractor(ReprMixin):
                 "intermediate layer, while postprocess_fn decodes the final model output."
             )
         self._postprocess_fn = postprocess_fn
+        self._warned_host_copy = False
 
         # Setup model
         self._model = model.to(self.device).eval()
@@ -201,11 +225,18 @@ class TorchExtractor(ReprMixin):
             images.append(tensor)
         return images
 
+    def _warn_if_pulled_to_cpu(self, batch: torch.Tensor) -> None:
+        """Warn once per extractor that a batch on an accelerator is copied to a CPU model, as the default does."""
+        if not self._warned_host_copy:
+            self._warned_host_copy = warn_if_pulled_to_cpu("TorchExtractor", batch, self.device)
+
     def _extract_features(self, images: list[torch.Tensor], batch_size: int) -> list[torch.Tensor]:
         """Extract features from a list of torch tensors."""
         outputs: list[torch.Tensor] = []
         for start in range(0, len(images), batch_size):
-            input_tensor = torch.stack(images[start : start + batch_size]).to(self.device)
+            input_tensor = torch.stack(images[start : start + batch_size])
+            self._warn_if_pulled_to_cpu(input_tensor)
+            input_tensor = input_tensor.to(self.device)
             with torch.no_grad():
                 if self._layer_name:
                     _ = self._model(input_tensor)  # Triggers hook
