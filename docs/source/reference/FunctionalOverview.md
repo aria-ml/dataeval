@@ -431,4 +431,5 @@ These tools apply only to video and have no row in the tables.
 | {func}`.frame_stats` | Measures the time since the previous frame and whether the frame repeats it, one row for each frame. Experimental, see [Stability status](../concepts/ValidationAndTrust.md#stability-status). |
 | {func}`.video_stats` | Computes statistics of each video as a whole, one row for each video. The `PERSISTENCE` and `BLUR` statistics are experimental, see [Stability status](../concepts/ValidationAndTrust.md#stability-status). |
 | {func}`.track_stats` | Computes motion statistics of each track. |
+| {func}`.track_steps` | Measures the step each detection takes from where its track was last seen, one row for each detection. Experimental, see [Stability status](../concepts/ValidationAndTrust.md#stability-status). |
 | {func}`.build_tracks` | Builds a dict of tracks for one target or a whole dataset. |

@@ -570,6 +570,14 @@ statistical and computational.
     capture. A missing, repeated or restarted timestamp leaves the step NaN rather than guessed, and a clip that starts
     later is one long step. A repeat is exact equality, so a re-encoded or noisy copy of a frame reads as not repeated.
     Tested on constructed inputs only, not on real footage.
+- - {func}`.track_steps` ⚠️
+  - Per-detection step from the previous observation of its track: distance in diagonals of the previous box, that
+    distance per frame and per second, overlap and scale change, with a status for every row that cannot be measured.
+  - Anchored (boxes constructed with known steps, scales and overlaps)
+  - Experimental: the names may change. A step is not conditioned on shot boundaries or camera motion, so a cut or a
+    pan reads as a large step, and the function does not judge identity, so an id switch reads as one too. Frame sizes
+    are compared as the stream reports them, so a lazy stream hides a resolution change inside one file. Tested on
+    constructed inputs only, not on real footage.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same
