@@ -564,6 +564,9 @@ Experimental ⚠️ (API may change or be removed):
   to {func}`.hash_neighbors` itself and raises nothing there.
 - {func}`.frame_stats` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process, whichever
   {class}`.FrameStats` flags it selects. The flag names, the column and detail names, and the roll-up names may change.
+- {func}`.track_steps` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The
+  status names and their order, the rule for a frame size that cannot be read, the column and detail names and the
+  `max_frame_delta` keyword may change.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

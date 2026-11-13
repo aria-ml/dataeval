@@ -115,6 +115,7 @@ __all__ = [
     "sequence_fingerprint",
     "sequence_residuals",
     "track_stats",
+    "track_steps",
     "units_to_cross",
     "xxhash",
     "uap",
@@ -215,5 +216,6 @@ from dataeval.core._sequence_match import (
 from dataeval.core._sequence_residuals import SequenceResidualsResult, sequence_residuals
 from dataeval.core._temporal import RedundantRunResult, redundant_runs
 from dataeval.core._track_stats import TrackStatsResult, track_stats
+from dataeval.core._track_steps import track_steps
 from dataeval.core._uap import uap
 from dataeval.core._video_stats import video_stats

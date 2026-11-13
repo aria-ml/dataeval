@@ -27,8 +27,9 @@ v1.1
     `value_range` in its metadata. `Duplicates`
     searches videos with long static stretches for shared segments with experimental `hash_neighbors` arguments
     `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames
-    and exact repeats, and `track_stats` returns two more columns, the longest gap and the net heading of a
-    track.
+    and exact repeats, `track_stats` returns two more columns, the longest gap and the net heading of a
+    track, and an experimental `track_steps` measures the step each detection takes from where its track was last
+    seen.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the
