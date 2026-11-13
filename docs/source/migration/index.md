@@ -21,7 +21,10 @@ v1.1
 - - [](v1.3.md)
   - v1.2 to v1.3: experimental blur statistics for `image_stats` (`ImageStats.BLUR`) and `video_stats`
     (`VideoStats.BLUR`), and `Resize`, `SelectChannels("gray")` and `TorchvisionTransform` declare the image ones as
-    invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors. `Duplicates`
+    invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors. A saturation
+    statistic (`ImageStats.SATURATION`, in `PIXEL`) reports the share of values at a clipping endpoint, so the default
+    image statistics gain a column, and `DetectionCrops` declares it invalidated too. A dataset can declare each image's
+    `value_range` in its metadata. `Duplicates`
     searches videos with long static stretches for shared segments with experimental `hash_neighbors` arguments
     `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames
     and exact repeats, and `track_stats` returns two more columns, the longest gap and the net heading of a

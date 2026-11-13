@@ -6,6 +6,7 @@ import pytest
 
 from dataeval.core._calculators._base import ALL_VIEWS, Calculator, ContextNeed, Handler, ViewKind
 from dataeval.core._image_stats import BandPlan, BatchPlan, _compute_batch, _enumerate_datum
+from dataeval.types._stats_config import ImageStatsConfig
 from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
 
 pytestmark = pytest.mark.required
@@ -66,10 +67,12 @@ def plan(**overrides: Any) -> BatchPlan:
         "per_background": False,
         "background_calculators": [],
         "declared_range": None,
+        "reads_range": False,
         "band_plans": {},
         "wide_band_names": "",
         "unmeasurable_names": "",
         "needs": ContextNeed.NONE,
+        "settings": ImageStatsConfig(),
     }
     return BatchPlan(**{**fields, **overrides})
 
@@ -91,7 +94,7 @@ def test_context_is_built_once_per_datum_and_every_pass_receives_it():
         needs=ContextNeed.CONTEXT,
     )
 
-    _compute_batch((0, datum(), build_annotations(BOXES, SHAPE, 0)), batch)
+    _compute_batch((0, datum(), build_annotations(BOXES, SHAPE, 0), None), batch)
 
     contexts = {id(context) for context, *_ in SEEN}
     assert len(contexts) == 1
@@ -118,7 +121,7 @@ def test_nothing_declared_builds_nothing(monkeypatch):
 
     monkeypatch.setattr(AnnotationContext, "__init__", refuse)
     _compute_batch(
-        (0, datum(), build_annotations(BOXES, SHAPE, 0)),
+        (0, datum(), build_annotations(BOXES, SHAPE, 0), None),
         plan(calculators=[(_NothingStub, _StubFlag.A)], needs=ContextNeed.NONE),
     )
 
@@ -127,7 +130,7 @@ def test_nothing_declared_builds_nothing(monkeypatch):
 
 
 def test_an_unannotated_datum_gets_an_empty_context():
-    _compute_batch((0, datum(), None), plan(calculators=[(_Stub, _StubFlag.A)], needs=ContextNeed.CONTEXT))
+    _compute_batch((0, datum(), None, None), plan(calculators=[(_Stub, _StubFlag.A)], needs=ContextNeed.CONTEXT))
 
     ((context, focal, _, _),) = SEEN
     assert focal is None
@@ -136,7 +139,7 @@ def test_an_unannotated_datum_gets_an_empty_context():
 
 def test_a_datum_with_no_spatial_extent_gets_an_empty_extent():
     _compute_batch(
-        (0, datum((40,)), None),
+        (0, datum((40,)), None, None),
         plan(calculators=[(_Stub, _StubFlag.A)], per_target=False, needs=ContextNeed.CONTEXT),
     )
 
@@ -146,7 +149,7 @@ def test_a_datum_with_no_spatial_extent_gets_an_empty_extent():
 
 def test_a_two_dimensional_datum_passes_its_extent_and_statuses():
     _compute_batch(
-        (0, datum((20, 40)), build_annotations([(5, 5, 15, 15), (10, 0, 2, 10)], (20, 40), 0)),
+        (0, datum((20, 40)), build_annotations([(5, 5, 15, 15), (10, 0, 2, 10)], (20, 40), 0), None),
         plan(calculators=[(_Stub, _StubFlag.A)], needs=ContextNeed.CONTEXT),
     )
 
@@ -174,7 +177,7 @@ def test_enumerate_datum_yields_annotations_that_keep_the_raw_boxes():
 
     out = list(_enumerate_datum(images, boxes))
 
-    assert [i for i, _, _ in out] == [0, 1, 2]
+    assert [i for i, _, _, _ in out] == [0, 1, 2]
     assert isinstance(out[0][2], Annotations)
     assert out[0][2].raw[0].tolist() == [30, 0, 10, 10]
     assert out[0][2].raw[1].tolist() == [0, 0, 40, 20]
@@ -184,4 +187,4 @@ def test_enumerate_datum_yields_annotations_that_keep_the_raw_boxes():
 
 
 def test_enumerate_datum_without_boxes_yields_no_annotations():
-    assert [a for _, _, a in _enumerate_datum([np.zeros(SHAPE)], None)] == [None]
+    assert [a for _, _, a, _ in _enumerate_datum([np.zeros(SHAPE)], None)] == [None]

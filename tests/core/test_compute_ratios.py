@@ -329,8 +329,9 @@ class TestCalculateRatios:
         for key, values in ratios["stats"].items():
             if isinstance(values, list | np.ndarray):
                 values_arr = np.asarray(values)
-                # Don't check for NaN in skew/kurtosis - they can legitimately be NaN for constant distributions
-                if key not in ["skew", "kurtosis"]:
+                # Don't check for NaN in skew/kurtosis - they can legitimately be NaN for constant distributions, nor
+                # in saturation, which is NaN for a float image that declares no range, since a float has no endpoint
+                if key not in ["skew", "kurtosis", "saturation"]:
                     assert not np.any(np.isnan(values_arr)), f"{key} contains NaN"
                 assert not np.any(np.isinf(values_arr)), f"{key} contains Inf"
 

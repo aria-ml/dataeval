@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval.protocols import ObjectDetectionTarget, SegmentationTarget, _is_protocol_instance
-from dataeval.utils._mask import MaskedTarget, materialize_target_attrs
+from dataeval.utils._mask import MaskedTarget, mask_metadata, materialize_target_attrs
 
 
 @pytest.mark.required
@@ -98,3 +98,13 @@ class TestMaskedTarget:
         proxy = MaskedTarget(self._segmentation(label_map), np.array([True, False]))
         np.testing.assert_array_equal(proxy.mask, label_map)
         np.testing.assert_array_equal(proxy.labels, [0])
+
+
+@pytest.mark.required
+class TestMaskMetadata:
+    def test_a_per_detection_value_is_filtered(self):
+        assert mask_metadata({"score": [0.1, 0.9]}, np.array([True, False])) == {"score": [0.1]}
+
+    def test_the_value_range_of_the_image_is_never_filtered_even_when_it_has_one_entry_per_detection(self):
+        meta = {"value_range": (0, 4095), "score": [0.1, 0.9]}
+        assert mask_metadata(meta, np.array([True, False])) == {"value_range": (0, 4095), "score": [0.1]}

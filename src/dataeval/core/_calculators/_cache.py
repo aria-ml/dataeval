@@ -1,11 +1,13 @@
 __all__ = []
 
+import math
 from functools import cached_property
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
+from dataeval.types._stats_config import ImageStatsConfig
 from dataeval.utils._annotations import AnnotationContext
 from dataeval.utils.preprocessing import (
     BoundingBox,
@@ -81,6 +83,8 @@ class CalculatorCache:
     focal : int or None, default None
         Index of `box` among the datum's boxes, or None on the datum's own row. Which box the `context` methods are
         asked about.
+    settings : ImageStatsConfig or None, default None
+        The call's validated settings for the statistics that take them. The documented defaults when None.
     """
 
     def __init__(
@@ -93,6 +97,7 @@ class CalculatorCache:
         bands: tuple[int, ...] | None = None,
         context: AnnotationContext | None = None,
         focal: int | None = None,
+        settings: ImageStatsConfig | None = None,
     ) -> None:
         is_spatial = len(datum.shape) >= 2
         self.raw = datum
@@ -107,6 +112,7 @@ class CalculatorCache:
         self.bands = bands
         self.context = context
         self.focal = focal
+        self.settings = ImageStatsConfig() if settings is None else settings
 
         # Ensure bounding box
         self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
@@ -131,6 +137,38 @@ class CalculatorCache:
         the answer it is.
         """
         return self._value_range if self._value_range is not None else get_value_range(self.raw)
+
+    @cached_property
+    def has_declared_range(self) -> bool:
+        """Whether :attr:`value_range` was stated by the caller rather than decoded from the data.
+
+        A declared interval carries no encoding depth, and a decoded one always does, so a known interval with no depth
+        is a declared one. Read this, not the range itself, where the answer must not depend on what the data holds.
+        """
+        return self.value_range.is_known and math.isnan(self.value_range.depth)
+
+    @cached_property
+    def has_pixels(self) -> bool:
+        """Whether the view holds a position that comes from the datum and has not been excluded.
+
+        What :attr:`image` cannot say. A window wholly outside the image, a zero-area one that is widened to a single
+        fill pixel, a band group the datum cannot supply and a window that `exclude` covers entirely are all NaN, and
+        so is an image that holds only NaN. Only the last is a measurement of the datum.
+
+        Answered from the geometry, so that it mirrors :attr:`image`, which it is read beside: the window's overlap
+        with the image, less what `exclude` removes. The mask is False wherever the window leaves the image, so every
+        excluded position is one the overlap counted.
+        """
+        if self.bands is not None and not (
+            self._has_geometry and max(self.bands) < normalize_image_shape(self.raw).shape[0]
+        ):
+            return False
+        if not self._has_geometry:
+            return self.raw.size > 0
+        x0, y0, x1, y1 = self.box.xyxy_int
+        overlap = max(0, min(x1, self.width) - max(x0, 0)) * max(0, min(y1, self.height) - max(y0, 0))
+        mask = self.window_mask
+        return overlap - (0 if mask is None else int(np.count_nonzero(mask))) > 0
 
     @cached_property
     def window_mask(self) -> NDArray[np.bool_] | None:

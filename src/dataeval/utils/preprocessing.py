@@ -645,6 +645,22 @@ def _decode_range(dtype: DTypeLike, pmax: float) -> ValueRange:
     return _UNKNOWN_RANGE
 
 
+def _declared_depth(dtype: DTypeLike, low: float, high: float) -> float:
+    """Name the depth an integer image's declared interval states, or ``nan`` where it states none.
+
+    A declaration of ``(0, 2**n - 1)`` on integer or Boolean data, for an ``n`` the decoder also reports, says the data
+    is ``n`` bits deep. It is read only where the dtype can hold the interval, so that a ``uint8`` image declared as 12
+    bits is not given a depth it cannot have. Floats carry no encoding, so they state none.
+    """
+    if not (np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.bool_)) or low != 0:
+        return np.nan
+    for depth in _BIT_DEPTH:
+        if high == 2**depth - 1:
+            top = 1 if np.issubdtype(dtype, np.bool_) else np.iinfo(dtype).max
+            return float(depth) if high <= top else np.nan
+    return np.nan
+
+
 def _validate_declared_range(declared: tuple[float, float]) -> tuple[float, float]:
     """Check a caller-declared interval, which nothing downstream can sanity-check for itself.
 

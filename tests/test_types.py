@@ -34,7 +34,7 @@ from dataeval.types._factors import (
     _relink,
     _validate_acyclic,
 )
-from dataeval.types._stats_config import ImageStatsConfig, SurroundConfig
+from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig, SurroundConfig
 from dataeval.types._target import detection_count, detection_score, own_class_scores, track_ids_of
 from dataeval.types._track import frame_size
 
@@ -1044,3 +1044,28 @@ class TestStatsConfig:
         unchecked = SurroundConfig.model_construct(min_pixels=-5)
         with pytest.raises(ValidationError, match="min_pixels"):
             ImageStatsConfig(surround=unchecked)
+
+    def test_the_saturation_defaults_are_the_documented_ones(self):
+        saturation = SaturationConfig()
+        assert saturation.atol == 0.0
+        assert ImageStatsConfig().saturation == saturation
+        assert ImageStatsConfig(saturation=SaturationConfig(atol=0.5)).saturation.atol == 0.5
+
+    def test_the_endpoint_is_not_a_saturation_setting(self):
+        with pytest.raises(ValidationError, match="upper"):
+            SaturationConfig(upper=4095)  # pyright: ignore[reportCallIssue]
+
+    @pytest.mark.parametrize("value", [0, 0.0, 0.5, 3, np.float32(0.25)])
+    def test_a_saturation_tolerance_is_a_finite_number_of_zero_or_more(self, value: Any):
+        assert SaturationConfig(atol=value).atol == float(value)
+
+    @pytest.mark.parametrize("value", [-0.1, -1, True, "0", None, float("nan"), float("inf")])
+    def test_a_saturation_tolerance_refuses_a_negative_a_bool_and_a_nonfinite_value(self, value: Any):
+        with pytest.raises(ValidationError, match="atol"):
+            SaturationConfig(atol=value)
+
+    def test_a_saturation_section_refuses_an_unknown_field_and_a_skipped_check(self):
+        with pytest.raises(ValidationError, match="lower"):
+            SaturationConfig(lower=0)  # pyright: ignore[reportCallIssue]
+        with pytest.raises(ValidationError, match="atol"):
+            ImageStatsConfig(saturation=SaturationConfig.model_construct(atol=-1.0))

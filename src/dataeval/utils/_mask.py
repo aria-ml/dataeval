@@ -57,9 +57,19 @@ def materialize_target_attrs(target: Any) -> dict[str, Any]:
     return attrs
 
 
+# Keys that describe the whole image and are read by DataEval as a declaration, not as an observation. Dropping a
+# detection must not touch them: a `(low, high)` pair is a sequence of two, which the length test above would take for
+# one value per detection on an image that has two. `Metadata` does not turn them into factors for the same reason.
+VALUE_RANGE_KEY = "value_range"
+IMAGE_KEYS = frozenset({VALUE_RANGE_KEY})
+
+
 def mask_metadata(metadata: Mapping[str, Any], mask: NDArray[np.bool_]) -> dict[str, Any]:
-    """Apply :func:`try_mask_object` to every leaf of a nested metadata mapping."""
-    return {k: mask_metadata(v, mask) if isinstance(v, dict) else try_mask_object(v, mask) for k, v in metadata.items()}
+    """Apply :func:`try_mask_object` to every leaf of a nested metadata mapping, except the keys of the whole image."""
+    return {
+        k: v if k in IMAGE_KEYS else mask_metadata(v, mask) if isinstance(v, dict) else try_mask_object(v, mask)
+        for k, v in metadata.items()
+    }
 
 
 class MaskedTarget:

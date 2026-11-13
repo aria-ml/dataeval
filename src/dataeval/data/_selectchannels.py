@@ -98,8 +98,9 @@ class SelectChannels(Operation):
 
     ``"gray"`` is different, and is the clearest illustration of why ``invalidates`` is
     computed per-instance rather than fixed per-class. A luminance mix is a new pixel
-    value at every position, so it moves ``PIXEL_MEAN``, ``PIXEL_STD``, and every visual
-    statistic -- all of which the ``"gray"`` form therefore declares.
+    value at every position, so it moves every pixel and visual statistic, the blur
+    statistics included, and it is not at a saturation endpoint where one channel was --
+    all of which the ``"gray"`` form therefore declares.
 
     Examples
     --------

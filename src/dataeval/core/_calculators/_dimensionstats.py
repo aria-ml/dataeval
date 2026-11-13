@@ -9,6 +9,7 @@ from dataeval.core._calculators._base import Calculator, Handler, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
+from dataeval.utils.preprocessing import _declared_depth
 
 
 @CalculatorRegistry.register(ImageStats)
@@ -70,8 +71,13 @@ class DimensionStatCalculator(Calculator[ImageStats]):
     def _depth(self) -> list[float]:
         # Through the cache rather than off `raw` directly, so a declared range is honored
         # and the answer is the same one `scaled` and the histogram were computed against.
-        # NaN where the data carries no encoding to read — see `ValueRange`.
-        return [self.cache.value_range.depth]
+        # NaN where the data carries no encoding to read — see `ValueRange`. A declared interval is the exception for
+        # integer data, where `(0, 2**n - 1)` states the depth, so it is read here and not by `ValueRange`, which other
+        # readers take as "decoded from the data".
+        depth = self.cache.value_range.depth
+        if np.isnan(depth) and self.cache.has_declared_range:
+            return [_declared_depth(self.cache.raw.dtype, self.cache.value_range.pmin, self.cache.value_range.pmax)]
+        return [depth]
 
     def _center(self) -> list[list[float]]:
         # Center only makes sense for spatial data

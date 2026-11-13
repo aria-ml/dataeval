@@ -48,7 +48,7 @@ class _Dataset:
 
 
 def annotations_of(dataset, **kwargs) -> list[Annotations]:
-    images, annotations = _unzip_annotations(dataset, per_target=True, **kwargs)
+    images, annotations, _ = _unzip_annotations(dataset, per_target=True, **kwargs)
     assert annotations is not None
     list(images)
     return cast("list[Annotations]", list(annotations))

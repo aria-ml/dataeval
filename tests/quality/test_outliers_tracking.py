@@ -377,8 +377,8 @@ class TestVideoStrataAndAccessors:
         assert set(units["n"]) == {360}
         assert units["judged"].any()
         # The sequence rows hold no weather, so they are judged together: one unstratified population for each of
-        # the 29 scalar ordered default statistics rolled up to the sequence level.
-        assert populations.filter(pl.col("level").is_null())["population"].null_count() == 29
+        # the 30 scalar ordered default statistics rolled up to the sequence level.
+        assert populations.filter(pl.col("level").is_null())["population"].null_count() == 30
         # The metadata you pass is read for its strata and left as it was; the statistics went on a copy.
         assert list(md.factor_names) == before
         assert "brightness" not in md.factor_names

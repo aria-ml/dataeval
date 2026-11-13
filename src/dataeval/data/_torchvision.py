@@ -15,7 +15,7 @@ from dataeval.data._view import Operation, View
 from dataeval.flags import ImageStats
 from dataeval.protocols import ObjectDetectionTarget, SegmentationTarget
 from dataeval.utils._array import as_numpy
-from dataeval.utils._mask import MaskedTarget, mask_metadata
+from dataeval.utils._mask import VALUE_RANGE_KEY, MaskedTarget, mask_metadata
 from dataeval.utils.data import DatasetKind
 from dataeval.utils.preprocessing import normalize_image_shape
 
@@ -75,6 +75,17 @@ def _datum_seed(metadata: Any, image: NDArray[Any]) -> tuple[int, bool]:
         return xxh.xxh64_intdigest(str(datum_id).encode()), False
     subsample = image[..., ::_CONTENT_HASH_STRIDE, ::_CONTENT_HASH_STRIDE]
     return xxh.xxh64_intdigest(np.ascontiguousarray(subsample).tobytes()), True
+
+
+def _rescaled(source: NDArray[Any], result: NDArray[Any]) -> bool:
+    """Whether a transform turned an integer image into a floating one, or moved the values past their old extremes.
+
+    The two signs :meth:`TorchvisionTransform._check_preprocessing` warns about, read for this datum alone, so the
+    answer does not depend on which datum a thread reached first.
+    """
+    if not np.issubdtype(result.dtype, np.floating) or result.size == 0 or source.size == 0:
+        return False
+    return bool(np.issubdtype(source.dtype, np.integer) or result.min() < source.min() or result.max() > source.max())
 
 
 class TorchvisionTransform(Operation):
@@ -139,6 +150,10 @@ class TorchvisionTransform(Operation):
     ``id`` survives reordering. For a source that omits it, a hash of a strided subsample
     of the image is used instead, and a warning is issued once.
 
+    **A declared value range does not survive a rescale.** A datum's ``value_range`` metadata describes the values as
+    the dataset stored them. When the transform turns an integer image into a floating one, or moves the values past
+    their old extremes, the key is dropped from that datum, so the statistics read what the new values say.
+
     **A view built through this operation may not be reconstructable from its sidecar.**
     Provenance records an operation's ``repr``; a curated operation reprs to something you
     can paste back, while ``v2.Compose([...])`` reprs multi-line and a lambda inside one
@@ -190,6 +205,10 @@ class TorchvisionTransform(Operation):
         output = self._run(image, target, metadata)
         new_image = as_numpy(output["image"])
         self._check_preprocessing(image, new_image)
+        if VALUE_RANGE_KEY in metadata and _rescaled(image, new_image):
+            # A declared range describes the values as the dataset stored them, which this transform has changed.
+            # Dropped, so the statistics fall back to what the new values say, and nothing reads a stale claim.
+            metadata = {k: v for k, v in metadata.items() if k != VALUE_RANGE_KEY}
 
         if not is_tuple:
             return new_image
