@@ -62,14 +62,13 @@ print(f"Factor names: {metadata.factor_names}")
 # %% [markdown]
 # ## Add image statistics as factors
 #
-# Run `image_stats` for the `PIXEL` and `VISUAL` statistics, leaving out `SATURATION`, which this how-to does not use,
-# and hand the whole result to `add_factors`. Passing the result rather than its `stats` mapping also passes its
-# source index, which places each value on the row it describes.
+# Run `image_stats` for the `PIXEL` and `VISUAL` statistics and hand the whole result to `add_factors`. Passing the
+# result rather than its `stats` mapping also passes its source index, which places each value on the row it describes.
 # The `missing` statistic counts missing pixels and is zero for every photograph, so exclude it.
 
 # %%
 # Calculate pixel and visual statistics
-calc_results = image_stats(train_ds, stats=(ImageStats.PIXEL & ~ImageStats.SATURATION) | ImageStats.VISUAL)
+calc_results = image_stats(train_ds, stats=ImageStats.PIXEL | ImageStats.VISUAL)
 
 # Append the factors to the metadata and drop the constant one
 metadata.add_factors(calc_results)
@@ -85,7 +84,20 @@ print(f"Factor names: {metadata.factor_names}")
 # images in the busiest of five bins.
 
 # %%
-keys = ("mean", "std", "var", "skew", "kurtosis", "entropy", "brightness", "darkness", "sharpness", "contrast", "zeros")
+keys = (
+    "mean",
+    "std",
+    "var",
+    "skew",
+    "kurtosis",
+    "entropy",
+    "saturation",
+    "brightness",
+    "darkness",
+    "sharpness",
+    "contrast",
+    "zeros",
+)
 values = {key: np.asarray(calc_results["stats"][key], dtype=float) for key in keys}
 # Cut at the quantiles, with infinite outer edges so that the largest value falls in the last bin
 quantile_edges = {key: [-np.inf, *np.unique(np.quantile(values[key], [0.2, 0.4, 0.6, 0.8])), np.inf] for key in keys}

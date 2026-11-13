@@ -349,12 +349,12 @@ specify which statistics you want, and `image_stats` handles the rest.
 
 The four flag categories and their integrity signals:
 
-| Category    | Key statistics                                   | Integrity signal                                          |
-| ----------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `PIXEL`     | Mean, std, entropy, skewness, kurtosis           | Corrupted or near-empty frames; distribution anomalies    |
-| `VISUAL`    | Brightness, contrast, sharpness, darkness        | Exposure and focus failures; sensor artifacts             |
-| `DIMENSION` | Width, height, aspect ratio, channels, bit depth | Incorrectly resized, cropped, or re-encoded samples       |
-| `HASH`      | xxHash, pHash, dHash (+ D4 variants)             | Exact and near-duplicate detection (used by `Duplicates`) |
+| Category    | Key statistics                                     | Integrity signal                                                |
+| ----------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| `PIXEL`     | Mean, std, entropy, skewness, kurtosis, saturation | Corrupted, near-empty or clipped frames; distribution anomalies |
+| `VISUAL`    | Brightness, contrast, sharpness, darkness          | Exposure and focus failures; sensor artifacts                   |
+| `DIMENSION` | Width, height, aspect ratio, channels, bit depth   | Incorrectly resized, cropped, or re-encoded samples             |
+| `HASH`      | xxHash, pHash, dHash (+ D4 variants)               | Exact and near-duplicate detection (used by `Duplicates`)       |
 
 Some flags have dependencies that are resolved automatically: requesting
 `PIXEL_ENTROPY` also enables `PIXEL_HISTOGRAM` (which entropy requires);

@@ -34,6 +34,8 @@ class ImageStats(Flag):
     - `PIXEL_MISSING` : Fraction of missing/NaN pixels
     - `PIXEL_ZEROS` : Fraction of zero pixels
     - `PIXEL_HISTOGRAM` : 256-bin histogram of pixel values
+    - `PIXEL_SATURATION` : Share of values at a clipping endpoint, also spelled `SATURATION`; its endpoint, details and
+      limits are under Saturation Statistic below
 
     Visual Statistics (read against the 0-255 display range; NaN without a reference):
 
