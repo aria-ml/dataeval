@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from dataeval.utils._annotations import AnnotationContext, Kind, build_annotations
+from dataeval.utils.preprocessing import boxes_to_mask
 
 pytestmark = pytest.mark.required
 
@@ -128,3 +129,29 @@ def test_arrays_are_computed_only_when_read():
     ctx.kind  # noqa: B018
     assert "kind" in ctx.__dict__
     assert "clipped" not in ctx.__dict__
+
+
+def test_coverage_is_the_union_of_the_valid_boxes_rounded_outward():
+    rows = [(3, 3, 6, 6), (5, 5, 9, 9)]
+    coverage = context(rows, (10, 10)).coverage
+    assert coverage.shape == (10, 10)
+    assert coverage.sum() == 9 + 16 - 1  # the two overlap in the single pixel (5, 5)
+    assert coverage.tolist() == boxes_to_mask((10, 10), rows).tolist()
+    assert context([(0.5, 0.5, 1.5, 1.5)], (10, 10)).coverage.sum() == 4  # rounds out to cells (0..1, 0..1)
+
+
+def test_a_box_that_is_not_valid_paints_nothing():
+    rows = [(NAN, 0, 5, 5), (6, 0, 2, 5), (0, 0, 0, 5), (20, 20, 30, 30), (1, 1, 3, 3)]
+    assert context(rows, (10, 10)).coverage.sum() == 4  # only the last row is VALID
+
+
+def test_an_image_with_no_boxes_has_an_all_false_coverage_and_no_extent_an_empty_one():
+    empty = context([], (10, 10)).coverage
+    assert empty.shape == (10, 10)
+    assert not empty.any()
+    assert AnnotationContext(None, (0, 0)).coverage.shape == (0, 0)
+
+
+def test_coverage_is_computed_once():
+    ctx = context([(3, 3, 6, 6)], (10, 10))
+    assert ctx.coverage is ctx.coverage

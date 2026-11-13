@@ -45,7 +45,12 @@ class TestFlag:
         assert ImageStats.PIXEL_SATURATION.name == "PIXEL_SATURATION"
 
     def test_no_existing_flag_moved_and_the_new_one_is_appended(self):
-        members = {m.name: m.value for m in ImageStats if m.name != "PIXEL_SATURATION"}
+        # The CONTEXT flags were appended after it by a later change, and have a test of their own.
+        members = {
+            m.name: m.value
+            for m in ImageStats
+            if m.name != "PIXEL_SATURATION" and not (m.name or "").startswith("CONTEXT_")
+        }
         assert members == _EXISTING_VALUES
         assert ImageStats.PIXEL_SATURATION.value == 2 * max(_EXISTING_VALUES.values())
 
@@ -67,7 +72,9 @@ class TestFlag:
         assert ImageStats.PIXEL_SATURATION in ImageStats.STANDARD | ImageStats.HASH
 
     def test_the_v12_column_set_is_the_default_request_without_it(self):
-        v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION
+        v12 = (
+            ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT
+        )
         assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
 
     def test_the_name_splits_into_a_family_and_the_calculators_statistic_name(self):

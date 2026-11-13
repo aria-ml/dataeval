@@ -36,7 +36,7 @@ from typing import Any, Literal
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from dataeval.utils.preprocessing import BoundingBox, BoxLike, to_bounding_box
+from dataeval.utils.preprocessing import BoundingBox, BoxLike, boxes_to_mask, to_bounding_box
 
 
 class Kind(IntEnum):
@@ -195,6 +195,10 @@ class AnnotationContext:
         ``VALID`` boxes; the other kinds are clipped coordinate by coordinate.
     labels : NDArray[np.int64] or None
         One class id per box, or None where none were given.
+    coverage : NDArray[np.bool_]
+        An ``(H, W)`` mask that is True where any ``VALID`` box covers the pixel, each box rounded outward and clipped
+        as :func:`~dataeval.utils.preprocessing.boxes_to_mask` does. Built once per image, so a statistic slices it per
+        box.
 
     Notes
     -----
@@ -231,6 +235,10 @@ class AnnotationContext:
         clipped[:, [0, 2]] = np.clip(clipped[:, [0, 2]], 0, width)
         clipped[:, [1, 3]] = np.clip(clipped[:, [1, 3]], 0, height)
         return clipped
+
+    @cached_property
+    def coverage(self) -> NDArray[np.bool_]:
+        return boxes_to_mask(self.extent, self.raw[self.kind == Kind.VALID])
 
     def _check(self, focal: int) -> None:
         """Refuse anything that is not the index of one of the boxes, so a missing focal cannot read as a status."""

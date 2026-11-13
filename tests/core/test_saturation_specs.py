@@ -94,7 +94,8 @@ class TestRecorded:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             result = image_stats(U8, stats=ImageStats.ALL)
-        assert set(result.get("measurement_specs", {})) == {"saturation"}
+        # The surround statistics record their settings too; no other statistic records any.
+        assert set(result.get("measurement_specs", {})) == {"saturation", "surround_mean", "surround_std"}
 
 
 class TestCombining:

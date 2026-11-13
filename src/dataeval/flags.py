@@ -178,6 +178,45 @@ class ImageStats(Flag):
     and a collection of ``uint16`` ones still combine. `QualityGate` does not accept it, since a gate measures frames
     with no datum metadata to declare a range in.
 
+    Context Statistics (the intensity of the pixels around a box, in `CONTEXT`):
+
+    - `CONTEXT_SURROUND_MEAN` : The mean of the normalized intensity of the box's surround, as the column
+      `surround_mean`. The surround is the box widened on every side by `surround_padding` times its width and its
+      height, a quarter by default, less the box and less every other valid box of the image, each rounded outward to
+      whole pixels and clipped to the image. A pixel's intensity is its value mapped to [0, 1] from the interval the
+      view is measured against (see `value_range` of :func:`~dataeval.core.image_stats`), averaged over the channels
+      read, so the box and its surround share one scale. A pixel counts only when every channel read is finite and
+      inside the interval, and a value outside is never clipped. An object that no box annotates stays in the surround,
+      and an image whose integer values carry no declared interval is read against the interval its own maximum decodes
+      to, so compare images only where the interval is declared
+    - `CONTEXT_SURROUND_STD` : The population standard deviation (``ddof=0``) of the same intensities, as the column
+      `surround_std`
+
+    Both are NaN on an image's own row, and for a box whose surround holds fewer than `surround_min_pixels` such pixels,
+    32 by default, which a small box can fall under and a box whose window other boxes cover always does. Both
+    settings are keywords of :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes
+    one also returns details, in the result's ``details``, one value per row, named with a band group's name in front
+    when the row is a band group's. The surround before other boxes are removed, less the box, is the candidate, and
+    the candidate's pixels that no other box covers are the retained ones:
+
+    - `context_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image, has
+      reversed edges or is not finite (read from the coordinates as given, as for `spatial_status`); `unknown_range`,
+      when no interval could be established for the view; `empty_ring`, when the box fills its window so that no
+      candidate pixel exists; `insufficient_support`, when fewer than `surround_min_pixels` retained pixels are
+      measurable, which includes a surround that other boxes cover and a band group the datum cannot supply;
+      `incomplete_geometry`, when another box of the image is reversed or not finite, so that pixels of it may lie in
+      the surround (the value is still computed from the valid boxes); or `not_applicable`, on an image's own row. The
+      value is NaN unless the status is `ok` or `incomplete_geometry`
+    - `surround_candidate_pixels`, `surround_retained_pixels`, `surround_measurable_pixels` : The candidate pixels,
+      the retained ones, and the retained ones measurable in every channel read. -1 where a count does not apply. The
+      first two are reported for the unnamed view only, since a band group does not change them
+    - `ring_peer_excluded_fraction` : The share of the candidate that other boxes cover, for the unnamed view only,
+      NaN where the candidate is empty or not counted
+    - `surround_valid_fraction`, `target_valid_fraction` : The measurable pixels over the retained ones, and the share
+      of the box's own pixels that are finite and inside the interval in every channel read
+    - `context_range_low`, `context_range_high` : The interval the row was measured against, NaN where none was
+      established
+
     Convenience Groups
     ------------------
     Sub-groups:
@@ -208,13 +247,14 @@ class ImageStats(Flag):
     - `BLUR` : The two blur statistics (experimental)
     - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
       two class statistics also read labels
+    - `CONTEXT` : The two surround statistics. In no other group. They need boxes, and are NaN on every other row
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
-    - `ALL` : Every statistic in this release, including the experimental blur statistics and the spatial statistics.
-      A later release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics when the columns must
-      not change
+    - `ALL` : Every statistic in this release, including the experimental blur statistics, the spatial statistics and
+      the context statistics. A later release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics
+      when the columns must not change
 
     Notes
     -----
@@ -222,13 +262,13 @@ class ImageStats(Flag):
     automatically during processing.
 
     .. versionadded:: 1.3
-        The `SPATIAL` statistics.
+        The `SPATIAL` and `CONTEXT` statistics.
 
     What `ALL` held in v1.2 is
-    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION``.
-    The `SPATIAL` statistics need box rows, so a request for `ALL` with no box rows returns their columns as NaN,
-    without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds them and
-    measures no box rows warns, or raises when it holds nothing else.
+    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT``.
+    The `SPATIAL` and `CONTEXT` statistics need box rows, so a request for `ALL` with no box rows returns their columns
+    as NaN, without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds
+    them and measures no box rows warns, or raises when it holds nothing else.
 
     Examples
     --------
@@ -310,6 +350,12 @@ class ImageStats(Flag):
     # computes it, which is the `<FAMILY>_<STATISTIC>` shape every reader of a flag's name relies on.
     PIXEL_SATURATION = auto()
 
+    # ===== CONTEXT =====
+    # Appended after the saturation flag so that no existing flag value moves. Named `<FAMILY>_<STATISTIC>`, as every
+    # reader of a flag's name expects: the columns are `surround_mean` and `surround_std`.
+    CONTEXT_SURROUND_MEAN = auto()
+    CONTEXT_SURROUND_STD = auto()
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -363,6 +409,9 @@ class ImageStats(Flag):
         | SPATIAL_MAX_IOU_OTHER_CLASS
     )
 
+    # Reads the pixels around a box, so it has a value only on a box's own row
+    CONTEXT = CONTEXT_SURROUND_MEAN | CONTEXT_SURROUND_STD
+
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
     PIXEL_DISTRIBUTION = PIXEL_SKEW | PIXEL_KURTOSIS | PIXEL_ENTROPY | PIXEL_HISTOGRAM
@@ -404,7 +453,7 @@ class ImageStats(Flag):
     BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
 
     # Ultimate convenience, spelled from the families so that a change to STANDARD cannot take a statistic out of it
-    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL
+    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL | CONTEXT
 
 
 class VideoStats(Flag):

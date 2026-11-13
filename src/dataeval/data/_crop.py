@@ -16,11 +16,13 @@ from dataeval.utils.preprocessing import normalize_image_shape
 # Cropping reframes the image, so every dimension statistic describes the region rather
 # than the source. Channel count and bit depth are untouched — a crop is a slice, not a
 # resample — and ``PIXEL``/``VISUAL`` are deliberately absent: cropping out an overlay
-# *improves* those statistics, which is the reason to do it. The SPATIAL statistics change as well: boxes are clipped
-# to the region and those left outside it are dropped.
+# *improves* those statistics, which is the reason to do it. The SPATIAL and CONTEXT statistics change as well: boxes
+# are clipped to the region and those left outside it are dropped, and a ring is cut by the region's edge.
 _INVALIDATES = (
-    ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH)
-) | ImageStats.SPATIAL
+    (ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH))
+    | ImageStats.SPATIAL
+    | ImageStats.CONTEXT
+)
 
 
 def _validate_params(region: Any) -> None:
@@ -57,8 +59,8 @@ class Crop(Operation):
     invalidates : ImageStats or None, default None
         Override the statistics this operation declares it invalidates. Leave as ``None``
         for the computed default: every dimension statistic except ``channels`` and
-        ``depth``, which a crop preserves, and the spatial statistics, since boxes are clipped
-        to the region and those left outside it are dropped. ``PIXEL`` and ``VISUAL`` are
+        ``depth``, which a crop preserves, and the spatial and surround statistics, since boxes are
+        clipped to the region and those left outside it are dropped. ``PIXEL`` and ``VISUAL`` are
         deliberately not declared — cropping out an overlay makes those statistics *more* faithful.
 
     Raises
