@@ -125,12 +125,12 @@ class TestAggSemantics:
         assert counted.rows_at("track")["n"].to_list() == [2], "only the two tracked detections"
 
     def test_unique_by_counts_each_entity_once(self):
-        """Two detections of one track in one frame are one frame, not two."""
-        metadata = Metadata(_mot_dataset([[[7, 7], [7]]]))
+        """Three detections across tracks 7 and 8 are two tracks, not three."""
+        metadata = Metadata(_mot_dataset([[[7, 8], [7]]]))
         metadata._structure()
-        assert metadata.agg("instance", "track", pl.len().alias("n")).rows_at("track")["n"].to_list() == [3]
-        deduped = metadata.agg("instance", "track", pl.len().alias("n"), unique_by="unit")
-        assert deduped.rows_at("track")["n"].to_list() == [2], "two frames, three detections"
+        assert metadata.agg("instance", "sequence", pl.len().alias("n")).rows_at("sequence")["n"].to_list() == [3]
+        deduped = metadata.agg("instance", "sequence", pl.len().alias("n"), unique_by="track")
+        assert deduped.rows_at("sequence")["n"].to_list() == [2], "two tracks, three detections"
 
     def test_an_untracked_row_is_not_deduplicated_against_another(self):
         """Rows sharing the no-ancestor marker are not the same entity."""

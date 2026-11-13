@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -254,6 +255,28 @@ class TestBuildTracks:
         # Frame indices are strictly increasing.
         assert list(track.frame_indices) == sorted(track.frame_indices)
         np.testing.assert_array_equal(track.frame_indices, [0, 1, 2, 3, 4])
+
+    def test_a_track_id_repeated_within_a_frame_is_refused(self):
+        """One id names one object per frame; two boxes under it would make a step of zero frames."""
+        vt = make_video_target([
+            make_frame([1], [[0, 0, 1, 1]], [0.9], [0]),
+            make_frame([1, 1], [[0, 0, 1, 1], [5, 5, 6, 6]], [0.9, 0.8], [0, 0]),
+        ])
+        with pytest.raises(ValueError, match=r"Track id 1 is given to 2 detections in frame 1"):
+            build_tracks(vt)
+
+    def test_a_negative_id_may_repeat_within_a_frame(self):
+        boxes = [[0, 0, 1, 1], [2, 2, 3, 3], [4, 4, 5, 5]]
+        vt = make_video_target([make_frame([-1, -1, 4], boxes, [1, 1, 1], [0, 0, 0])])
+        assert list(build_tracks(vt)) == [4]
+
+    def test_detections_past_a_short_track_ids_count_as_untracked(self, caplog):
+        """Metadata pads a short ``track_ids`` with -1; the count reported here is the same."""
+        vt = make_video_target([make_frame([1], [[0, 0, 1, 1], [2, 2, 3, 3], [4, 4, 5, 5]], [1, 1, 1], [0, 0, 0])])
+        with caplog.at_level(logging.INFO):
+            tracks = build_tracks(vt)
+        assert list(tracks) == [1]
+        assert any("2 detection(s) carry no track id" in r.message for r in caplog.records)
 
     def test_multiple_detections_same_frame(self):
         # Two different track IDs detected within the same frame.
