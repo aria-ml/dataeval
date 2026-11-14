@@ -41,6 +41,7 @@ from dataeval.protocols import (
 from dataeval.types import FactorLevel, MeasurementSpec, SourceIndex
 from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig, SurroundConfig
 from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
+from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils._mask import VALUE_RANGE_KEY
 from dataeval.utils.preprocessing import (
@@ -913,13 +914,13 @@ def _enumerate_datum(
     ranges = repeat(None) if value_ranges is None else chain(value_ranges, repeat(None))
     if boxes is None:
         for i, (image, raw) in enumerate(zip(images, ranges, strict=False)):
-            yield i, np.asarray(image), None, _declared(i, raw)
+            yield i, as_numpy(image), None, _declared(i, raw)
         return
     sources = {"images": images, "boxes": boxes, **({} if labels is None else {"labels": labels})}
     for i, (entries, raw) in enumerate(zip(zip_longest(*sources.values(), fillvalue=_END), ranges, strict=False)):
         _refuse_ragged(dict(zip(sources, entries, strict=True)), i)
         image, box, *label = entries
-        np_image = np.asarray(image)
+        np_image = as_numpy(cast("ArrayLike", image))
         yield (
             i,
             np_image,

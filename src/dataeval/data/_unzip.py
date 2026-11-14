@@ -120,7 +120,7 @@ def _unzip_annotations(
             # range needs it to be a pair, and a dataset that holds another value under the key is fine for the rest.
             meta = d[2] if isinstance(d, tuple) and len(d) == 3 else None
             declared = meta.get(VALUE_RANGE_KEY) if isinstance(meta, Mapping) else None
-            image = np.asarray(unwrap_image(d))
+            image = as_numpy(unwrap_image(d))
             if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
                 labels = _dataset_labels(d[1].labels, i) if with_labels else None
