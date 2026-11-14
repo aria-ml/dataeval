@@ -84,3 +84,21 @@ class TestDeclarations:
         default = ImageStats.STANDARD | ImageStats.HASH
         assert not Resize((8, 8)).invalidates & default & CONTEXT
         assert not Crop((0, 0, 8, 8)).invalidates & default & CONTEXT
+
+
+class TestTheRatios:
+    """The two ratios read the same pixels and boxes as the surround statistics, so they move with the group."""
+
+    RATIOS = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
+
+    def test_each_operation_that_declares_the_group_declares_both_ratios(self):
+        assert Resize((8, 8)).invalidates & self.RATIOS == self.RATIOS
+        assert Crop((0, 0, 8, 8)).invalidates & self.RATIOS == self.RATIOS
+        assert SelectChannels("gray").invalidates & self.RATIOS == self.RATIOS
+        assert Indices([SourceIndex(0, 1)], exclude=True).invalidates & self.RATIOS == self.RATIOS
+        assert Relabel({"0": "a"}).invalidates & self.RATIOS == self.RATIOS
+
+    def test_the_operations_that_leave_the_group_alone_leave_them_alone(self):
+        assert not SelectChannels([0]).invalidates & self.RATIOS
+        assert not Relabel({"0": "a"}, on_unmatched="raise").invalidates & self.RATIOS
+        assert not DetectionCrops.invalidates & self.RATIOS

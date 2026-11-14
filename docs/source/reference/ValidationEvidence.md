@@ -515,20 +515,28 @@ statistical and computational.
 - - {func}`.image_stats` (`ImageStats.CONTEXT`)
   - The intensity of the pixels around a box: the mean and the population standard deviation, over a frame a quarter of
     the box's width and height wide, less the box and less every other valid box, with the intensity mapped to [0, 1]
-    from the image's interval and averaged over the channels.
-  - Anchored (hand-computed fixtures for the overlap, the edge and the encodings; a per-pixel check written from the
-    same definition, so not independent of it, agrees on 200 awkward boxes; constructed images only, plus a run on the
-    real boxes of one aerial dataset that counts the statuses and times the statistic, and checks no value)
-  - Descriptive only: the values do not say whether a target is camouflaged or in clutter, which are the readings built
-    on them. An object that no box annotates counts as surround. A box that contains another box's window, such as an
-    area marked as ignored, leaves that box no surround, so it reads `insufficient_support`, and a small box can fall
-    under the 32-pixel floor at the defaults. On the 114,133 boxes of VisDrone2019-MOT validation that are not ignored
-    regions, 373 read `insufficient_support`: 257 had nothing left of their surround after the other boxes, and 116 had
-    fewer than 32 measurable pixels left. With the ignored regions kept as a class, 818 of 118,127 did, 686 of them with
-    nothing left. A box near the image edge reads from a ring that the edge has cut. An image of integers with no
-    declared range is read against the interval its own maximum decodes to, so compare images only where the range is
-    declared. The intensity is a mean over the channels, so hue does not show in it. The padding of a quarter and the
-    floor of 32 pixels were chosen by no study.
+    from the image's interval and averaged over the channels. And how far the box's own mean intensity stands from the
+    surround's, relative to the surround's level and to its spread.
+  - Anchored (hand-computed fixtures for the overlap, the edge, the encodings and the ratios; a per-pixel check written
+    from the same definition, so not independent of it, agrees on 200 awkward boxes for the surround and on 53 for the
+    ratios, 29 of which hold a value; constructed images only, plus a run on the real boxes of one aerial dataset that
+    counts the statuses and the floor and times the statistic, and checks no value)
+  - Descriptive only. A ratio near 0 says the box has about the mean intensity of its surround. It does not establish
+    that a target is camouflaged: the box holds more than the object, the intensity is the encoded value and not
+    luminance, and hue and texture are not read. A large value says the box differs from its surround, not that the
+    object is easy to find. An object that no box annotates counts as surround. A box that contains another box's
+    window, such as an area marked as ignored, leaves that box no surround, so it reads `insufficient_support`, and a
+    small box can fall under the 32-pixel floor at the defaults. On the 114,133 boxes of VisDrone2019-MOT validation
+    that are not ignored regions, 373 read `insufficient_support`: 257 had nothing left of their surround after the
+    other boxes, and 116 had fewer than 32 measurable pixels left. With the ignored regions kept as a class, 818 of
+    118,127 did, 686 of them with nothing left. A box near the image edge reads from a ring that the edge has cut. The
+    default floor of 1/255 under the ratios' denominators fell on the signal-to-clutter ratio of 22 of the 113,760 boxes
+    that have a surround, and on the contrast of none (23 of 117,309 with the ignored regions kept). Every target pixel
+    of that footage is valid, since the frames are 8-bit, so no box was refused for too few valid target pixels: that
+    rule was exercised on constructed images only. An image of integers with no declared range is read against the
+    interval its own maximum decodes to, so compare images only where the range is declared. The intensity is a mean
+    over the channels, so hue does not show in it. The padding of a quarter, the floor of 32 pixels, the 90% of valid
+    target pixels and the floor of 1/255 were chosen by no study.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored

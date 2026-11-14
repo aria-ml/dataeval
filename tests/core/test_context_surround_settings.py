@@ -21,6 +21,9 @@ pytestmark = [
 ]
 
 CONTEXT = ImageStats.CONTEXT
+SURROUND = ImageStats.CONTEXT_SURROUND_MEAN | ImageStats.CONTEXT_SURROUND_STD
+SURROUND_NAMES = ("surround_mean", "surround_std")
+RATIOS = ("target_surround_contrast", "signal_clutter_ratio")
 BOX = (10, 10, 40, 40)
 F2_BOXES = [(3, 3, 6, 6), (5, 5, 9, 9)]
 
@@ -49,6 +52,7 @@ def specs_of(**kw: Any) -> dict[str, MeasurementSpec]:
 BAD = {
     "surround_padding": [True, np.True_, 0, -1, float("nan"), float("inf"), "1", None],
     "surround_min_pixels": [True, np.True_, 0, -1, 0.5, 32.0, float("nan"), "1", None],
+    "surround_intensity_floor": [True, np.True_, 0, 0.0, -1, 1.5, float("nan"), float("inf"), "1", None],
 }
 
 
@@ -66,14 +70,20 @@ class TestKeywords:
         numpy = run(surround_padding=np.float32(0.5), surround_min_pixels=np.int64(5))
         assert details_of(numpy)["context_status"].tolist() == ["ok"]
 
+    def test_a_floor_of_one_and_a_numpy_float_are_accepted(self):
+        for floor in (1, np.float32(0.5)):
+            assert details_of(run(surround_intensity_floor=floor))["context_status"].tolist() == ["ok"]
+
     def test_the_defaults_are_the_sections_defaults(self):
         parameters = inspect.signature(image_stats).parameters
         defaults = SurroundConfig()
         assert parameters["surround_padding"].default == defaults.padding == 0.25
         assert parameters["surround_min_pixels"].default == defaults.min_pixels == 32
+        assert parameters["surround_intensity_floor"].default == defaults.intensity_floor == 1 / 255
 
     def test_stating_the_defaults_changes_nothing(self):
-        plain, stated = run(), run(surround_padding=0.25, surround_min_pixels=32)
+        plain = run()
+        stated = run(surround_padding=0.25, surround_min_pixels=32, surround_intensity_floor=1 / 255)
         for group in ("stats", "details"):
             assert plain[group].keys() == stated[group].keys()
             for name in plain[group]:
@@ -97,7 +107,9 @@ class TestKeywords:
 
 
 class TestTheWarning:
-    @pytest.mark.parametrize(("name", "value"), [("surround_padding", 0.5), ("surround_min_pixels", 10)])
+    @pytest.mark.parametrize(
+        ("name", "value"), [("surround_padding", 0.5), ("surround_min_pixels", 10), ("surround_intensity_floor", 0.5)]
+    )
     def test_a_setting_that_differs_warns_once_when_no_context_flag_is_requested(self, name, value):
         with pytest.warns(UserWarning, match=rf"{name} is ignored.*ImageStats\.CONTEXT") as caught:
             run(stats=ImageStats.PIXEL_MEAN, **{name: value})
@@ -107,14 +119,50 @@ class TestTheWarning:
         with pytest.warns(UserWarning, match=r"surround_padding and surround_min_pixels are ignored"):
             run(stats=ImageStats.PIXEL_MEAN, surround_padding=0.5, surround_min_pixels=10)
 
+    @pytest.mark.parametrize("stats", [ImageStats.PIXEL_MEAN, ImageStats.CONTEXT_SURROUND_MEAN])
+    def test_a_float32_default_is_not_the_default_because_the_spec_records_another_number(self, stats):
+        # `np.float32(1 / 255) == 1 / 255` in NumPy, but the stored float is 0.0039215688..., so results made with it
+        # do not combine with the default's, and the setting must warn where it is ignored.
+        with pytest.warns(UserWarning, match="surround_intensity_floor is ignored"):
+            run(stats=stats, surround_intensity_floor=np.float32(1 / 255))
+        spec = specs_of(surround_intensity_floor=np.float32(1 / 255))["signal_clutter_ratio"]
+        assert spec.config["intensity_floor"] != 1 / 255
+
+    def test_all_three_are_named_in_one_warning(self):
+        kw = {"surround_padding": 0.5, "surround_min_pixels": 10, "surround_intensity_floor": 0.5}
+        with pytest.warns(UserWarning, match="are ignored") as caught:
+            run(stats=ImageStats.PIXEL_MEAN, **kw)
+        messages = [str(w.message) for w in caught if "ignored" in str(w.message)]
+        assert len(messages) == 1
+        assert "surround_padding, surround_min_pixels and surround_intensity_floor are ignored" in messages[0]
+        assert "they set up `ImageStats.CONTEXT`" in messages[0]
+
+    @pytest.mark.parametrize("stats", [SURROUND, ImageStats.CONTEXT_SURROUND_MEAN])
+    def test_a_floor_warns_when_only_surround_statistics_are_requested_and_names_the_ratios(self, stats):
+        # The context group is requested, but nothing in it reads the floor.
+        with pytest.warns(UserWarning, match=r"surround_intensity_floor is ignored") as caught:
+            run(stats=stats, surround_intensity_floor=0.5)
+        (message,) = [str(w.message) for w in caught if "ignored" in str(w.message)]
+        assert "ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST" in message
+        assert "ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO" in message
+
+    def test_padding_with_a_surround_statistic_alone_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            run(stats=ImageStats.CONTEXT_SURROUND_MEAN, surround_padding=0.5, surround_min_pixels=10)
+
     @pytest.mark.parametrize(
         "kw",
         [
             {"stats": CONTEXT, "surround_padding": 0.5},
             {"stats": ImageStats.CONTEXT_SURROUND_STD, "surround_min_pixels": 10},
             {"stats": ImageStats.PIXEL_MEAN, "surround_padding": 0.25, "surround_min_pixels": 32},
+            {"stats": ImageStats.PIXEL_MEAN, "surround_intensity_floor": 1 / 255},
+            {"stats": ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST, "surround_intensity_floor": 0.5},
+            {"stats": ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO, "surround_intensity_floor": 0.5},
+            {"stats": CONTEXT, "surround_intensity_floor": 0.5},
         ],
-        ids=["requested", "one_of_the_two", "stated_default"],
+        ids=["requested", "one_of_the_two", "stated_default", "stated_default_floor", "contrast", "clutter", "group"],
     )
     def test_no_warning_when_a_flag_is_requested_or_the_value_is_the_default(self, kw):
         with warnings.catch_warnings():
@@ -133,8 +181,12 @@ class TestTheSpec:
         range_policy="inferred",
     )
 
-    def test_a_default_call_records_both_columns_with_the_defaults_and_the_inferred_range(self):
-        assert specs_of() == {"surround_mean": self.SPEC, "surround_std": self.SPEC}
+    def test_a_default_call_records_every_column_with_the_defaults_and_the_inferred_range(self):
+        specs = specs_of()
+        assert set(specs) == {"surround_mean", "surround_std", *RATIOS}
+        # the two surround statistics record what #1605 recorded, so they still combine with results made before
+        assert specs["surround_mean"] == specs["surround_std"] == self.SPEC
+        assert specs_of(stats=SURROUND) == {"surround_mean": self.SPEC, "surround_std": self.SPEC}
 
     def test_only_the_selected_statistic_has_a_spec(self):
         assert set(specs_of(stats=ImageStats.CONTEXT_SURROUND_STD)) == {"surround_std"}
@@ -150,15 +202,12 @@ class TestTheSpec:
     def test_a_band_group_records_its_own_declared_range_under_its_own_columns(self):
         cube = np.full((4, 60, 80), 1000, dtype=np.uint16)
         specs = specs_of(image=cube, value_range=(0, 65535), channels={"nir": ChannelGroup(3, value_range=(0, 4095))})
-        assert set(specs) == {"surround_mean", "surround_std", "nir_surround_mean", "nir_surround_std"}
+        assert set(specs) == {f"{prefix}{name}" for prefix in ("", "nir_") for name in (*SURROUND_NAMES, *RATIOS)}
         assert specs["surround_mean"].declared_range == (0.0, 65535.0)
         assert specs["nir_surround_std"].declared_range == (0.0, 4095.0)
 
     def test_per_background_adds_no_spec_for_these_columns(self):
-        assert set(specs_of(stats=ImageStats.PIXEL_MEAN | CONTEXT, per_background=True)) == {
-            "surround_mean",
-            "surround_std",
-        }
+        assert set(specs_of(stats=ImageStats.PIXEL_MEAN | CONTEXT, per_background=True)) == {*SURROUND_NAMES, *RATIOS}
 
     def test_a_call_with_no_context_flag_records_none(self):
         assert specs_of(stats=ImageStats.PIXEL_MEAN) == {}
@@ -188,11 +237,22 @@ class TestCombining:
         stats, _, _ = combine_stats_results([run(), run()])
         assert len(stats["surround_mean"]) == 2
 
-    @pytest.mark.parametrize("name", ["surround_padding", "surround_min_pixels"])
+    @pytest.mark.parametrize("name", ["surround_padding", "surround_min_pixels", "surround_intensity_floor"])
     def test_results_measured_with_different_settings_are_refused(self, name):
-        other = {"surround_padding": 0.5, "surround_min_pixels": 10}[name]
+        other = {"surround_padding": 0.5, "surround_min_pixels": 10, "surround_intensity_floor": 0.5}[name]
         with pytest.raises(ValueError, match=name.removeprefix("surround_")):
             combine_stats_results([run(**{name: other}), run()])
+
+    def test_results_measured_with_the_same_floor_combine(self):
+        stats, _, _ = combine_stats_results([run(surround_intensity_floor=0.5), run(surround_intensity_floor=0.5)])
+        assert len(stats["signal_clutter_ratio"]) == 2
+
+    def test_a_floor_that_no_column_read_does_not_stop_results_combining(self):
+        # The surround statistics do not read the floor, so it is not recorded with them.
+        with pytest.warns(UserWarning, match="surround_intensity_floor is ignored"):
+            odd = run(stats=SURROUND, surround_intensity_floor=0.5)
+        stats, _, _ = combine_stats_results([odd, run(stats=SURROUND)])
+        assert len(stats["surround_mean"]) == 2
 
     def test_results_that_differ_only_in_a_range_an_image_declares_still_combine(self):
         # The stated limit, as for saturation: the interval each row used is in the details, which are not compared.

@@ -67,6 +67,31 @@ def oracle(image: np.ndarray, boxes: list[Any], focal: int, valid: list[bool], l
     return candidate, retained, len(intensities), mean, std, excluded
 
 
+def target_oracle(image: np.ndarray, box: Any, low: float, high: float) -> tuple[float, float]:
+    """A box's target by looping over its pixels: the share that is valid in every channel, and their mean intensity."""
+    _, height, width = image.shape
+    x0, y0, x1, y1 = rounded(box, width, height)
+    intensities: list[float] = []
+    count = 0
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            count += 1
+            pixel = image[:, y, x]
+            if np.isfinite(pixel).all() and (pixel >= low).all() and (pixel <= high).all():
+                intensities.append(float(np.mean((pixel - low) / (high - low))))
+    return len(intensities) / count, float(np.mean(intensities)) if intensities else NAN
+
+
+def ratio_oracle(fraction: float, target: float, mean: float, std: float, measured: bool) -> tuple[Any, ...]:
+    """The two ratios, their floor flags and the reason, from the definition, at the default floor and minimum."""
+    floor, minimum = 1 / 255, 0.90
+    if not measured:
+        return NAN, NAN, False, False, ""
+    if not fraction >= minimum or math.isnan(target):
+        return NAN, NAN, False, False, "insufficient_target_support"
+    return (target - mean) / max(mean, floor), (target - mean) / max(std, floor), mean < floor, std < floor, ""
+
+
 def picture(seed: int) -> np.ndarray:
     """Floats in [0, 1], with a few NaN and a few values above the declared range, so the exclusions matter."""
     rng = np.random.default_rng(seed)
@@ -137,6 +162,67 @@ def test_the_calculator_agrees_with_a_per_pixel_oracle_on_200_awkward_boxes():
     assert measured >= 30
 
 
+def light_picture(seed: int) -> np.ndarray:
+    """Floats in [0, 1] with 3% of the values missing or above the range in each channel, so a pixel is valid in all
+    three at 91%, and the targets straddle the 0.90 that the ratios need: some reach it and some fall short."""
+    rng = np.random.default_rng(seed)
+    image = rng.random((3, HEIGHT, WIDTH))
+    odd = rng.random(image.shape)
+    image[odd < 0.015] = np.nan
+    image[(odd >= 0.015) & (odd < 0.03)] = 1.5
+    return image
+
+
+# Four-by-four targets of 0.5 in a field of 0, far apart: each ring is 0, so both denominators sit on the floor.
+LIT_BOXES = [(5, 5, 9, 9), (20, 5, 24, 9), (40, 5, 44, 9), (5, 25, 9, 29), (40, 30, 44, 34)]
+
+
+def lit_picture() -> np.ndarray:
+    image = np.zeros((3, HEIGHT, WIDTH))
+    for x0, y0, x1, y1 in LIT_BOXES:
+        image[:, y0:y1, x0:x1] = 0.5
+    return image
+
+
+def test_the_ratios_agree_with_a_per_pixel_oracle_on_awkward_boxes():
+    dense, sparse = random_boxes(1, 30), random_boxes(2, 15)
+    bad = [(NAN, 0, 5, 5), (30, 10, 20, 15), (5, 5, 5, 9)]  # not removed from any ring, and they say so
+    cases = [(light_picture(1605), dense), (light_picture(1606), sparse + bad), (lit_picture(), LIT_BOXES)]
+    validity = [[True] * len(dense), [True] * len(sparse) + [False] * len(bad), [True] * len(LIT_BOXES)]
+    frames = ["ok", "incomplete_geometry", "ok"]
+    columns = measure(cases)
+
+    row = valued = unsupported = floored = 0
+    for (image, boxes), valid, frame in zip(cases, validity, frames, strict=True):
+        for focal in range(len(boxes)):
+            if not valid[focal]:
+                assert math.isnan(columns["target_surround_contrast"][row]), row
+                assert columns["contrast_reason"][row] == "", row
+                row += 1
+                continue
+            candidate, _, measurable, mean, std, _ = oracle(image, boxes, focal, valid, 0.0, 1.0, 0.25)
+            fraction, target = target_oracle(image, boxes[focal], 0.0, 1.0)
+            assert columns["target_valid_fraction"][row] == pytest.approx(fraction, abs=1e-12), row
+            status = "empty_ring" if candidate == 0 else (frame if measurable > 0 else "insufficient_support")
+            expected = ratio_oracle(fraction, target, mean, std, status in ("ok", "incomplete_geometry"))
+            # The statistic columns are float32, as every statistic's is.
+            for name, value in zip(("target_surround_contrast", "signal_clutter_ratio"), expected[:2], strict=True):
+                np.testing.assert_allclose(columns[name][row], value, rtol=1e-6, atol=1e-6, err_msg=f"{name} {row}")
+            assert columns["target_surround_contrast_floored"][row] == expected[2], row
+            assert columns["signal_clutter_ratio_floored"][row] == expected[3], row
+            assert columns["contrast_reason"][row] == expected[4], row
+            valued += not math.isnan(expected[0])
+            unsupported += expected[4] == "insufficient_target_support"
+            floored += bool(expected[2] or expected[3])
+            row += 1
+    assert row == len(columns["context_status"]) == 53
+    # The gate and the mean over valid pixels are both exercised: rows with a value, rows the target's own validity
+    # removed, and rows whose denominator is the floor. A test of a gate that no row reaches would pass without it.
+    assert valued >= 20
+    assert unsupported >= 8
+    assert floored >= len(LIT_BOXES)
+
+
 def test_the_boxes_were_awkward_enough_to_matter():
     # The oracle test is only as good as its boxes: some are cut by the image, and peers took part of many rings.
     boxes = random_boxes(1, 140)
@@ -156,8 +242,20 @@ def test_reordering_the_boxes_permutes_the_rows_and_changes_nothing_else():
         np.testing.assert_array_equal(shuffled[name], column[order], err_msg=name)
 
 
+def test_reordering_the_boxes_permutes_the_ratio_rows_and_changes_nothing_else():
+    image, boxes = light_picture(1605), random_boxes(3, 24)
+    order = np.random.default_rng(7).permutation(len(boxes))
+    original = measure([(image, boxes)])
+    shuffled = measure([(image, [boxes[i] for i in order])])
+    # Most of the 24 rows hold a value, so the permutation is checked on numbers and not on NaN alone.
+    assert np.isfinite(original["target_surround_contrast"]).sum() >= 5
+    assert original.keys() == shuffled.keys()
+    for name, column in original.items():
+        np.testing.assert_array_equal(shuffled[name], column[order], err_msg=name)
+
+
 def test_two_runs_are_identical():
-    cases = [(picture(1605), random_boxes(1, 30))]
+    cases = [(picture(1605), random_boxes(1, 30)), (light_picture(1606), random_boxes(2, 30))]
     first, second = measure(cases), measure(cases)
     assert first.keys() == second.keys()
     for name in first:

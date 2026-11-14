@@ -90,6 +90,38 @@ def test_read_surround_on_f2():
     assert reading.mean == pytest.approx(expected.mean(), abs=1e-12)
     assert reading.std == pytest.approx(expected.std(), abs=1e-12)  # population: ddof=0
     assert reading.target_valid_fraction == 1.0
+    focal = np.array([(10 * y + x) / 99 for y in range(3, 6) for x in range(3, 6)])
+    assert reading.target_mean == pytest.approx(focal.mean(), abs=1e-12)
+
+
+def test_the_target_mean_is_over_the_pixels_valid_in_every_channel():
+    image = np.stack([np.full((10, 10), 0.2), np.full((10, 10), 0.6)])
+    image[0, 4, 4] = 0.9  # fine in channel 0, which must not count while channel 1 is out of range there
+    image[1, 4, 4] = 1.5
+    reading = read_focal(image)
+    assert reading.target_mean == pytest.approx(0.4, abs=1e-12)  # the 8 other target pixels, averaged over channels
+    assert reading.target_valid_fraction == pytest.approx(8 / 9)
+
+
+def test_the_target_mean_does_not_overflow_where_the_values_are_near_the_float_limit():
+    # The span 1e308 is finite, so the range is usable; a sum of the raw values of nine pixels would be infinity.
+    reading = read_focal(np.full((1, 10, 10), 1e308), low=0.0, high=1e308)
+    assert reading.target_mean == pytest.approx(1.0)
+    assert reading.mean == pytest.approx(1.0)
+
+
+def test_the_target_mean_of_a_range_far_from_zero_keeps_its_accuracy():
+    reading = read_focal(np.full((1, 10, 10), 1e6 + 0.25), low=1e6, high=1e6 + 1)
+    assert reading.target_mean == pytest.approx(0.25, abs=1e-9)
+
+
+def test_a_target_with_no_valid_pixel_has_no_mean():
+    image = np.full((1, 10, 10), 0.5)
+    image[0, 3:6, 3:6] = np.nan
+    reading = read_focal(image)
+    assert np.isnan(reading.target_mean)
+    assert reading.target_valid_fraction == 0.0
+    assert reading.mean == pytest.approx(0.5, abs=1e-12)  # the surround is read all the same
 
 
 def test_the_intensity_is_a_mean_over_channels():

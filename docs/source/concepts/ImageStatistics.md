@@ -138,7 +138,8 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
     darkness.
 - - `VISUAL_CONTRAST`
   - The range of the five reported percentiles (0, 25, 50, 75 and 100) divided by their mean: (max − min) / mean. The
-    result has no units. The range runs from the darkest pixel to the brightest, so one extreme pixel raises it.
+    result has no units. The range runs from the darkest pixel to the brightest, so one extreme pixel raises it. It
+    describes one image or box, and is not the `CONTEXT` contrast, which compares a box with its surround.
 - - `PIXEL_ENTROPY`
   - The Shannon entropy, in nats, of the 256-bin histogram of the pixel values. It describes how the values spread
     across their range. Rearranging the pixels leaves it unchanged, so it does not measure texture.
@@ -157,6 +158,12 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
     from the image's interval and averaged over the channels, and a pixel counts only if every channel lies in the
     interval. This reads one box's own neighborhood, where the `background_` prefix below pools the pixels outside every
     box over the whole image, and an object that no box annotates stays in the neighborhood.
+- - `CONTEXT_TARGET_SURROUND_CONTRAST` and `CONTEXT_SIGNAL_CLUTTER_RATIO`
+  - How far a box's own mean intensity stands from its surround's, relative to the surround's level
+    (`target_surround_contrast`) and to its spread (`signal_clutter_ratio`). The sign says whether the box is brighter or
+    darker than its surround. A floor under each denominator keeps a dark or flat surround from giving a huge value, and
+    the details record where it decided. The {class}`.ImageStats` docstring gives the formulas, and
+    [the section below](#the-target-surround-ratios) the limits.
 - - Background statistics (the `background_` prefix)
   - The same statistics measured over the pixels outside every annotated box. The boxes are unioned, so the values
     describe the scene. See
@@ -197,6 +204,27 @@ its range is declared as `(0, 4095)`.
 A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
 floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the
 endpoint, and `saturation_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
+
+## The target-surround ratios
+
+`target_surround_contrast` and `signal_clutter_ratio` compare a box's mean intensity with the pixels around it, as a
+difference over a reference level, in the manner of a Weber contrast. The intensity is the encoded value mapped to
+[0, 1], so the ratios are not contrasts of physical luminance, which gamma and the sensor's response separate from the
+stored values. Four limits decide what a value can support.
+
+- The box is the target. Its mean covers every pixel of the box, including the pixels of overlapping neighbors and of
+  background inside a loose box, so a loose box reads nearer its surround than the object does.
+- The intensity is averaged over the channels, so a box that differs from its surround in hue and not in brightness
+  reads near 0.
+- A dark or flat surround puts a small number under the division. Each denominator has a floor, 1/255 by default, so a
+  value never exceeds 255 in size at the default, and where the floor was used the details say so: the value is then
+  mostly the difference over the floor, and says little of the surround.
+- Intensity is `(value - low) / (high - low)`, so when a declared range does not start at 0 the denominator of the
+  contrast depends on that low end. Declare the range where images are compared.
+
+A box with fewer than 90% of its pixels valid reads NaN for both ratios, with the surround kept, since a mean over a
+small part of a box describes the part and not the box. {class}`.Outliers` with `ImageStats.ALL` and `per_target=True`
+judges the two ratios too, and both are signed.
 
 ## Blur statistics
 
