@@ -1,0 +1,165 @@
+/* DataFrame outputs (the HTML repr of polars and pandas frames) */
+
+/* Polars puts its own <style> before every table that right-aligns every cell, so these rules name .md-typeset. */
+.md-typeset .df-box {
+  margin: 0.6em 0 1.2em;
+}
+
+.md-typeset .df-box > small,
+.md-typeset .output.text_html > div > small {
+  display: block;
+  margin-bottom: 0.3em;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+}
+
+.md-typeset .df-scroll {
+  width: fit-content;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+}
+
+.md-typeset .df-scroll.df-tall {
+  max-height: 26rem;
+}
+
+.md-typeset table.dataframe {
+  width: max-content;
+  margin: 0;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  background: var(--md-default-bg-color);
+  color: var(--md-typeset-color);
+  display: table;
+}
+
+/* Without the script the table still scrolls sideways inside the page. */
+.md-typeset .output.text_html > div > table.dataframe {
+  display: block;
+  overflow: auto;
+  max-width: 100%;
+  width: max-content;
+}
+
+.md-typeset table.dataframe th,
+.md-typeset table.dataframe td {
+  padding: 0.38rem 0.8rem;
+  border: 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.md-typeset table.dataframe > thead > tr > th,
+.md-typeset table.dataframe > thead > tr > td {
+  background: var(--md-code-bg-color);
+  text-align: left;
+}
+
+.md-typeset table.dataframe > thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 700;
+  border-bottom: 1px solid var(--md-default-fg-color--lighter);
+}
+
+/* The dtype row polars prints under the names, when the script has not folded it into the header. */
+.md-typeset table.dataframe > thead > tr:nth-child(2) > td {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.85em;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.md-typeset table.dataframe th .df-dtype {
+  display: block;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.85em;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.md-typeset table.dataframe th {
+  position: relative;
+}
+
+.md-typeset table.dataframe th .df-arrow {
+  position: absolute;
+  left: 0.25rem;
+  top: 0.45rem;
+  color: var(--md-accent-fg-color);
+  font-size: 0.7em;
+}
+
+.md-typeset table.dataframe th.df-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.md-typeset table.dataframe th.df-sortable:hover {
+  background: var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table.dataframe .df-num {
+  text-align: right;
+}
+
+.md-typeset table.dataframe .df-null {
+  color: var(--md-default-fg-color--light);
+  font-style: italic;
+}
+
+/* myst-nb stripes odd rows light gray and tints the hovered row on the <tr>; the cells below do both instead. */
+.md-typeset table.dataframe > thead,
+.md-typeset table.dataframe > tbody > tr,
+.md-typeset table.dataframe > tbody > tr:nth-child(odd),
+.md-typeset table.dataframe > tbody > tr:hover {
+  background: none;
+  border: 0;
+}
+
+.md-typeset table.dataframe > tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+.md-typeset table.dataframe > tbody > tr:nth-child(even) > td {
+  background: var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table.dataframe > tbody > tr:hover > td {
+  background: var(--md-accent-fg-color--transparent);
+}
+
+.md-typeset .df-filter {
+  box-sizing: border-box;
+  width: 14rem;
+  max-width: 100%;
+  margin: 0 0 0.4em;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.3rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-typeset-color);
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.md-typeset .df-filter:focus {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 0;
+}
+
+.md-typeset table.dataframe > tbody > tr > th {
+  font-weight: 700;
+  text-align: right;
+}

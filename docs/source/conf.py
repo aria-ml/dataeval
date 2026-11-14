@@ -181,7 +181,8 @@ html_favicon = "_static/images/DataEval_Favicon.png"
 
 html_show_sourcelink = True
 html_static_path = ["_static"]
-html_css_files = ["ARiA.css"]
+html_css_files = ["ARiA.css", "dataframe.css"]
+html_js_files = [("dataframe.js", {"defer": "defer"})]
 html_theme_options = {
     "repo_url": "https://github.com/aria-ml/dataeval/",
     "icon": {"repo": "fontawesome/brands/github"},
