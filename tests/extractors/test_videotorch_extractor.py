@@ -568,3 +568,32 @@ class TestVideoTorchExtractorIntegration:
 
         # Access count is 4: 1 during Embeddings initialization (dataset validation) + 3 during first compute access
         assert first_count == second_count == 4
+
+
+@pytest.mark.required
+class TestClipsOnAnAcceleratorWithACpuExtractor:
+    """A clip on an accelerator that a CPU extractor runs is copied to the host: say so once, naming the fix.
+
+    A `meta` tensor stands in for a CUDA one on a CPU-only runner.
+    """
+
+    @staticmethod
+    def _copy_warnings(caplog) -> list[str]:
+        return [r.getMessage() for r in caplog.records if "copied to the host" in r.getMessage()]
+
+    def test_warns_once_and_names_the_fix(self, processor, caplog):
+        extractor = VideoTorchExtractor(MockVideoModel(), processor=processor, device="cpu")
+        clip = torch.zeros(1, 3, NUM_FRAMES, 8, 8, device="meta")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            extractor._warn_if_pulled_to_cpu(clip)
+            extractor._warn_if_pulled_to_cpu(clip)
+        (message,) = self._copy_warnings(caplog)
+        assert message.startswith("VideoTorchExtractor:")
+        assert "device='meta'" in message
+        assert "set_device('meta')" in message
+
+    def test_clips_on_the_cpu_do_not_warn(self, processor, caplog):
+        extractor = VideoTorchExtractor(MockVideoModel(), processor=processor, device="cpu")
+        with caplog.at_level("WARNING", logger="dataeval"):
+            extractor._warn_if_pulled_to_cpu(torch.zeros(1, 3, NUM_FRAMES, 8, 8))
+        assert not self._copy_warnings(caplog)

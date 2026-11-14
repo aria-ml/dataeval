@@ -13,7 +13,7 @@ from torch.amp.autocast_mode import autocast
 
 from dataeval._log import get_logger
 from dataeval.config import get_device
-from dataeval.extractors._torch import get_valid_layer, normalize_transforms
+from dataeval.extractors._torch import get_valid_layer, normalize_transforms, warn_if_pulled_to_cpu
 from dataeval.protocols import Array, DeviceLike, Transform
 from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
@@ -129,7 +129,11 @@ class VideoTorchExtractor:
         Additional preprocessing transforms to apply after the processor.
         When None, only the processor is used.
     device : DeviceLike or None, default None
-        Device for computation. When None, uses DataEval's configured device.
+        Device for computation. When None, uses the device set with
+        :func:`~dataeval.config.set_device`, otherwise PyTorch's default device, which is the CPU
+        unless you changed it. The model is moved to this device, and each clip is copied to it,
+        so clips on a GPU are copied back to the host unless ``device`` names that GPU. A warning
+        says so the first time it happens.
     layer_name : str or None, default None
         Layer to extract embeddings from. When None, uses model output.
     use_output : bool, default True
@@ -212,6 +216,7 @@ class VideoTorchExtractor:
         self._pooling = pooling
         self._clip_aggregation = clip_aggregation
         self._use_amp = use_amp
+        self._warned_host_copy = False
 
         # Validate pooling strategy
         if pooling not in _POOLING:
@@ -450,6 +455,11 @@ class VideoTorchExtractor:
             raise ValueError(f"Unsupported model output type: {type(model_output)}")
         return output
 
+    def _warn_if_pulled_to_cpu(self, clip: torch.Tensor) -> None:
+        """Warn once per extractor that a clip on an accelerator is copied to a CPU model, as the default does."""
+        if not self._warned_host_copy:
+            self._warned_host_copy = warn_if_pulled_to_cpu("VideoTorchExtractor", clip, self.device)
+
     def _extract_clip_embedding(self, clip_tensor: torch.Tensor) -> torch.Tensor:
         """
         Extract embedding from a single preprocessed clip.
@@ -464,7 +474,9 @@ class VideoTorchExtractor:
         torch.Tensor
             Clip embedding of shape (embedding_dim,).
         """
-        clip_tensor = clip_tensor.unsqueeze(0).to(self.device)  # Add batch dim
+        clip_tensor = clip_tensor.unsqueeze(0)  # Add batch dim
+        self._warn_if_pulled_to_cpu(clip_tensor)
+        clip_tensor = clip_tensor.to(self.device)
 
         # autocast is CUDA-only here, so the enabled case is the only one that needs it and
         # the disabled case costs nothing rather than entering a no-op autocast.
