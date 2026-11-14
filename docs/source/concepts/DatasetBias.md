@@ -404,6 +404,7 @@ evaluation subset that corrects for it.
 ### How-to guides
 
 - [Add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py)
+- [Find crowded, truncated and conflicting annotations](../notebooks/h2_find_annotation_review_candidates.py)
 - [Measure label independence](../notebooks/h2_measure_label_independence.py)
 - [Configure global DataEval defaults](../notebooks/h2_configure_defaults.py)
 - [Build a MetadataLike object from a DataFrame](../notebooks/h2_metadata_from_dataframe.py)
