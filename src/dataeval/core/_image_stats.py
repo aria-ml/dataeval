@@ -235,6 +235,7 @@ def _collect_calculator_stats(
     context: AnnotationContext | None = None,
     focal: int | None = None,
     settings: ImageStatsConfig | None = None,
+    scratch: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -264,6 +265,9 @@ def _collect_calculator_stats(
     settings : ImageStatsConfig or None, default None
         The call's validated settings, handed to the cache for the statistics that take them. The documented
         defaults when None.
+    scratch : dict[str, Any] or None, default None
+        Where a measurement made here is kept for the masked pass of the same view of the same datum, which is another
+        call of this function. Only the datum's own row has one; see `_shared`.
 
     Returns
     -------
@@ -288,6 +292,7 @@ def _collect_calculator_stats(
         context=context,
         focal=focal,
         settings=settings,
+        scratch=scratch,
     )
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor)
@@ -348,6 +353,7 @@ def _collect_band_stats(
     context: AnnotationContext | None = None,
     focal: int | None = None,
     settings: ImageStatsConfig | None = None,
+    scratch: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """Run one named band group as its own view of the datum.
 
@@ -370,7 +376,18 @@ def _collect_band_stats(
         context=context,
         focal=focal,
         settings=settings,
+        scratch=scratch,
     )
+
+
+def _shared(passes: dict[str, dict[str, Any]] | None, name: str) -> dict[str, Any] | None:
+    """Return the dict the passes of view `name` share on the datum's own row, or None on a row that shares nothing.
+
+    The datum's own row measures a view twice when `per_background` is set: once whole and once masked. A measurement
+    the first pass makes and the second can use, such as the edge widths blur pools, goes here, so that it is made once.
+    A box row has a different picture and a masked pass of none, so it passes None.
+    """
+    return None if passes is None else passes.setdefault(name, {})
 
 
 def _get_items(
@@ -564,6 +581,9 @@ def _compute_batch(  # noqa: C901
         calculator_details: list[dict[str, list[Any]]] = []
         empty_values_map: dict[str, Any] = {}
         calc_warnings: list[str] = []
+        # Only the datum's own row (no box) has a masked pass, so only it keeps what the whole pass measured, by view.
+        # Rebound on the next row, which frees it before any box row is measured.
+        passes: dict[str, dict[str, Any]] | None = {} if per_background and box is None else None
 
         # Collect stats from all calculators
         if unmasked:
@@ -576,6 +596,7 @@ def _compute_batch(  # noqa: C901
                 context=context,
                 focal=i_b,
                 settings=settings,
+                scratch=_shared(passes, ""),
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -601,6 +622,7 @@ def _compute_batch(  # noqa: C901
                     context=context,
                     focal=i_b,
                     settings=settings,
+                    scratch=_shared(passes, name),
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -623,6 +645,7 @@ def _compute_batch(  # noqa: C901
                 context=context,
                 focal=i_b,
                 settings=settings,
+                scratch=_shared(passes, ""),
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -657,6 +680,7 @@ def _compute_batch(  # noqa: C901
                     context=context,
                     focal=i_b,
                     settings=settings,
+                    scratch=_shared(passes, name),
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -1179,13 +1203,13 @@ def image_stats(  # noqa: C901
         background statistic measured over a few percent of an image is noise wearing
         a measurement's clothes.
 
-        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and :attr:`~dataeval.flags.ImageStats.VISUAL` statistics are
-        computed for the
-        background; any hash, dimension or spatial statistics in `stats` are computed for the
+        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and :attr:`~dataeval.flags.ImageStats.VISUAL` statistics and
+        :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR` are computed for the
+        background; any hash, dimension, spatial or blur directionality statistics in `stats` are computed for the
         image and its boxes as usual and skipped for the background, which has no
-        meaningful hash and no geometry of its own. The blur statistics are
-        skipped for the background too, because their filters would spread the masked
-        holes over every edge.
+        meaningful hash and no geometry of its own. ``background_blur`` is the blur value taken over the edges
+        outside the boxes: they are found on the whole image, so the masked holes cannot spread through the filters,
+        and those within 9 pixels of a box are left out, so the pool is smaller than ``background_fraction`` says.
 
         Boxes are rounded outwards and unioned into the mask, so the background
         excludes slightly more than the annotations strictly cover — a retained pixel
@@ -1200,6 +1224,9 @@ def image_stats(  # noqa: C901
         results from two such datasets be combined.
 
         .. versionadded:: 1.1
+        .. versionchanged:: 1.3
+            Adds ``background_blur`` (and ``background_<group>_blur``) when `stats` includes
+            :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR`, which was skipped for the background before.
     channels : Mapping[str, ChannelGroupLike] or None, default None
         Named groups of bands to measure separately, alongside the whole image.
 
@@ -1835,8 +1862,8 @@ def image_stats(  # noqa: C901
                 f"per_background=True but none of the requested statistics apply to a background region, "
                 f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
                 f"part of it masked out, which hash statistics are not stable under, which dimension "
-                f"statistics do not describe and in which the filters of the blur statistics spread the masked "
-                f"holes; request ImageStats.PIXEL or ImageStats.VISUAL for it.",
+                f"statistics do not describe and over which blur directionality is not measured; request "
+                f"ImageStats.PIXEL, ImageStats.VISUAL or ImageStats.VISUAL_BLUR for it.",
                 UserWarning,
                 stacklevel=2,
             )

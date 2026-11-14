@@ -50,7 +50,8 @@ class ImageStats(Flag):
     with a NaN pixel, or for a box that extends past the image):
 
     - `VISUAL_BLUR` : Width of the sharpest edges, in pixels at the image's own resolution: the 5th percentile
-      of edge widths, after Liang et al. (2010)
+      of edge widths, after Liang et al. (2010). With `per_background=True` it also gives `background_blur`, taken over
+      the edges outside the boxes and a 9 px margin around them
     - `VISUAL_BLUR_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
       of their median widths
 

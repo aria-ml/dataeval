@@ -484,10 +484,11 @@ statistical and computational.
     prototype, so not independent; tests on synthetic images check the trends, the NaN cases and determinism; nothing
     is compared with a published implementation)
   - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations and on
-    11 clips with simulated blur, with no human-rated blur. Widths are in pixels, so compare only at one resolution. Not
-    a calibrated level of defocus and not a motion blur detector. Noise and JPEG artifacts move it by amounts and in
-    directions that depend on the scene, and a soft 8-bit image at low contrast reads sharper than at full contrast. See
-    [Blur statistics](../concepts/BlurStatistics.md).
+    11 clips with simulated blur, with no human-rated blur. The background value, `background_blur`, was checked on real
+    frames and boxes from two datasets with a blur added to the background, with no natural defocus. Widths are in
+    pixels, so compare only at one resolution. Not a calibrated level of defocus and not a motion blur detector. Noise
+    and JPEG artifacts move it by amounts and in directions that depend on the scene, and a soft 8-bit image at low
+    contrast reads sharper than at full contrast. See [Blur statistics](../concepts/BlurStatistics.md).
 - - {func}`.image_stats` (`ImageStats.SPATIAL`)
   - The geometry of a box against its peers and the image: the distance between box centers over the box's own
     diagonal, the share of the box inside the image, the share the other boxes cover, and the largest overlap with a

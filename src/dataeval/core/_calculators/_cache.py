@@ -85,6 +85,10 @@ class CalculatorCache:
         asked about.
     settings : ImageStatsConfig or None, default None
         The call's validated settings for the statistics that take them. The documented defaults when None.
+    scratch : dict[str, Any] or None, default None
+        A dict shared by the caches of one view of one datum, so that a measurement made on the datum's own row can be
+        read by the masked pass of the same row instead of being made again. The blur calculator keeps its edge widths
+        in it. None, which is what a call without `per_background` passes, stores nothing.
     """
 
     def __init__(
@@ -98,6 +102,7 @@ class CalculatorCache:
         context: AnnotationContext | None = None,
         focal: int | None = None,
         settings: ImageStatsConfig | None = None,
+        scratch: dict[str, Any] | None = None,
     ) -> None:
         is_spatial = len(datum.shape) >= 2
         self.raw = datum
@@ -113,6 +118,7 @@ class CalculatorCache:
         self.context = context
         self.focal = focal
         self.settings = ImageStatsConfig() if settings is None else settings
+        self.scratch = scratch
 
         # Ensure bounding box
         self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box

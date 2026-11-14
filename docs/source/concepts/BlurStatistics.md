@@ -2,12 +2,12 @@
 
 # Blur statistics
 
-The blur statistics measure how wide the edges in an image are, in pixels. They are two columns of
-{func}`.image_stats`, `blur` and `blur_directionality`, and one column of {func}`.video_stats`, `blur_level`, a median
-of the image measurement over a sample of the video's frames, so the method and the limits of the image measurement
-apply to both. You request them with the `ImageStats.BLUR` and `VideoStats.BLUR` groups. This page is a spinoff of
-[Image statistics](ImageStatistics.md), which describes the pixel and visual statistics and the full-scale reference
-that the visual statistics rely on. Read that page first if those terms are new.
+The blur statistics measure how wide the edges in an image are, in pixels. They are two columns of {func}`.image_stats`,
+`blur` and `blur_directionality`, plus `background_blur` when you ask for the scene outside the boxes, and one column of
+{func}`.video_stats`, `blur_level`, a median of the image measurement over a sample of the video's frames, so the method
+and the limits of the image measurement apply to both. You request them with the `ImageStats.BLUR` and `VideoStats.BLUR`
+groups. This page is a spinoff of [Image statistics](ImageStatistics.md), which describes the pixel and visual
+statistics and the full-scale reference that the visual statistics rely on. Read that page first if those terms are new.
 
 The blur statistics are experimental ⚠️. The first image request and the first video request in a process each raise
 {class}`~dataeval.exceptions.ExperimentalWarning`, and a request for `ImageStats.ALL` or `VideoStats.ALL` raises it too.
@@ -38,6 +38,7 @@ an image and one for a video:
 | --- | --- | --- |
 | `blur` | `VISUAL_BLUR` | The 5th percentile of the edge widths, in pixels. It follows the sharpest edges. Larger is softer. |
 | `blur_directionality` | `VISUAL_BLUR_DIRECTIONALITY` | The absolute value of the base-2 logarithm of the median width of edges with a horizontal gradient over the median width of edges with a vertical gradient. It is 0 when the two agree and 1 when one is twice the other. |
+| `background_blur` | `VISUAL_BLUR`, with `per_background=True` | The same percentile over only the edges outside the boxes and a margin of 9 pixels around them. |
 | `blur_level` | `BLUR_LEVEL` | For a video, the median of `blur` over the sampled frames. |
 
 `blur` describes the widths of the sharpest detected edges and is not a severity score for the whole image. An edge
@@ -63,8 +64,21 @@ about 0.1 s against about 5 ms for `sharpness`. A 3840 × 2160 frame took about 
 800 MiB. Each figure is one frame at that size, so read it as an order of magnitude and not as a benchmark. The image
 path does not cap the size of an image, so time a sample before you request blur for a dataset of large frames.
 
-With `per_background=True`, the background view returns no blur column, because the background holds NaN where bounding
-boxes were and the smoothing would spread those holes over every edge.
+### Request the blur of the scene outside the boxes
+
+With `per_background=True`, `VISUAL_BLUR` also returns `background_blur`, and `background_<group>_blur` for each named
+channel group. On a {class}`.Metadata` it is the unit-level factor `unit_background_blur`, beside `instance_blur` for
+the boxes. The background holds NaN where the boxes were, and the smoothing would spread those holes over every edge, so
+the edges are found on the whole image. The value is then the 5th percentile of the widths of the edges that lie outside
+every box and a margin of 9 pixels around each. The margin is there for loose boxes: an edge of the object just outside
+its box would otherwise count as background. It is a constant fixed on study data and is provisional, as the size of 720
+is.
+
+Three things follow from the definition. The pool is smaller than `background_fraction` says, because that fraction is
+measured on the boxes alone. A sharp object that nobody annotated counts as background, and a few such edges can set the
+value. And the value is the width of the sharpest edges outside the boxes, not a measure of how defocused the background
+is. The limits of `blur` below carry over. `blur_directionality` has no background value. Dividing an object's `blur` by
+`unit_background_blur` is not a validated comparison, and no per-box ratio was tested.
 
 ### Request the video statistics
 
@@ -96,7 +110,7 @@ cases where a value is NaN, what moves it, and where the measurement stops.
 
 ### Where the values are NaN
 
-A statistic with no reading reports NaN. Both image columns are NaN when:
+A statistic with no reading reports NaN. `blur` and `blur_directionality` are NaN when:
 
 - The picture has fewer than 100 edge points, as a flat picture, a tiny picture and a tiny bounding box do, or the
   median edge width is 0.
@@ -104,6 +118,12 @@ A statistic with no reading reports NaN. Both image columns are NaN when:
 - A bounding box extends past the border of the image.
 - The data has no value range, such as signed float data. A warning names `value_range`. Declare the interval to get a
   reading, as [When there is no reference](ImageStatistics.md#when-there-is-no-reference) describes.
+
+`background_blur` has its own list. It is NaN when fewer than 100 edge points lie outside the boxes and their margin, as
+a flat background or boxes that cover most of the image leave, or when the median width of those points is 0. It is NaN
+when the boxes cover the whole image, when the image holds a NaN pixel anywhere, even inside a box, because the edges are
+found on the whole image, and when the data has no value range. A box that extends past the border is clipped to the
+image and is not a NaN case for the background.
 
 Only `blur_directionality` is NaN when fewer than 50 edge points have a horizontal gradient, when fewer than 50 have a
 vertical gradient, or when the median edge width of one axis is 0. An image of vertical stripes reads a finite `blur`
@@ -208,8 +228,12 @@ of soft 8-bit images at low contrast reused the VisDrone frame of set (b) and to
 clips of set (b), at frame index 39 instead of 120. The video evidence is 11 clips with simulated blur. Every clip has a
 short side of 720 or more, so no video below 720 was measured. The runs at 480 and 360 use the same footage shrunk
 first, so they are simulated small videos. The evidence holds no blur rated by people and no footage from a lens with a
-real defect. Values were measured on one machine and were not compared across machines, between a CPU and a GPU, or
-across library versions. A second run of the video check gave identical saved outputs apart from the timings.
+real defect. The background value was checked on real frames and real boxes from two datasets, VisDrone2019-MOT frames
+and CPPE-5 images, with a blur added to the background, to the boxes, or to neither. Every added blur was built from the
+same boxes the statistic leaves out, and was a Gaussian, a circular-aperture blur or a blur that grows down the image,
+so natural depth of field is not covered, and the margin was fixed on the same data. Values were measured on one machine
+and were not compared across machines, between a CPU and a GPU, or across library versions. A second run of the video
+check gave identical saved outputs apart from the timings.
 
 ## When to use the statistics
 
