@@ -69,6 +69,7 @@ datasets for machine learning.
 ../notebooks/h2_measure_frames_and_tracks.py
 ../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_find_conditional_outliers.py
+../notebooks/h2_find_annotation_review_candidates.py
 ../notebooks/h2_trace_findings_to_source.py
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_custom_image_stats_object_detection.py
@@ -153,6 +154,10 @@ datasets for machine learning.
   - Judge metadata factors within strata, by rarity, given another factor,
     and in combination
   - [![Open In Colab][colab-badge]][cout-colab]
+- - [](../notebooks/h2_find_annotation_review_candidates.py)
+  - Find crowded, truncated and overlapping boxes with the spatial statistics, and see which
+    classes they tie to
+  - [![Open In Colab][colab-badge]][review-colab]
 - - [](../notebooks/h2_trace_findings_to_source.py)
   - Retrieve the image, frame, track or detection a finding's
     {class}`.SourceIndex` names
@@ -216,6 +221,7 @@ datasets for machine learning.
 [mft-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_measure_frames_and_tracks.ipynb
 [fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_factor_outliers.ipynb
 [cout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_conditional_outliers.ipynb
+[review-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_annotation_review_candidates.ipynb
 [trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_trace_findings_to_source.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_custom_image_stats_object_detection.ipynb
 [band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_measure_channel_groups.ipynb
