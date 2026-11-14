@@ -5,7 +5,6 @@ __all__ = []
 from collections.abc import Iterator
 from typing import Any
 
-import numpy as np
 from numpy.typing import NDArray
 
 from dataeval.exceptions import MaiteShapeError
@@ -83,7 +82,7 @@ def unzip_dataset(
     def _generate_pairs() -> Iterator[tuple[NDArray[Any], list[BoundingBox] | None]]:
         for i in range(len(dataset)):
             d = dataset[i]
-            image = np.asarray(unwrap_image(d))
+            image = as_numpy(unwrap_image(d))
             if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
                 try:
                     boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)

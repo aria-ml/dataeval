@@ -37,6 +37,7 @@ from dataeval.protocols import (
     _is_protocol_instance,
 )
 from dataeval.types import FactorLevel, SourceIndex
+from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import PoolWrapper
 from dataeval.utils.preprocessing import (
     _UNKNOWN_RANGE,
@@ -761,13 +762,13 @@ def _enumerate_datum(
 ) -> Iterator[tuple[int, NDArray[Any], list[BoundingBox] | None]]:
     if boxes is None:
         for i, image in enumerate(images):
-            yield i, np.asarray(image), None
+            yield i, as_numpy(image), None
     else:
         for i, (image, box) in enumerate(zip_longest(images, boxes, fillvalue=_END)):
             if image is _END or box is _END:
                 ran_out = "images" if image is _END else "boxes"
                 raise ValueError(f"images and boxes differ in length: {ran_out} ran out at index {i}")
-            np_image = np.asarray(image)
+            np_image = as_numpy(cast("ArrayLike", image))
             entries = () if box is None else cast("Iterable[BoxLike]", box)
             bboxes = [to_bounding_box(b, image_shape=np_image.shape) for b in entries]
             yield i, np_image, bboxes
