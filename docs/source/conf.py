@@ -87,7 +87,7 @@ suppress_warnings = ["autoapi.python_import_resolution"]
 # "_intersphinx/<name>.inv") here; the fetch script discovers entries automatically.
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", "_intersphinx/python.inv"),
-    "maite": ("https://mit-ll-ai-technology.github.io/maite/", "_intersphinx/maite.inv"),
+    "maite": ("https://mit-ll-ai-technology.github.io/maite/latest/", "_intersphinx/maite.inv"),
     "scipy": ("https://docs.scipy.org/doc/scipy/", "_intersphinx/scipy.inv"),
     "sklearn": ("https://scikit-learn.org/stable/", "_intersphinx/sklearn.inv"),
     "numpy": ("https://numpy.org/doc/stable/", "_intersphinx/numpy.inv"),
