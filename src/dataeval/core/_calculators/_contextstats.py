@@ -27,8 +27,11 @@ _EMPTY_RING = "empty_ring"
 _INSUFFICIENT_SUPPORT = "insufficient_support"
 _INCOMPLETE_GEOMETRY = "incomplete_geometry"
 _OK = "ok"
+# Why a ratio is NaN while its surround is measured: the target, whose pixels it reads, has too few valid ones.
+_INSUFFICIENT_TARGET_SUPPORT = "insufficient_target_support"
 # The statuses that carry a value: every other one is NaN.
 _MEASURED = (_OK, _INCOMPLETE_GEOMETRY)
+_RATIOS = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
 
 
 class Regions(NamedTuple):
@@ -59,12 +62,15 @@ class Reading(NamedTuple):
         Their population (``ddof=0``) standard deviation, or NaN when there are none.
     target_valid_fraction : float
         The share of the target's pixels at which every selected channel is finite and within the range.
+    target_mean : float
+        The mean intensity of those target pixels, in ``[0, 1]``, or NaN when there are none.
     """
 
     measurable: int
     mean: float
     std: float
     target_valid_fraction: float
+    target_mean: float
 
 
 def _rounded(box: tuple[float, float, float, float], extent: tuple[int, int]) -> IntBox:
@@ -139,9 +145,10 @@ def read_surround(
     Returns
     -------
     Reading
-        The count, mean and standard deviation of the measurable surround pixels, and the target's valid fraction. A
-        pixel is measurable only if every channel read is within ``[low, high]``, and a value outside is never clipped,
-        so NaN and infinity, which no finite interval holds, are excluded by the same test.
+        The count, mean and standard deviation of the measurable surround pixels, and the target's valid fraction and
+        mean. A pixel is measurable only if every channel read is within ``[low, high]``, and a value outside is never
+        clipped, so NaN and infinity, which no finite interval holds, are excluded by the same test. The target's mean
+        is over the pixels that pass it too.
     """
     x0, y0, x1, y1 = regions.window
     tx0, ty0, tx1, ty1 = regions.target
@@ -160,12 +167,21 @@ def read_surround(
             inside = image[channel, ty0:ty1, tx0:tx1].astype(np.float64)
             target_valid &= (inside >= low) & (inside <= high)
     intensity = total[measurable] / len(channels)
-    fraction = float(np.count_nonzero(target_valid)) / target_valid.size
+    valid = int(np.count_nonzero(target_valid))
+    fraction = valid / target_valid.size
+    # `total` holds each pixel's intensity summed over the channels, the target's among them, since the window contains
+    # the target, so its mean is read from it and costs no second mapping. A pixel that is not valid is left out.
+    target_mean = math.nan
+    if valid:
+        target_total = total[ty0 - y0 : ty1 - y0, tx0 - x0 : tx1 - x0]
+        # Where every pixel is valid, which is the usual case, the plain sum is about twice as fast as the masked one.
+        target_sum = target_total.sum() if valid == target_valid.size else np.sum(target_total, where=target_valid)
+        target_mean = float(target_sum) / (valid * len(channels))
     if intensity.size == 0:
-        return Reading(0, math.nan, math.nan, fraction)
+        return Reading(0, math.nan, math.nan, fraction, target_mean)
     mean = float(intensity.mean())
     # Two passes, so a constant surround reads a spread of 0 to float64 precision and not a cancellation's residue.
-    return Reading(int(intensity.size), mean, float(np.sqrt(np.mean((intensity - mean) ** 2))), fraction)
+    return Reading(int(intensity.size), mean, float(np.sqrt(np.mean((intensity - mean) ** 2))), fraction, target_mean)
 
 
 class _Surround(NamedTuple):
@@ -180,8 +196,22 @@ class _Surround(NamedTuple):
     measurable: int
     surround_valid: float
     target_valid: float
+    target_mean: float
     low: float
     high: float
+
+
+class _Ratios(NamedTuple):
+    """One row's two ratios, whether each rests on its floor, and why they are NaN where the target is the cause."""
+
+    contrast: float
+    clutter: float
+    contrast_floored: bool
+    clutter_floored: bool
+    reason: str
+
+
+_NO_RATIOS = _Ratios(math.nan, math.nan, False, False, "")
 
 
 class _Geometry(NamedTuple):
@@ -195,7 +225,7 @@ class _Geometry(NamedTuple):
 
 def _none(status: str, low: float = math.nan, high: float = math.nan) -> _Surround:
     """Return a row with nothing counted: the status alone, and the interval where the view has one."""
-    return _Surround(status, math.nan, math.nan, -1, -1, math.nan, -1, math.nan, math.nan, low, high)
+    return _Surround(status, math.nan, math.nan, -1, -1, math.nan, -1, math.nan, math.nan, math.nan, low, high)
 
 
 def _interval(value_range: ValueRange) -> tuple[float, float]:
@@ -256,7 +286,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
         """Read the surround's pixels over the channels this view selects."""
         if self._lacks_bands():
             # A group the datum cannot supply is measured all-or-nothing, as every other statistic does.
-            return Reading(0, math.nan, math.nan, 0.0)
+            return Reading(0, math.nan, math.nan, 0.0, math.nan)
         image = normalize_image_shape(self.cache.raw)
         bands = self.cache.bands
         channels = range(image.shape[0]) if bands is None else bands
@@ -293,8 +323,33 @@ class ContextStatCalculator(Calculator[ImageStats]):
             reading.measurable,
             reading.measurable / geometry.retained if geometry.retained else math.nan,
             reading.target_valid_fraction,
+            reading.target_mean,
             low,
             high,
+        )
+
+    @cached_property
+    def _ratios(self) -> _Ratios:
+        """Read the two ratios from the surround and the target, once for both statistics and the details.
+
+        The surround's status comes first: a ratio is NaN, with no reason, wherever the surround is not measured, since
+        that is not the target's doing and `context_status` says what it is. Then the target must have enough valid
+        pixels. A denominator under the floor is replaced by it and recorded, so that a ratio bounded by ``1 / floor``
+        is not read as a measurement of the spread or the level alone.
+        """
+        row = self._surround
+        if row.status not in _MEASURED:
+            return _NO_RATIOS
+        settings = self.cache.settings.surround
+        if not row.target_valid >= settings.min_target_valid_fraction or math.isnan(row.target_mean):
+            return _Ratios(math.nan, math.nan, False, False, _INSUFFICIENT_TARGET_SUPPORT)
+        difference, floor = row.target_mean - row.mean, settings.intensity_floor
+        return _Ratios(
+            difference / max(row.mean, floor),
+            difference / max(row.std, floor),
+            row.mean < floor,
+            row.std < floor,
+            "",
         )
 
     @classmethod
@@ -305,7 +360,11 @@ class ContextStatCalculator(Calculator[ImageStats]):
         settings: Any,
         declared_range: tuple[float, float] | None,
     ) -> dict[str, MeasurementSpec]:
-        """Record the padding and the support floor, and the range the call or a channel group declared.
+        """Record each statistic's settings, and the range the call or a channel group declared.
+
+        The surround statistics record the padding and the support floor. A ratio also records the share of valid target
+        pixels it needs and the floor under its denominator, which decide its value, so results of a ratio measured with
+        different ones refuse to combine and results of the surround statistics still combine with older ones.
 
         Without a declared range each image's interval is its own metadata's, or what its dtype decodes to, and the spec
         reads the same for all of them, as it does for saturation: the interval each row used is in its details, which
@@ -315,17 +374,40 @@ class ContextStatCalculator(Calculator[ImageStats]):
         if not selected:
             return {}
         surround = settings.surround
-        spec = MeasurementSpec(
+        policy = {
+            "range_policy": "inferred" if declared_range is None else "declared",
+            "declared_range": declared_range,
+        }
+        surround_spec = MeasurementSpec(
             algorithm="surround_intensity",
             version="1",
             units="normalized intensity",
             region="surround",
             normalization="[0, 1]",
             config={"padding": surround.padding, "min_pixels": surround.min_pixels},
-            range_policy="inferred" if declared_range is None else "declared",
-            declared_range=declared_range,
+            **policy,
         )
-        return {handler.name: spec for handler in cls._handlers_for(selected).values()}
+        ratio_config = {
+            "padding": surround.padding,
+            "min_pixels": surround.min_pixels,
+            "min_target_valid_fraction": surround.min_target_valid_fraction,
+            "intensity_floor": surround.intensity_floor,
+        }
+        specs: dict[str, MeasurementSpec] = {}
+        for handler in cls._handlers_for(selected).values():
+            if handler.name in ("surround_mean", "surround_std"):
+                specs[handler.name] = surround_spec
+            else:
+                specs[handler.name] = MeasurementSpec(
+                    algorithm=handler.name,
+                    version="1",
+                    units="ratio",
+                    region="target and surround",
+                    normalization="[0, 1]",
+                    config=ratio_config,
+                    **policy,
+                )
+        return specs
 
     def _mean(self) -> list[float]:
         return [self._surround.mean]
@@ -333,8 +415,18 @@ class ContextStatCalculator(Calculator[ImageStats]):
     def _std(self) -> list[float]:
         return [self._surround.std]
 
-    def details(self, flags: ImageStats, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:  # noqa: ARG002
-        """Return how the row was measured: its status, the pixel counts and fractions, and the interval."""
+    def _contrast(self) -> list[float]:
+        return [self._ratios.contrast]
+
+    def _clutter(self) -> list[float]:
+        return [self._ratios.clutter]
+
+    def details(self, flags: ImageStats, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:
+        """Return how the row was measured: its status, the pixel counts and fractions, and the interval.
+
+        A request for a ratio adds the reason a ratio is NaN for want of target pixels, and whether each ratio selected
+        rests on its floor. A request for neither returns the details it always did.
+        """
         row = self._surround
         details: dict[str, list[Any]] = {"context_status": [row.status]}
         # The geometry is the same in every band group, so only the unnamed view reports it.
@@ -347,6 +439,13 @@ class ContextStatCalculator(Calculator[ImageStats]):
         details["target_valid_fraction"] = [row.target_valid]
         details["context_range_low"] = [row.low]
         details["context_range_high"] = [row.high]
+        if flags & _RATIOS:
+            ratios = self._ratios
+            details["contrast_reason"] = [ratios.reason]
+            if flags & ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST:
+                details["target_surround_contrast_floored"] = [ratios.contrast_floored]
+            if flags & ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO:
+                details["signal_clutter_ratio_floored"] = [ratios.clutter_floored]
         return details
 
     def get_empty_values(self) -> dict[str, Any]:
@@ -356,6 +455,9 @@ class ContextStatCalculator(Calculator[ImageStats]):
             "surround_candidate_pixels": -1,
             "surround_retained_pixels": -1,
             "surround_measurable_pixels": -1,
+            "contrast_reason": "",
+            "target_surround_contrast_floored": False,
+            "signal_clutter_ratio_floored": False,
         }
 
     def get_handlers(self) -> dict[ImageStats, Handler]:
@@ -369,4 +471,10 @@ class ContextStatCalculator(Calculator[ImageStats]):
         return {
             ImageStats.CONTEXT_SURROUND_MEAN: Handler("surround_mean", self._mean, views, ContextNeed.CONTEXT),
             ImageStats.CONTEXT_SURROUND_STD: Handler("surround_std", self._std, views, ContextNeed.CONTEXT),
+            ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST: Handler(
+                "target_surround_contrast", self._contrast, views, ContextNeed.CONTEXT
+            ),
+            ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO: Handler(
+                "signal_clutter_ratio", self._clutter, views, ContextNeed.CONTEXT
+            ),
         }

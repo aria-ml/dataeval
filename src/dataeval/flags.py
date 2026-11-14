@@ -191,13 +191,27 @@ class ImageStats(Flag):
       to, so compare images only where the interval is declared
     - `CONTEXT_SURROUND_STD` : The population standard deviation (``ddof=0``) of the same intensities, as the column
       `surround_std`
+    - `CONTEXT_TARGET_SURROUND_CONTRAST` : How far the box stands from its surround relative to the surround's level,
+      ``(mu_t - mu_s) / max(mu_s, floor)``, as the column `target_surround_contrast`. `mu_s` is `surround_mean`, and
+      `mu_t` is the mean intensity of the box's own pixels, the box rounded outward and clipped as for the surround,
+      over the pixels at which every channel read is finite and inside the interval. It covers the whole box, so it
+      includes the pixels of overlapping neighbors and of background inside a loose box. The sign is kept: a box
+      darker than its surround reads below 0. `floor` is `surround_intensity_floor` of
+      :func:`~dataeval.core.image_stats`, 1/255 by default
+    - `CONTEXT_SIGNAL_CLUTTER_RATIO` : The same difference relative to the surround's spread,
+      ``(mu_t - mu_s) / max(sd_s, floor)`` with `sd_s` the `surround_std`, as the column `signal_clutter_ratio`
 
-    Both are NaN on an image's own row, and for a box whose surround holds fewer than `surround_min_pixels` such pixels,
-    32 by default, which a small box can fall under and a box whose window other boxes cover always does. Both
-    settings are keywords of :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes
-    one also returns details, in the result's ``details``, one value per row, named with a band group's name in front
-    when the row is a band group's. The surround before other boxes are removed, less the box, is the candidate, and
-    the candidate's pixels that no other box covers are the retained ones:
+    The two ratios are Weber-style contrasts of the encoded intensity in [0, 1], and not contrasts of physical
+    luminance, which gamma and the sensor's response separate from the values. They are not `VISUAL_CONTRAST`, the
+    range of an image's percentiles over their mean.
+
+    The surround statistics are NaN on an image's own row, and for a box whose surround holds fewer than
+    `surround_min_pixels` such pixels, 32 by default, which a small box can fall under and a box whose window other
+    boxes cover always does. A ratio is NaN wherever the surround is. Those settings and the floor are keywords of
+    :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes one also returns details, in
+    the result's ``details``, one value per row, named with a band group's name in front when the row is a band group's.
+    The surround before other boxes are removed, less the box, is the candidate, and the candidate's pixels that no
+    other box covers are the retained ones:
 
     - `context_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image, has
       reversed edges or is not finite (read from the coordinates as given, as for `spatial_status`); `unknown_range`,
@@ -216,6 +230,13 @@ class ImageStats(Flag):
       of the box's own pixels that are finite and inside the interval in every channel read
     - `context_range_low`, `context_range_high` : The interval the row was measured against, NaN where none was
       established
+    - `contrast_reason`, `target_surround_contrast_floored`, `signal_clutter_ratio_floored` : Present when a ratio is
+      requested, each floored value only with its own ratio. `contrast_reason` is `insufficient_target_support` when
+      the surround was measured and fewer than 90% of the box's pixels are valid, which leaves both ratios NaN with the
+      surround kept, and is empty otherwise, including where a ratio is NaN because the surround is not measured, which
+      `context_status` says. A floored value is True where that ratio's denominator was below the floor, so the ratio
+      is the difference over the floor, no larger than ``1 / floor`` in size, and reads the floor and not the surround.
+      False where the ratio is NaN
 
     Convenience Groups
     ------------------
@@ -247,7 +268,8 @@ class ImageStats(Flag):
     - `BLUR` : The two blur statistics (experimental)
     - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
       two class statistics also read labels
-    - `CONTEXT` : The two surround statistics. In no other group. They need boxes, and are NaN on every other row
+    - `CONTEXT` : The four context statistics, the surround mean and standard deviation and the two ratios. In no other
+      group. They need boxes, and are NaN on every other row
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
@@ -355,6 +377,9 @@ class ImageStats(Flag):
     # reader of a flag's name expects: the columns are `surround_mean` and `surround_std`.
     CONTEXT_SURROUND_MEAN = auto()
     CONTEXT_SURROUND_STD = auto()
+    # The box against its surround. Appended after the surround flags so that no flag value moves.
+    CONTEXT_TARGET_SURROUND_CONTRAST = auto()
+    CONTEXT_SIGNAL_CLUTTER_RATIO = auto()
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
@@ -410,7 +435,9 @@ class ImageStats(Flag):
     )
 
     # Reads the pixels around a box, so it has a value only on a box's own row
-    CONTEXT = CONTEXT_SURROUND_MEAN | CONTEXT_SURROUND_STD
+    CONTEXT = (
+        CONTEXT_SURROUND_MEAN | CONTEXT_SURROUND_STD | CONTEXT_TARGET_SURROUND_CONTRAST | CONTEXT_SIGNAL_CLUTTER_RATIO
+    )
 
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR

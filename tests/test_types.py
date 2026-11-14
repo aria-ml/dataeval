@@ -984,11 +984,20 @@ class TestStatsConfig:
         with pytest.raises(ValidationError, match="padding"):
             SurroundConfig(padding=value)
 
-    @pytest.mark.parametrize("name", ["min_target_valid_fraction", "intensity_floor"])
     @pytest.mark.parametrize("value", [-0.1, 1.1, True, float("nan")])
-    def test_a_fraction_refuses_a_value_outside_zero_to_one(self, name: str, value: Any):
-        with pytest.raises(ValidationError, match=name):
-            SurroundConfig(**{name: value})
+    def test_a_fraction_refuses_a_value_outside_zero_to_one(self, value: Any):
+        with pytest.raises(ValidationError, match="min_target_valid_fraction"):
+            SurroundConfig(min_target_valid_fraction=value)
+
+    @pytest.mark.parametrize("value", [0, 0.0, -0.1, 1.1, True, float("nan"), float("inf"), "0.5"])
+    def test_a_floor_refuses_zero_and_what_is_outside_zero_to_one(self, value: Any):
+        # A floor of 0 would divide by a spread that rounding leaves at 1e-16, and read 1e15 for a constant surround.
+        with pytest.raises(ValidationError, match="intensity_floor"):
+            SurroundConfig(intensity_floor=value)
+
+    @pytest.mark.parametrize("value", [1e-9, 1 / 255, 1, 1.0])
+    def test_a_floor_accepts_a_positive_value_up_to_one(self, value: Any):
+        assert SurroundConfig(intensity_floor=value).intensity_floor == float(value)
 
     def test_an_unknown_field_is_refused_at_every_level(self):
         with pytest.raises(ValidationError, match="width"):
@@ -997,9 +1006,11 @@ class TestStatsConfig:
             ImageStatsConfig(ring=SurroundConfig())  # pyright: ignore[reportCallIssue]
 
     def test_an_int_is_accepted_for_a_float_field_and_stored_as_a_float(self):
-        config = SurroundConfig(padding=1, min_target_valid_fraction=1, intensity_floor=0)
-        assert (config.padding, config.min_target_valid_fraction, config.intensity_floor) == (1.0, 1.0, 0.0)
-        assert all(isinstance(v, float) for v in (config.padding, config.min_target_valid_fraction))
+        config = SurroundConfig(padding=1, min_target_valid_fraction=1, intensity_floor=1)
+        assert (config.padding, config.min_target_valid_fraction, config.intensity_floor) == (1.0, 1.0, 1.0)
+        assert all(
+            isinstance(v, float) for v in (config.padding, config.min_target_valid_fraction, config.intensity_floor)
+        )
 
     @pytest.mark.parametrize("value", [np.int64(4), np.uint8(4), np.int32(4)])
     def test_a_numpy_integer_is_accepted_for_a_count_and_stored_as_an_int(self, value: Any):

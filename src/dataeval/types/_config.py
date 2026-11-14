@@ -15,6 +15,8 @@ from dataeval.protocols import FeatureExtractor
 # bound and writes it into the JSON Schema. Counts use pydantic's ``PositiveInt`` and ``NonNegativeInt``.
 UnitInterval = Annotated[float, Field(ge=0.0, le=1.0)]
 """A share or score in [0, 1]."""
+PositiveUnitInterval = Annotated[float, Field(gt=0.0, le=1.0)]
+"""A scale in (0, 1], where 0 would divide by nothing and 1 is the whole range."""
 OpenUnitInterval = Annotated[float, Field(gt=0.0, lt=1.0)]
 """A p-value threshold or a fraction in (0, 1), where either end would decide nothing."""
 Percentage = Annotated[float, Field(ge=0.0, le=100.0)]

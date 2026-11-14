@@ -1049,7 +1049,9 @@ def _checked(build: Callable[[], Any], keyword: str, expected: str, value: Any) 
         raise ValueError(f"{keyword} must be {expected}, got {value!r}.") from None
 
 
-def _settings(saturation_atol: Any, surround_padding: Any, surround_min_pixels: Any) -> ImageStatsConfig:
+def _settings(
+    saturation_atol: Any, surround_padding: Any, surround_min_pixels: Any, surround_intensity_floor: Any
+) -> ImageStatsConfig:
     """Check the keywords that set up a statistic and bundle them, each on its own so the error names the keyword."""
     saturation = _checked(
         lambda: SaturationConfig(atol=saturation_atol),
@@ -1069,7 +1071,15 @@ def _settings(saturation_atol: Any, surround_padding: Any, surround_min_pixels: 
         "a whole number of 1 or more",
         surround_min_pixels,
     )
-    surround = SurroundConfig(padding=surround_padding, min_pixels=surround_min_pixels)
+    _checked(
+        lambda: SurroundConfig(intensity_floor=surround_intensity_floor),
+        "surround_intensity_floor",
+        "a finite number greater than 0 and at most 1",
+        surround_intensity_floor,
+    )
+    surround = SurroundConfig(
+        padding=surround_padding, min_pixels=surround_min_pixels, intensity_floor=surround_intensity_floor
+    )
     return ImageStatsConfig(saturation=saturation, surround=surround)
 
 
@@ -1088,6 +1098,7 @@ def image_stats(  # noqa: C901
     saturation_atol: float = 0.0,
     surround_padding: float = 0.25,
     surround_min_pixels: int = 32,
+    surround_intensity_floor: float = 1 / 255,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
@@ -1298,9 +1309,22 @@ def image_stats(  # noqa: C901
 
         .. versionadded:: 1.3
     surround_min_pixels : int, default 32
-        The fewest measurable surround pixels a box needs for `surround_mean` and `surround_std` to have a value, a
-        whole number of 1 or more. A box with fewer reads NaN with the status `insufficient_support`, so a small box
-        can fall under the default. Checked, ignored and recorded as `surround_padding` is.
+        The fewest measurable surround pixels a box needs for `surround_mean`, `surround_std` and the two ratios to have
+        a value, a whole number of 1 or more. A box with fewer reads NaN with the status `insufficient_support`, so a
+        small box can fall under the default. Checked, ignored and recorded as `surround_padding` is.
+
+        .. versionadded:: 1.3
+    surround_intensity_floor : float, default 1/255
+        The least a denominator of `target_surround_contrast` or `signal_clutter_ratio` may be, a finite number greater
+        than 0 and at most 1, in the normalized intensity of [0, 1]. A dark surround or a flat one then gives a ratio
+        no larger than ``1 / surround_intensity_floor`` in size, and not a huge or infinite one, and the details
+        `target_surround_contrast_floored` and `signal_clutter_ratio_floored` say where the floor decided. A floor of 0
+        is refused, since a surround of one value reads a spread of rounding residue, about 1e-16, and not 0, and a
+        floor under that residue protects nothing; one under 3e-39 overflows the float32 column to infinity. The
+        default, one level of an 8-bit image, is the choice of the issue that added the statistics and no study picked
+        it, so it is provisional. Checked on every call, and ignored, with a warning, when `stats` requests neither
+        ratio. Recorded in `measurement_specs` with the two ratios and not with the surround statistics, which do not
+        read it.
 
         .. versionadded:: 1.3
     progress_callback : ProgressCallback or None, default None
@@ -1339,9 +1363,9 @@ def image_stats(  # noqa: C901
         labels are floating and hold a value that is not a whole number. A request that holds `ImageStats.ALL`
         can raise on those labels, since it reads them.
         Also if `saturation_atol` is not a finite number of 0 or more, `surround_padding` not a finite number greater
-        than 0, or `surround_min_pixels` not a whole number of 1 or more, whether or not `stats` requests the statistic
-        they set up, or if the datum metadata's `value_range` of an image is not a finite, ordered pair while a
-        requested statistic reads a range.
+        than 0, `surround_min_pixels` not a whole number of 1 or more, or `surround_intensity_floor` not a finite number
+        greater than 0 and at most 1, whether or not `stats` requests the statistic they set up, or if the datum
+        metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a range.
 
     Warns
     -----
@@ -1351,8 +1375,11 @@ def image_stats(  # noqa: C901
         `labels`, so every label is missing. A request that holds every statistic of `ImageStats.ALL` that needs no
         box does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
         A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`,
-        so the setting is ignored, and a fourth for `surround_padding` or `surround_min_pixels` given a value other
-        than its default when `stats` requests no `ImageStats.CONTEXT` statistic.
+        so the setting is ignored, and a fourth for `surround_padding`, `surround_min_pixels` or
+        `surround_intensity_floor` given a value other than its default when `stats` requests no `ImageStats.CONTEXT`
+        statistic, or for `surround_intensity_floor` when `stats` requests neither
+        `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only
+        statistics that read it.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
@@ -1513,9 +1540,10 @@ def image_stats(  # noqa: C901
     >>> image_stats(Sensor(), stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
     [1.0]
 
-    Measure the intensity around a box. The surround is a frame around it, a quarter of the box's size wide by default,
-    less the box and every other valid box. Here the box is 0.8 against a ring of 0.2, and a ring of 16 pixels needs
-    ``surround_min_pixels`` of 16 or less to count:
+    Measure the intensity around a box, and how far the box stands from it. The surround is a frame around it, a quarter
+    of the box's size wide by default, less the box and every other valid box. Here the box is 0.8 against a ring of
+    0.2, which is a contrast of (0.8 - 0.2) / 0.2, and a ring of 16 pixels needs ``surround_min_pixels`` of 16 or less
+    to count:
 
     >>> picture = np.full((1, 10, 10), 0.2)
     >>> picture[0, 3:6, 3:6] = 0.8
@@ -1528,6 +1556,8 @@ def image_stats(  # noqa: C901
     ... )
     >>> round(float(ringed["stats"]["surround_mean"][0]), 3)
     0.2
+    >>> round(float(ringed["stats"]["target_surround_contrast"][0]), 3)
+    3.0
     >>> ringed["details"]["context_status"].tolist(), ringed["details"]["surround_candidate_pixels"].tolist()
     (['ok'], [16])
     """
@@ -1574,7 +1604,7 @@ def image_stats(  # noqa: C901
 
     # Checked before any image is read, and whether or not the statistic is requested, so a bad value never waits for
     # the first image that would have used it.
-    settings = _settings(saturation_atol, surround_padding, surround_min_pixels)
+    settings = _settings(saturation_atol, surround_padding, surround_min_pixels, surround_intensity_floor)
 
     if channels is True:
         # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
@@ -1620,19 +1650,31 @@ def image_stats(  # noqa: C901
             UserWarning,
             stacklevel=2,
         )
+    # Compared as stored, so a value that NumPy takes for the default, such as ``np.float32(1 / 255)``, and that the
+    # spec records as another number, is not mistaken for it.
+    given, defaults = settings.surround, SurroundConfig()
     unused = [
         name
-        for name, value, default in (
-            ("surround_padding", surround_padding, SurroundConfig().padding),
-            ("surround_min_pixels", surround_min_pixels, SurroundConfig().min_pixels),
-        )
-        if value != default
+        for name in ("surround_padding", "surround_min_pixels", "surround_intensity_floor")
+        if getattr(given, name.removeprefix("surround_")) != getattr(defaults, name.removeprefix("surround_"))
     ]
+    ratios = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
     if unused and not requested & ImageStats.CONTEXT:
+        names = unused[0] if len(unused) == 1 else f"{', '.join(unused[:-1])} and {unused[-1]}"
         warnings.warn(
-            f"{' and '.join(unused)} {'is' if len(unused) == 1 else 'are'} ignored, because "
+            f"{names} {'is' if len(unused) == 1 else 'are'} ignored, because "
             f"{'it sets' if len(unused) == 1 else 'they set'} up `ImageStats.CONTEXT` and stats does not request it. "
             "Add `ImageStats.CONTEXT` to stats, or drop it.",
+            UserWarning,
+            stacklevel=2,
+        )
+    elif given.intensity_floor != defaults.intensity_floor and not requested & ratios:
+        # The group is requested, and the padding and the support floor are read by every statistic in it, but only the
+        # two ratios divide by this floor.
+        warnings.warn(
+            "surround_intensity_floor is ignored, because it sets up `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` "
+            "and `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO` and stats requests neither. Add one of them to stats, or "
+            "drop it.",
             UserWarning,
             stacklevel=2,
         )

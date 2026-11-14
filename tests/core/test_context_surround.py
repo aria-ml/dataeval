@@ -73,7 +73,7 @@ class TestFlags:
     def test_the_names_split_into_family_and_statistic(self):
         # `quality._shared._stat_names` and dataeval-flow's `stat_names_for` both read a flag as <FAMILY>_<STATISTIC>.
         names = [(m.name or "").split("_", 1)[1].lower() for m in CONTEXT]
-        assert names == ["surround_mean", "surround_std"]
+        assert names == ["surround_mean", "surround_std", "target_surround_contrast", "signal_clutter_ratio"]
 
     def test_all_holds_the_group_and_no_other_group_does(self):
         assert CONTEXT in ImageStats.ALL
@@ -87,6 +87,8 @@ class TestFlags:
     def test_no_existing_bit_moves(self):
         assert ImageStats.CONTEXT_SURROUND_MEAN.value > ImageStats.PIXEL_SATURATION.value
         assert ImageStats.CONTEXT_SURROUND_STD.value > ImageStats.CONTEXT_SURROUND_MEAN.value
+        assert ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST.value > ImageStats.CONTEXT_SURROUND_STD.value
+        assert ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO.value > ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST.value
 
 
 class TestValues:

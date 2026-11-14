@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 import numpy as np
 from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveFloat, PositiveInt, field_validator
 
-from dataeval.types._config import UnitInterval
+from dataeval.types._config import PositiveUnitInterval, UnitInterval
 
 
 class StrictConfig(BaseModel):
@@ -52,13 +52,13 @@ class SurroundConfig(StrictConfig):
     min_target_valid_fraction : float, default 0.90
         In [0, 1].
     intensity_floor : float, default 1/255
-        In [0, 1].
+        In (0, 1]. The least a ratio's denominator may be, so a zero never divides.
     """
 
     padding: PositiveFloat = 0.25
     min_pixels: PositiveInt = 32
     min_target_valid_fraction: UnitInterval = 0.90
-    intensity_floor: UnitInterval = 1 / 255
+    intensity_floor: PositiveUnitInterval = 1 / 255
 
 
 class SaturationConfig(StrictConfig):
