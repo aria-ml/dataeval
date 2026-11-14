@@ -18,7 +18,7 @@ import dataeval.core._calculators._blurstats as blurstats_module
 import dataeval.core._image_stats as image_stats_module
 from dataeval.config import use_max_processes
 from dataeval.core import compute_stats, image_stats
-from dataeval.core._blur import blur_stat
+from dataeval.core._blur import blur_stat, measure_edges
 from dataeval.core._calculators._base import ViewKind
 from dataeval.core._calculators._blurstats import BlurStatCalculator
 from dataeval.core._calculators._cache import CalculatorCache
@@ -215,9 +215,9 @@ def test_one_detection_serves_both_columns(monkeypatch):
 
     def counting(gray):
         calls.append(gray.shape)
-        return blur_stat(gray)
+        return measure_edges(gray)
 
-    monkeypatch.setattr(blurstats_module, "blur_stat", counting)
+    monkeypatch.setattr(blurstats_module, "measure_edges", counting)
 
     computed = BlurStatCalculator(image, CalculatorCache(image)).compute(ImageStats.BLUR)
 
@@ -322,7 +322,7 @@ def test_2d_is_one_gray_band_and_1d_has_no_picture():
 
 
 def test_bands_and_background():
-    """Named band groups get prefixed blur columns; the background view, which holds NaN holes, gets none."""
+    """Named band groups get prefixed blur columns, and so does the background, pooled from the whole image."""
     t = textured()
     cube = to_uint8(np.stack([np.roll(t, 3 * band, axis=1) for band in range(6)]))
     groups = {"vis": [0, 1, 2], "nir": [3, 4, 5]}
@@ -334,7 +334,6 @@ def test_bands_and_background():
     for prefix, bands in (("", slice(0, 6)), ("vis_", slice(0, 3)), ("nir_", slice(3, 6))):
         assert stats[f"{prefix}blur"][0] == pytest.approx(blur_stat(gray_of(cube[bands])).blur, rel=1e-6)
 
-    # Sharpness answers over the background; blur does not, so it is the sharpness columns that show the view ran.
     background = image_stats(
         [cube],
         boxes=[[(20, 20, 90, 90)]],
@@ -344,24 +343,29 @@ def test_bands_and_background():
     )["stats"]
 
     assert {"background_sharpness", "background_vis_sharpness", "background_nir_sharpness"} <= set(background)
-    assert not [name for name in background if "background" in name and "blur" in name]
+    assert {"background_blur", "background_vis_blur", "background_nir_blur"} <= set(background)
+    assert not [name for name in background if "background" in name and "directionality" in name]
     assert set(COLUMNS) <= set(background), "the unprefixed whole-image columns are still there"
-    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK) == ImageStats(0)
+    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK) == ImageStats.VISUAL_BLUR
+    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK | ViewKind.BAND) == ImageStats.VISUAL_BLUR
     assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.BAND) == ImageStats.BLUR
 
 
-def test_background_with_only_blur_says_why_it_does_not_apply():
-    """Blur alone has nothing to compute over a background, and the warning names it among the reasons."""
+def test_background_with_only_directionality_says_why_it_does_not_apply():
+    """Directionality alone has nothing to compute over a background; the warning names `VISUAL_BLUR` as the way out."""
     with pytest.warns(
         UserWarning,
-        match=r"none of the requested statistics apply to a background region.*the filters "
-        r"of the blur statistics spread the masked holes",
+        match=r"none of the requested statistics apply to a background region.*blur directionality is not "
+        r"measured.*ImageStats\.VISUAL_BLUR for it",
     ):
-        result = image_stats([picture()], boxes=[[(20, 20, 90, 90)]], stats=ImageStats.BLUR, per_background=True)[
-            "stats"
-        ]
+        result = image_stats(
+            [picture()],
+            boxes=[[(20, 20, 90, 90)]],
+            stats=ImageStats.VISUAL_BLUR_DIRECTIONALITY,
+            per_background=True,
+        )["stats"]
 
-    assert set(result) == set(COLUMNS) | {"background_fraction"}
+    assert set(result) == {"blur_directionality", "background_fraction"}
 
 
 def test_deterministic_permutes():
@@ -574,16 +578,16 @@ def test_default_columns_unchanged():
 
 
 def test_default_paths_never_run_the_blur_measurement(monkeypatch):
-    """A bare call and a default Outliers run never call `blur_stat`: the column names alone do not show that."""
+    """A bare call and a default Outliers run never measure edges: the column names alone do not show that."""
     rng = np.random.default_rng(20261107)
     images = [rng.integers(0, 256, (3, 32, 32), dtype=np.uint8) for _ in range(24)]  # Outliers judges from 20 rows
 
     def refuse(gray):
-        raise AssertionError("blur_stat ran for a request with no blur flag")
+        raise AssertionError("edges were measured for a request with no blur flag")
 
-    monkeypatch.setattr(blurstats_module, "blur_stat", refuse)
+    monkeypatch.setattr(blurstats_module, "measure_edges", refuse)
 
-    with pytest.raises(AssertionError, match="blur_stat ran"):  # control: the patch reaches a request that asks
+    with pytest.raises(AssertionError, match="edges were measured"):  # control: the patch reaches a request that asks
         image_stats(images, stats=ImageStats.BLUR)
     image_stats(images)
     image_stats(images, stats=ImageStats.NO_HASH | ImageStats.HASH)
@@ -605,9 +609,9 @@ def test_unmeasurable_view_never_runs_the_detection(monkeypatch):
 
     def counting(gray):
         calls.append(gray.shape)
-        return blur_stat(gray)
+        return measure_edges(gray)
 
-    monkeypatch.setattr(blurstats_module, "blur_stat", counting)
+    monkeypatch.setattr(blurstats_module, "measure_edges", counting)
     cache = CalculatorCache(signed)
 
     computed = BlurStatCalculator(signed, cache).compute(ImageStats.BLUR)

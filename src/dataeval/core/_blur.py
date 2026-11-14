@@ -9,6 +9,10 @@ After Liang, Wang, Chen, Ma, Zhao and Gao (2010), "No-reference perceptual image
 gradient profiles for JPEG2000", Signal Processing: Image Communication 25, 502-516, Sections 2.1.2 and 2.1.3.
 The percentile summary is a modification of the paper's histogram score.
 
+The same percentile taken over the edge points that lie outside a margin around the annotated boxes is the
+background value (``background_blur``). The edges are found on the whole image, so no filter sees a hole where a
+box was.
+
 The 5th percentile follows the sharpest edges, so a blur along one axis only (motion blur) moves ``blur``
 weakly and unevenly and shows in ``directionality`` instead. Noise and JPEG artifacts change ``blur`` too, by
 amounts and in directions that depend on the scene, so it cannot tell them from focus.
@@ -23,6 +27,9 @@ from numpy.typing import NDArray
 from scipy import ndimage
 
 MIN_POINTS = 100  # fewer edge points than this and no value is reported
+# Pixels around each box left out of the background pool (a square margin). Fixed on study data at a plateau that
+# starts at 4 to 6 px, and provisional: the validation record keeps the sweep.
+BACKGROUND_MARGIN = 9
 MIN_AXIS_POINTS = 50  # fewer on either axis and directionality is NaN
 _SIGMA = 1.0  # smoothing before edge detection
 
@@ -32,6 +39,14 @@ class BlurValues(NamedTuple):
 
     blur: float
     directionality: float
+
+
+class Edges(NamedTuple):
+    """The edge points of a picture that carry a width, with the width of each and which axis its gradient follows."""
+
+    widths: NDArray[np.float64]
+    horizontal: NDArray[np.bool_]
+    points: NDArray[np.intp]  # (N, 2) rows of (y, x), in the order of `widths`
 
 
 def _peak_mask(g: NDArray[np.floating[Any]], gg: NDArray[np.floating[Any]], axis: int) -> NDArray[np.bool_]:
@@ -105,11 +120,14 @@ def _spread_axis1(m: NDArray[np.float64], ys: NDArray[np.intp], xs: NDArray[np.i
     return np.sqrt(np.maximum(var, 0.0))
 
 
-def edge_widths(gray: NDArray[np.float32], points: NDArray[np.intp]) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
-    """Width of the edge at each (y, x) point, in pixels, and whether its dominant gradient is horizontal.
+def edge_widths(
+    gray: NDArray[np.float32], points: NDArray[np.intp]
+) -> tuple[NDArray[np.float64], NDArray[np.bool_], NDArray[np.intp]]:
+    """Width of the edge at each (y, x) point, in pixels, whether its dominant gradient is horizontal, and the points.
 
     Measured on the unsmoothed Sobel gradient. A point whose unsmoothed gradient is exactly zero has no
-    direction, so it is dropped: the result holds only the kept points, in their order.
+    direction, so it is dropped: the result holds only the kept points, in their order, and the third value is
+    those points, so that a width can be matched to its position.
     """
     gx = ndimage.sobel(gray, axis=1, mode="mirror")
     gy = ndimage.sobel(gray, axis=0, mode="mirror")
@@ -131,32 +149,75 @@ def edge_widths(gray: NDArray[np.float32], points: NDArray[np.intp]) -> tuple[ND
         * np.abs(gy[ys[vertical], xs[vertical]])
         / m[ys[vertical], xs[vertical]]
     )
-    return widths, horizontal
+    return widths, horizontal, points[keep]
+
+
+def measure_edges(gray: NDArray[np.floating[Any]]) -> Edges:
+    """Edge points and widths of a 2D grayscale image in the 0-255 display range, cast to float32.
+
+    Input that is not 2D or is empty has no edges: the arrays come back empty, which every value computed from
+    them reports as NaN.
+    """
+    gray = np.asarray(gray, dtype=np.float32)
+    if gray.ndim != 2 or gray.size == 0:
+        return Edges(np.empty(0), np.empty(0, dtype=np.bool_), np.empty((0, 2), dtype=np.intp))
+    return Edges(*edge_widths(gray, edge_points(gray)))
+
+
+def _p5(widths: NDArray[np.float64]) -> float:
+    """Return the 5th percentile of `widths`, or NaN with fewer than `MIN_POINTS` of them or a median width of 0."""
+    if len(widths) < MIN_POINTS:  # before any percentile, which is undefined on too few points
+        return float("nan")
+    p5, p50 = np.percentile(widths, [5, 50])
+    return float(p5) if p50 != 0 else float("nan")
+
+
+def blur_values(edges: Edges) -> BlurValues:
+    """Compute the two blur values of a picture whose edges are `edges`.
+
+    `blur` is the 5th percentile of the edge widths in pixels at the image's own resolution and `directionality` is
+    the absolute log2 ratio of the median width of horizontal-gradient edges to that of vertical-gradient edges.
+
+    Both are NaN with fewer than `MIN_POINTS` edge points or a median width of 0. `directionality` alone is NaN with
+    fewer than `MIN_AXIS_POINTS` edge points on either axis, or when the median width on either axis is 0 (`blur` is
+    unaffected).
+    """
+    nan = BlurValues(np.nan, np.nan)
+    blur = _p5(edges.widths)
+    if np.isnan(blur):
+        return nan
+    across, down = edges.widths[edges.horizontal], edges.widths[~edges.horizontal]
+    median_across = np.median(across) if len(across) >= MIN_AXIS_POINTS else np.nan
+    median_down = np.median(down) if len(down) >= MIN_AXIS_POINTS else np.nan
+    directionality = abs(np.log2(median_across / median_down)) if median_across > 0 and median_down > 0 else np.nan
+    return BlurValues(blur, float(directionality))
 
 
 def blur_stat(gray: NDArray[np.floating[Any]]) -> BlurValues:
     """Edge-width blur values of a 2D grayscale image in the 0-255 display range.
 
-    Any float dtype is accepted and cast to float32. `blur` is the 5th percentile of the edge widths in
-    pixels at the image's own resolution and `directionality` is the absolute log2 ratio of the median width of
-    horizontal-gradient edges to that of vertical-gradient edges.
-
-    Both are NaN for input that is not 2D or is empty, with fewer than `MIN_POINTS` edge points, or with a median
-    width of 0. `directionality` alone is NaN with fewer than `MIN_AXIS_POINTS` edge points on either axis, or
-    when the median width on either axis is 0 (`blur` is unaffected).
+    Any float dtype is accepted and cast to float32; input that is not 2D or is empty gives NaN. See
+    :func:`blur_values` for the values and when they are NaN.
     """
-    nan = BlurValues(np.nan, np.nan)
-    gray = np.asarray(gray, dtype=np.float32)
-    if gray.ndim != 2 or gray.size == 0:
-        return nan
-    widths, horizontal = edge_widths(gray, edge_points(gray))
-    if len(widths) < MIN_POINTS:  # before any percentile, which is undefined on too few points
-        return nan
-    p5, p50 = np.percentile(widths, [5, 50])
-    if p50 == 0:
-        return nan
-    across, down = widths[horizontal], widths[~horizontal]
-    median_across = np.median(across) if len(across) >= MIN_AXIS_POINTS else np.nan
-    median_down = np.median(down) if len(down) >= MIN_AXIS_POINTS else np.nan
-    directionality = abs(np.log2(median_across / median_down)) if median_across > 0 and median_down > 0 else np.nan
-    return BlurValues(float(p5), float(directionality))
+    return blur_values(measure_edges(gray))
+
+
+def grow_region(exclude: NDArray[np.bool_], margin: int = BACKGROUND_MARGIN) -> NDArray[np.bool_]:
+    """`exclude` grown by `margin` pixels on every side: a ``(2 * margin + 1)`` square dilation, clipped at the border.
+
+    A Chebyshev distance, so a pixel is in the region when it is within `margin` rows and within `margin` columns of an
+    excluded one. Two separable maximum filters, which cost a few milliseconds at 1,344 x 756.
+    """
+    size = 2 * margin + 1
+    grown = ndimage.maximum_filter1d(exclude, size, axis=0, mode="constant", cval=False)
+    return ndimage.maximum_filter1d(grown, size, axis=1, mode="constant", cval=False).astype(np.bool_, copy=False)
+
+
+def background_blur(edges: Edges, region: NDArray[np.bool_]) -> float:
+    """Return the `blur` value over the edge points that lie outside `region`, NaN by the same rules.
+
+    `region` has the picture's shape, so that it can be looked up at each point. With nothing in it the pool is every
+    point and the value equals `blur` to the bit.
+    """
+    outside = ~region[edges.points[:, 0], edges.points[:, 1]]
+    return _p5(edges.widths[outside])

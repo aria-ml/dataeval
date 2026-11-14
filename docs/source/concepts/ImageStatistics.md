@@ -165,8 +165,8 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
     the details record where it decided. The {class}`.ImageStats` docstring gives the formulas, and
     [the section below](#the-target-surround-ratios) the limits.
 - - Background statistics (the `background_` prefix)
-  - The same statistics measured over the pixels outside every annotated box. The boxes are unioned, so the values
-    describe the scene. See
+  - The same statistics measured over the pixels outside every annotated box, and `background_blur`, which pools the
+    edges outside the boxes. The boxes are unioned, so the values describe the scene. See
     [Image statistics in integrity checks](DataIntegrity.md#image-statistics-in-integrity-checks).
 
 :::

@@ -26,7 +26,8 @@ class ViewKind(Flag):
         Every statistic answers here.
     MASK : ViewKind
         A region with part of it masked out to NaN, which is how ``per_background``
-        measures the scene behind the annotations. Only NaN-aware reductions survive it.
+        measures the scene behind the annotations. A NaN-aware reduction survives it, and so does a statistic that
+        reads the unmasked picture and leaves the masked pixels out of what it pools, as blur does.
     BAND : ViewKind
         A named subset of the channel axis. Statistics that reduce over pixel values
         answer differently per band and so belong here; pure geometry restates the

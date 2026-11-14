@@ -6,7 +6,18 @@ from numpy.typing import NDArray
 from scipy import ndimage
 
 import dataeval.core._blur as blur_module
-from dataeval.core._blur import MIN_POINTS, BlurValues, blur_stat, edge_points, edge_widths
+from dataeval.core._blur import (
+    MIN_POINTS,
+    BlurValues,
+    Edges,
+    background_blur,
+    blur_stat,
+    blur_values,
+    edge_points,
+    edge_widths,
+    grow_region,
+    measure_edges,
+)
 
 
 def textured() -> NDArray[np.float32]:
@@ -128,7 +139,7 @@ class TestBlurStat:
         img = gaussian(textured(), 1.0)
         pts = _nonzero_gradient(img, edge_points(img))
         assert len(pts) > 1000
-        fast, fast_horizontal = edge_widths(img, pts)
+        fast, fast_horizontal, _ = edge_widths(img, pts)
         ref, ref_horizontal = _reference_widths(img, pts)
         assert fast.shape == ref.shape
         assert np.abs(fast - ref).max() < 1e-6
@@ -163,7 +174,7 @@ class TestBlurStat:
         img = np.where(np.arange(256)[:, None] // 8 % 2 == 0, 60.0, 160.0) * np.ones((256, 256))
         img[:, 16::32] = 255
         img = img.astype(np.float32)
-        widths, horizontal = edge_widths(img, edge_points(img))
+        widths, horizontal, _ = edge_widths(img, edge_points(img))
         assert np.median(widths[horizontal]) == 0
         assert np.median(widths) > 0
         result = blur_stat(img)
@@ -171,7 +182,8 @@ class TestBlurStat:
         assert np.isnan(result.directionality)
 
     def test_zero_median_width_is_nan(self, monkeypatch):
-        monkeypatch.setattr(blur_module, "edge_widths", lambda gray, pts: (np.zeros(200), np.ones(200, bool)))
+        zeros = (np.zeros(200), np.ones(200, bool), np.zeros((200, 2), np.intp))
+        monkeypatch.setattr(blur_module, "edge_widths", lambda gray, pts: zeros)
         assert np.isnan(blur_stat(textured())).all()
 
     def test_deterministic_and_pure(self):
@@ -186,3 +198,88 @@ class TestBlurStat:
         assert state[0] == after[0]
         assert np.array_equal(state[1], after[1])
         assert state[2:] == after[2:]
+
+
+class TestBackgroundBlur:
+    """The pooling that `background_blur` adds to the edge widths `blur_stat` already measures."""
+
+    def test_edge_widths_returns_the_kept_points(self):
+        """The third value is the points whose unsmoothed gradient is not exactly zero, in the order of the widths."""
+        img = np.clip(np.round(textured() * 1.6 - 60), 0, 255).astype(np.float32)
+        pts = edge_points(img)
+        widths, horizontal, kept = edge_widths(img, pts)
+        assert len(kept) == len(widths) == len(horizontal)
+        assert len(kept) < len(pts), "fixture has no exactly-zero-gradient edge point"
+        assert kept.dtype == np.intp
+        assert np.array_equal(kept, _nonzero_gradient(img, pts))
+
+    @pytest.mark.parametrize(
+        ("sigma", "blur", "directionality"),
+        [(0.0, 0.7071067811865476, 0.004453233427689264), (2.0, 1.6188710693695116, 0.016617058558734115)],
+    )
+    def test_blur_stat_is_unchanged_by_the_split(self, sigma, blur, directionality):
+        """The numbers were recorded from `main` before the split, so the split cannot have moved them.
+
+        Compared to 1e-9, not exactly: on the lowest supported SciPy and NumPy directionality differs in its last digit.
+        """
+        img = gaussian(textured(), sigma)
+        assert blur_stat(img) == pytest.approx((blur, directionality), rel=1e-9)
+        assert blur_values(measure_edges(img)) == blur_stat(img)
+
+    def test_measure_edges_of_input_with_no_picture_is_empty(self):
+        for bad in (np.zeros((0, 5)), np.zeros(10), np.zeros((2, 4, 4))):
+            edges = measure_edges(bad)
+            assert isinstance(edges, Edges)
+            assert len(edges.widths) == len(edges.horizontal) == len(edges.points) == 0
+            assert np.isnan(blur_values(edges)).all()
+
+    def test_grow_region_is_a_chebyshev_margin(self):
+        mask = np.zeros((40, 40), bool)
+        mask[10, 10] = True
+        grown = grow_region(mask, 9)
+        expected = np.zeros((40, 40), bool)
+        expected[1:20, 1:20] = True  # distance 9 is inside, 10 is outside, and the corner counts
+        assert grown.dtype == np.bool_
+        assert np.array_equal(grown, expected)
+        assert grown[19, 19]
+        assert not grown[20, 20]
+        assert np.array_equal(grow_region(mask, 0), mask)
+        assert mask.sum() == 1, "the input is not modified"
+
+    def test_grow_region_does_not_wrap_at_the_border(self):
+        mask = np.zeros((40, 40), bool)
+        mask[:, 0] = True
+        grown = grow_region(mask, 9)
+        assert grown[:, :10].all()
+        assert not grown[:, 10:].any()
+
+    def test_no_region_is_blur(self):
+        """With nothing excluded the pool is every kept point, so the value is `blur` to the bit."""
+        img = textured()
+        edges = measure_edges(img)
+        assert background_blur(edges, np.zeros(img.shape, bool)) == blur_values(edges).blur
+
+    def test_nan_rules(self):
+        def edges(n, width):
+            idx = np.arange(n)
+            widths = np.full(n, width) if np.isscalar(width) else width
+            return Edges(widths, np.ones(n, bool), np.stack([idx, idx], axis=1))
+
+        none = np.zeros((400, 400), bool)
+        assert np.isnan(background_blur(edges(MIN_POINTS - 1, np.linspace(1, 3, MIN_POINTS - 1)), none))
+        assert np.isfinite(background_blur(edges(MIN_POINTS, np.linspace(1, 3, MIN_POINTS)), none))
+        assert np.isnan(background_blur(edges(200, 0.0), none)), "a pool whose median width is 0"
+        covered = np.ones((400, 400), bool)
+        assert np.isnan(background_blur(edges(200, np.linspace(1, 3, 200)), covered)), "every point inside the region"
+
+    def test_margin_counts_a_sharp_ring_only_at_margin_zero(self):
+        """A sharp ring just outside the box is in the pool at margin 0 and out of it at 9, so the value is larger."""
+        sharp = textured()
+        img = gaussian(sharp, 3.0)
+        img[59:197, 59:197] = sharp[59:197, 59:197]  # the box [64:192] and a 5 px sharp ring around it
+        box = np.zeros(img.shape, bool)
+        box[64:192, 64:192] = True
+        edges = measure_edges(img)
+        at_zero = background_blur(edges, grow_region(box, 0))
+        at_nine = background_blur(edges, grow_region(box, 9))
+        assert at_zero < 0.65 * at_nine  # measured 0.59
