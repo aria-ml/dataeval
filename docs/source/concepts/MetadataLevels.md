@@ -535,5 +535,7 @@ what granularity was this measured?" is a level question.
 - [Keep metadata in sync with its dataset and cache it](../notebooks/h2_sync_and_cache_metadata.py):
   realigning filtered metadata with its dataset, and saving it so it is built
   once.
+- [Measure frames and tracks in a tracking dataset](../notebooks/h2_measure_frames_and_tracks.py): attaching frame
+  timing, exact repeats, track steps and track statistics, each at its own level.
 - [Trace a finding back to its source](../notebooks/h2_trace_findings_to_source.py): retrieving the image,
   frame, track or detection that a finding's `SourceIndex` names.
