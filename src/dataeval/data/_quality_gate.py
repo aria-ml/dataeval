@@ -28,13 +28,15 @@ def _single_statistics() -> dict[str, tuple[type[Any], ImageStats]]:
     Read off the calculators' declared names, so nothing is computed. A statistic that declares it reads the image's
     other boxes is left out: a gate measures whole frames, which have no boxes, so it would read NaN on every frame.
     Saturation is left out too: its endpoint is a range declared in a datum's metadata, which a gate measuring frames
-    it is handed has none of, so it would read the dtype's maximum or NaN without saying which.
+    it is handed has none of, so it would read the dtype's maximum or NaN without saying which. The color statistics are
+    left out for the same kind of reason: they are measured only from channels declared to be sRGB red, green and blue,
+    which a gate has no way to be given.
     """
     from dataeval.core._calculators._registry import CalculatorRegistry
 
     statistics: dict[str, tuple[type[Any], ImageStats]] = {}
     for flag in ImageStats:
-        if flag == ImageStats.PIXEL_SATURATION:
+        if flag == ImageStats.PIXEL_SATURATION or flag & ImageStats.COLOR:
             continue
         calculators = CalculatorRegistry.get_calculators(flag)
         if len(calculators) == 1 and len(names := calculators[0][0].stat_names(flag)) == 1:
@@ -191,7 +193,9 @@ class QualityGate(FrameSelector):
                 f"QualityGate: stat must name a numeric scalar image_stats statistic, one of "
                 f"{', '.join(_numeric_scalar_stats())}; got {stat!r}. A statistic that compares a box with its peers "
                 f"is not accepted, because a gate measures whole frames, which have no boxes. Nor is 'saturation', "
-                f"because it needs an endpoint declared in datum metadata, which a gate has none of."
+                f"because it needs an endpoint declared in datum metadata, which a gate has none of. Nor is a color "
+                f"statistic, because it is measured only from channels declared to be sRGB red, green and blue, which "
+                f"a gate has none of."
             )
         # QualityGate reads the statistic without calling image_stats, where the blur flags warn.
         if calculator[1] & ImageStats.BLUR:

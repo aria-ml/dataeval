@@ -1,8 +1,9 @@
 # Image statistics
 
 {func}`.image_stats` measures four families of statistics about an image (pixel, visual, dimension, and hash), plus
-the experimental [blur statistics](BlurStatistics.md). Two of the families, pixel and visual, answer different kinds of
-questions, and the distinction determines whether a value can be compared across a dataset. The flags and their
+the experimental [blur statistics](BlurStatistics.md) and [color statistics](#color-statistics). Two of the families,
+pixel and visual, answer different kinds of questions, and the distinction determines whether a value can be compared
+across a dataset. The flags and their
 parameters are in {func}`~dataeval.core.image_stats`, and the full statistic list is in
 {class}`~dataeval.flags.ImageStats`.
 
@@ -103,6 +104,8 @@ which is a request to divide by a range that does not exist.
 
 When this happens, a warning names `value_range`, because an all-NaN column is easy to miss.
 
+The [color statistics](#color-statistics) need an interval too, and do not use a decoded one.
+
 ## Statistics that depend on scale
 
 Few statistics depend on scale. Of the pixel family, only three change when the values
@@ -164,6 +167,15 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
     darker than its surround. A floor under each denominator keeps a dark or flat surround from giving a huge value, and
     the details record where it decided. The {class}`.ImageStats` docstring gives the formulas, and
     [the section below](#the-target-surround-ratios) the limits.
+- - `VISUAL_COLOR_LIGHTNESS_MEAN` and `VISUAL_COLOR_CHROMA_MEAN`
+  - The mean lightness and the mean chroma of the pixels in the CIELAB color space, read from three channels that you
+    declare are sRGB red, green and blue. Lightness runs from 0 for black to 100 for white, and chroma is 0 for a neutral
+    pixel and grows with how colorful it is. See [the section below](#color-statistics).
+- - `VISUAL_COLOR_ACHROMATIC_FRACTION`
+  - The share of pixels whose chroma is under a threshold, 12 by default, so that they count as neutral.
+- - `VISUAL_COLOR_HUE_COS` and `VISUAL_COLOR_HUE_SIN`
+  - The direction of the average hue of the colorful pixels, weighted so that a more colorful pixel counts more. The two
+    are the coordinates of that direction on the color wheel, and are NaN where no pixel is colorful.
 - - Background statistics (the `background_` prefix)
   - The same statistics measured over the pixels outside every annotated box, and `background_blur`, which pools the
     edges outside the boxes. The boxes are unioned, so the values describe the scene. See
@@ -225,6 +237,44 @@ stored values. Four limits decide what a value can support.
 A box with fewer than 90% of its pixels valid reads NaN for both ratios, with the surround kept, since a mean over a
 small part of a box describes the part and not the box. {class}`.Outliers` with `ImageStats.ALL` and `per_target=True`
 judges the two ratios too, and both are signed.
+
+## Color statistics
+
+The color statistics, `color_lightness_mean`, `color_chroma_mean`, `color_achromatic_fraction`, `color_hue_cos` and
+`color_hue_sin`, measure the color of an image, a box or the background in the CIELAB color space. They are experimental
+⚠️. `ImageStats.ALL` includes them, and `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of {func}`.image_stats`
+do not.
+
+Nothing in the pixels says which channels are red, green and blue, or that they are sRGB, so you declare them with
+`color_rgb_channels`: `(0, 1, 2)` for an RGB image and `(2, 1, 0)` for a BGR one. Without it the color statistics are
+dropped from the request with a notice, and a request for `ImageStats.ALL` leaves them out and logs it. The values are
+only as true as the declaration: a false-color or thermal image read as sRGB gives numbers that have no color meaning.
+Images are channel-first, as everywhere in DataEval, so an image stored as height, width and channels reads as that many
+channels. An evaluator such as {class}`.Outliers` cannot take the keyword, so compute with {func}`.image_stats` and pass
+the result to its `from_stats`.
+
+A color needs an absolute scale. The scale is the declared `value_range`, or 255 for an 8-bit image, and it is never
+read off the data's maximum, which would make the same pixels read as different colors. A 16-bit or floating-point image
+needs a declared range, and is NaN with the status `unknown_range` without one.
+
+"Chroma" and "hue" are CIELAB terms and have nothing to do with a codec's chroma subsampling. The lightness is that of
+the sRGB color once its transfer function is undone, which is neither `brightness`, a percentile of display values, nor
+`mean`, a mean of stored values.
+
+Hue is a position on the color wheel, and an average of angles misleads because the wheel is a circle: the mean of 350
+and 10 degrees is 0, not 180. `color_hue_cos` and `color_hue_sin` are the coordinates of the average direction of the
+colorful pixels, weighted so that a more colorful pixel counts more. The point lies near the rim when those pixels share
+one hue and near the center when their hues are mixed, and `atan2(color_hue_sin, color_hue_cos)` gives the mean angle
+where it is not near the center.
+
+The threshold between neutral and colorful, `color_chroma_threshold`, is a default chosen without study data and is
+provisional. On a mid gray, one channel 16 of 255 levels above the other two reads a chroma of 6.5 for red, 11.1 for green
+and 9.2 for blue, and 30 levels reads 12.3, 20.6 and 17.3, so at the default a pixel with one channel well off the others
+can still count as neutral.
+
+The statistics describe stored color, so a difference between two sets of images can be a difference in the scene, the
+camera or its white balance, and they cannot tell these apart. Video in a gamma other than sRGB, wide-gamut files and
+chroma subsampling were not measured, and the statistics read all of them as sRGB.
 
 ## Blur statistics
 

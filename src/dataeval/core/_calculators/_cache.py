@@ -171,10 +171,21 @@ class CalculatorCache:
             return False
         if not self._has_geometry:
             return self.raw.size > 0
-        x0, y0, x1, y1 = self.box.xyxy_int
-        overlap = max(0, min(x1, self.width) - max(x0, 0)) * max(0, min(y1, self.height) - max(y0, 0))
         mask = self.window_mask
-        return overlap - (0 if mask is None else int(np.count_nonzero(mask))) > 0
+        return self.overlap_pixels - (0 if mask is None else int(np.count_nonzero(mask))) > 0
+
+    @cached_property
+    def overlap_pixels(self) -> int:
+        """Pixels of the view's window that lie inside the datum, which are the pixels the view can measure.
+
+        A box that leaves the image is filled with NaN outside it, and those positions are not part of the datum:
+        counting them as missing would make every truncated box look damaged. :attr:`window_mask` is False outside the
+        image, so what it excludes is always counted here.
+        """
+        if not self._has_geometry:
+            return self.raw.shape[-2] * self.raw.shape[-1] if self.raw.ndim >= 2 else 0
+        x0, y0, x1, y1 = self.box.xyxy_int
+        return max(0, min(x1, self.width) - max(x0, 0)) * max(0, min(y1, self.height) - max(y0, 0))
 
     @cached_property
     def window_mask(self) -> NDArray[np.bool_] | None:

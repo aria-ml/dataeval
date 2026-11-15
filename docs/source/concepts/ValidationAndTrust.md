@@ -546,6 +546,12 @@ Experimental ⚠️ (API may change or be removed):
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
+- {func}`.image_stats` with any `ImageStats.COLOR` flag (`VISUAL_COLOR_LIGHTNESS_MEAN`, `VISUAL_COLOR_CHROMA_MEAN`,
+  `VISUAL_COLOR_ACHROMATIC_FRACTION`, `VISUAL_COLOR_HUE_COS`, `VISUAL_COLOR_HUE_SIN`) and the `color_rgb_channels`,
+  `color_min_pixels` and `color_chroma_threshold` keywords. The column names, the values and the keywords may change. A
+  call that measures color raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process.
+  `ImageStats.ALL` includes the group but measures it only where `color_rgb_channels` is given, so a call that does not
+  give it raises nothing. See [Image statistics](ImageStatistics.md#color-statistics).
 - {func}`.image_stats` with the `labels` keyword. The keyword may change. It raises no warning. The two class
   statistics of `ImageStats.SPATIAL` read it, and no other statistic does.
 - The `value_range` key of a datum's metadata, which declares the interval an image's values occupy. It is read by

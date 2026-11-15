@@ -24,8 +24,9 @@ v1.1
     invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors, and surround statistics
     (`ImageStats.CONTEXT`) read the intensity of the pixels around a box and how far the box stands from it. A saturation
     statistic (`ImageStats.PIXEL_SATURATION`, in `PIXEL`) reports the share of values at a clipping endpoint, so the default
-    image statistics gain a column, and `DetectionCrops` declares it invalidated too. A dataset can declare each image's
-    `value_range` in its metadata. `Duplicates`
+    image statistics gain a column, and `DetectionCrops` declares it invalidated too. Experimental color statistics
+    (`ImageStats.COLOR`, in `ALL`) measure lightness, chroma and hue from channels you declare are sRGB. A dataset can
+    declare each image's `value_range` in its metadata. `Duplicates`
     searches videos with long static stretches for shared segments with experimental `hash_neighbors` arguments
     `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames
     and exact repeats, `track_stats` returns two more columns, the longest gap and the net heading of a

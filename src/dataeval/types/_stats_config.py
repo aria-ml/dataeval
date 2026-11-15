@@ -74,6 +74,28 @@ class SaturationConfig(StrictConfig):
     atol: NonNegativeFloat = 0.0
 
 
+class ColorConfig(StrictConfig):
+    """
+    Settings for the color statistics.
+
+    Attributes
+    ----------
+    rgb_channels : tuple[int, int, int] or None, default None
+        The channels of the datum that are sRGB red, green and blue, in that order. None means none were declared.
+    min_pixels : int, default 32
+        Greater than 0.
+    min_valid_fraction : float, default 0.90
+        In [0, 1]. Fixed by the library: `image_stats` has no keyword for it.
+    chroma_threshold : float, default 12.0
+        Greater than 0. Chroma under it is achromatic.
+    """
+
+    rgb_channels: tuple[int, int, int] | None = None
+    min_pixels: PositiveInt = 32
+    min_valid_fraction: UnitInterval = 0.90
+    chroma_threshold: PositiveFloat = 12.0
+
+
 class ImageStatsConfig(StrictConfig):
     """
     Settings for the statistics of :func:`~dataeval.core.image_stats` that take them.
@@ -87,7 +109,10 @@ class ImageStatsConfig(StrictConfig):
         Settings for the surround of a box.
     saturation : SaturationConfig, default SaturationConfig()
         Settings for the saturation statistic.
+    color : ColorConfig, default ColorConfig()
+        Settings for the color statistics.
     """
 
     surround: SurroundConfig = SurroundConfig()
     saturation: SaturationConfig = SaturationConfig()
+    color: ColorConfig = ColorConfig()
