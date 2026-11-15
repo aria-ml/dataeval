@@ -48,8 +48,7 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
         # silently covers a subset of the dataset and the first sign is a row-count
         # mismatch from add_factors much later.
         undetected: list[int] = []
-        for i in range(count):
-            _, target, metadata = self._datum(dataset, i)
+        for i, (_, target, metadata) in enumerate(self._datums(dataset)):
             raw.append(metadata)
             if not isinstance(target, ObjectDetectionTarget):
                 raise TypeError(

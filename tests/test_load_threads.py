@@ -1,0 +1,227 @@
+"""`load_threads` loads several dataset items at once in the two whole-dataset walks, `Embeddings` and `Metadata`, and
+leaves every result and the order of reads exactly as they were when it is not set."""
+
+import threading
+import time
+import warnings
+from typing import Any, cast
+
+import numpy as np
+import pytest
+from polars.testing import assert_frame_equal
+
+from dataeval import Embeddings, Metadata
+from dataeval import _experimental as experimental_module
+from dataeval.bias import Balance
+from dataeval.config import get_load_threads, set_load_threads, use_load_threads
+from dataeval.exceptions import ExperimentalWarning
+from dataeval.extractors import FlattenExtractor
+from dataeval.protocols import DatasetMetadata, DatumMetadata
+from dataeval.quality import Outliers
+from tests.data.conftest import VIDEO_FACTORS, VIDEOS, FactorVideos
+
+pytestmark = [
+    pytest.mark.required,
+    pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning"),
+]
+
+N = 32
+DELAY = 0.02
+
+
+class _SlowImages:
+    """A classification dataset whose reads take `delay` seconds and record which thread made them."""
+
+    metadata = DatasetMetadata(id="slow", index2label={0: "a", 1: "b", 2: "c"})
+
+    def __init__(self, size: int = N, delay: float = DELAY) -> None:
+        self.size, self.delay = size, delay
+        self.order: list[int] = []
+        self.idents: dict[int, int] = {}
+
+    def __len__(self) -> int:
+        return self.size
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, DatumMetadata]:
+        self.order.append(index)
+        self.idents[index] = threading.get_ident()
+        time.sleep(self.delay)
+        image = np.random.default_rng(index).random((3, 8, 8), dtype=np.float32)
+        metadata = cast(DatumMetadata, {"id": index, "group": ("x", "y")[index % 2]})
+        return image, np.eye(3, dtype=np.float32)[index % 3], metadata
+
+    @property
+    def off_main_thread(self) -> int:
+        return sum(1 for ident in self.idents.values() if ident != threading.get_ident())
+
+
+@pytest.fixture(autouse=True)
+def fresh_state(monkeypatch):
+    monkeypatch.setattr(experimental_module, "_WARNED", set())
+    set_load_threads(None)
+    yield
+    set_load_threads(None)
+
+
+def _same(left: Any, right: Any) -> None:
+    """Assert two evaluator outputs, dictionaries of frames and other values, are equal."""
+    assert left.keys() == right.keys()
+    for key in left:
+        if hasattr(left[key], "equals"):
+            assert_frame_equal(left[key], right[key])
+        else:
+            assert repr(left[key]) == repr(right[key])
+
+
+def _embed(dataset: Any) -> Any:
+    return np.asarray(Embeddings(dataset, extractor=FlattenExtractor(), batch_size=8))
+
+
+class TestTheSetting:
+    def test_it_is_unset_by_default(self):
+        assert get_load_threads() is None
+
+    def test_set_get_and_use_restore(self):
+        set_load_threads(4)
+        assert get_load_threads() == 4
+        with use_load_threads(2):
+            assert get_load_threads() == 2
+        assert get_load_threads() == 4
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_a_value_below_one_is_refused(self, value):
+        with pytest.raises(ValueError, match="load_threads"):
+            set_load_threads(value)
+
+    def test_asking_for_threads_warns_once_and_not_asking_raises_nothing(self):
+        with pytest.warns(ExperimentalWarning, match="load_threads"):
+            set_load_threads(4)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            set_load_threads(4)
+            with use_load_threads(2):
+                pass
+            set_load_threads(None)
+            set_load_threads(1)
+
+
+class TestDefaultIsUnchanged:
+    def test_embeddings_read_in_order_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0)
+        _embed(dataset)
+        assert dataset.order[1:] == list(range(N))  # the first read is the constructor's probe of item 0
+        assert dataset.off_main_thread == 0
+
+    def test_the_metadata_walk_reads_in_order_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0)
+        _ = Metadata(dataset).factor_names
+        assert dataset.off_main_thread == 0
+        assert dataset.order[-(N - 1) :] == list(range(1, N))
+
+
+class TestEmbeddings:
+    def test_threads_give_the_same_embeddings_faster(self):
+        serial_dataset = _SlowImages()
+        start = time.perf_counter()
+        serial = _embed(serial_dataset)
+        serial_time = time.perf_counter() - start
+
+        threaded_dataset = _SlowImages()
+        with use_load_threads(4):
+            start = time.perf_counter()
+            threaded = _embed(threaded_dataset)
+            threaded_time = time.perf_counter() - start
+
+        np.testing.assert_array_equal(threaded, serial)
+        assert threaded_dataset.off_main_thread > 0
+        assert threaded_time < 0.6 * serial_time
+
+    def test_a_single_index_builds_no_pool(self):
+        dataset = _SlowImages(delay=0)
+        with use_load_threads(4):
+            Embeddings(dataset, extractor=FlattenExtractor(), batch_size=8)[5]
+        assert dataset.off_main_thread == 0
+
+    def test_a_slow_extractor_still_sees_batches_in_order(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            threaded = _embed(dataset)
+        np.testing.assert_array_equal(threaded, _embed(_SlowImages(delay=0)))
+
+
+class TestMetadataWalk:
+    def test_threads_give_the_same_metadata_faster(self):
+        start = time.perf_counter()
+        serial = Metadata(_SlowImages()).dataframe
+        serial_time = time.perf_counter() - start
+
+        dataset = _SlowImages()
+        with use_load_threads(4):
+            start = time.perf_counter()
+            threaded = Metadata(dataset).dataframe
+            threaded_time = time.perf_counter() - start
+
+        assert_frame_equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+        assert threaded_time < 0.7 * serial_time
+
+    def test_item_zero_is_read_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            _ = Metadata(dataset).factor_names
+        assert dataset.idents[0] == threading.get_ident()
+
+    def test_a_tracking_dataset_is_walked_serially_and_gives_the_same_metadata(self):
+        serial = Metadata(FactorVideos(VIDEOS, VIDEO_FACTORS)).dataframe
+        with use_load_threads(4):
+            threaded = Metadata(FactorVideos(VIDEOS, VIDEO_FACTORS)).dataframe
+        assert_frame_equal(threaded, serial)
+
+    def test_a_view_record_is_read_serially(self):
+        from dataeval.data import Filter, View
+
+        dataset = _SlowImages(delay=0)
+        # The predicate structures every item, so the view keeps its record.
+        view = View(dataset, Filter("\"group\" = 'x'"))
+        assert view._reads is not None
+        before = len(dataset.order)
+        with use_load_threads(4):
+            frame = Metadata(view).dataframe
+        assert dataset.off_main_thread == 0
+        assert len(dataset.order) - before <= 1  # the probe of item 0, and nothing is read again
+        assert_frame_equal(frame, Metadata(View(_SlowImages(delay=0), Filter("\"group\" = 'x'"))).dataframe)
+
+
+class TestWithTheReadRecord:
+    def test_threaded_embeddings_fill_a_views_record_and_metadata_then_reads_nothing_again(self):
+        from dataeval.data import View
+
+        dataset = _SlowImages(delay=0.002)
+        view = View(dataset, record_reads=True)
+        with use_load_threads(4):
+            _embed(view)
+        assert dataset.off_main_thread > 0
+        assert view._reads is not None
+        assert set(view._reads) == set(range(N))
+        before = len(dataset.order)
+        frame = Metadata(view).dataframe
+        assert len(dataset.order) - before <= 1  # the probe of item 0, and nothing is read again
+        assert_frame_equal(frame, Metadata(_SlowImages(delay=0)).dataframe)
+
+
+class TestEvaluatorsThatBuildTheirOwn:
+    def test_outliers_loads_its_embeddings_in_threads(self):
+        dataset = _SlowImages(delay=0.005)
+        with use_load_threads(4):
+            threaded = Outliers(extractor=FlattenExtractor()).evaluate(dataset)
+        assert dataset.off_main_thread > 0
+        serial = Outliers(extractor=FlattenExtractor()).evaluate(_SlowImages(delay=0))
+        assert_frame_equal(threaded.data(), serial.data())
+
+    def test_balance_loads_its_metadata_in_threads(self):
+        dataset = _SlowImages(delay=0.005)
+        with use_load_threads(4):
+            threaded = Balance().evaluate(dataset)
+        assert dataset.off_main_thread > 0
+        serial = Balance().evaluate(_SlowImages(delay=0))
+        _same(threaded.data(), serial.data())

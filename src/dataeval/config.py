@@ -11,6 +11,9 @@ __all__ = [
     "get_max_processes",
     "set_max_processes",
     "use_max_processes",
+    "get_load_threads",
+    "set_load_threads",
+    "use_load_threads",
     "get_seed",
     "set_seed",
     "use_seed",
@@ -23,6 +26,7 @@ import numpy as np
 import torch
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from dataeval._experimental import warn_experimental_once
 from dataeval.protocols import DeviceLike
 
 # GLOBAL CONFIG ###
@@ -44,6 +48,8 @@ class GlobalConfig(BaseModel):
         Default batch size for data processing.
     max_processes : int or None, default None
         Maximum number of worker processes for parallel tasks.
+    load_threads : int or None, default None
+        Number of threads that load dataset items at once while a whole-dataset walk reads them.
     seed : int or None, default None
         Random seed for reproducibility.
     """
@@ -56,6 +62,7 @@ class GlobalConfig(BaseModel):
     device: torch.device | None = None
     batch_size: int | None = None
     max_processes: int | None = None
+    load_threads: int | None = None
     seed: int | None = None
 
     @field_validator("max_processes")
@@ -64,6 +71,14 @@ class GlobalConfig(BaseModel):
         """Validate that max_processes is not zero."""
         if v == 0:
             raise ValueError("max_processes cannot be zero; use None to default to CPU count.")
+        return v
+
+    @field_validator("load_threads")
+    @classmethod
+    def validate_load_threads(cls, v: int | None) -> int | None:
+        """Validate that load_threads is at least one."""
+        if v is not None and v < 1:
+            raise ValueError("load_threads must be at least 1; use None to load serially.")
         return v
 
     @field_validator("batch_size")
@@ -326,6 +341,83 @@ def use_max_processes(processes: int) -> _ConfigContextManager:
         Context manager that restores the previous value on exit.
     """
     return _ConfigContextManager("max_processes", processes)
+
+
+_LOAD_THREADS_DETAILS = (
+    "It helps when each dataset read takes more than a few milliseconds and releases the GIL, and it can be slower "
+    "than the serial loop on small images. The dataset must be safe to read from several threads at once."
+)
+
+
+def set_load_threads(threads: int | None) -> None:
+    """
+    Set how many threads load dataset items at once.
+
+    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset.
+
+    Parameters
+    ----------
+    threads : int or None
+        The number of threads. None, the default, and 1 read one item at a time on the calling thread, as before.
+
+    Raises
+    ------
+    ValueError
+        If `threads` is below one.
+
+    See Also
+    --------
+    set_max_processes : The separate setting for worker processes and scikit-learn's ``n_jobs``.
+
+    Notes
+    -----
+    **Parallelism.** With more than one thread, ``dataset[i]`` is called from several threads at once and in no fixed
+    order. A dataset that is not safe for that, such as one that holds an open file handle, returns wrong data without
+    raising. Results and their order are unchanged. Threads help when each read takes more than a few milliseconds and
+    releases the GIL, such as decoding a large image, and can be slower than the serial loop when reads are short. A
+    random transform inside the dataset draws from shared random state, so seeded results can differ between runs. A
+    multi-object tracking dataset is always read serially, and so is a :class:`~dataeval.data.View` record. Evaluators
+    that build their own :class:`~dataeval.Embeddings` or :class:`~dataeval.Metadata` use the setting too. It is not
+    tested with datasets that land their data on a GPU, or on Windows or macOS.
+
+    Setting more than one thread raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
+
+    .. versionadded:: 1.3
+    """
+    if threads is not None and threads > 1:
+        warn_experimental_once("load_threads", details=_LOAD_THREADS_DETAILS)
+    _config.load_threads = threads
+
+
+def get_load_threads() -> int | None:
+    """
+    Return how many threads load dataset items at once, or None when items are read one at a time.
+
+    Returns
+    -------
+    int or None
+        The number of threads set with :func:`set_load_threads`.
+    """
+    return _config.load_threads
+
+
+def use_load_threads(threads: int) -> _ConfigContextManager:
+    """
+    Context manager to temporarily override the number of threads that load dataset items.
+
+    Parameters
+    ----------
+    threads : int
+        The number of threads to use within the context. See :func:`set_load_threads` for what to expect.
+
+    Returns
+    -------
+    _ConfigContextManager
+        Context manager that restores the previous value on exit.
+    """
+    if threads > 1:
+        warn_experimental_once("load_threads", details=_LOAD_THREADS_DETAILS)
+    return _ConfigContextManager("load_threads", threads)
 
 
 def set_seed(seed: int | None, all_generators: bool = False, deterministic: bool = False) -> None:
