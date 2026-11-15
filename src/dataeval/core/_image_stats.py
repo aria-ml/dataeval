@@ -39,7 +39,7 @@ from dataeval.protocols import (
     _is_protocol_instance,
 )
 from dataeval.types import FactorLevel, MeasurementSpec, SourceIndex
-from dataeval.types._stats_config import ImageStatsConfig, SaturationConfig, SurroundConfig
+from dataeval.types._stats_config import ColorConfig, ImageStatsConfig, SaturationConfig, SurroundConfig
 from dataeval.utils._annotations import AnnotationContext, Annotations, build_annotations
 from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import PoolWrapper
@@ -52,6 +52,7 @@ from dataeval.utils.preprocessing import (
     ChannelGroupLike,
     ValueRange,
     _validate_declared_range,
+    _validate_index_selection,
     boxes_to_mask,
     get_value_range,
     normalize_image_shape,
@@ -59,6 +60,10 @@ from dataeval.utils.preprocessing import (
 )
 
 _logger = get_logger(__name__)
+
+# Notices given once per process, by name, like the experimental warnings: a warning on every call would be noise for a
+# caller whose request names no color and cannot declare it.
+_NOTICES_GIVEN: set[str] = set()
 
 
 def _flag_list(flags: Flag) -> list[str]:
@@ -791,7 +796,8 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
 def _reads_a_range(whole_flags: Flag, group_flags: Mapping[str, Flag], normalize_pixel_values: bool) -> bool:
     """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy."""
     return any(
-        _unmeasurable_flags(flags, None, normalize_pixel_values) or flags & ImageStats.PIXEL_SATURATION
+        _unmeasurable_flags(flags, None, normalize_pixel_values)
+        or flags & (ImageStats.PIXEL_SATURATION | ImageStats.COLOR)
         for flags in (whole_flags, *group_flags.values())
     )
 
@@ -1074,8 +1080,28 @@ def _checked(build: Callable[[], Any], keyword: str, expected: str, value: Any) 
         raise ValueError(f"{keyword} must be {expected}, got {value!r}.") from None
 
 
+def _color_channels(value: Any) -> tuple[int, int, int] | None:
+    """Return the declared red, green and blue channels as built-in ints in the order given, or None where none are."""
+    if value is None:
+        return None
+    expected = "three distinct non-negative whole numbers, as a list, a tuple or an array"
+    try:
+        channels = _validate_index_selection(value)
+    except ValueError:
+        raise ValueError(f"color_rgb_channels must be {expected}, got {value!r}.") from None
+    if len(channels) != 3 or len(set(channels)) != 3:
+        raise ValueError(f"color_rgb_channels must be {expected}, got {value!r}.")
+    return (channels[0], channels[1], channels[2])
+
+
 def _settings(
-    saturation_atol: Any, surround_padding: Any, surround_min_pixels: Any, surround_intensity_floor: Any
+    saturation_atol: Any,
+    surround_padding: Any,
+    surround_min_pixels: Any,
+    surround_intensity_floor: Any,
+    color_rgb_channels: Any = None,
+    color_min_pixels: Any = 32,
+    color_chroma_threshold: Any = 12.0,
 ) -> ImageStatsConfig:
     """Check the keywords that set up a statistic and bundle them, each on its own so the error names the keyword."""
     saturation = _checked(
@@ -1105,7 +1131,21 @@ def _settings(
     surround = SurroundConfig(
         padding=surround_padding, min_pixels=surround_min_pixels, intensity_floor=surround_intensity_floor
     )
-    return ImageStatsConfig(saturation=saturation, surround=surround)
+    channels = _color_channels(color_rgb_channels)
+    _checked(
+        lambda: ColorConfig(min_pixels=color_min_pixels),
+        "color_min_pixels",
+        "a whole number of 1 or more",
+        color_min_pixels,
+    )
+    _checked(
+        lambda: ColorConfig(chroma_threshold=color_chroma_threshold),
+        "color_chroma_threshold",
+        "a finite number greater than 0",
+        color_chroma_threshold,
+    )
+    color = ColorConfig(rgb_channels=channels, min_pixels=color_min_pixels, chroma_threshold=color_chroma_threshold)
+    return ImageStatsConfig(saturation=saturation, surround=surround, color=color)
 
 
 def image_stats(  # noqa: C901
@@ -1124,6 +1164,9 @@ def image_stats(  # noqa: C901
     surround_padding: float = 0.25,
     surround_min_pixels: int = 32,
     surround_intensity_floor: float = 1 / 255,
+    color_rgb_channels: Sequence[int] | None = None,
+    color_min_pixels: int = 32,
+    color_chroma_threshold: float = 12.0,
     progress_callback: ProgressCallback | None = None,
 ) -> StatsResult:
     """
@@ -1203,8 +1246,9 @@ def image_stats(  # noqa: C901
         background statistic measured over a few percent of an image is noise wearing
         a measurement's clothes.
 
-        Only :attr:`~dataeval.flags.ImageStats.PIXEL` and :attr:`~dataeval.flags.ImageStats.VISUAL` statistics and
-        :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR` are computed for the
+        Only :attr:`~dataeval.flags.ImageStats.PIXEL`, :attr:`~dataeval.flags.ImageStats.VISUAL` and
+        :attr:`~dataeval.flags.ImageStats.COLOR` statistics and :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR` are
+        computed for the
         background; any hash, dimension, spatial or blur directionality statistics in `stats` are computed for the
         image and its boxes as usual and skipped for the background, which has no
         meaningful hash and no geometry of its own. ``background_blur`` is the blur value taken over the edges
@@ -1300,6 +1344,10 @@ def image_stats(  # noqa: C901
         A statistic that does not need an interval is unaffected: an unnormalized mean of
         physical values is a perfectly good mean.
 
+        The color statistics (:attr:`~dataeval.flags.ImageStats.COLOR`) never use the decoded interval, which is read
+        off the data's own maximum: they use the declared one, and 255 for an unsigned 8-bit datum, so a 16-bit or float
+        image needs one declared, and is NaN with the status `unknown_range` without.
+
         A dataset can declare the interval image by image instead, as a ``(low, high)`` pair under ``value_range`` in
         each datum's metadata, so one collection can hold sensors of different depths. It is read when a requested
         statistic reads an interval, and a pair that is not finite and ordered raises, naming the image. This argument
@@ -1355,6 +1403,29 @@ def image_stats(  # noqa: C901
         read it.
 
         .. versionadded:: 1.3
+    color_rgb_channels : Sequence[int] or None, default None
+        The three channels of the datum that are sRGB red, green and blue, in that order, as a list, a tuple or an
+        array of three distinct non-negative whole numbers: ``(0, 1, 2)`` for an RGB image, ``(2, 1, 0)`` for a BGR
+        one. Color is not readable from the pixels, so the statistics of `ImageStats.COLOR` are measured only where
+        this is given, and are dropped from the request, with a notice, where it is not. It indexes the datum's own
+        channels, not a group of `channels`, and an evaluator cannot pass it. A value that is given and wrong
+        raises. Recorded in `measurement_specs`.
+
+        .. versionadded:: 1.3
+    color_min_pixels : int, default 32
+        The fewest valid pixels a view needs for the color statistics to have a value, a whole number of 1 or more.
+        A view with fewer reads NaN with the status `insufficient_support`. The default is the choice of the issue
+        that added the statistics and no study picked it, so it is provisional. Checked on every call, and ignored,
+        with a warning, when `stats` requests no `ImageStats.COLOR` statistic. Recorded in `measurement_specs`.
+
+        .. versionadded:: 1.3
+    color_chroma_threshold : float, default 12.0
+        The chroma under which a pixel is achromatic, a finite number greater than 0, in CIELAB chroma units. It moves
+        `color_achromatic_fraction` and both hue columns. The default is the choice of the issue that added the
+        statistics and no study picked it, so it is provisional. Checked, ignored and recorded as `color_min_pixels`
+        is.
+
+        .. versionadded:: 1.3
     progress_callback : ProgressCallback or None, default None
         Callback to report progress during calculation. Called after each image is processed
         with the current image count and total number of images (if known).
@@ -1401,16 +1472,23 @@ def image_stats(  # noqa: C901
         If `stats` asks for a spatial or context statistic beside others and the call measures no box rows, so those
         columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
         `labels`, so every label is missing. A request that holds every statistic of `ImageStats.ALL` that needs no
-        box does not warn in either case: it asks for everything, and the statistics that cannot be measured read NaN.
+        box, less the color statistics where `color_rgb_channels` is not given, does not warn in either case: it asks
+        for everything, and the statistics that cannot be measured read NaN.
         A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`,
         so the setting is ignored, and a fourth for `surround_padding`, `surround_min_pixels` or
         `surround_intensity_floor` given a value other than its default when `stats` requests no `ImageStats.CONTEXT`
         statistic, or for `surround_intensity_floor` when `stats` requests neither
         `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only
-        statistics that read it.
+        statistics that read it. A fifth is for the same of `color_min_pixels`, `color_chroma_threshold` and
+        `color_rgb_channels` when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a
+        color statistic and `color_rgb_channels` is not given, so the color statistics are dropped from the request,
+        once per process; a request that holds every statistic of `ImageStats.ALL` that can be measured logs that and
+        does not warn, and every drop is logged.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
-        `ImageStats.ALL` holds it. The spatial statistics are stable and raise none.
+        `ImageStats.ALL` holds it. Likewise for the first request that measures a color statistic (`ImageStats.COLOR`),
+        which `ImageStats.ALL` does only where `color_rgb_channels` is given. The spatial statistics are stable and
+        raise none.
 
     Notes
     -----
@@ -1588,6 +1666,22 @@ def image_stats(  # noqa: C901
     3.0
     >>> ringed["details"]["context_status"].tolist(), ringed["details"]["surround_candidate_pixels"].tolist()
     (['ok'], [16])
+
+    Measure color. It is read from three channels that you declare are sRGB red, green and blue, because nothing in the
+    pixels says so, and without them the color statistics are dropped from the request. Here a red image is declared as
+    channels 0, 1 and 2, then its blue-green-red twin as 2, 1 and 0, and the two read alike. The hue is a direction on
+    the color wheel, given as a cosine and a sine:
+
+    >>> red = np.zeros((3, 8, 8), dtype=np.uint8)
+    >>> red[0] = 255
+    >>> seen = image_stats([red], stats=ImageStats.COLOR, color_rgb_channels=(0, 1, 2))["stats"]
+    >>> round(float(seen["color_hue_cos"][0]), 3), round(float(seen["color_hue_sin"][0]), 3)
+    (0.766, 0.643)
+    >>> round(float(np.hypot(seen["color_hue_cos"][0], seen["color_hue_sin"][0])), 3)
+    1.0
+    >>> bgr = image_stats([red[::-1]], stats=ImageStats.COLOR, color_rgb_channels=(2, 1, 0))["stats"]
+    >>> bool(bgr["color_chroma_mean"][0] == seen["color_chroma_mean"][0])
+    True
     """
     # Checked here rather than in a worker: a malformed declaration is a mistake in the
     # call, and surfacing it out of a pool process names the wrong frame.
@@ -1632,7 +1726,15 @@ def image_stats(  # noqa: C901
 
     # Checked before any image is read, and whether or not the statistic is requested, so a bad value never waits for
     # the first image that would have used it.
-    settings = _settings(saturation_atol, surround_padding, surround_min_pixels, surround_intensity_floor)
+    settings = _settings(
+        saturation_atol,
+        surround_padding,
+        surround_min_pixels,
+        surround_intensity_floor,
+        color_rgb_channels,
+        color_min_pixels,
+        color_chroma_threshold,
+    )
 
     if channels is True:
         # Caught by name rather than left to fail inside `_resolve_channel_groups`, where a
@@ -1652,6 +1754,42 @@ def image_stats(  # noqa: C901
     # `distance` collides with `distance_center` whichever view produces that column — and
     # so does the log line, which should say what was requested rather than what one view got.
     requested = reduce(or_, group_flags.values(), whole_flags)
+
+    # What `ALL` asks for that cannot be measured on every call: a statistic that needs a box, read from the
+    # statistics' own declarations so the next family that needs one cannot be missed, and the color statistics where
+    # no channels are declared. A request that holds all of the rest asks for everything, so `ALL` stays quiet about
+    # what it cannot measure.
+    needs_box = reduce(
+        or_,
+        (
+            calculator.flags_with_needs(flags)
+            for calculator, flags in CalculatorRegistry.get_calculators(ImageStats.ALL)
+        ),
+        ImageStats(0),
+    )
+    color_undeclared = ImageStats.COLOR if settings.color.rgb_channels is None else ImageStats(0)
+    asks_for_all = (requested & ~(needs_box | color_undeclared)) == (ImageStats.ALL & ~(needs_box | color_undeclared))
+
+    # Color is not readable from the pixels, so it is measured only from channels the caller declares are sRGB red,
+    # green and blue. Without them it is dropped from the request, before anything else reads the request, and said:
+    # in the log every time, and with a warning once per process for a request short of `ALL`. A request that asks for
+    # everything only logs, since Flow and the evaluators make it and cannot declare.
+    if requested & color_undeclared:
+        dropped = requested & color_undeclared
+        whole_flags &= ~dropped
+        group_flags = {name: flags & ~dropped for name, flags in group_flags.items()}
+        requested &= ~dropped
+        message = (
+            "the color statistics are dropped from this request, because color_rgb_channels is not given. Color is not "
+            "readable from the pixels, so the three channels that are sRGB red, green and blue must be declared: pass "
+            "color_rgb_channels=(0, 1, 2), which asserts that channels 0, 1 and 2 are sRGB red, green and blue "
+            "(color_rgb_channels=(2, 1, 0) for a BGR image). An evaluator such as Outliers cannot take the keyword: "
+            "compute with image_stats, then call the evaluator's from_stats."
+        )
+        _logger.info(message)
+        if not asks_for_all and "color_dropped" not in _NOTICES_GIVEN:
+            _NOTICES_GIVEN.add("color_dropped")
+            warnings.warn(message, UserWarning, stacklevel=2)
 
     # Nothing to compute, said once wherever it came from: ``ImageStats.NONE``, ``{}`` and
     # ``{None: ImageStats.NONE}`` are three spellings of one request and answer the same
@@ -1707,6 +1845,29 @@ def image_stats(  # noqa: C901
             stacklevel=2,
         )
 
+    # The color settings set up `ImageStats.COLOR`, so given with none of it requested they are probably a flag
+    # forgotten.
+    color_given, color_defaults = settings.color, ColorConfig()
+    color_unused = [
+        name
+        for name, value, default in (
+            ("color_rgb_channels", color_given.rgb_channels, color_defaults.rgb_channels),
+            ("color_min_pixels", color_given.min_pixels, color_defaults.min_pixels),
+            ("color_chroma_threshold", color_given.chroma_threshold, color_defaults.chroma_threshold),
+        )
+        if value != default
+    ]
+    if color_unused and not requested & ImageStats.COLOR:
+        names = color_unused[0] if len(color_unused) == 1 else f"{', '.join(color_unused[:-1])} and {color_unused[-1]}"
+        warnings.warn(
+            f"{names} {'is' if len(color_unused) == 1 else 'are'} ignored, because "
+            f"{'it sets' if len(color_unused) == 1 else 'they set'} up `ImageStats.COLOR` and stats does not request "
+            "it. "
+            "Add `ImageStats.COLOR` to stats, or drop it.",
+            UserWarning,
+            stacklevel=2,
+        )
+
     calculators = CalculatorRegistry.get_calculators(whole_flags)
     channel_groups = _resolve_channel_groups(channels or {}, CalculatorRegistry.get_calculators(requested))
 
@@ -1717,15 +1878,7 @@ def image_stats(  # noqa: C901
     # cannot be measured reads NaN without a word, as on any row it cannot measure: `ALL` is what a caller reaches for
     # when it does not choose, and dataeval-flow does so with `per_target=False`. What needs a box is read from the
     # statistics' own declarations, so the next family that needs one cannot be missed here.
-    needs_box = reduce(
-        or_,
-        (
-            calculator.flags_with_needs(flags)
-            for calculator, flags in CalculatorRegistry.get_calculators(ImageStats.ALL)
-        ),
-        ImageStats(0),
-    )
-    asks_for_all = (requested & ~needs_box) == (ImageStats.ALL & ~needs_box)
+    # (`needs_box` and `asks_for_all` are settled where the request is resolved, above.)
     peer_flags = reduce(
         or_,
         (calculator.flags_with_needs(flags) for calculator, flags in CalculatorRegistry.get_calculators(requested)),
@@ -1781,6 +1934,17 @@ def image_stats(  # noqa: C901
                 "The column names and values may change. "
                 "`ImageStats.ALL` includes the blur statistics, "
                 "and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
+            ),
+        )
+
+    # Color warns only where it is measured, that is, where it was requested and survived the drop above: a request
+    # for `ALL` with no declaration measures none of it.
+    if requested & ImageStats.COLOR:
+        warn_experimental_once(
+            "ImageStats.COLOR",
+            details=(
+                "The column names and values may change. The channels are declared and not detected, and sRGB is "
+                "assumed."
             ),
         )
 

@@ -88,11 +88,12 @@ results_background = image_stats(
 print(f"Computed statistics: {sorted(results_background['stats'])}")
 
 # %% [markdown]
-# Only {attr}`.ImageStats.PIXEL` and {attr}`.ImageStats.VISUAL` statistics, and {attr}`.ImageStats.VISUAL_BLUR`, are
-# computed for the background. A hash, dimension or blur directionality flag is skipped for it. Read
-# `background_fraction`, the share of the image left unmasked, before the rest. A background statistic measured over a
-# few percent of an image is unreliable, and where boxes cover an image entirely every background statistic for it is
-# NaN. See [Data integrity](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks).
+# Only {attr}`.ImageStats.PIXEL`, {attr}`.ImageStats.VISUAL` and {attr}`.ImageStats.COLOR` statistics, and
+# {attr}`.ImageStats.VISUAL_BLUR`, are computed for the background. A hash, dimension or blur directionality flag is
+# skipped for it. Read `background_fraction`, the share of the image left unmasked, before the rest. A background
+# statistic measured over a few percent of an image is unreliable, and where boxes cover an image entirely every
+# background statistic for it is NaN. See
+# [Data integrity](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks).
 
 # %%
 # The result spans image rows and target rows; only the image rows carry a background, so the

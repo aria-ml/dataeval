@@ -98,9 +98,21 @@ def test_blur_is_in_all_and_in_no_smaller_group():
     """`ALL` holds blur and every other statistic, `SPATIAL` and `CONTEXT` too; the smaller groups hold no blur."""
     assert ImageStats.BLUR in ImageStats.ALL
     assert ImageStats.ALL == (
-        ImageStats.STANDARD | ImageStats.HASH | ImageStats.BLUR | ImageStats.SPATIAL | ImageStats.CONTEXT
+        ImageStats.STANDARD
+        | ImageStats.HASH
+        | ImageStats.BLUR
+        | ImageStats.SPATIAL
+        | ImageStats.CONTEXT
+        | ImageStats.COLOR
     )
-    v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT
+    v12 = (
+        ImageStats.ALL
+        & ~ImageStats.BLUR
+        & ~ImageStats.SPATIAL
+        & ~ImageStats.PIXEL_SATURATION
+        & ~ImageStats.CONTEXT
+        & ~ImageStats.COLOR
+    )
     assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
     assert ~ImageStats.ALL == ImageStats.NONE
     for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.STANDARD, ImageStats.BASIC):
@@ -134,6 +146,7 @@ def test_all_is_spelled_from_the_families():
         | ImageStats.SPATIAL
         | ImageStats.PIXEL_SATURATION
         | ImageStats.CONTEXT
+        | ImageStats.COLOR
     )
     assert families == ImageStats.ALL
 

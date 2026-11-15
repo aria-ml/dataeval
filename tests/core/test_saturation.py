@@ -45,11 +45,11 @@ class TestFlag:
         assert ImageStats.PIXEL_SATURATION.name == "PIXEL_SATURATION"
 
     def test_no_existing_flag_moved_and_the_new_one_is_appended(self):
-        # The CONTEXT flags were appended after it by a later change, and have a test of their own.
+        # The CONTEXT and COLOR flags were appended after it by later changes, and have tests of their own.
         members = {
             m.name: m.value
             for m in ImageStats
-            if m.name != "PIXEL_SATURATION" and not (m.name or "").startswith("CONTEXT_")
+            if m.name != "PIXEL_SATURATION" and not (m.name or "").startswith(("CONTEXT_", "VISUAL_COLOR_"))
         }
         assert members == _EXISTING_VALUES
         assert ImageStats.PIXEL_SATURATION.value == 2 * max(_EXISTING_VALUES.values())
@@ -73,7 +73,12 @@ class TestFlag:
 
     def test_the_v12_column_set_is_the_default_request_without_it(self):
         v12 = (
-            ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT
+            ImageStats.ALL
+            & ~ImageStats.BLUR
+            & ~ImageStats.SPATIAL
+            & ~ImageStats.PIXEL_SATURATION
+            & ~ImageStats.CONTEXT
+            & ~ImageStats.COLOR
         )
         assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
 

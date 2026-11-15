@@ -538,6 +538,20 @@ statistical and computational.
     interval its own maximum decodes to, so compare images only where the range is declared. The intensity is a mean
     over the channels, so hue does not show in it. The padding of a quarter, the floor of 32 pixels, the 90% of valid
     target pixels and the floor of 1/255 were chosen by no study.
+- - {func}`.image_stats` (`ImageStats.COLOR`)
+  - The mean lightness and chroma, the share of neutral pixels, and the chroma-weighted direction of the hue of an image,
+    a box or the background, in CIELAB (D65, 2-degree observer), read from three channels that the caller declares are sRGB
+    red, green and blue. The conversion follows [IEC 61966-2-1](https://webstore.iec.ch/en/publication/6169) (sRGB) and
+    [CIE 15:2004](https://cie.co.at/publications/colorimetry-3rd-edition) (colorimetry).
+  - Anchored (the reference CIELAB values of red, green, blue, white and black, a gray ramp that stays neutral, the hue
+    identities on seeded random pixels, and the same image stored as `uint8`, `float` and `uint16` agreeing once its range
+    is declared; constructed images only)
+  - Descriptive only. A value is as true as the declaration of the channels: nothing in the pixels says they are sRGB, so
+    a false-color or thermal image read this way gives numbers with no color meaning. The default chroma threshold of 12
+    was chosen by no study: on a mid gray, one channel 16 levels above the other two reads a chroma of 6.5 for red, 11.1
+    for green and 9.2 for blue, and 30 levels reads 12.3, 20.6 and 17.3, so a pixel with one channel 16 levels off the
+    others still counts as neutral. Video in a
+    gamma other than sRGB, wide-gamut files, chroma subsampling and real imagery were not measured.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored

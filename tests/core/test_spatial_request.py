@@ -219,7 +219,12 @@ def test_a_request_short_of_all_still_warns_once_without_naming_all():
     with pytest.warns(UserWarning, match="SPATIAL_NN_DISTANCE_NORM") as record, quiet_experimental():
         image_stats(images(1), stats=ImageStats.ALL & ~ImageStats.BLUR)
 
-    messages = [str(w.message) for w in record if not issubclass(w.category, ExperimentalWarning)]
+    # A request short of `ALL` also says that color, which it holds, is dropped for want of declared channels.
+    messages = [
+        str(w.message)
+        for w in record
+        if not issubclass(w.category, ExperimentalWarning) and "color_rgb_channels" not in str(w.message)
+    ]
     assert len(messages) == 1
     assert "ImageStats.ALL" not in messages[0]
     assert messages[0].endswith("or drop them from stats.")

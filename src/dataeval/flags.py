@@ -239,6 +239,45 @@ class ImageStats(Flag):
       is the difference over the floor, no larger than ``1 / floor`` in size, and reads the floor and not the surround.
       False where the ratio is NaN
 
+    Color Statistics (experimental, so names and values may change; measured only from channels the caller declares
+    are sRGB red, green and blue with `color_rgb_channels` of :func:`~dataeval.core.image_stats`, and dropped from a
+    request, with a notice, where they are not declared):
+
+    - `VISUAL_COLOR_LIGHTNESS_MEAN` : The mean CIELAB lightness, ``L*``, of the valid pixels, as the column
+      `color_lightness_mean`. A pixel is valid when its three declared channels are finite and inside the interval the
+      view is measured against, and a value outside is never clipped. Each channel is mapped to [0, 1] from that
+      interval, decoded from the sRGB transfer function, converted to XYZ with the D65 matrix and to CIELAB with the
+      D65 white and the 2-degree observer. The interval is the declared one (the call's `value_range` or the datum's own
+      metadata; a channel group's range does not apply), and without one an unsigned 8-bit datum reads against
+      ``(0, 255)`` and any other datum is NaN
+    - `VISUAL_COLOR_CHROMA_MEAN` : The mean chroma, ``C = hypot(a*, b*)``, of the valid pixels, as `color_chroma_mean`
+    - `VISUAL_COLOR_ACHROMATIC_FRACTION` : The share of valid pixels whose chroma is under `color_chroma_threshold`,
+      as `color_achromatic_fraction`
+    - `VISUAL_COLOR_HUE_COS`, `VISUAL_COLOR_HUE_SIN` : The coordinates of the chroma-weighted mean hue direction of
+      the chromatic pixels, those at or over the threshold, ``sum(a*) / sum(C)`` and ``sum(b*) / sum(C)``, as
+      `color_hue_cos` and `color_hue_sin`. Each is in [-1, 1] and ``hue_cos**2 + hue_sin**2 <= 1``, with equality when
+      every chromatic pixel has one hue, so ``np.hypot(cos, sin)`` says how concentrated the hues are and
+      ``np.arctan2(sin, cos)`` is the mean angle where that is not near 0. NaN, with the reason `achromatic`, where
+      no pixel is chromatic
+
+    The channels are declared and not detected, so a value is only as true as the declaration, and a view is measured
+    only if it holds at least `color_min_pixels` valid pixels and 90% of its pixels are valid. They are defined for the
+    image, each box and the background, and not for a channel group. A request that includes them also returns
+    details, in the result's ``details``, one value per row:
+
+    - `color_status` : `ok`; `missing_band`, where the datum has fewer than two dimensions or lacks a declared channel;
+      `unknown_range`, where no interval applies; or `insufficient_support`. The value is NaN unless the status is `ok`
+    - `color_valid_fraction` : The valid pixels over the pixels of the view that lie inside the datum and that the
+      background mask does not remove, so a box that leaves the image is judged on the part inside it
+    - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the background mask removes.
+      -1 where the view is not measured, and the exclusion is still reported
+    - `color_hue_reason` : `achromatic` where hue is NaN for want of a chromatic pixel, else empty
+
+    The result's ``measurement_specs`` records the declared channels, the settings and the range that the call
+    declared, so `combine_stats_results` refuses results measured with different ones. `QualityGate` does not accept
+    them, and `Outliers` and `Duplicates` cannot take the keyword, so compute with `image_stats` and pass the result
+    to their ``from_stats``. See :doc:`/concepts/ImageStatistics` for what they do not establish.
+
     Convenience Groups
     ------------------
     Sub-groups:
@@ -271,13 +310,16 @@ class ImageStats(Flag):
       two class statistics also read labels
     - `CONTEXT` : The four context statistics, the surround mean and standard deviation and the two ratios. In no other
       group. They need boxes, and are NaN on every other row
+    - `COLOR` : The five experimental color statistics. In `ALL` and no other group. They are measured only where
+      `color_rgb_channels` is given, and are dropped from a request, with a notice, where it is not
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
-    - `ALL` : Every statistic in this release, including the experimental blur statistics, the spatial statistics and
-      the context statistics. A later release can add statistics to it. Name `BASIC`, `STANDARD` or single statistics
-      when the columns must not change
+    - `ALL` : Every statistic in this release, including the experimental blur and color statistics, the spatial
+      statistics and the context statistics. A later release can add statistics to it. The color statistics are
+      measured only where `color_rgb_channels` is given. Name `BASIC`, `STANDARD` or single statistics when the
+      columns must not change
 
     Notes
     -----
@@ -285,10 +327,11 @@ class ImageStats(Flag):
     automatically during processing.
 
     .. versionadded:: 1.3
-        The `SPATIAL` and `CONTEXT` statistics.
+        The `SPATIAL`, `CONTEXT` and `COLOR` statistics.
 
     What `ALL` held in v1.2 is
-    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT``.
+    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT &
+    ~ImageStats.COLOR``.
     The `SPATIAL` and `CONTEXT` statistics need box rows, so a request for `ALL` with no box rows returns their columns
     as NaN, without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds
     them and measures no box rows warns, or raises when it holds nothing else.
@@ -382,6 +425,16 @@ class ImageStats(Flag):
     CONTEXT_TARGET_SURROUND_CONTRAST = auto()
     CONTEXT_SIGNAL_CLUTTER_RATIO = auto()
 
+    # ===== COLOR =====
+    # Appended after the context flags so that no flag value moves. Named `<FAMILY>_<STATISTIC>` for the columns, which
+    # are `color_lightness_mean` and so on. The family is VISUAL because color is read against a value range and means
+    # nothing without one, as the blur flags are; like them these sit outside `VISUAL`, in their own group.
+    VISUAL_COLOR_LIGHTNESS_MEAN = auto()
+    VISUAL_COLOR_CHROMA_MEAN = auto()
+    VISUAL_COLOR_ACHROMATIC_FRACTION = auto()
+    VISUAL_COLOR_HUE_COS = auto()
+    VISUAL_COLOR_HUE_SIN = auto()
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -440,6 +493,15 @@ class ImageStats(Flag):
         CONTEXT_SURROUND_MEAN | CONTEXT_SURROUND_STD | CONTEXT_TARGET_SURROUND_CONTRAST | CONTEXT_SIGNAL_CLUTTER_RATIO
     )
 
+    # Reads three declared channels as sRGB, so it has a value only where `color_rgb_channels` is given
+    COLOR = (
+        VISUAL_COLOR_LIGHTNESS_MEAN
+        | VISUAL_COLOR_CHROMA_MEAN
+        | VISUAL_COLOR_ACHROMATIC_FRACTION
+        | VISUAL_COLOR_HUE_COS
+        | VISUAL_COLOR_HUE_SIN
+    )
+
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
     PIXEL_DISTRIBUTION = PIXEL_SKEW | PIXEL_KURTOSIS | PIXEL_ENTROPY | PIXEL_HISTOGRAM
@@ -481,7 +543,7 @@ class ImageStats(Flag):
     BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
 
     # Ultimate convenience, spelled from the families so that a change to STANDARD cannot take a statistic out of it
-    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL | CONTEXT
+    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL | CONTEXT | COLOR
 
 
 class VideoStats(Flag):

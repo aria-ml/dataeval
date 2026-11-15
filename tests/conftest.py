@@ -334,3 +334,11 @@ def simple_dataset() -> SimpleDataset:
 @pytest.fixture(scope="module")
 def RNG() -> np.random.Generator:
     return np.random.default_rng(0)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_image_stats_notices() -> None:
+    """Start each test with no once-per-process image_stats notice given, as in a new process."""
+    from dataeval.core import _image_stats
+
+    _image_stats._NOTICES_GIVEN.clear()

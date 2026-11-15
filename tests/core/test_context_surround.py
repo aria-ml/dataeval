@@ -81,7 +81,14 @@ class TestFlags:
             assert not CONTEXT & getattr(ImageStats, group), group
 
     def test_the_v12_all_is_still_the_v12_column_set(self):
-        v12 = ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~CONTEXT
+        v12 = (
+            ImageStats.ALL
+            & ~ImageStats.BLUR
+            & ~ImageStats.SPATIAL
+            & ~ImageStats.PIXEL_SATURATION
+            & ~CONTEXT
+            & ~ImageStats.COLOR
+        )
         assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
 
     def test_no_existing_bit_moves(self):
