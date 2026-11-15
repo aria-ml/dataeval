@@ -67,8 +67,7 @@ class ICStructurer(PropagationMixin, DatasetStructurer):
 
         count = len(dataset)
         unlabeled: list[int] = []
-        for i in range(count):
-            _, target, metadata = self._datum(dataset, i)
+        for i, (_, target, metadata) in enumerate(self._datums(dataset)):
             raw.append(metadata)
             if not isinstance(target, Array):
                 raise TypeError(

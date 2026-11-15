@@ -70,6 +70,9 @@ class Reads:
         The dataset-level metadata of the dataset the skeletons came from.
     """
 
+    _in_memory = True
+    """Read by a structurer's walk, which does not load such a dataset in threads: its items are already in memory."""
+
     def __init__(self, skeletons: Sequence[tuple[Any, Any, Any]], metadata: DatasetMetadata) -> None:
         self._skeletons = skeletons
         self.metadata = metadata

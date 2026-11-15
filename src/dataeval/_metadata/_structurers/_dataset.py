@@ -3,7 +3,7 @@
 __all__ = []
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -13,7 +13,9 @@ from dataeval._log import get_logger
 from dataeval._metadata._structurers._base import Structurer
 from dataeval._metadata._structurers._data import StructuredData
 from dataeval._metadata._structurers._reserved import ID_KEY, safe_column_name
+from dataeval.config import get_load_threads
 from dataeval.protocols import AnnotatedDataset, DatumMetadata, ProgressCallback
+from dataeval.utils._internal import read_ordered
 from dataeval.utils._mask import IMAGE_KEYS
 from dataeval.utils._merge import _merge, sorted_drop_reasons
 
@@ -74,6 +76,24 @@ class DatasetStructurer(Structurer, ABC):
             datum, self._first_datum = self._first_datum, None
             return datum
         return dataset[index]
+
+    def _datums(
+        self, dataset: AnnotatedDataset[tuple[Any, Any, DatumMetadata]]
+    ) -> Iterator[tuple[Any, Any, DatumMetadata]]:
+        """Yield every datum in index order, loading several at once when ``load_threads`` is set.
+
+        Item 0 is always read on the calling thread, because it may be the datum the task probe already read (see
+        :meth:`_datum`). A dataset that is already in memory, such as a view's record, is read serially, since threads
+        cost more than they save there. With no threads set this is the loop over :meth:`_datum` it replaces.
+        """
+        count = len(dataset)
+        threads = get_load_threads()
+        if threads is None or threads < 2 or count < 3 or getattr(dataset, "_in_memory", False):
+            for index in range(count):
+                yield self._datum(dataset, index)
+            return
+        yield self._datum(dataset, 0)
+        yield from read_ordered(dataset.__getitem__, range(1, count), threads, ahead=4 * threads)
 
     @abstractmethod
     def build(

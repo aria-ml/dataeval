@@ -5,7 +5,9 @@ __all__ = []
 import logging
 import multiprocessing
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections import deque
+from collections.abc import Callable, Generator, Iterable, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
 from importlib import import_module
 from multiprocessing.pool import ThreadPool
 from os import cpu_count
@@ -140,6 +142,52 @@ T = TypeVar("T")
 # macOS defaults to spawn (fork unsafe with Objective-C runtime).
 # Windows only supports spawn.
 DEFAULT_CONTEXT: Literal["fork", "spawn"] = "fork" if sys.platform == "linux" else "spawn"
+
+
+def read_ordered(
+    read: Callable[[T], R], indices: Iterable[T], threads: int | None, ahead: int | None = None
+) -> Generator[R, None, None]:
+    """Yield ``read(index)`` for each index, in order, loading up to `threads` of them at once.
+
+    With `threads` None or 1, or fewer than two indices, this is the plain loop on the calling thread, so a caller that
+    never asks for threads reads exactly as it did before. Otherwise the reads run on a thread pool that lives for the
+    life of the generator and each result is yielded in index order, whatever order the reads finish in. At most `ahead`
+    reads are submitted beyond the one being yielded (all of them when None), which bounds how many results wait in
+    memory. An exception raised by a read is raised at that index's position; reads not yet started are canceled and
+    those in flight finish before it propagates. Closing the generator early cancels the rest.
+
+    Raises
+    ------
+    ValueError
+        If `threads` is below one. Raised when this is called, before anything is read.
+    """
+    if threads is not None and threads < 1:
+        raise ValueError(f"threads must be at least 1, got {threads}.")
+    items = list(indices)
+    if threads is None or threads == 1 or len(items) < 2:
+        return (read(index) for index in items)
+    return _read_threaded(read, items, threads, len(items) if ahead is None else max(1, ahead))
+
+
+def _read_threaded(  # noqa: C901
+    read: Callable[[T], R], items: list[T], threads: int, ahead: int
+) -> Generator[R, None, None]:
+    pending: deque[Future[R]] = deque()
+    remaining = iter(items)
+    with ThreadPoolExecutor(threads) as pool:
+        try:
+            for index in remaining:
+                pending.append(pool.submit(read, index))
+                if len(pending) >= ahead:
+                    break
+            while pending:
+                yield pending.popleft().result()
+                for index in remaining:  # one more read for the one just yielded
+                    pending.append(pool.submit(read, index))
+                    break
+        finally:
+            for future in pending:
+                future.cancel()
 
 
 class PoolWrapper:

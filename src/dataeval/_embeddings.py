@@ -13,7 +13,7 @@ import xxhash as xxh
 from numpy.typing import NDArray
 
 from dataeval._log import get_logger
-from dataeval.config import resolve_batch_size
+from dataeval.config import get_load_threads, resolve_batch_size
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import (
@@ -23,6 +23,7 @@ from dataeval.protocols import (
     ImageDataset,
     ProgressCallback,
 )
+from dataeval.utils._internal import read_ordered
 from dataeval.utils.data import requires_maite_dataset, unwrap_image
 
 _logger = get_logger(__name__)
@@ -515,7 +516,8 @@ class Embeddings(Array, FeatureExtractor):
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
 
-        return [unwrap_image(self._dataset[idx]) for idx in indices]
+        dataset = self._dataset
+        return list(read_ordered(lambda idx: unwrap_image(dataset[idx]), indices, get_load_threads()))
 
     def _rows(self, raw: Any, expected: int) -> NDArray[Any]:
         """Return the extractor's output as an array with one row for each of ``expected`` images.

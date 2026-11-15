@@ -576,6 +576,9 @@ Experimental ⚠️ (API may change or be removed):
 - {class}`.View` with `record_reads=True` raises {class}`~dataeval.exceptions.ExperimentalWarning` when the first such
   view is constructed in a process. The keyword and what the view records may change. A view built without it raises
   nothing.
+- {func}`.set_load_threads` and {func}`.use_load_threads` raise {class}`~dataeval.exceptions.ExperimentalWarning` the
+  first time either is given more than one thread in a process. The names, and which reads the setting covers, may
+  change. With the default, None, or one thread they raise nothing.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,
