@@ -26,6 +26,16 @@ def _frame_stub(frame: Any) -> SimpleNamespace:
     return stub
 
 
+def recordable(datum: Any) -> bool:
+    """Whether `datum` is one whose skeleton is worth recording while a pass reads it.
+
+    An ``(item, target, metadata)`` datum that is not tracking. A tracking skeleton walks the video stream, so recording
+    it during a pass would add a decode and not save one. Anything that is not a 3-tuple is left for the evaluator's own
+    validation to refuse, so recording adds no error of its own.
+    """
+    return isinstance(datum, tuple) and len(datum) == 3 and detect_task(datum[1]) != "MOT"
+
+
 def skeleton(datum: Any) -> tuple[Any, Any, Any]:
     """Return `datum` without its pixels, keeping everything structuring reads.
 

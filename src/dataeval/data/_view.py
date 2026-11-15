@@ -7,11 +7,15 @@ from typing import Any, TypeVar
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.data._reads import Reads, skeleton
+from dataeval._experimental import warn_experimental_once
+from dataeval._log import get_logger
+from dataeval.data._reads import Reads, recordable, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
 from dataeval.utils.data import DatasetKind, validate_dataset
+
+_logger = get_logger(__name__)
 
 _TDatum = TypeVar("_TDatum")
 
@@ -161,6 +165,20 @@ class View(AnnotatedDataset[_TDatum]):
     operations : Operation or Sequence[Operation] or None, default None
         Operations to apply, **in order**. When ``None`` the view is an unfiltered,
         untransformed pass-through.
+    record_reads : bool, default False
+        Record each datum's structure, without its pixels, as the view reads it, so
+        :class:`~dataeval.Metadata` built from the view afterward does not read the dataset
+        again. Run the pass that reads the pixels first, such as :class:`~dataeval.Embeddings`
+        or :class:`~dataeval.quality.Outliers`, and build the metadata after it: in the other
+        order nothing is saved, because the pass that follows needs the pixels. The record
+        holds each datum's target and metadata for the life of the view, so it costs memory in
+        proportion to them. It keeps the first read of each item, so a dataset whose targets
+        change between reads gives metadata that differs from a fresh walk. Set it on the
+        outermost view that both consumers receive. It has no effect on a tracking dataset, on
+        an item that is not an ``(item, target, metadata)`` tuple, or on a pickled copy.
+        Setting it raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
+
+        .. versionadded:: 1.3
 
     Notes
     -----
@@ -194,16 +212,23 @@ class View(AnnotatedDataset[_TDatum]):
     _reads: dict[int, Any] | None = None
     """Skeletons of this view's datums (see ``dataeval.data._reads``), keyed by source index.
 
-    Created by a :class:`Filter` given `where`, which structures every datum anyway; a :class:`Filter` given `classes`
-    alone keeps one current but never starts one. Read by :class:`~dataeval.Metadata` in place of the view. Keyed by
-    source index, so a change of `selection` never invalidates it; any new transform does.
+    Created by a :class:`Filter` given `where`, which structures every datum anyway, or, when `record_reads` is set, by
+    the first datum the view reads; a :class:`Filter` given `classes` alone keeps one current but never starts one. Read
+    by :class:`~dataeval.Metadata` in place of the view. Keyed by source index, so a change of `selection` never
+    invalidates it; any new transform does, and `record_reads` then starts it again.
     """
+    _record_reads: bool = False
 
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         dataset: Dataset[_TDatum],
         operations: Operation | Sequence[Operation] | None = None,
+        *,
+        record_reads: bool = False,
     ) -> None:
+        if record_reads:
+            warn_experimental_once("View(record_reads=True)", details="The keyword and what it records may change.")
+        self._record_reads = record_reads
         self._dataset = dataset
         self._operations = self._normalize(operations)
         self.selection = list(range(len(dataset)))
@@ -284,9 +309,18 @@ class View(AnnotatedDataset[_TDatum]):
     def _skeletons(self) -> list[Any]:
         """Return the datums without their pixels, in selection order, starting or extending the read cache."""
         reads = {} if self._reads is None else self._reads
-        for index in dict.fromkeys(self.selection):
-            if index not in reads:
-                reads[index] = skeleton(self.read(index))
+        wanted = list(dict.fromkeys(self.selection))
+        missing = [index for index in wanted if index not in reads]
+        if self._record_reads and reads and missing:
+            _logger.info(
+                "View(record_reads=True) held %d of %d items, so the other %d are read again. "
+                "Run the pass that reads the pixels over every item first.",
+                len(wanted) - len(missing),
+                len(wanted),
+                len(missing),
+            )
+        for index in missing:
+            reads[index] = skeleton(self.read(index))
         self._reads = reads
         return [reads[index] for index in self.selection]
 
@@ -369,7 +403,19 @@ class View(AnnotatedDataset[_TDatum]):
         return self._metadata
 
     def __getitem__(self, index: int) -> _TDatum:
-        return self.read(self.selection[index])
+        src_index = self.selection[index]
+        datum = self.read(src_index)
+        if self._record_reads:
+            self._record(src_index, datum)
+        return datum
+
+    def _record(self, src_index: int, datum: Any) -> None:
+        """Keep the skeleton of a datum a pass just read, the first time only, so structuring it later reads nothing."""
+        reads = self._reads
+        if (reads is None or src_index not in reads) and recordable(datum):
+            if reads is None:
+                reads = self._reads = {}
+            reads[src_index] = skeleton(datum)
 
     def __iter__(self) -> Iterator[_TDatum]:
         for i in range(len(self)):
@@ -390,9 +436,13 @@ class View(AnnotatedDataset[_TDatum]):
         return f"{title}\n{sep}{nt}{operations}{nt}Selected Size: {len(self)}\n\n{self._dataset}"
 
     def __getstate__(self) -> dict[str, Any]:
-        """Pickle without the read cache, so a DataLoader worker is not sent every target."""
+        """Pickle without the read cache or the recording flag.
+
+        A DataLoader worker is then not sent every target, and does not record into a copy that is thrown away.
+        """
         state = self.__dict__.copy()
         state["_reads"] = None
+        state["_record_reads"] = False
         return state
 
     def resolve_indices(self, indices: int | SourceIndex | Sequence[int | SourceIndex] | None = None) -> list[int]:
