@@ -27,6 +27,7 @@ from dataeval.core._compute_stats import (
     StatsResult,
     _produced_stat_names,
     _reconcile_stats,
+    column_name,
 )
 from dataeval.data._unzip import _unzip_annotations
 from dataeval.flags import ImageStats
@@ -302,13 +303,15 @@ def _collect_calculator_stats(
     for calculator_cls, flags in calculators:
         calculator = calculator_cls(datum, processor)
         computed = calculator.compute(flags, view)
-        stats_list.append({f"{prefix}{name}": values for name, values in computed.items()})
+        stats_list.append({column_name(prefix, name): values for name, values in computed.items()})
         # Only a calculator that reports details adds an entry: an empty one would leave
         # `_reconcile_stats` nothing to read a row length from.
         if details := calculator.details(flags, view):
-            details_list.append({f"{prefix}{name}": values for name, values in details.items()})
+            details_list.append({column_name(prefix, name): values for name, values in details.items()})
         # Collect empty values from this calculator
-        empty_values_map.update({f"{prefix}{name}": value for name, value in calculator.get_empty_values().items()})
+        empty_values_map.update({
+            column_name(prefix, name): value for name, value in calculator.get_empty_values().items()
+        })
         # Collect warnings from this calculator
         if hasattr(calculator, "warnings"):
             warnings.extend(calculator.warnings)
@@ -745,7 +748,9 @@ def _resolve_channel_groups(
                 f"region prefix or a metadata level qualifier. Reserved: {sorted(reserved)}, "
                 f"and any name beginning with '{BACKGROUND_PREFIX}'."
             )
-        collisions = sorted(f"{name}_{stat}" for stat in produced if f"{name}_{stat}" in produced)
+        collisions = sorted(
+            column_name(f"{name}_", stat) for stat in produced if column_name(f"{name}_", stat) in produced
+        )
         if collisions:
             raise ValueError(
                 f"channel group name {name!r} would produce {collisions}, which already "
@@ -790,14 +795,14 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
     )
     if normalize_pixel_values:
         needs_range |= flags & ImageStats.PIXEL
-    return needs_range & ~(ImageStats.PIXEL_MISSING | ImageStats.PIXEL_SATURATION)
+    return needs_range & ~(ImageStats.PIXEL_MISSING | ImageStats.PIXEL_SATURATED_FRACTION)
 
 
 def _reads_a_range(whole_flags: Flag, group_flags: Mapping[str, Flag], normalize_pixel_values: bool) -> bool:
     """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy."""
     return any(
         _unmeasurable_flags(flags, None, normalize_pixel_values)
-        or flags & (ImageStats.PIXEL_SATURATION | ImageStats.COLOR)
+        or flags & (ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.COLOR)
         for flags in (whole_flags, *group_flags.values())
     )
 
@@ -1062,7 +1067,7 @@ def _measurement_specs(plan: BatchPlan) -> dict[str, MeasurementSpec]:
                 declared,
             ))
     return {
-        f"{prefix}{name}": spec
+        column_name(prefix, name): spec
         for prefix, view, calculators, declared in views
         for calculator, flags in calculators
         for name, spec in calculator.measurement_specs(flags, view, plan.settings, declared).items()
@@ -1095,20 +1100,20 @@ def _color_channels(value: Any) -> tuple[int, int, int] | None:
 
 
 def _settings(
-    saturation_atol: Any,
+    saturated_atol: Any,
     surround_padding: Any,
     surround_min_pixels: Any,
-    surround_intensity_floor: Any,
+    context_ratio_floor: Any,
     color_rgb_channels: Any = None,
     color_min_pixels: Any = 32,
     color_chroma_threshold: Any = 12.0,
 ) -> ImageStatsConfig:
     """Check the keywords that set up a statistic and bundle them, each on its own so the error names the keyword."""
     saturation = _checked(
-        lambda: SaturationConfig(atol=saturation_atol),
-        "saturation_atol",
+        lambda: SaturationConfig(atol=saturated_atol),
+        "saturated_atol",
         "a finite number of 0 or more",
-        saturation_atol,
+        saturated_atol,
     )
     _checked(
         lambda: SurroundConfig(padding=surround_padding),
@@ -1123,13 +1128,13 @@ def _settings(
         surround_min_pixels,
     )
     _checked(
-        lambda: SurroundConfig(intensity_floor=surround_intensity_floor),
-        "surround_intensity_floor",
+        lambda: SurroundConfig(intensity_floor=context_ratio_floor),
+        "context_ratio_floor",
         "a finite number greater than 0 and at most 1",
-        surround_intensity_floor,
+        context_ratio_floor,
     )
     surround = SurroundConfig(
-        padding=surround_padding, min_pixels=surround_min_pixels, intensity_floor=surround_intensity_floor
+        padding=surround_padding, min_pixels=surround_min_pixels, intensity_floor=context_ratio_floor
     )
     channels = _color_channels(color_rgb_channels)
     _checked(
@@ -1160,10 +1165,10 @@ def image_stats(  # noqa: C901
     channels: Mapping[str, ChannelGroupLike] | None = None,
     normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
-    saturation_atol: float = 0.0,
+    saturated_atol: float = 0.0,
     surround_padding: float = 0.25,
     surround_min_pixels: int = 32,
-    surround_intensity_floor: float = 1 / 255,
+    context_ratio_floor: float = 1 / 255,
     color_rgb_channels: Sequence[int] | None = None,
     color_min_pixels: int = 32,
     color_chroma_threshold: float = 12.0,
@@ -1247,13 +1252,13 @@ def image_stats(  # noqa: C901
         a measurement's clothes.
 
         Only :attr:`~dataeval.flags.ImageStats.PIXEL`, :attr:`~dataeval.flags.ImageStats.VISUAL` and
-        :attr:`~dataeval.flags.ImageStats.COLOR` statistics and :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR` are
-        computed for the
-        background; any hash, dimension, spatial or blur directionality statistics in `stats` are computed for the
-        image and its boxes as usual and skipped for the background, which has no
-        meaningful hash and no geometry of its own. ``background_blur`` is the blur value taken over the edges
-        outside the boxes: they are found on the whole image, so the masked holes cannot spread through the filters,
-        and those within 9 pixels of a box are left out, so the pool is smaller than ``background_fraction`` says.
+        :attr:`~dataeval.flags.ImageStats.COLOR` statistics and
+        :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR_EDGE_WIDTH` are computed for the background; any hash,
+        dimension, spatial or blur directionality statistics in `stats` are computed for the image and its boxes as
+        usual and skipped for the background, which has no meaningful hash and no geometry of its own.
+        ``background_blur_edge_width`` is the blur value taken over the edges outside the boxes: they are found on the
+        whole image, so the masked holes cannot spread through the filters, and those within 9 pixels of a box are left
+        out, so the pool is smaller than ``background_fraction`` says.
 
         Boxes are rounded outwards and unioned into the mask, so the background
         excludes slightly more than the annotations strictly cover — a retained pixel
@@ -1269,13 +1274,14 @@ def image_stats(  # noqa: C901
 
         .. versionadded:: 1.1
         .. versionchanged:: 1.3
-            Adds ``background_blur`` (and ``background_<group>_blur``) when `stats` includes
-            :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR`, which was skipped for the background before.
+            Adds ``background_blur_edge_width`` (and ``background_<group>_blur_edge_width``) when `stats` includes
+            :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR_EDGE_WIDTH`, which was skipped for the background before.
     channels : Mapping[str, ChannelGroupLike] or None, default None
         Named groups of bands to measure separately, alongside the whole image.
 
         Each group becomes a set of columns named ``<group>_<statistic>`` on the same rows
-        the unprefixed statistics occupy — the band-axis counterpart of `per_background`,
+        the unprefixed statistics occupy (the surround's own columns put the surround first,
+        ``surround_<group>_intensity_mean``) — the band-axis counterpart of `per_background`,
         which does the same thing to the spatial axes. The two compose, giving
         ``background_nir_brightness``.
 
@@ -1367,14 +1373,14 @@ def image_stats(  # noqa: C901
         .. versionadded:: 1.1
         .. versionchanged:: 1.3
             Also read from each datum's metadata, and names a depth for ``(0, 2**n - 1)`` on integer data.
-    saturation_atol : float, default 0.0
+    saturated_atol : float, default 0.0
         How far from the endpoint a value may sit and still count as saturated, at least 0. The default is exact
         equality, which a float image that went through arithmetic rarely meets, so set a tolerance for one. The
         endpoint is the upper bound of the declared `value_range`, else the maximum of an unsigned integer dtype of 32
         bits or fewer, or 1 for Boolean data, else it is unknown and the statistic is NaN. It is never read from the
         data, so 12-bit data stored in ``uint16`` is measured against 65535 unless its range is declared as
         ``(0, 4095)``. The value is checked on every call, and ignored, with a warning, when `stats` does not request
-        ``PIXEL_SATURATION``.
+        ``PIXEL_SATURATED_FRACTION``.
 
         .. versionadded:: 1.3
     surround_padding : float, default 0.25
@@ -1385,15 +1391,16 @@ def image_stats(  # noqa: C901
 
         .. versionadded:: 1.3
     surround_min_pixels : int, default 32
-        The fewest measurable surround pixels a box needs for `surround_mean`, `surround_std` and the two ratios to have
-        a value, a whole number of 1 or more. A box with fewer reads NaN with the status `insufficient_support`, so a
-        small box can fall under the default. Checked, ignored and recorded as `surround_padding` is.
+        The fewest measurable surround pixels a box needs for `surround_intensity_mean`, `surround_intensity_std` and
+        the two ratios to have a value, a whole number of 1 or more. A box with fewer reads NaN with the status
+        `insufficient_support`, so a small box can fall under the default. Checked, ignored and recorded as
+        `surround_padding` is.
 
         .. versionadded:: 1.3
-    surround_intensity_floor : float, default 1/255
+    context_ratio_floor : float, default 1/255
         The least a denominator of `target_surround_contrast` or `signal_clutter_ratio` may be, a finite number greater
         than 0 and at most 1, in the normalized intensity of [0, 1]. A dark surround or a flat one then gives a ratio
-        no larger than ``1 / surround_intensity_floor`` in size, and not a huge or infinite one, and the details
+        no larger than ``1 / context_ratio_floor`` in size, and not a huge or infinite one, and the details
         `target_surround_contrast_floored` and `signal_clutter_ratio_floored` say where the floor decided. A floor of 0
         is refused, since a surround of one value reads a spread of rounding residue, about 1e-16, and not 0, and a
         floor under that residue protects nothing; one under 3e-39 overflows the float32 column to infinity. The
@@ -1461,8 +1468,8 @@ def image_stats(  # noqa: C901
         `ImageStats.SPATIAL_MAX_IOU_OTHER_CLASS`) and `boxes` is given without `labels`, and if a dataset's
         labels are floating and hold a value that is not a whole number. A request that holds `ImageStats.ALL`
         can raise on those labels, since it reads them.
-        Also if `saturation_atol` is not a finite number of 0 or more, `surround_padding` not a finite number greater
-        than 0, `surround_min_pixels` not a whole number of 1 or more, or `surround_intensity_floor` not a finite number
+        Also if `saturated_atol` is not a finite number of 0 or more, `surround_padding` not a finite number greater
+        than 0, `surround_min_pixels` not a whole number of 1 or more, or `context_ratio_floor` not a finite number
         greater than 0 and at most 1, whether or not `stats` requests the statistic they set up, or if the datum
         metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a range.
 
@@ -1474,16 +1481,16 @@ def image_stats(  # noqa: C901
         `labels`, so every label is missing. A request that holds every statistic of `ImageStats.ALL` that needs no
         box, less the color statistics where `color_rgb_channels` is not given, does not warn in either case: it asks
         for everything, and the statistics that cannot be measured read NaN.
-        A third warning is for `saturation_atol` given when `stats` does not request `ImageStats.PIXEL_SATURATION`,
-        so the setting is ignored, and a fourth for `surround_padding`, `surround_min_pixels` or
-        `surround_intensity_floor` given a value other than its default when `stats` requests no `ImageStats.CONTEXT`
-        statistic, or for `surround_intensity_floor` when `stats` requests neither
-        `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only
-        statistics that read it. A fifth is for the same of `color_min_pixels`, `color_chroma_threshold` and
-        `color_rgb_channels` when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a
-        color statistic and `color_rgb_channels` is not given, so the color statistics are dropped from the request,
-        once per process; a request that holds every statistic of `ImageStats.ALL` that can be measured logs that and
-        does not warn, and every drop is logged.
+        A third warning is for `saturated_atol` given when `stats` does not request
+        `ImageStats.PIXEL_SATURATED_FRACTION`, so the setting is ignored, and a fourth for `surround_padding`,
+        `surround_min_pixels` or `context_ratio_floor` given a value other than its default when `stats` requests no
+        `ImageStats.CONTEXT` statistic, or for `context_ratio_floor` when `stats` requests neither
+        `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only statistics
+        that read it. A fifth is for the same of `color_min_pixels`, `color_chroma_threshold` and `color_rgb_channels`
+        when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a color statistic and
+        `color_rgb_channels` is not given, so the color statistics are dropped from the request, once per process; a
+        request that holds every statistic of `ImageStats.ALL` that can be measured logs that and does not warn, and
+        every drop is logged.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. Likewise for the first request that measures a color statistic (`ImageStats.COLOR`),
@@ -1633,7 +1640,7 @@ def image_stats(  # noqa: C901
     metadata:
 
     >>> pixels = np.full((1, 4, 4), 4095, dtype=np.uint16)
-    >>> image_stats([pixels], stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
+    >>> image_stats([pixels], stats=ImageStats.PIXEL_SATURATED_FRACTION)["stats"]["saturated_fraction"].tolist()
     [0.0]
     >>> class Sensor:
     ...     metadata = {"id": "sensor"}
@@ -1643,28 +1650,28 @@ def image_stats(  # noqa: C901
     ...
     ...     def __getitem__(self, i):
     ...         return pixels, np.array([1.0]), {"id": i, "value_range": (0, 4095)}
-    >>> image_stats(Sensor(), stats=ImageStats.PIXEL_SATURATION)["stats"]["saturation"].tolist()
+    >>> image_stats(Sensor(), stats=ImageStats.PIXEL_SATURATED_FRACTION)["stats"]["saturated_fraction"].tolist()
     [1.0]
 
     Measure the intensity around a box, and how far the box stands from it. The surround is a frame around it, a quarter
-    of the box's size wide by default, less the box and every other valid box. Here the box is 0.8 against a ring of
-    0.2, which is a contrast of (0.8 - 0.2) / 0.2, and a ring of 16 pixels needs ``surround_min_pixels`` of 16 or less
-    to count:
+    of the box's size wide by default, less the box and every other valid box. Here the box is 0.8 against a surround
+    of 0.2, which is a contrast of (0.8 - 0.2) / 0.2, and a surround of 16 pixels needs ``surround_min_pixels`` of 16 or
+    less to count:
 
     >>> picture = np.full((1, 10, 10), 0.2)
     >>> picture[0, 3:6, 3:6] = 0.8
-    >>> ringed = image_stats(
+    >>> measured = image_stats(
     ...     [picture],
     ...     boxes=[[(3, 3, 6, 6)]],
     ...     stats=ImageStats.CONTEXT,
     ...     per_image=False,
     ...     surround_min_pixels=16,
     ... )
-    >>> round(float(ringed["stats"]["surround_mean"][0]), 3)
+    >>> round(float(measured["stats"]["surround_intensity_mean"][0]), 3)
     0.2
-    >>> round(float(ringed["stats"]["target_surround_contrast"][0]), 3)
+    >>> round(float(measured["stats"]["target_surround_contrast"][0]), 3)
     3.0
-    >>> ringed["details"]["context_status"].tolist(), ringed["details"]["surround_candidate_pixels"].tolist()
+    >>> measured["details"]["context_status"].tolist(), measured["details"]["surround_candidate_pixels"].tolist()
     (['ok'], [16])
 
     Measure color. It is read from three channels that you declare are sRGB red, green and blue, because nothing in the
@@ -1675,9 +1682,9 @@ def image_stats(  # noqa: C901
     >>> red = np.zeros((3, 8, 8), dtype=np.uint8)
     >>> red[0] = 255
     >>> seen = image_stats([red], stats=ImageStats.COLOR, color_rgb_channels=(0, 1, 2))["stats"]
-    >>> round(float(seen["color_hue_cos"][0]), 3), round(float(seen["color_hue_sin"][0]), 3)
+    >>> round(float(seen["color_hue_cos_mean"][0]), 3), round(float(seen["color_hue_sin_mean"][0]), 3)
     (0.766, 0.643)
-    >>> round(float(np.hypot(seen["color_hue_cos"][0], seen["color_hue_sin"][0])), 3)
+    >>> round(float(np.hypot(seen["color_hue_cos_mean"][0], seen["color_hue_sin_mean"][0])), 3)
     1.0
     >>> bgr = image_stats([red[::-1]], stats=ImageStats.COLOR, color_rgb_channels=(2, 1, 0))["stats"]
     >>> bool(bgr["color_chroma_mean"][0] == seen["color_chroma_mean"][0])
@@ -1727,10 +1734,10 @@ def image_stats(  # noqa: C901
     # Checked before any image is read, and whether or not the statistic is requested, so a bad value never waits for
     # the first image that would have used it.
     settings = _settings(
-        saturation_atol,
+        saturated_atol,
         surround_padding,
         surround_min_pixels,
-        surround_intensity_floor,
+        context_ratio_floor,
         color_rgb_channels,
         color_min_pixels,
         color_chroma_threshold,
@@ -1808,11 +1815,11 @@ def image_stats(  # noqa: C901
 
     # A setting that sets up a statistic the request leaves out is probably a flag forgotten, not a setting wanted.
     # `requested` is the union over the unnamed view and every band group, so a mapping that asks only a group for
-    # PIXEL_SATURATION is using it.
-    if not requested & ImageStats.PIXEL_SATURATION and saturation_atol != 0:
+    # PIXEL_SATURATED_FRACTION is using it.
+    if not requested & ImageStats.PIXEL_SATURATED_FRACTION and saturated_atol != 0:
         warnings.warn(
-            "saturation_atol is ignored, because it sets up `ImageStats.PIXEL_SATURATION` and stats does not request "
-            "it. Add `ImageStats.PIXEL_SATURATION` to stats, or drop it.",
+            "saturated_atol is ignored, because it sets up `ImageStats.PIXEL_SATURATED_FRACTION` and stats does not "
+            "request it. Add `ImageStats.PIXEL_SATURATED_FRACTION` to stats, or drop it.",
             UserWarning,
             stacklevel=2,
         )
@@ -1820,9 +1827,13 @@ def image_stats(  # noqa: C901
     # spec records as another number, is not mistaken for it.
     given, defaults = settings.surround, SurroundConfig()
     unused = [
-        name
-        for name in ("surround_padding", "surround_min_pixels", "surround_intensity_floor")
-        if getattr(given, name.removeprefix("surround_")) != getattr(defaults, name.removeprefix("surround_"))
+        keyword
+        for keyword, field in (
+            ("surround_padding", "padding"),
+            ("surround_min_pixels", "min_pixels"),
+            ("context_ratio_floor", "intensity_floor"),
+        )
+        if getattr(given, field) != getattr(defaults, field)
     ]
     ratios = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
     if unused and not requested & ImageStats.CONTEXT:
@@ -1838,7 +1849,7 @@ def image_stats(  # noqa: C901
         # The group is requested, and the padding and the support floor are read by every statistic in it, but only the
         # two ratios divide by this floor.
         warnings.warn(
-            "surround_intensity_floor is ignored, because it sets up `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` "
+            "context_ratio_floor is ignored, because it sets up `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` "
             "and `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO` and stats requests neither. Add one of them to stats, or "
             "drop it.",
             UserWarning,
@@ -2027,7 +2038,7 @@ def image_stats(  # noqa: C901
                 f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
                 f"part of it masked out, which hash statistics are not stable under, which dimension "
                 f"statistics do not describe and over which blur directionality is not measured; request "
-                f"ImageStats.PIXEL, ImageStats.VISUAL or ImageStats.VISUAL_BLUR for it.",
+                f"ImageStats.PIXEL, ImageStats.VISUAL or ImageStats.VISUAL_BLUR_EDGE_WIDTH for it.",
                 UserWarning,
                 stacklevel=2,
             )

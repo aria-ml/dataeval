@@ -10,7 +10,13 @@ from dataeval.quality import Outliers
 
 pytestmark = pytest.mark.required
 
-COLUMNS = ["color_lightness_mean", "color_chroma_mean", "color_achromatic_fraction", "color_hue_cos", "color_hue_sin"]
+COLUMNS = [
+    "color_lightness_mean",
+    "color_chroma_mean",
+    "color_achromatic_fraction",
+    "color_hue_cos_mean",
+    "color_hue_sin_mean",
+]
 IMAGES = [np.random.default_rng(i).integers(0, 256, (3, 16, 16)).astype(np.uint8) for i in range(12)]
 
 

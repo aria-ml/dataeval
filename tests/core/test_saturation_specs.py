@@ -18,12 +18,12 @@ pytestmark = pytest.mark.required
 def specs_of(images: list[np.ndarray], **kw: Any) -> dict[str, MeasurementSpec]:
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        result = image_stats(images, stats=kw.pop("stats", ImageStats.PIXEL_SATURATION), **kw)
+        result = image_stats(images, stats=kw.pop("stats", ImageStats.PIXEL_SATURATED_FRACTION), **kw)
     return dict(result.get("measurement_specs", {}))
 
 
 def run(images: Any, **kw: Any) -> Any:
-    return image_stats(images, stats=ImageStats.PIXEL_SATURATION, **kw)
+    return image_stats(images, stats=ImageStats.PIXEL_SATURATED_FRACTION, **kw)
 
 
 U8 = [np.full((3, 6, 6), 255, dtype=np.uint8)]
@@ -35,11 +35,11 @@ class TestRecorded:
         assert "measurement_specs" not in image_stats(U8, stats=ImageStats.PIXEL_MEAN)
 
     def test_a_default_call_records_it_because_the_pixel_family_holds_saturation(self):
-        assert set(image_stats(U8).get("measurement_specs", {})) == {"saturation"}
+        assert set(image_stats(U8).get("measurement_specs", {})) == {"saturated_fraction"}
 
     def test_the_defaults_are_recorded_with_the_range_inferred_from_each_image(self):
         assert specs_of(U8) == {
-            "saturation": MeasurementSpec(
+            "saturated_fraction": MeasurementSpec(
                 algorithm="saturation",
                 version="1",
                 units="fraction",
@@ -50,20 +50,23 @@ class TestRecorded:
         }
 
     def test_a_declared_value_range_is_recorded(self):
-        spec = specs_of(U16, value_range=(0, 4095))["saturation"]
+        spec = specs_of(U16, value_range=(0, 4095))["saturated_fraction"]
         assert (spec.range_policy, spec.declared_range) == ("declared", (0.0, 4095.0))
 
     def test_the_tolerance_is_recorded(self):
-        assert dict(specs_of(U8, saturation_atol=0.5)["saturation"].config) == {"atol": 0.5}
+        assert dict(specs_of(U8, saturated_atol=0.5)["saturated_fraction"].config) == {"atol": 0.5}
 
     def test_the_background_column_has_its_own_spec_and_region(self):
         specs = specs_of(U8, boxes=[[(0, 0, 3, 3)]], per_background=True)
-        assert set(specs) == {"saturation", "background_saturation"}
-        assert (specs["saturation"].region, specs["background_saturation"].region) == ("pixels", "background")
+        assert set(specs) == {"saturated_fraction", "background_saturated_fraction"}
+        assert (specs["saturated_fraction"].region, specs["background_saturated_fraction"].region) == (
+            "pixels",
+            "background",
+        )
 
     def test_a_call_that_measures_only_the_background_records_only_the_background_spec(self):
         specs = specs_of(U8, boxes=[[(0, 0, 3, 3)]], per_background=True, per_image=False, per_target=False)
-        assert set(specs) == {"background_saturation"}
+        assert set(specs) == {"background_saturated_fraction"}
 
     def test_a_band_group_records_its_own_declared_range_under_its_own_column(self):
         image = [np.zeros((4, 6, 6), dtype=np.uint16)]
@@ -74,20 +77,25 @@ class TestRecorded:
             value_range=(0, 65535),
             channels={"nir": ChannelGroup(3, value_range=(0, 4095))},
         )
-        assert set(specs) == {"saturation", "background_saturation", "nir_saturation", "background_nir_saturation"}
-        assert specs["saturation"].declared_range == (0.0, 65535.0)
-        assert specs["nir_saturation"].declared_range == (0.0, 4095.0)
-        assert specs["background_nir_saturation"].declared_range == (0.0, 4095.0)
-        assert specs["background_nir_saturation"].region == "background"
+        assert set(specs) == {
+            "saturated_fraction",
+            "background_saturated_fraction",
+            "nir_saturated_fraction",
+            "background_nir_saturated_fraction",
+        }
+        assert specs["saturated_fraction"].declared_range == (0.0, 65535.0)
+        assert specs["nir_saturated_fraction"].declared_range == (0.0, 4095.0)
+        assert specs["background_nir_saturated_fraction"].declared_range == (0.0, 4095.0)
+        assert specs["background_nir_saturated_fraction"].region == "background"
 
     def test_only_the_columns_the_result_holds_have_a_spec(self):
         specs = specs_of(
-            U8, stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.PIXEL_SATURATION}, channels={"nir": 1}
+            U8, stats={None: ImageStats.PIXEL_MEAN, "nir": ImageStats.PIXEL_SATURATED_FRACTION}, channels={"nir": 1}
         )
-        assert set(specs) == {"nir_saturation"}
+        assert set(specs) == {"nir_saturated_fraction"}
 
     def test_a_spec_serializes_and_rebuilds_equal(self):
-        spec = specs_of(U16, value_range=(0, 4095), saturation_atol=1.5)["saturation"]
+        spec = specs_of(U16, value_range=(0, 4095), saturated_atol=1.5)["saturated_fraction"]
         assert MeasurementSpec(**json.loads(json.dumps(spec.to_dict()))) == spec
 
     def test_a_request_for_all_records_it_beside_the_statistics_that_record_none(self):
@@ -96,9 +104,9 @@ class TestRecorded:
             result = image_stats(U8, stats=ImageStats.ALL)
         # The context statistics record their settings too; no other statistic records any.
         assert set(result.get("measurement_specs", {})) == {
-            "saturation",
-            "surround_mean",
-            "surround_std",
+            "saturated_fraction",
+            "surround_intensity_mean",
+            "surround_intensity_std",
             "target_surround_contrast",
             "signal_clutter_ratio",
         }
@@ -107,11 +115,11 @@ class TestRecorded:
 class TestCombining:
     def test_results_measured_with_the_same_settings_combine(self):
         stats, _, _ = combine_stats_results([run(U8), run(U8)])
-        assert stats["saturation"].tolist() == [1.0, 1.0]
+        assert stats["saturated_fraction"].tolist() == [1.0, 1.0]
 
     def test_results_with_different_tolerances_are_refused(self):
         with pytest.raises(ValueError, match="atol"):
-            combine_stats_results([run(U8, saturation_atol=1), run(U8)])
+            combine_stats_results([run(U8, saturated_atol=1), run(U8)])
 
     def test_results_with_different_declared_ranges_are_refused(self):
         with pytest.raises(ValueError, match="declared_range"):
@@ -125,7 +133,7 @@ class TestCombining:
         # The stated limit: both specs read as undeclared, and the endpoint each row used is in the details, which
         # are not compared. Pinned so that closing the gap is a decision and not an accident.
         stats, _, _ = combine_stats_results([run(U8), run(U16)])
-        assert stats["saturation"].tolist() == [1.0, 0.0]
+        assert stats["saturated_fraction"].tolist() == [1.0, 0.0]
 
 
 class Declared:
@@ -147,6 +155,6 @@ class TestPerImageDeclarations:
     def test_a_range_an_image_declares_is_not_in_the_spec_so_the_results_still_combine(self):
         # The stated limit: the endpoint each row used is in the details, which are not compared.
         declared, undeclared = run(Declared(value_range=(0, 4095))), run(Declared())
-        assert declared["details"]["saturation_upper"].tolist() == [4095.0]
-        assert undeclared["details"]["saturation_upper"].tolist() == [65535.0]
+        assert declared["details"]["saturated_upper"].tolist() == [4095.0]
+        assert undeclared["details"]["saturated_upper"].tolist() == [65535.0]
         combine_stats_results([declared, undeclared])

@@ -32,7 +32,7 @@ def spatial(boxes, shape=SHAPE, stats=ImageStats.SPATIAL, **kw):
 
 
 def test_spatial_flags_are_appended_and_inside_all():
-    assert ImageStats.VISUAL_BLUR_DIRECTIONALITY.value < ImageStats.SPATIAL_NN_DISTANCE_NORM.value
+    assert ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY.value < ImageStats.SPATIAL_NN_DISTANCE_NORM.value
     assert ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION.value < ImageStats.SPATIAL_COVERED_FRACTION.value
     assert ImageStats.ALL & ImageStats.SPATIAL == ImageStats.SPATIAL
     assert ImageStats.SPATIAL_COVERED_FRACTION.value < ImageStats.SPATIAL_MAX_IOU_SAME_CLASS.value

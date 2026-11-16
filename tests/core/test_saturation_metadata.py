@@ -35,12 +35,12 @@ class Sensors:
 
 
 def read(data: Any, **kw: Any) -> tuple[list[float], list[float], list[str]]:
-    result = image_stats(data, stats=kw.pop("stats", ImageStats.PIXEL_SATURATION), **kw)
+    result = image_stats(data, stats=kw.pop("stats", ImageStats.PIXEL_SATURATED_FRACTION), **kw)
     details = result.get("details", {})
     return (
-        np.asarray(result["stats"]["saturation"]).tolist(),
-        np.asarray(details["saturation_upper"]).tolist(),
-        np.asarray(details["saturation_upper_rule"]).tolist(),
+        np.asarray(result["stats"]["saturated_fraction"]).tolist(),
+        np.asarray(details["saturated_upper"]).tolist(),
+        np.asarray(details["saturated_upper_rule"]).tolist(),
     )
 
 
@@ -60,7 +60,7 @@ class TestTheEndpointComesFromTheImage:
 
     def test_the_default_request_reads_it_too(self):
         result = image_stats(Sensors([TWELVE], [{"value_range": (0, 4095)}]))
-        assert result["stats"]["saturation"].tolist() == [1.0]
+        assert result["stats"]["saturated_fraction"].tolist() == [1.0]
 
     def test_the_call_range_beats_the_metadata(self):
         data = Sensors([TWELVE], [{"value_range": (0, 65535)}])
@@ -68,10 +68,10 @@ class TestTheEndpointComesFromTheImage:
 
     def test_a_channel_groups_own_range_beats_both(self):
         data = Sensors([np.full((2, 4, 4), 4095, dtype=np.uint16)], [{"value_range": (0, 65535)}])
-        stats = {None: ImageStats.PIXEL_SATURATION, "nir": ImageStats.PIXEL_SATURATION}
+        stats = {None: ImageStats.PIXEL_SATURATED_FRACTION, "nir": ImageStats.PIXEL_SATURATED_FRACTION}
         result = image_stats(data, stats=stats, channels={"nir": ChannelGroup(1, value_range=(0, 4095))})
-        assert result["stats"]["saturation"].tolist() == [0.0]
-        assert result["stats"]["nir_saturation"].tolist() == [1.0]
+        assert result["stats"]["saturated_fraction"].tolist() == [0.0]
+        assert result["stats"]["nir_saturated_fraction"].tolist() == [1.0]
 
     def test_a_malformed_range_raises_naming_the_image(self):
         with pytest.raises(ValueError, match=r"image 1.*value_range"):
@@ -87,12 +87,12 @@ class TestInThePixelFamily:
             image_stats([wide], stats=ImageStats.PIXEL, normalize_pixel_values=True)
         said = [r.getMessage() for r in caplog.records if "no value range" in r.getMessage()]
         assert said
-        assert all("PIXEL_SATURATION" not in m for m in said)
+        assert all("PIXEL_SATURATED_FRACTION" not in m for m in said)
 
     def test_a_float_image_without_a_range_is_nan_and_says_why(self):
         got = image_stats([np.zeros((3, 4, 4), dtype=np.float32)], stats=ImageStats.PIXEL)
-        assert np.isnan(got["stats"]["saturation"][0])
-        assert got.get("details", {})["saturation_status"].tolist() == ["unknown_upper"]
+        assert np.isnan(got["stats"]["saturated_fraction"][0])
+        assert got.get("details", {})["saturated_status"].tolist() == ["unknown_upper"]
 
 
 # Each kind of image: how to make n of them, and the range to declare for them.
@@ -120,4 +120,4 @@ class TestDefaultOutliers:
     def test_an_image_clipped_all_over_is_flagged_on_the_saturation_column(self):
         images = [*pictures("uint8"), np.full((3, 8, 8), 255, dtype=np.uint8)]
         flagged = Outliers().evaluate(images).data()
-        assert (flagged["metric_name"] == "saturation").any()
+        assert (flagged["metric_name"] == "saturated_fraction").any()

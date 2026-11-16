@@ -91,7 +91,7 @@ keys = (
     "skew",
     "kurtosis",
     "entropy",
-    "saturation",
+    "saturated_fraction",
     "brightness",
     "darkness",
     "sharpness",

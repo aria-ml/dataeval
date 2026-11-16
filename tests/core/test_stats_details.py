@@ -144,7 +144,7 @@ class TestImageStatsDetails:
         legacy = (
             ImageStats.ALL
             & ~ImageStats.SPATIAL
-            & ~ImageStats.PIXEL_SATURATION
+            & ~ImageStats.PIXEL_SATURATED_FRACTION
             & ~ImageStats.CONTEXT
             & ~ImageStats.COLOR
         )

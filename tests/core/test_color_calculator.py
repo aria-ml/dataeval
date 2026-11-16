@@ -22,7 +22,13 @@ pytestmark = [
 ]
 
 COLOR = ImageStats.COLOR
-STATS = ["color_lightness_mean", "color_chroma_mean", "color_achromatic_fraction", "color_hue_cos", "color_hue_sin"]
+STATS = [
+    "color_lightness_mean",
+    "color_chroma_mean",
+    "color_achromatic_fraction",
+    "color_hue_cos_mean",
+    "color_hue_sin_mean",
+]
 DETAILS = ["color_status", "color_valid_fraction", "color_valid_pixels", "color_excluded_pixels", "color_hue_reason"]
 
 
@@ -68,8 +74,8 @@ class TestValues:
         assert got["color_status"] == "ok"
         assert got["color_lightness_mean"] == pytest.approx(53.2408, abs=0.01)
         assert got["color_chroma_mean"] == pytest.approx(104.5518, abs=0.01)
-        assert got["color_hue_cos"] == pytest.approx(0.76606, abs=1e-4)
-        assert got["color_hue_sin"] == pytest.approx(0.64277, abs=1e-4)
+        assert got["color_hue_cos_mean"] == pytest.approx(0.76606, abs=1e-4)
+        assert got["color_hue_sin_mean"] == pytest.approx(0.64277, abs=1e-4)
         assert got["color_achromatic_fraction"] == 0.0
         assert got["color_hue_reason"] == ""
 
@@ -79,8 +85,8 @@ class TestValues:
         assert got["color_lightness_mean"] == pytest.approx(53.585, abs=0.01)
         assert got["color_chroma_mean"] < 1e-3
         assert got["color_achromatic_fraction"] == 1.0
-        assert math.isnan(got["color_hue_cos"])
-        assert math.isnan(got["color_hue_sin"])
+        assert math.isnan(got["color_hue_cos_mean"])
+        assert math.isnan(got["color_hue_sin_mean"])
         assert got["color_hue_reason"] == "achromatic"
 
     def test_half_gray_half_red_reads_hue_from_the_red_half_only(self):
@@ -88,7 +94,7 @@ class TestValues:
         image[:, :, 4:] = np.array([255, 0, 0], dtype=np.uint8)[:, None, None]
         got = measure(image)
         assert got["color_achromatic_fraction"] == 0.5
-        assert got["color_hue_cos"] == pytest.approx(0.76606, abs=1e-4)
+        assert got["color_hue_cos_mean"] == pytest.approx(0.76606, abs=1e-4)
 
     def test_the_threshold_moves_what_is_achromatic(self):
         faint = solid((140, 128, 128))  # a few levels off a gray: chroma of about 4

@@ -73,7 +73,7 @@ class _FrameRows:
         """Take in one frame."""
         self.numbers.append(view.number)
         self.times.append(view.time_s)
-        if not self.stats & FrameStats.EXACT_REPEAT:
+        if not self.stats & FrameStats.REPEAT_EXACT:
             return
         # ponytail: compared on `FrameView.pixels`, the (C, H, W) array every statistic reads, which keeps only the
         # first slice of a frame with more than 3 dimensions. Such frames are not a video input. Upgrade path:
@@ -114,7 +114,7 @@ def _aggregations(stats: FrameStats) -> tuple[Aggregator, ...]:
             Aggregator(how, "unit", "sequence", ("elapsed_time_s",), min_coverage=_TIMING_COVERAGE)
             for how in ("median", "std")
         ]
-    if stats & FrameStats.EXACT_REPEAT:
+    if stats & FrameStats.REPEAT_EXACT:
         # Every frame but the first has a value, so no coverage is needed beyond what is there.
         declared.append(
             Aggregator("mean", "unit", "sequence", ("repeat_frame",), min_coverage=0.0, suffix="_fraction"),
@@ -199,7 +199,7 @@ def frame_stats(
 
     Notes
     -----
-    ``TIMING`` reads timestamps and decodes no pixels. ``EXACT_REPEAT`` decodes each frame once and holds a copy
+    ``TIMING`` reads timestamps and decodes no pixels. ``REPEAT_EXACT`` decodes each frame once and holds a copy
     of the previous one.
 
     **Parallelism.** Videos are measured concurrently, one per worker thread, when
@@ -228,7 +228,8 @@ def frame_stats(
     """
     if not stats:
         raise ValueError(
-            "stats requests no statistics. Select FrameStats.TIMING, FrameStats.EXACT_REPEAT or FrameStats.ALL.",
+            "stats requests no statistics. Select FrameStats.TIMING_ELAPSED, FrameStats.REPEAT_EXACT or "
+            "FrameStats.ALL.",
         )
     videos = run_videos(source, partial(_measure_video, stats), progress_callback)
     source_index = [SourceIndex(item, number, "unit") for item, rows in enumerate(videos) for number in rows.numbers]
@@ -238,7 +239,7 @@ def frame_stats(
         elapsed = [rows.elapsed() for rows in videos]
         columns["elapsed_time_s"] = _join([e for e, _ in elapsed], np.float64)
         details["elapsed_time_status"] = _join([status for _, status in elapsed], object)
-    if stats & FrameStats.EXACT_REPEAT:
+    if stats & FrameStats.REPEAT_EXACT:
         columns["repeat_frame"] = _join([np.array(rows.repeat, dtype=np.float64) for rows in videos], np.float64)
         details["repeat_pair_has_missing"] = _join([np.array(rows.pair_missing, dtype=bool) for rows in videos], bool)
     return AddressedResult(

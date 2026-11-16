@@ -154,8 +154,8 @@ class TestQualityGate:
         [
             "nn_distance_norm",
             "box_in_image_fraction",
-            "surround_mean",
-            "surround_std",
+            "surround_intensity_mean",
+            "surround_intensity_std",
             "target_surround_contrast",
             "signal_clutter_ratio",
         ],
@@ -175,9 +175,9 @@ class TestQualityGate:
         """Its endpoint is a keyword of `image_stats`, so a gate would read the dtype rail or NaN and say nothing."""
         _numeric_scalar_stats.cache_clear()
         try:
-            assert "saturation" not in _numeric_scalar_stats()
+            assert "saturated_fraction" not in _numeric_scalar_stats()
             with pytest.raises(ValueError, match="endpoint"):
-                QualityGate("saturation", min=0.0)
+                QualityGate("saturated_fraction", min=0.0)
         finally:
             _numeric_scalar_stats.cache_clear()
 

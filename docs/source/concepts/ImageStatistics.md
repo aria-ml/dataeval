@@ -115,7 +115,7 @@ are rescaled:
 | --- | --- |
 | `mean`, `std`, `var` | `skew`, `kurtosis` (standardized moments) |
 | | `entropy`, `histogram` (binned over the reference either way) |
-| | `missing`, `zeros`, `saturation` (counts) |
+| | `missing`, `zeros`, `saturated_fraction` (counts) |
 
 `normalize_pixel_values=True` exists for those three, and only for them. It divides by
 the same reference the visual family uses, which makes a pixel distribution comparable
@@ -155,7 +155,7 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
   - The smallest of the four absolute gaps between the box and the image edges, in pixels. The value is unsigned, so a
     box that extends past an edge reads as a positive distance, as one inside the image does, and the value does not
     say whether the box lies inside.
-- - `CONTEXT_SURROUND_MEAN` and `CONTEXT_SURROUND_STD`
+- - `CONTEXT_SURROUND_INTENSITY_MEAN` and `CONTEXT_SURROUND_INTENSITY_STD`
   - The mean and the population standard deviation of the intensity of the pixels around a box: a frame a quarter of the
     box's width and height wide, less the box and less every other valid box. Intensity is the value mapped to [0, 1]
     from the image's interval and averaged over the channels, and a pixel counts only if every channel lies in the
@@ -173,13 +173,13 @@ Each row below states what {func}`.image_stats` computes for a statistic whose n
     pixel and grows with how colorful it is. See [the section below](#color-statistics).
 - - `VISUAL_COLOR_ACHROMATIC_FRACTION`
   - The share of pixels whose chroma is under a threshold, 12 by default, so that they count as neutral.
-- - `VISUAL_COLOR_HUE_COS` and `VISUAL_COLOR_HUE_SIN`
+- - `VISUAL_COLOR_HUE_COS_MEAN` and `VISUAL_COLOR_HUE_SIN_MEAN`
   - The direction of the average hue of the colorful pixels, weighted so that a more colorful pixel counts more. The two
     are the coordinates of that direction on the color wheel, and are NaN where no pixel is colorful.
 - - Background statistics (the `background_` prefix)
-  - The same statistics measured over the pixels outside every annotated box, and `background_blur`, which pools the
-    edges outside the boxes. The boxes are unioned, so the values describe the scene. See
-    [Image statistics in integrity checks](DataIntegrity.md#image-statistics-in-integrity-checks).
+  - The same statistics measured over the pixels outside every annotated box, and `background_blur_edge_width`, which
+    pools the edges outside the boxes. The boxes are unioned, so the values describe the scene. See [Image statistics in
+    integrity checks](DataIntegrity.md#image-statistics-in-integrity-checks).
 
 :::
 
@@ -201,11 +201,11 @@ more directly; a normalized `PIXEL_MEAN` is often a less direct route to the sam
 
 ## Saturation at a clipping endpoint
 
-`ImageStats.PIXEL_SATURATION` is a pixel statistic: the share of finite raw values that lie within a tolerance of a clipping
-endpoint. It counts channel values as stored, and not pixels or colors, so an RGB image clipped in one channel reads
-1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. Measure the color bands as a named
-[group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values above
-the endpoint stay in the denominator, are not counted as saturated, and are reported separately.
+`ImageStats.PIXEL_SATURATED_FRACTION` is a pixel statistic: the share of finite raw values that lie within a tolerance
+of a clipping endpoint. It counts channel values as stored, and not pixels or colors, so an RGB image clipped in one
+channel reads 1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. Measure the color bands as a named
+[group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values
+above the endpoint stay in the denominator, are not counted as saturated, and are reported separately.
 
 DataEval does not decode the endpoint from the data. It is the upper bound of the declared `value_range`, then the
 maximum of an unsigned integer dtype, and the value is NaN when none applies. A depth decoded from the data depends on
@@ -215,7 +215,7 @@ its range is declared as `(0, 4095)`.
 
 A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
 floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the
-endpoint, and `saturation_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
+endpoint, and `saturated_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
 
 ## The target-surround ratios
 
@@ -240,8 +240,8 @@ judges the two ratios too, and both are signed.
 
 ## Color statistics
 
-The color statistics, `color_lightness_mean`, `color_chroma_mean`, `color_achromatic_fraction`, `color_hue_cos` and
-`color_hue_sin`, measure the color of an image, a box or the background in the CIELAB color space. They are experimental
+The color statistics, `color_lightness_mean`, `color_chroma_mean`, `color_achromatic_fraction`, `color_hue_cos_mean` and
+`color_hue_sin_mean`, measure the color of an image, a box or the background in the CIELAB color space. They are experimental
 ⚠️. `ImageStats.ALL` includes them, and `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of {func}`.image_stats`
 do not.
 
@@ -262,10 +262,10 @@ the sRGB color once its transfer function is undone, which is neither `brightnes
 `mean`, a mean of stored values.
 
 Hue is a position on the color wheel, and an average of angles misleads because the wheel is a circle: the mean of 350
-and 10 degrees is 0, not 180. `color_hue_cos` and `color_hue_sin` are the coordinates of the average direction of the
-colorful pixels, weighted so that a more colorful pixel counts more. The point lies near the rim when those pixels share
-one hue and near the center when their hues are mixed, and `atan2(color_hue_sin, color_hue_cos)` gives the mean angle
-where it is not near the center.
+and 10 degrees is 0, not 180. `color_hue_cos_mean` and `color_hue_sin_mean` are the coordinates of the average direction
+of the colorful pixels, weighted so that a more colorful pixel counts more. The point lies near the rim when those
+pixels share one hue and near the center when their hues are mixed, and `atan2(color_hue_sin_mean, color_hue_cos_mean)`
+gives the mean angle where it is not near the center.
 
 The threshold between neutral and colorful, `color_chroma_threshold`, is a default chosen without study data and is
 provisional. On a mid gray, one channel 16 of 255 levels above the other two reads a chroma of 6.5 for red, 11.1 for green
@@ -278,8 +278,8 @@ chroma subsampling were not measured, and the statistics read all of them as sRG
 
 ## Blur statistics
 
-The blur statistics, `blur` and `blur_directionality`, measure the width of edges in pixels. They are experimental ⚠️.
-`ImageStats.ALL` includes them, and `ImageStats.VISUAL` and the default of {func}`.image_stats` do not.
+The blur statistics, `blur_edge_width` and `blur_edge_directionality`, measure the width of edges in pixels. They are
+experimental ⚠️. `ImageStats.ALL` includes them, and `ImageStats.VISUAL` and the default of {func}`.image_stats` do not.
 [Blur statistics](BlurStatistics.md) describes them.
 
 ## Transforms and the statistics they invalidate
@@ -308,7 +308,7 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
 the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
-clipped to the new canvas and those left outside it are dropped, the surround statistics, because the ring around a box
+clipped to the new canvas and those left outside it are dropped, the surround statistics, because the surround of a box
 is made of interpolated pixels, and the saturation statistic, because a resize returns floats, which have no dtype
 endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
 resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source

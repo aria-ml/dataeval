@@ -73,7 +73,12 @@ class TestFlags:
     def test_the_names_split_into_family_and_statistic(self):
         # `quality._shared._stat_names` and dataeval-flow's `stat_names_for` both read a flag as <FAMILY>_<STATISTIC>.
         names = [(m.name or "").split("_", 1)[1].lower() for m in CONTEXT]
-        assert names == ["surround_mean", "surround_std", "target_surround_contrast", "signal_clutter_ratio"]
+        assert names == [
+            "surround_intensity_mean",
+            "surround_intensity_std",
+            "target_surround_contrast",
+            "signal_clutter_ratio",
+        ]
 
     def test_all_holds_the_group_and_no_other_group_does(self):
         assert CONTEXT in ImageStats.ALL
@@ -85,16 +90,16 @@ class TestFlags:
             ImageStats.ALL
             & ~ImageStats.BLUR
             & ~ImageStats.SPATIAL
-            & ~ImageStats.PIXEL_SATURATION
+            & ~ImageStats.PIXEL_SATURATED_FRACTION
             & ~CONTEXT
             & ~ImageStats.COLOR
         )
-        assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
+        assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATED_FRACTION
 
     def test_no_existing_bit_moves(self):
-        assert ImageStats.CONTEXT_SURROUND_MEAN.value > ImageStats.PIXEL_SATURATION.value
-        assert ImageStats.CONTEXT_SURROUND_STD.value > ImageStats.CONTEXT_SURROUND_MEAN.value
-        assert ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST.value > ImageStats.CONTEXT_SURROUND_STD.value
+        assert ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN.value > ImageStats.PIXEL_SATURATED_FRACTION.value
+        assert ImageStats.CONTEXT_SURROUND_INTENSITY_STD.value > ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN.value
+        assert ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST.value > ImageStats.CONTEXT_SURROUND_INTENSITY_STD.value
         assert ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO.value > ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST.value
 
 
@@ -103,19 +108,19 @@ class TestValues:
         image = np.full((1, 10, 10), 0.2)
         image[0, 3:6, 3:6] = 0.8  # the target, so a region read wrongly reads wrong
         row = measure(image, [FOCAL], 0)
-        assert row["surround_mean"] == pytest.approx(0.2, abs=1e-12)
-        assert row["surround_mean"] != pytest.approx(0.8)
-        assert row["surround_std"] <= 1e-12
+        assert row["surround_intensity_mean"] == pytest.approx(0.2, abs=1e-12)
+        assert row["surround_intensity_mean"] != pytest.approx(0.8)
+        assert row["surround_intensity_std"] <= 1e-12
         assert (row["context_status"], row["surround_candidate_pixels"]) == ("ok", 16)
 
     def test_f2_overlap(self):
         row = measure(f2_image(), F2_BOXES, 0)
-        assert row["surround_mean"] == pytest.approx(F2_MEAN, abs=1e-12)
-        assert row["surround_std"] == pytest.approx(F2_STD, abs=1e-12)
+        assert row["surround_intensity_mean"] == pytest.approx(F2_MEAN, abs=1e-12)
+        assert row["surround_intensity_std"] == pytest.approx(F2_STD, abs=1e-12)
         assert row["context_status"] == "ok"
         assert row["surround_candidate_pixels"] == 16
         assert row["surround_retained_pixels"] == 13
-        assert row["ring_peer_excluded_fraction"] == 0.1875
+        assert row["surround_peer_excluded_fraction"] == 0.1875
         assert row["surround_measurable_pixels"] == 13
         assert row["surround_valid_fraction"] == 1.0
         assert row["target_valid_fraction"] == 1.0
@@ -151,9 +156,9 @@ class TestValues:
         row = measure(f2_image(), [FOCAL, (0, 0, 10, 6)], 0, min_pixels=5)
         assert row["context_status"] == "ok"
         assert row["surround_retained_pixels"] == 5  # the row y = 6, x = 2..6
-        assert row["ring_peer_excluded_fraction"] == 0.6875
-        assert row["surround_mean"] == pytest.approx(0.6464646464646464, abs=1e-12)
-        assert row["surround_std"] == pytest.approx(0.014284985478516093, abs=1e-12)
+        assert row["surround_peer_excluded_fraction"] == 0.6875
+        assert row["surround_intensity_mean"] == pytest.approx(0.6464646464646464, abs=1e-12)
+        assert row["surround_intensity_std"] == pytest.approx(0.014284985478516093, abs=1e-12)
 
     def test_f3_a_ring_wholly_covered_is_insufficient_support(self):
         # A peer that contains the whole window, as a parent box such as an ignored region does.
@@ -161,7 +166,7 @@ class TestValues:
         assert row["context_status"] == "insufficient_support"
         assert row["surround_retained_pixels"] == 0
         assert math.isnan(row["surround_valid_fraction"])
-        assert math.isnan(row["surround_mean"])
+        assert math.isnan(row["surround_intensity_mean"])
 
     @pytest.mark.parametrize(
         ("box", "candidate"),
@@ -185,19 +190,19 @@ class TestEncodings:
             measure(u8.astype(np.uint16), box, 0, min_pixels=32, declared=(0, 255)),
             measure(u8 / 255.0, box, 0, min_pixels=32),
         ):
-            assert other["surround_mean"] == pytest.approx(reference["surround_mean"], abs=1e-12)
-            assert other["surround_std"] == pytest.approx(reference["surround_std"], abs=1e-12)
+            assert other["surround_intensity_mean"] == pytest.approx(reference["surround_intensity_mean"], abs=1e-12)
+            assert other["surround_intensity_std"] == pytest.approx(reference["surround_intensity_std"], abs=1e-12)
 
 
 class TestStatuses:
     def test_invalid_box(self):
         row = measure(f2_image(), [(NAN, 0, 5, 5), (1, 1, 3, 3)], 0)
         assert row["context_status"] == "invalid_box"
-        assert math.isnan(row["surround_mean"])
-        assert math.isnan(row["surround_std"])
+        assert math.isnan(row["surround_intensity_mean"])
+        assert math.isnan(row["surround_intensity_std"])
         assert (row["surround_candidate_pixels"], row["surround_retained_pixels"]) == (-1, -1)
         assert row["surround_measurable_pixels"] == -1
-        assert math.isnan(row["ring_peer_excluded_fraction"])
+        assert math.isnan(row["surround_peer_excluded_fraction"])
         assert math.isnan(row["surround_valid_fraction"])
         assert math.isnan(row["target_valid_fraction"])
         assert (row["context_range_low"], row["context_range_high"]) == (0.0, 1.0)
@@ -211,9 +216,9 @@ class TestStatuses:
         image[0, 8, 8] = np.inf  # a float image with an infinite value decodes to no interval
         row = measure(image, [FOCAL], 0)
         assert row["context_status"] == "unknown_range"
-        assert math.isnan(row["surround_mean"])
+        assert math.isnan(row["surround_intensity_mean"])
         assert (row["surround_candidate_pixels"], row["surround_retained_pixels"]) == (16, 16)
-        assert row["ring_peer_excluded_fraction"] == 0.0
+        assert row["surround_peer_excluded_fraction"] == 0.0
         assert row["surround_measurable_pixels"] == -1
         assert math.isnan(row["context_range_low"])
         assert math.isnan(row["context_range_high"])
@@ -226,17 +231,17 @@ class TestStatuses:
         image = np.random.default_rng(0).random((1, 10, 10))
         row = measure(image, [FOCAL], 0, declared=declared)
         assert row["context_status"] == "unknown_range"
-        assert math.isnan(row["surround_mean"])
-        assert math.isnan(row["surround_std"])
+        assert math.isnan(row["surround_intensity_mean"])
+        assert math.isnan(row["surround_intensity_std"])
 
     @pytest.mark.parametrize("box", [(0, 0, 10, 10), None], ids=["filling_box", "full_image_entry"])
     def test_empty_ring(self, box):
         # A box that fills its window leaves no surround. A `None` entry is the full-image box.
         row = measure(f2_image(), [box], 0)
         assert row["context_status"] == "empty_ring"
-        assert math.isnan(row["surround_mean"])
+        assert math.isnan(row["surround_intensity_mean"])
         assert (row["surround_candidate_pixels"], row["surround_retained_pixels"]) == (0, 0)
-        assert math.isnan(row["ring_peer_excluded_fraction"])
+        assert math.isnan(row["surround_peer_excluded_fraction"])
         assert row["surround_measurable_pixels"] == 0
         assert math.isnan(row["surround_valid_fraction"])
         assert row["target_valid_fraction"] == 1.0
@@ -245,8 +250,8 @@ class TestStatuses:
     def test_insufficient_support(self):
         row = measure(f2_image(), F2_BOXES, 0, min_pixels=14)  # F2 has 13
         assert row["context_status"] == "insufficient_support"
-        assert math.isnan(row["surround_mean"])
-        assert math.isnan(row["surround_std"])
+        assert math.isnan(row["surround_intensity_mean"])
+        assert math.isnan(row["surround_intensity_std"])
         assert (row["surround_candidate_pixels"], row["surround_retained_pixels"]) == (16, 13)
         assert row["surround_measurable_pixels"] == 13
         assert row["surround_valid_fraction"] == 1.0
@@ -263,7 +268,7 @@ class TestStatuses:
     def test_the_image_row_is_not_applicable(self):
         row = measure(f2_image(), F2_BOXES, None)
         assert row["context_status"] == "not_applicable"
-        assert math.isnan(row["surround_mean"])
+        assert math.isnan(row["surround_intensity_mean"])
         assert row["surround_candidate_pixels"] == -1
 
 
@@ -280,14 +285,14 @@ class TestThroughImageStats:
         result = image_stats([picture()], boxes=[BIG_BOXES], stats=CONTEXT)
         details = details_of(result)
         assert details["context_status"].tolist() == ["not_applicable", "ok", "ok"]
-        assert np.isnan(result["stats"]["surround_mean"][0])
+        assert np.isnan(result["stats"]["surround_intensity_mean"][0])
         assert details["surround_candidate_pixels"].dtype.kind == "i"
         assert details["surround_candidate_pixels"].tolist() == [-1, 1216, 1078]
-        assert not np.isnan(result["stats"]["surround_mean"][1:]).any()
+        assert not np.isnan(result["stats"]["surround_intensity_mean"][1:]).any()
 
     def test_per_background_adds_no_context_column(self):
         result = image_stats([picture()], boxes=[BIG_BOXES], stats=ImageStats.PIXEL_MEAN | CONTEXT, per_background=True)
-        assert "surround_mean" in result["stats"]
+        assert "surround_intensity_mean" in result["stats"]
         assert not [name for name in result["stats"] if name.startswith("background_surround")]
 
 
@@ -309,15 +314,19 @@ class TestRequestRules:
             image_stats(images(), stats=CONTEXT, per_target=False)
 
     def test_a_mixed_request_without_box_rows_warns_and_names_the_flags_and_what_they_read(self):
-        with pytest.warns(UserWarning, match="CONTEXT_SURROUND_MEAN, CONTEXT_SURROUND_STD.*read the pixels around"):
+        with pytest.warns(
+            UserWarning, match="CONTEXT_SURROUND_INTENSITY_MEAN, CONTEXT_SURROUND_INTENSITY_STD.*read the pixels around"
+        ):
             image_stats(images(), stats=ImageStats.PIXEL | CONTEXT, per_target=False)
 
     def test_all_is_silent_and_returns_nan_columns(self):
         assert caught_for_peers(ImageStats.ALL) == []
         result = image_stats(images(), stats=ImageStats.ALL, per_target=False)
-        assert np.isnan(result["stats"]["surround_mean"]).all()
+        assert np.isnan(result["stats"]["surround_intensity_mean"]).all()
 
-    @pytest.mark.parametrize("extra", [ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION, ImageStats.CONTEXT_SURROUND_MEAN])
+    @pytest.mark.parametrize(
+        "extra", [ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION, ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN]
+    )
     def test_everything_but_the_box_needing_statistics_plus_one_is_silent(self, extra):
         # `asks_for_all` names what needs boxes, so the next box-needing family cannot miss it.
         assert caught_for_peers((ImageStats.ALL & ~(ImageStats.SPATIAL | CONTEXT)) | extra) == []

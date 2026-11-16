@@ -15,9 +15,9 @@ from dataeval.flags import ImageStats
 # A named band group is a smaller cube that averages to a picture like the whole. Directionality is left out of the
 # background view because nothing has tested it there.
 _VIEWS = ViewKind.WHOLE | ViewKind.BAND
-# `blur` answers the background view too, but not by reading it: the view holds NaN where boxes were, and the smoothing
-# would spread those holes over every edge. The edges are found on the unmasked picture and the ones outside the boxes,
-# and a margin around them, are pooled.
+# `blur_edge_width` answers the background view too, but not by reading it: the view holds NaN where boxes were, and the
+# smoothing would spread those holes over every edge. The edges are found on the unmasked picture and the ones outside
+# the boxes, and a margin around them, are pooled.
 _BLUR_VIEWS = _VIEWS | ViewKind.MASK
 
 _NAN = BlurValues(np.nan, np.nan)
@@ -86,7 +86,7 @@ class BlurStatCalculator(Calculator[ImageStats]):
         return background_blur(edges, grow_region(mask))
 
     def _blur(self) -> float:
-        """Return the `blur` column: the background value in a masked view, the whole picture's otherwise."""
+        """Return the `blur_edge_width` column: the background value in a masked view, the whole picture's otherwise."""
         return self._background if self.cache.exclude is not None else self._values.blur
 
     def get_applicable_flags(self) -> ImageStats:
@@ -96,8 +96,8 @@ class BlurStatCalculator(Calculator[ImageStats]):
     def get_handlers(self) -> dict[ImageStats, Handler]:
         """Return mapping of flags to the statistic each produces."""
         return {
-            ImageStats.VISUAL_BLUR: Handler("blur", lambda: [self._blur()], _BLUR_VIEWS),
-            ImageStats.VISUAL_BLUR_DIRECTIONALITY: Handler(
-                "blur_directionality", lambda: [self._values.directionality], _VIEWS
+            ImageStats.VISUAL_BLUR_EDGE_WIDTH: Handler("blur_edge_width", lambda: [self._blur()], _BLUR_VIEWS),
+            ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY: Handler(
+                "blur_edge_directionality", lambda: [self._values.directionality], _VIEWS
             ),
         }

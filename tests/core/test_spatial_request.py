@@ -164,7 +164,7 @@ def test_every_group_without_spatial_is_unchanged(monkeypatch, group, source):
         result = image_stats(images(2), stats=group)
 
     # `PIXEL` holds saturation, which reports details of its own; no other group reports any.
-    assert all(name.startswith("saturation_") for name in result.get("details", {}))
+    assert all(name.startswith("saturated_") for name in result.get("details", {}))
     assert not SPATIAL_NAMES & set(result["stats"])
 
 

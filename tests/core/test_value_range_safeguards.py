@@ -17,7 +17,7 @@ from dataeval.flags import ImageStats
 
 pytestmark = pytest.mark.required
 
-READ = ImageStats.VISUAL_BRIGHTNESS | ImageStats.PIXEL_ENTROPY | ImageStats.PIXEL_SATURATION
+READ = ImageStats.VISUAL_BRIGHTNESS | ImageStats.PIXEL_ENTROPY | ImageStats.PIXEL_SATURATED_FRACTION
 
 
 class Boxes:

@@ -19,7 +19,13 @@ class ImageStats(Flag):
     a full-scale reference and reads against the 0-255 display range — which makes one
     picture answer identically whether it arrived as 8-bit, 16-bit or float, and makes the
     answer NaN for data with no such reference, such as an elevation or temperature band.
+    The color statistics are the exception: they read only a declared interval or 8-bit data.
     See :doc:`/concepts/ImageStatistics`.
+
+    A statistic's column is its flag's name after the first underscore, in lower case: `PIXEL_MEAN` gives `mean` and
+    `VISUAL_BLUR_EDGE_WIDTH` gives `blur_edge_width`. A channel group's name goes in front of a column and a view's name
+    in front of that (`background_nir_mean`), except that the surround's own columns put the surround first
+    (`surround_nir_intensity_mean`).
 
     Individual Stats
     ----------------
@@ -34,7 +40,7 @@ class ImageStats(Flag):
     - `PIXEL_MISSING` : Fraction of missing/NaN pixels
     - `PIXEL_ZEROS` : Fraction of zero pixels
     - `PIXEL_HISTOGRAM` : 256-bin histogram of pixel values
-    - `PIXEL_SATURATION` : Share of values at a clipping endpoint; its endpoint, details and limits are under
+    - `PIXEL_SATURATED_FRACTION` : Share of values at a clipping endpoint; its endpoint, details and limits are under
       Saturation Statistic below
 
     Visual Statistics (read against the 0-255 display range; NaN without a reference):
@@ -49,19 +55,20 @@ class ImageStats(Flag):
     Blur Statistics (experimental, so names and values may change; NaN without a reference, with too few edges,
     with a NaN pixel, or for a box that extends past the image):
 
-    - `VISUAL_BLUR` : Width of the sharpest edges, in pixels at the image's own resolution: the 5th percentile
-      of edge widths, after Liang et al. (2010). With `per_background=True` it also gives `background_blur`, taken over
-      the edges outside the boxes and a 9 px margin around them
-    - `VISUAL_BLUR_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
+    - `VISUAL_BLUR_EDGE_WIDTH` : Width of the sharpest edges, in pixels at the image's own resolution: the 5th
+      percentile of edge widths, each the spread of an edge's gradient profile, after Liang et al. (2010). With
+      `per_background=True` it also gives `background_blur_edge_width`, taken over the edges outside the boxes and a
+      9 px margin around them
+    - `VISUAL_BLUR_EDGE_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
       of their median widths
 
     Known limits: a width is in pixels, so values compare only at one resolution. `image_stats` warns when one call
     requests blur for images of more than one size; `Outliers` calls it once per dataset, so sizes that differ only
-    between datasets go unwarned. `VISUAL_BLUR` follows the sharpest edges, so motion blur moves it weakly and
-    unevenly and shows in `VISUAL_BLUR_DIRECTIONALITY` instead, which is unsigned and has a scene-dependent baseline.
-    Noise and JPEG artifacts move it by amounts and in directions that depend on the scene, so it cannot tell them
-    from focus, and a soft 8-bit image at low contrast reads sharper than at full contrast, for a cause not traced, so
-    compare only images of similar contrast. It costs far more than `VISUAL_SHARPNESS`, and nothing caps the image
+    between datasets go unwarned. `VISUAL_BLUR_EDGE_WIDTH` follows the sharpest edges, so motion blur moves it weakly
+    and unevenly and shows in `VISUAL_BLUR_EDGE_DIRECTIONALITY` instead, which is unsigned and has a scene-dependent
+    baseline. Noise and JPEG artifacts move it by amounts and in directions that depend on the scene, so it cannot tell
+    them from focus, and a soft 8-bit image at low contrast reads sharper than at full contrast, for a cause not traced,
+    so compare only images of similar contrast. It costs far more than `VISUAL_SHARPNESS`, and nothing caps the image
     size, so time a sample first. It was checked only on a few real frames with synthetic degradations and no
     human-rated blur. See :doc:`/concepts/BlurStatistics`.
 
@@ -153,9 +160,9 @@ class ImageStats(Flag):
 
     Saturation Statistic (the share of values at a clipping endpoint, in `PIXEL`):
 
-    - `PIXEL_SATURATION` : The share of finite raw values that sit at the endpoint, within `saturation_atol`. It counts
-      channel values, not spatial pixels, so an image clipped in one channel of three reads 1/3. The endpoint is never
-      read from the data. It is the upper bound of a declared `value_range`, as :func:`~dataeval.core.image_stats`
+    - `PIXEL_SATURATED_FRACTION` : The share of finite raw values that sit at the endpoint, within `saturated_atol`. It
+      counts channel values, not spatial pixels, so an image clipped in one channel of three reads 1/3. The endpoint is
+      never read from the data. It is the upper bound of a declared `value_range`, as :func:`~dataeval.core.image_stats`
       resolves one for each image, else the maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean
       data, else it is unknown and the value is NaN. Data of 12 bits stored in uint16 therefore reads against 65535
       unless its range is declared as ``(0, 4095)``. Finite values above the endpoint stay in the denominator and are
@@ -164,16 +171,16 @@ class ImageStats(Flag):
     A request that includes it also returns details, in the result's ``details``, one value per row, named with a band
     group's name in front when the row is a band group's:
 
-    - `saturation_status` : `ok`; `unknown_upper`, when no endpoint resolved; `no_finite_values`, when the view holds
+    - `saturated_status` : `ok`; `unknown_upper`, when no endpoint resolved; `no_finite_values`, when the view holds
       no finite value; or `empty_region`, when it holds no position of the datum, as for a box outside the image or a
       band group the datum cannot supply. The value is NaN unless the status is `ok`
-    - `saturation_valid_fraction` : The finite values over the positions of the view
-    - `saturation_above_range_fraction` : The finite values above the endpoint plus `saturation_atol`, over the finite
+    - `saturated_valid_fraction` : The finite values over the positions of the view
+    - `saturated_above_range_fraction` : The finite values above the endpoint plus `saturated_atol`, over the finite
       values
-    - `saturation_upper` : The endpoint used, NaN when none resolved
-    - `saturation_upper_rule` : What supplied it, `declared` or `dtype`, and empty when none did
+    - `saturated_upper` : The endpoint used, NaN when none resolved
+    - `saturated_upper_rule` : What supplied it, `declared` or `dtype`, and empty when none did
 
-    The result's ``measurement_specs`` records `saturation_atol` and a range that the call or a channel group declared,
+    The result's ``measurement_specs`` records `saturated_atol` and a range that the call or a channel group declared,
     so `combine_stats_results` refuses results measured with different ones. A range an image's own metadata declares
     and the endpoint a dtype supplies are in the details, which are not compared, so a collection of ``uint8`` images
     and a collection of ``uint16`` ones still combine. `QualityGate` does not accept it, since a gate measures frames
@@ -181,26 +188,24 @@ class ImageStats(Flag):
 
     Context Statistics (the intensity of the pixels around a box, in `CONTEXT`):
 
-    - `CONTEXT_SURROUND_MEAN` : The mean of the normalized intensity of the box's surround, as the column
-      `surround_mean`. The surround is the box widened on every side by `surround_padding` times its width and its
-      height, a quarter by default, less the box and less every other valid box of the image, each rounded outward to
-      whole pixels and clipped to the image. A pixel's intensity is its value mapped to [0, 1] from the interval the
-      view is measured against (see `value_range` of :func:`~dataeval.core.image_stats`), averaged over the channels
-      read, so the box and its surround share one scale. A pixel counts only when every channel read is finite and
-      inside the interval, and a value outside is never clipped. An object that no box annotates stays in the surround,
-      and an image whose integer values carry no declared interval is read against the interval its own maximum decodes
-      to, so compare images only where the interval is declared
-    - `CONTEXT_SURROUND_STD` : The population standard deviation (``ddof=0``) of the same intensities, as the column
-      `surround_std`
+    - `CONTEXT_SURROUND_INTENSITY_MEAN` : The mean of the normalized intensity of the box's surround. The surround is
+      the box widened on every side by `surround_padding` times its width and its height, a quarter by default, less the
+      box and less every other valid box of the image, each rounded outward to whole pixels and clipped to the image. A
+      pixel's intensity is its value mapped to [0, 1] from the interval the view is measured against (see `value_range`
+      of :func:`~dataeval.core.image_stats`), averaged over the channels read, so the box and its surround share one
+      scale. A pixel counts only when every channel read is finite and inside the interval, and a value outside is never
+      clipped. An object that no box annotates stays in the surround, and an image whose integer values carry no
+      declared interval is read against the interval its own maximum decodes to, so compare images only where the
+      interval is declared
+    - `CONTEXT_SURROUND_INTENSITY_STD` : The population standard deviation (``ddof=0``) of the same intensities
     - `CONTEXT_TARGET_SURROUND_CONTRAST` : How far the box stands from its surround relative to the surround's level,
-      ``(mu_t - mu_s) / max(mu_s, floor)``, as the column `target_surround_contrast`. `mu_s` is `surround_mean`, and
-      `mu_t` is the mean intensity of the box's own pixels, the box rounded outward and clipped as for the surround,
-      over the pixels at which every channel read is finite and inside the interval. It covers the whole box, so it
-      includes the pixels of overlapping neighbors and of background inside a loose box. The sign is kept: a box
-      darker than its surround reads below 0. `floor` is `surround_intensity_floor` of
-      :func:`~dataeval.core.image_stats`, 1/255 by default
+      ``(mu_t - mu_s) / max(mu_s, floor)``. `mu_s` is `surround_intensity_mean`, and `mu_t` is the mean intensity of the
+      box's own pixels, the box rounded outward and clipped as for the surround, over the pixels at which every channel
+      read is finite and inside the interval. It covers the whole box, so it includes the pixels of overlapping
+      neighbors and of background inside a loose box. The sign is kept: a box darker than its surround reads below 0.
+      `floor` is `context_ratio_floor` of :func:`~dataeval.core.image_stats`, 1/255 by default
     - `CONTEXT_SIGNAL_CLUTTER_RATIO` : The same difference relative to the surround's spread,
-      ``(mu_t - mu_s) / max(sd_s, floor)`` with `sd_s` the `surround_std`, as the column `signal_clutter_ratio`
+      ``(mu_t - mu_s) / max(sd_s, floor)`` with `sd_s` the `surround_intensity_std`
 
     The two ratios are Weber-style contrasts of the encoded intensity in [0, 1], and not contrasts of physical
     luminance, which gamma and the sensor's response separate from the values. They are not `VISUAL_CONTRAST`, the
@@ -210,7 +215,7 @@ class ImageStats(Flag):
     `surround_min_pixels` such pixels, 32 by default, which a small box can fall under and a box whose window other
     boxes cover always does. A ratio is NaN wherever the surround is. Those settings and the floor are keywords of
     :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes one also returns details, in
-    the result's ``details``, one value per row, named with a band group's name in front when the row is a band group's.
+    the result's ``details``, one value per row, named for a band group as the columns are (see the naming rule above).
     The surround before other boxes are removed, less the box, is the candidate, and the candidate's pixels that no
     other box covers are the retained ones:
 
@@ -225,40 +230,37 @@ class ImageStats(Flag):
     - `surround_candidate_pixels`, `surround_retained_pixels`, `surround_measurable_pixels` : The candidate pixels,
       the retained ones, and the retained ones measurable in every channel read. -1 where a count does not apply. The
       first two are reported for the unnamed view only, since a band group does not change them
-    - `ring_peer_excluded_fraction` : The share of the candidate that other boxes cover, for the unnamed view only,
+    - `surround_peer_excluded_fraction` : The share of the candidate that other boxes cover, for the unnamed view only,
       NaN where the candidate is empty or not counted
     - `surround_valid_fraction`, `target_valid_fraction` : The measurable pixels over the retained ones, and the share
       of the box's own pixels that are finite and inside the interval in every channel read
     - `context_range_low`, `context_range_high` : The interval the row was measured against, NaN where none was
       established
-    - `contrast_reason`, `target_surround_contrast_floored`, `signal_clutter_ratio_floored` : Present when a ratio is
-      requested, each floored value only with its own ratio. `contrast_reason` is `insufficient_target_support` when
-      the surround was measured and fewer than 90% of the box's pixels are valid, which leaves both ratios NaN with the
-      surround kept, and is empty otherwise, including where a ratio is NaN because the surround is not measured, which
-      `context_status` says. A floored value is True where that ratio's denominator was below the floor, so the ratio
-      is the difference over the floor, no larger than ``1 / floor`` in size, and reads the floor and not the surround.
-      False where the ratio is NaN
+    - `context_ratio_reason`, `target_surround_contrast_floored`, `signal_clutter_ratio_floored` : Present when a ratio
+      is requested, each floored value only with its own ratio. `context_ratio_reason` is `insufficient_target_support`
+      when the surround was measured and fewer than 90% of the box's pixels are valid, which leaves both ratios NaN with
+      the surround kept, and is empty otherwise, including where a ratio is NaN because the surround is not measured,
+      which `context_status` says. A floored value is True where that ratio's denominator was below the floor, so the
+      ratio is the difference over the floor, no larger than ``1 / floor`` in size, and reads the floor and not the
+      surround. False where the ratio is NaN
 
     Color Statistics (experimental, so names and values may change; measured only from channels the caller declares
     are sRGB red, green and blue with `color_rgb_channels` of :func:`~dataeval.core.image_stats`, and dropped from a
     request, with a notice, where they are not declared):
 
-    - `VISUAL_COLOR_LIGHTNESS_MEAN` : The mean CIELAB lightness, ``L*``, of the valid pixels, as the column
-      `color_lightness_mean`. A pixel is valid when its three declared channels are finite and inside the interval the
-      view is measured against, and a value outside is never clipped. Each channel is mapped to [0, 1] from that
-      interval, decoded from the sRGB transfer function, converted to XYZ with the D65 matrix and to CIELAB with the
-      D65 white and the 2-degree observer. The interval is the declared one (the call's `value_range` or the datum's own
-      metadata; a channel group's range does not apply), and without one an unsigned 8-bit datum reads against
-      ``(0, 255)`` and any other datum is NaN
-    - `VISUAL_COLOR_CHROMA_MEAN` : The mean chroma, ``C = hypot(a*, b*)``, of the valid pixels, as `color_chroma_mean`
-    - `VISUAL_COLOR_ACHROMATIC_FRACTION` : The share of valid pixels whose chroma is under `color_chroma_threshold`,
-      as `color_achromatic_fraction`
-    - `VISUAL_COLOR_HUE_COS`, `VISUAL_COLOR_HUE_SIN` : The coordinates of the chroma-weighted mean hue direction of
-      the chromatic pixels, those at or over the threshold, ``sum(a*) / sum(C)`` and ``sum(b*) / sum(C)``, as
-      `color_hue_cos` and `color_hue_sin`. Each is in [-1, 1] and ``hue_cos**2 + hue_sin**2 <= 1``, with equality when
-      every chromatic pixel has one hue, so ``np.hypot(cos, sin)`` says how concentrated the hues are and
-      ``np.arctan2(sin, cos)`` is the mean angle where that is not near 0. NaN, with the reason `achromatic`, where
-      no pixel is chromatic
+    - `VISUAL_COLOR_LIGHTNESS_MEAN` : The mean CIELAB lightness, ``L*``, of the valid pixels. A pixel is valid when its
+      three declared channels are finite and inside the interval the view is measured against, and a value outside is
+      never clipped. Each channel is mapped to [0, 1] from that interval, decoded from the sRGB transfer function,
+      converted to XYZ with the D65 matrix and to CIELAB with the D65 white and the 2-degree observer. The interval is
+      the declared one (the call's `value_range` or the datum's own metadata; a channel group's range does not apply),
+      and without one an unsigned 8-bit datum reads against ``(0, 255)`` and any other datum is NaN
+    - `VISUAL_COLOR_CHROMA_MEAN` : The mean chroma, ``C = hypot(a*, b*)``, of the valid pixels
+    - `VISUAL_COLOR_ACHROMATIC_FRACTION` : The share of valid pixels whose chroma is under `color_chroma_threshold`
+    - `VISUAL_COLOR_HUE_COS_MEAN`, `VISUAL_COLOR_HUE_SIN_MEAN` : The coordinates of the chroma-weighted mean hue
+      direction of the chromatic pixels, those at or over the threshold, ``sum(a*) / sum(C)`` and ``sum(b*) / sum(C)``.
+      Each is in [-1, 1] and their squares sum to at most 1, with equality when every chromatic pixel has one hue, so
+      ``np.hypot(cos, sin)`` says how concentrated the hues are and ``np.arctan2(sin, cos)`` is the mean angle where
+      that is not near 0. NaN, with the reason `achromatic`, where no pixel is chromatic
 
     The channels are declared and not detected, so a value is only as true as the declaration, and a view is measured
     only if it holds at least `color_min_pixels` valid pixels and 90% of its pixels are valid. They are defined for the
@@ -297,20 +299,22 @@ class ImageStats(Flag):
     Full Categories:
 
     - `NONE` : No statistics
-    - `PIXEL` : All pixel statistics, including `PIXEL_SATURATION`
-    - `VISUAL` : All visual statistics, except the blur statistics (`BLUR`)
+    - `PIXEL` : All pixel statistics, including `PIXEL_SATURATED_FRACTION`
+    - `VISUAL` : The core visual statistics. The blur and color statistics are visual statistics too, in their own
+      opt-in groups `BLUR` and `COLOR`, outside `VISUAL`
     - `DIMENSION` : All dimension statistics
     - `STANDARD` : The pixel, visual and dimension statistics (`PIXEL`, `VISUAL` and `DIMENSION`), with no hashes and
       no blur. Its columns change only after a deprecation and a migration note. `image_stats` computes it plus `HASH`
       when given no `stats`, and `HASH` can gain members. `Duplicates` needs the hashes, so add `HASH` for it
-    - `NO_HASH` : The same set as `STANDARD`, under the name v1.2 gave it, so v1.3 added `PIXEL_SATURATION` to it too
+    - `NO_HASH` : The same set as `STANDARD`, under the name v1.2 gave it, so v1.3 added `PIXEL_SATURATED_FRACTION` to
+      it too. Deprecated, and removed in 2.0: name `STANDARD`
     - `HASH` : All hash statistics
     - `BLUR` : The two blur statistics (experimental)
-    - `SPATIAL` : The five spatial statistics. In no other group. They need boxes, and are NaN on every other row. The
+    - `SPATIAL` : The five spatial statistics. They need boxes, and are NaN on every other row. The
       two class statistics also read labels
-    - `CONTEXT` : The four context statistics, the surround mean and standard deviation and the two ratios. In no other
-      group. They need boxes, and are NaN on every other row
-    - `COLOR` : The five experimental color statistics. In `ALL` and no other group. They are measured only where
+    - `CONTEXT` : The four context statistics, the surround mean and standard deviation and the two ratios. They need
+      boxes, and are NaN on every other row
+    - `COLOR` : The five experimental color statistics. They are measured only where
       `color_rgb_channels` is given, and are dropped from a request, with a notice, where it is not
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
@@ -327,11 +331,15 @@ class ImageStats(Flag):
     automatically during processing.
 
     .. versionadded:: 1.3
-        The `SPATIAL`, `CONTEXT` and `COLOR` statistics.
+        The `BLUR`, `SPATIAL`, `CONTEXT` and `COLOR` statistics, `PIXEL_SATURATED_FRACTION`, and the `STANDARD` and
+        `BASIC` groups.
+
+    .. deprecated:: 1.3
+        `NO_HASH`, the v1.2 name of `STANDARD`. It is removed in 2.0.
 
     What `ALL` held in v1.2 is
-    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATION & ~ImageStats.CONTEXT &
-    ~ImageStats.COLOR``.
+    ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATED_FRACTION &
+    ~ImageStats.CONTEXT & ~ImageStats.COLOR``.
     The `SPATIAL` and `CONTEXT` statistics need box rows, so a request for `ALL` with no box rows returns their columns
     as NaN, without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds
     them and measures no box rows warns, or raises when it holds nothing else.
@@ -348,6 +356,16 @@ class ImageStats(Flag):
     >>> stats = ImageStats.PIXEL  # All pixel stats
     >>> stats = ImageStats.PIXEL_BASIC | ImageStats.VISUAL  # Basic pixel & all visual
     """
+
+    # Naming rules, read by `_stat_names` and by dataeval-flow's `stat_names_for`:
+    # - One prefix per family. A member's column is its name after the first underscore, lowercased, so the name must
+    #   parse to a column that says what it measures and collides with no other (a new noise family cannot be
+    #   `NOISE_STD`, which parses to `std`).
+    # - `BLUR` and `COLOR` are opt-in groups of visual statistics outside `VISUAL`; their members carry `VISUAL_` so
+    #   that the column keeps the family word (`blur_edge_width`, `color_lightness_mean`).
+    # - A detail's stem is its family, its sub-category or the shared stem of the statistics it covers; `<stem>_status`
+    #   is a row's state and `<stem>_reason` one statistic's own NaN cause. A keyword's prefix names what it configures.
+    # - Members are appended, never inserted, so that no flag value moves.
 
     # ===== NONE (no stats) =====
     NONE = 0
@@ -400,8 +418,8 @@ class ImageStats(Flag):
 
     # ===== BLUR STATS =====
     # Appended after the hash flags so that no existing flag value moves
-    VISUAL_BLUR = auto()
-    VISUAL_BLUR_DIRECTIONALITY = auto()
+    VISUAL_BLUR_EDGE_WIDTH = auto()
+    VISUAL_BLUR_EDGE_DIRECTIONALITY = auto()
 
     # ===== SPATIAL STATS =====
     # Appended after the blur flags so that no existing flag value moves
@@ -412,28 +430,24 @@ class ImageStats(Flag):
     SPATIAL_MAX_IOU_OTHER_CLASS = auto()
 
     # ===== SATURATION =====
-    # Appended after the spatial flags so that no existing flag value moves. Named for the pixel calculator that
-    # computes it, which is the `<FAMILY>_<STATISTIC>` shape every reader of a flag's name relies on.
-    PIXEL_SATURATION = auto()
+    # Appended after the spatial flags so that no existing flag value moves.
+    PIXEL_SATURATED_FRACTION = auto()
 
     # ===== CONTEXT =====
-    # Appended after the saturation flag so that no existing flag value moves. Named `<FAMILY>_<STATISTIC>`, as every
-    # reader of a flag's name expects: the columns are `surround_mean` and `surround_std`.
-    CONTEXT_SURROUND_MEAN = auto()
-    CONTEXT_SURROUND_STD = auto()
+    # Appended after the saturation flag so that no existing flag value moves.
+    CONTEXT_SURROUND_INTENSITY_MEAN = auto()
+    CONTEXT_SURROUND_INTENSITY_STD = auto()
     # The box against its surround. Appended after the surround flags so that no flag value moves.
     CONTEXT_TARGET_SURROUND_CONTRAST = auto()
     CONTEXT_SIGNAL_CLUTTER_RATIO = auto()
 
     # ===== COLOR =====
-    # Appended after the context flags so that no flag value moves. Named `<FAMILY>_<STATISTIC>` for the columns, which
-    # are `color_lightness_mean` and so on. The family is VISUAL because color is read against a value range and means
-    # nothing without one, as the blur flags are; like them these sit outside `VISUAL`, in their own group.
+    # Appended after the context flags so that no flag value moves.
     VISUAL_COLOR_LIGHTNESS_MEAN = auto()
     VISUAL_COLOR_CHROMA_MEAN = auto()
     VISUAL_COLOR_ACHROMATIC_FRACTION = auto()
-    VISUAL_COLOR_HUE_COS = auto()
-    VISUAL_COLOR_HUE_SIN = auto()
+    VISUAL_COLOR_HUE_COS_MEAN = auto()
+    VISUAL_COLOR_HUE_SIN_MEAN = auto()
 
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
@@ -447,7 +461,7 @@ class ImageStats(Flag):
         | PIXEL_MISSING
         | PIXEL_ZEROS
         | PIXEL_HISTOGRAM
-        | PIXEL_SATURATION
+        | PIXEL_SATURATED_FRACTION
     )
 
     VISUAL = VISUAL_BRIGHTNESS | VISUAL_CONTRAST | VISUAL_DARKNESS | VISUAL_SHARPNESS | VISUAL_PERCENTILES
@@ -477,7 +491,7 @@ class ImageStats(Flag):
     HASH = HASH_XXHASH | HASH_PHASH | HASH_DHASH | HASH_PHASH_D4 | HASH_DHASH_D4
 
     # Kept out of VISUAL and VISUAL_BASIC, so Outliers' default keeps its columns and its speed
-    BLUR = VISUAL_BLUR | VISUAL_BLUR_DIRECTIONALITY
+    BLUR = VISUAL_BLUR_EDGE_WIDTH | VISUAL_BLUR_EDGE_DIRECTIONALITY
 
     # Compares a box with the other boxes of its image, so it has a value only on a box's own row
     SPATIAL = (
@@ -490,7 +504,10 @@ class ImageStats(Flag):
 
     # Reads the pixels around a box, so it has a value only on a box's own row
     CONTEXT = (
-        CONTEXT_SURROUND_MEAN | CONTEXT_SURROUND_STD | CONTEXT_TARGET_SURROUND_CONTRAST | CONTEXT_SIGNAL_CLUTTER_RATIO
+        CONTEXT_SURROUND_INTENSITY_MEAN
+        | CONTEXT_SURROUND_INTENSITY_STD
+        | CONTEXT_TARGET_SURROUND_CONTRAST
+        | CONTEXT_SIGNAL_CLUTTER_RATIO
     )
 
     # Reads three declared channels as sRGB, so it has a value only where `color_rgb_channels` is given
@@ -498,8 +515,8 @@ class ImageStats(Flag):
         VISUAL_COLOR_LIGHTNESS_MEAN
         | VISUAL_COLOR_CHROMA_MEAN
         | VISUAL_COLOR_ACHROMATIC_FRACTION
-        | VISUAL_COLOR_HUE_COS
-        | VISUAL_COLOR_HUE_SIN
+        | VISUAL_COLOR_HUE_COS_MEAN
+        | VISUAL_COLOR_HUE_SIN_MEAN
     )
 
     # Convenience sub-groups
@@ -603,10 +620,11 @@ class VideoStats(Flag):
 
     Blur Statistics (experimental: the column name and the `blur_samples` keyword may change, and selecting it,
     directly or through `ALL`, raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process; one value
-    per video, the median over a sample of its frames of the measurement behind `ImageStats.VISUAL_BLUR`; needs
-    OpenCV, from the ``dataeval[opencv]`` extra):
+    per video, the median over a sample of its frames of the measurement behind
+    `ImageStats.VISUAL_BLUR_EDGE_WIDTH`; needs OpenCV, from the ``dataeval[opencv]`` extra):
 
-    - `BLUR_LEVEL` : Median over the sampled frames of the width of the sharpest edges, in pixels (``blur_level``)
+    - `BLUR_EDGE_WIDTH` : Median over the sampled frames of the width of the sharpest edges, in pixels
+      (``blur_edge_width_median``)
 
     At most `blur_samples` frames per video count toward the median, spread evenly over its length. Frames are shrunk
     to a short side of 720 pixels and never enlarged, so compare only videos of one frame size, and only frames of the
@@ -624,7 +642,7 @@ class VideoStats(Flag):
     - `BASIC` : The descriptive and redundancy statistics, which need no OpenCV. The default for
       :func:`~dataeval.core.video_stats`. Its columns change only after a deprecation and a migration note. The set to
       start from
-    - `NO_EGO` : The same set as `BASIC`, under its v1.2 name
+    - `NO_EGO` : The same set as `BASIC`, under its v1.2 name. Deprecated, and removed in 2.0: name `BASIC`
     - `ALL` : Every statistic in this release, including the experimental persistence and blur statistics. A later
       release can add statistics to it. Name `BASIC` or single statistics when the columns must not change
 
@@ -637,9 +655,15 @@ class VideoStats(Flag):
     Selecting any `PERSISTENCE` flag computes ``ego_map``, which the blur maps rely on, and
     selecting either persistence blur flag pays for one solve that gives both blur maps.
 
-    Selecting `BLUR_LEVEL` measures a sample of each video's frames, and a long video can measure more
+    Selecting `BLUR_EDGE_WIDTH` measures a sample of each video's frames, and a long video can measure more
     frames than count toward its median. The cost is seconds per video on the clips timed;
     :doc:`/concepts/BlurStatistics` gives the measurements.
+
+    .. versionadded:: 1.3
+        The `BLUR` statistic and the `BASIC` group.
+
+    .. deprecated:: 1.3
+        `NO_EGO`, the v1.2 name of `BASIC`. It is removed in 2.0.
 
     Examples
     --------
@@ -683,7 +707,7 @@ class VideoStats(Flag):
     PERSISTENCE_BLUR_RAW = auto()
 
     # ===== BLUR STATS =====
-    BLUR_LEVEL = auto()
+    BLUR_EDGE_WIDTH = auto()
 
     # ===== GROUPS =====
     DESCRIPTIVE = DESCRIPTIVE_FRAME_COUNT | DESCRIPTIVE_DURATION | DESCRIPTIVE_FRAME_RATE
@@ -705,7 +729,7 @@ class VideoStats(Flag):
     PERSISTENCE = PERSISTENCE_EGO | PERSISTENCE_BLUR | PERSISTENCE_BLUR_RAW
 
     # The group name of the blur statistics, which can grow; today it is the one flag.
-    BLUR = BLUR_LEVEL
+    BLUR = BLUR_EDGE_WIDTH
 
     # The core cheap statistics. NO_EGO is its v1.2 name and must come second, so that Python prints BASIC.
     BASIC = DESCRIPTIVE | REDUNDANCY
@@ -725,16 +749,18 @@ class FrameStats(Flag):
 
     Individual Stats
     ----------------
-    - `TIMING` : Seconds since the previous frame (``elapsed_time_s``), read from the frame timestamps and
-      never from pixels
-    - `EXACT_REPEAT` : Whether the frame is identical to the previous one (``repeat_frame``), which decodes
+    - `TIMING_ELAPSED` : Seconds since the previous frame (``elapsed_time_s``), read from the frame timestamps
+      and never from pixels
+    - `REPEAT_EXACT` : Whether the frame is identical to the previous one (``repeat_frame``), which decodes
       every frame
 
     Convenience Groups
     ------------------
     - `NONE` : No statistics
+    - `TIMING` : The timing statistics, today `TIMING_ELAPSED`
+    - `REPEAT` : The repeat statistics, today `REPEAT_EXACT`
     - `ALL` : Every statistic in this release. A later release can add statistics to it, and it decodes
-      every frame because it includes `EXACT_REPEAT`
+      every frame because it includes `REPEAT_EXACT`
 
     Examples
     --------
@@ -744,7 +770,11 @@ class FrameStats(Flag):
     """
 
     NONE = 0
-    TIMING = auto()
-    EXACT_REPEAT = auto()
+    TIMING_ELAPSED = auto()
+    REPEAT_EXACT = auto()
 
-    ALL = TIMING | EXACT_REPEAT
+    # One member each today. The group names come second, so that Python prints the statistic's name.
+    TIMING = TIMING_ELAPSED
+    REPEAT = REPEAT_EXACT
+
+    ALL = TIMING_ELAPSED | REPEAT_EXACT

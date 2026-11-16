@@ -36,7 +36,7 @@ def _single_statistics() -> dict[str, tuple[type[Any], ImageStats]]:
 
     statistics: dict[str, tuple[type[Any], ImageStats]] = {}
     for flag in ImageStats:
-        if flag == ImageStats.PIXEL_SATURATION or flag & ImageStats.COLOR:
+        if flag == ImageStats.PIXEL_SATURATED_FRACTION or flag & ImageStats.COLOR:
             continue
         calculators = CalculatorRegistry.get_calculators(flag)
         if len(calculators) == 1 and len(names := calculators[0][0].stat_names(flag)) == 1:
@@ -113,8 +113,8 @@ class QualityGate(FrameSelector):
     Warns
     -----
     ExperimentalWarning
-        Once per process, if ``stat`` is one of the experimental blur statistics (``"blur"`` or
-        ``"blur_directionality"``).
+        Once per process, if ``stat`` is one of the experimental blur statistics (``"blur_edge_width"`` or
+        ``"blur_edge_directionality"``).
 
     See Also
     --------
@@ -192,8 +192,9 @@ class QualityGate(FrameSelector):
             raise ValueError(
                 f"QualityGate: stat must name a numeric scalar image_stats statistic, one of "
                 f"{', '.join(_numeric_scalar_stats())}; got {stat!r}. A statistic that compares a box with its peers "
-                f"is not accepted, because a gate measures whole frames, which have no boxes. Nor is 'saturation', "
-                f"because it needs an endpoint declared in datum metadata, which a gate has none of. Nor is a color "
+                f"is not accepted, because a gate measures whole frames, which have no boxes. Nor is "
+                f"'saturated_fraction', because it needs an endpoint declared in datum metadata, which a gate has none "
+                f"of. Nor is a color "
                 f"statistic, because it is measured only from channels declared to be sRGB red, green and blue, which "
                 f"a gate has none of."
             )

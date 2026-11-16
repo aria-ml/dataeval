@@ -484,11 +484,11 @@ statistical and computational.
     prototype, so not independent; tests on synthetic images check the trends, the NaN cases and determinism; nothing
     is compared with a published implementation)
   - Experimental: the column names and values may change. Checked on six real frames with synthetic degradations and on
-    11 clips with simulated blur, with no human-rated blur. The background value, `background_blur`, was checked on real
-    frames and boxes from two datasets with a blur added to the background, with no natural defocus. Widths are in
-    pixels, so compare only at one resolution. Not a calibrated level of defocus and not a motion blur detector. Noise
-    and JPEG artifacts move it by amounts and in directions that depend on the scene, and a soft 8-bit image at low
-    contrast reads sharper than at full contrast. See [Blur statistics](../concepts/BlurStatistics.md).
+    11 clips with simulated blur, with no human-rated blur. The background value, `background_blur_edge_width`, was
+    checked on real frames and boxes from two datasets with a blur added to the background, with no natural defocus.
+    Widths are in pixels, so compare only at one resolution. Not a calibrated level of defocus and not a motion blur
+    detector. Noise and JPEG artifacts move it by amounts and in directions that depend on the scene, and a soft 8-bit
+    image at low contrast reads sharper than at full contrast. See [Blur statistics](../concepts/BlurStatistics.md).
 - - {func}`.image_stats` (`ImageStats.SPATIAL`)
   - The geometry of a box against its peers and the image: the distance between box centers over the box's own
     diagonal, the share of the box inside the image, the share the other boxes cover, and the largest overlap with a
@@ -530,7 +530,7 @@ statistical and computational.
     small box can fall under the 32-pixel floor at the defaults. On the 114,133 boxes of VisDrone2019-MOT validation
     that are not ignored regions, 373 read `insufficient_support`: 257 had nothing left of their surround after the
     other boxes, and 116 had fewer than 32 measurable pixels left. With the ignored regions kept as a class, 818 of
-    118,127 did, 686 of them with nothing left. A box near the image edge reads from a ring that the edge has cut. The
+    118,127 did, 686 of them with nothing left. A box near the image edge reads from a surround that the edge has cut. The
     default floor of 1/255 under the ratios' denominators fell on the signal-to-clutter ratio of 22 of the 113,760 boxes
     that have a surround, and on the contrast of none (23 of 117,309 with the ignored regions kept). Every target pixel
     of that footage is valid, since the frames are 8-bit, so no box was refused for too few valid target pixels: that

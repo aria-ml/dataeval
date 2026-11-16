@@ -22,17 +22,17 @@ v1.1
   - v1.2 to v1.3: experimental blur statistics for `image_stats` (`ImageStats.BLUR`) and `video_stats`
     (`VideoStats.BLUR`), and `Resize`, `SelectChannels("gray")` and `TorchvisionTransform` declare the image ones as
     invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors, and surround statistics
-    (`ImageStats.CONTEXT`) read the intensity of the pixels around a box and how far the box stands from it. A saturation
-    statistic (`ImageStats.PIXEL_SATURATION`, in `PIXEL`) reports the share of values at a clipping endpoint, so the default
-    image statistics gain a column, and `DetectionCrops` declares it invalidated too. Experimental color statistics
-    (`ImageStats.COLOR`, in `ALL`) measure lightness, chroma and hue from channels you declare are sRGB. A dataset can
-    declare each image's `value_range` in its metadata. `Duplicates`
-    searches videos with long static stretches for shared segments with experimental `hash_neighbors` arguments
-    `partition` and `k`, and a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames
-    and exact repeats, `track_stats` returns two more columns, the longest gap and the net heading of a
-    track, and an experimental `track_steps` measures the step each detection takes from where its track was last
-    seen. An experimental `View(record_reads=True)` lets `Metadata` reuse what an earlier pass read. An experimental
-    `set_load_threads` loads dataset items in several threads while `Embeddings` and `Metadata` read a dataset.
+    (`ImageStats.CONTEXT`) read the intensity of the pixels around a box and how far the box stands from it. A
+    saturation statistic (`ImageStats.PIXEL_SATURATED_FRACTION`, in `PIXEL`) reports the share of values at a clipping
+    endpoint, so the default image statistics gain a column, and `DetectionCrops` declares it invalidated too.
+    Experimental color statistics (`ImageStats.COLOR`, in `ALL`) measure lightness, chroma and hue from channels you
+    declare are sRGB. A dataset can declare each image's `value_range` in its metadata. `Duplicates` searches videos
+    with long static stretches for shared segments with experimental `hash_neighbors` arguments `partition` and `k`, and
+    a `segment_neighbors` option. An experimental `frame_stats` measures the time between frames and exact repeats,
+    `track_stats` returns two more columns, the longest gap and the net heading of a track, and an experimental
+    `track_steps` measures the step each detection takes from where its track was last seen. An experimental
+    `View(record_reads=True)` lets `Metadata` reuse what an earlier pass read. An experimental `set_load_threads` loads
+    dataset items in several threads while `Embeddings` and `Metadata` read a dataset.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the

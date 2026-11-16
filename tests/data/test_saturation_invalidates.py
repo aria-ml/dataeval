@@ -10,7 +10,7 @@ from dataeval.quality._shared import checked_compute_stats
 
 pytestmark = pytest.mark.required
 
-SATURATION = ImageStats.PIXEL_SATURATION
+SATURATION = ImageStats.PIXEL_SATURATED_FRACTION
 
 
 class TestDeclarations:
@@ -53,7 +53,7 @@ class _Images:
 class TestTheWarning:
     def test_a_saturation_request_through_a_resize_warns_and_names_the_statistic(self):
         view = View(_Images(), [Resize((4, 4))])  # pyright: ignore[reportArgumentType]
-        with pytest.warns(StatsInvalidatedWarning, match="saturation") as caught:
+        with pytest.warns(StatsInvalidatedWarning, match="saturated_fraction") as caught:
             checked_compute_stats([view], stats=SATURATION, caller="Outliers")
         assert len(caught) == 1
 
@@ -64,6 +64,6 @@ class TestTheWarning:
     def test_a_pixel_request_through_a_resize_warns_for_saturation_alone(self):
         # Saturation is in `PIXEL`, so a request for the group meets the declaration, and only for that statistic.
         view = View(_Images(), [Resize((4, 4), mode="stretch")])  # pyright: ignore[reportArgumentType]
-        with pytest.warns(StatsInvalidatedWarning, match=r"requested by Outliers: saturation\.") as caught:
+        with pytest.warns(StatsInvalidatedWarning, match=r"requested by Outliers: saturated_fraction\.") as caught:
             checked_compute_stats([view], stats=ImageStats.PIXEL, caller="Outliers")
         assert len(caught) == 1

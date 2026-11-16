@@ -27,12 +27,12 @@ pytestmark = pytest.mark.required
 
 def test_blur_is_the_level_flag_and_ends_the_enum():
     # The group name is an alias of the one flag, so it can grow without the flag changing.
-    assert VideoStats.BLUR is VideoStats.BLUR_LEVEL
+    assert VideoStats.BLUR is VideoStats.BLUR_EDGE_WIDTH
     assert not hasattr(VideoStats, "BLUR_DIRECTIONALITY")
     members = [flag for flag in VideoStats if flag.value and flag.value & (flag.value - 1) == 0]
     # New members come last, so no existing flag value moves.
-    assert members[-2:] == [VideoStats.PERSISTENCE_BLUR_RAW, VideoStats.BLUR_LEVEL]
-    assert VideoStats.BLUR_LEVEL.value == 2 * VideoStats.PERSISTENCE_BLUR_RAW.value
+    assert members[-2:] == [VideoStats.PERSISTENCE_BLUR_RAW, VideoStats.BLUR_EDGE_WIDTH]
+    assert VideoStats.BLUR_EDGE_WIDTH.value == 2 * VideoStats.PERSISTENCE_BLUR_RAW.value
 
 
 def test_basic_is_the_core_set_under_its_v1_2_name_no_ego():
@@ -69,7 +69,7 @@ def test_blur_samples_is_the_last_option_and_defaults_to_64():
 
 
 @pytest.mark.parametrize("blur_samples", [0, -1])
-@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_LEVEL])
+@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_EDGE_WIDTH])
 def test_a_non_positive_blur_samples_is_refused_before_reading(stats, blur_samples):
     with pytest.raises(ValueError, match=f"blur_samples must be positive; got {blur_samples}"):
         video_stats(cast(Any, _Unreadable()), stats=stats, blur_samples=blur_samples)
@@ -81,7 +81,7 @@ def test_blur_samples_is_ignored_without_a_blur_flag(blur_samples):
 
 
 @pytest.mark.parametrize("blur_samples", [True, 2.5, 64.0, float("nan"), float("inf"), None, "64"])
-@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_LEVEL])
+@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_EDGE_WIDTH])
 def test_a_non_integer_blur_samples_is_refused_before_reading(stats, blur_samples):
     with pytest.raises(ValueError, match="blur_samples must be an integer; got"):
         video_stats(cast(Any, _Unreadable()), stats=stats, blur_samples=cast(Any, blur_samples))
@@ -95,7 +95,7 @@ def test_a_positive_integer_blur_samples_passes_the_check(blur_samples):
 def test_missing_opencv_names_the_extra_before_reading(monkeypatch):
     monkeypatch.setitem(sys.modules, "cv2", None)
     with pytest.raises(ImportError, match=r"dataeval\[opencv\]"):
-        video_stats(cast(Any, _Unreadable()), stats=VideoStats.BLUR_LEVEL)
+        video_stats(cast(Any, _Unreadable()), stats=VideoStats.BLUR_EDGE_WIDTH)
 
 
 def test_a_non_blur_request_does_not_need_opencv(monkeypatch):
@@ -111,7 +111,7 @@ def test_the_default_does_not_warn_about_blur():
 
 def test_the_flag_docstring_names_the_new_members():
     doc = VideoStats.__doc__ or ""
-    for name in ("BLUR_LEVEL", "blur_level", "blur_samples", "BASIC"):
+    for name in ("BLUR_EDGE_WIDTH", "blur_edge_width_median", "blur_samples", "BASIC"):
         assert name in doc
 
 

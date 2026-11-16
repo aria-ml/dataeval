@@ -96,5 +96,5 @@ class VideoBlurStatCalculator(VideoCalculator):
     def get_handlers(self) -> dict[VideoStats, Handler]:
         """Return the value each flag produces."""
         return {
-            VideoStats.BLUR_LEVEL: Handler("blur_level", lambda: [self.level]),
+            VideoStats.BLUR_EDGE_WIDTH: Handler("blur_edge_width_median", lambda: [self.level]),
         }

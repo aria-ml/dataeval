@@ -1,4 +1,4 @@
-"""``VideoStats.BLUR``: the calculator behind ``blur_level``.
+"""``VideoStats.BLUR``: the calculator behind ``blur_edge_width_median``.
 
 Every video here is a sequence of in-memory frames built from seeded blurred noise, so no test needs ffmpeg. A video
 steps through 7 textures of rising softness, one after the other (a `drift`) or in a cycle, so the median over a
@@ -95,21 +95,23 @@ def test_level_equals_median_of_image_values(short_side, n, channels):
         # that kept the dropped ones would show.
         assert sampler.stride > STEP
         dropped = image_stats([frames[k].pixels for k in taken if k not in kept], stats=ImageStats.BLUR)["stats"]
-        assert _median([*per_image["blur"], *dropped["blur"]]) != _median(per_image["blur"])
+        assert _median([*per_image["blur_edge_width"], *dropped["blur_edge_width"]]) != _median(
+            per_image["blur_edge_width"]
+        )
 
     got = _run([frames])
-    assert set(got) == {"blur_level"}
+    assert set(got) == {"blur_edge_width_median"}
     # image_stats stores float32, so its values carry that rounding: 6e-8 relative at most.
-    assert per_image["blur"].dtype == np.float32
+    assert per_image["blur_edge_width"].dtype == np.float32
     # Single-band frames: the video's gray is the image, so the two paths measure the same picture.
     tolerance = 1e-6 if channels == 1 else 0.03
-    want = _median(per_image["blur"])
+    want = _median(per_image["blur_edge_width"])
     assert math.isfinite(want)
-    assert got["blur_level"][0] == pytest.approx(want, rel=tolerance)
+    assert got["blur_edge_width_median"][0] == pytest.approx(want, rel=tolerance)
     if channels == 1:
         # Exactly the median of the same function over the same frames, before any float32 storage.
         values = [blur_stat(frames[k].pixels[0].astype(np.float32)) for k in kept]
-        assert got["blur_level"][0] == _median([v.blur for v in values])
+        assert got["blur_edge_width_median"][0] == _median([v.blur for v in values])
 
 
 @pytest.mark.parametrize("n", [100, 400])
@@ -131,7 +133,7 @@ def test_kept_frames_bounded(monkeypatch, n):
     assert len(sampler.kept) <= 8
     # The level is the median over the replayed sampler's kept frames, so no other frame feeds it.
     values = [blur_stat(frames[k].pixels[0].astype(np.float32)) for k in sampler.kept]
-    assert got["blur_level"][0] == _median([v.blur for v in values])
+    assert got["blur_edge_width_median"][0] == _median([v.blur for v in values])
     # A frame is computed when offered, and dropped when the stride doubles: half the ceiling per doubling.
     assert len(sampler.kept) <= len(calls) <= 8 + 4 * doublings
 
@@ -142,8 +144,8 @@ def test_reorder_permutes_rows():
     videos = [_video(30, (200, 266)), _video(18, (160, 214), seed=1), _video(40, (180, 240), seed=2)]
     with use_max_processes(1):
         forward = video_stats(cast(Any, videos), stats=VideoStats.BLUR | VideoStats.DESCRIPTIVE_FRAME_COUNT)
-    assert np.isfinite(forward["stats"]["blur_level"]).all()
-    assert len(set(forward["stats"]["blur_level"])) == 3  # the rows differ, so a swap would show
+    assert np.isfinite(forward["stats"]["blur_edge_width_median"]).all()
+    assert len(set(forward["stats"]["blur_edge_width_median"])) == 3  # the rows differ, so a swap would show
     for processes in (1, 2):
         with use_max_processes(processes):
             backward = video_stats(cast(Any, videos[::-1]), stats=VideoStats.BLUR | VideoStats.DESCRIPTIVE_FRAME_COUNT)
@@ -168,7 +170,7 @@ def test_decode_once_with_persistence(monkeypatch):
         return seen, got
 
     seen, got = converted(VideoStats.PERSISTENCE | VideoStats.BLUR)
-    assert np.isfinite(got["blur_level"]).all()
+    assert np.isfinite(got["blur_edge_width_median"]).all()
     assert len({id(p) for p in seen}) == len(seen)  # no frame converted twice
     # While blur_samples equals persistence_samples (both default to 64), the blur starts are persistence starts,
     # so asking for blur as well reads no frame more.
@@ -191,7 +193,7 @@ def test_large_frames_shrunk(monkeypatch, shape):
     factor = 720 / min(shape)
     assert calls == [((round(shape[0] * factor), round(shape[1] * factor)), np.dtype(np.float32))]
     assert min(calls[0][0]) == 720
-    assert got["blur_level"][0] == 2.0
+    assert got["blur_edge_width_median"][0] == 2.0
 
 
 @pytest.mark.parametrize("blur_samples", [64, 4])
@@ -200,7 +202,7 @@ def test_frames_that_cannot_be_starts_are_never_read(blur_samples):
     # `_Frame` fails the test on any read of pixels=None, and starts fall on every STEP-th frame at the least.
     frames = [f if k % STEP == 0 else _Frame(None, f.time_s, k) for k, f in enumerate(textured)]
     got = _run([frames], blur_samples=blur_samples)
-    assert np.isfinite(got["blur_level"]).all()
+    assert np.isfinite(got["blur_edge_width_median"]).all()
 
 
 def test_empty_and_flat_video():
@@ -213,15 +215,15 @@ def test_empty_and_flat_video():
         warnings.simplefilter("error")  # a median of nothing would warn here
         warnings.simplefilter("ignore", ExperimentalWarning)
         got = _run([[], flat, mixed])
-    assert np.isnan(got["blur_level"][:2]).all()
+    assert np.isnan(got["blur_edge_width_median"][:2]).all()
     values = [blur_stat(textured[k].pixels[0].astype(np.float32)) for k in (0, 10)]
-    assert got["blur_level"][2] == _median([v.blur for v in values])
+    assert got["blur_edge_width_median"][2] == _median([v.blur for v in values])
 
 
 def test_blur_returns_only_the_level_column():
     got = _run([_video(10, (200, 266))])
-    assert list(got) == ["blur_level"]
-    assert np.isfinite(got["blur_level"]).all()
+    assert list(got) == ["blur_edge_width_median"]
+    assert np.isfinite(got["blur_edge_width_median"]).all()
 
 
 def _left_out(caplog) -> list[str]:
@@ -244,7 +246,7 @@ def test_mixed_sizes_measure_only_the_first_size(monkeypatch, caplog):
     frames = [_Frame(p, k / 30, k) for k, p in enumerate(pixels)]
     got = _run([frames])
     assert set(shapes) == {(200, 260)}
-    assert np.isfinite(got["blur_level"]).all()
+    assert np.isfinite(got["blur_edge_width_median"]).all()
     # One message per other size, each saying which size the median reads.
     tail = "are left out of the BLUR median, which reads only frames of the first frame's size, 260x200. — indices: 0"
     assert sorted(_left_out(caplog)) == [f"Frames of 1000x800 {tail}", f"Frames of 220x160 {tail}"]
@@ -257,7 +259,7 @@ def test_a_size_change_keeps_the_first_size(caplog):
     later = [_Frame(f.pixels, f.time_s + 1, 30 + k) for k, f in enumerate(_video(30, (160, 214), seed=1, drift=True))]
     got = _run([first + later])
     want = _run([first])
-    assert got["blur_level"][0] == want["blur_level"][0]
+    assert got["blur_edge_width_median"][0] == want["blur_edge_width_median"][0]
     assert len(_left_out(caplog)) == 1
 
 
@@ -275,7 +277,7 @@ def test_a_frame_of_another_size_does_not_take_a_start_place():
         sampler.offer(k)
     assert sampler.kept == [0, 15, 30, 45]
     values = [blur_stat(frames[k].pixels[0].astype(np.float32)) for k in sampler.kept]
-    assert _run([frames], blur_samples=4)["blur_level"][0] == _median([v.blur for v in values])
+    assert _run([frames], blur_samples=4)["blur_edge_width_median"][0] == _median([v.blur for v in values])
 
 
 def _short_side_video(size: int | None, n: int = 1) -> list[_Frame]:

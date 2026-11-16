@@ -2,20 +2,20 @@
 
 Edge points are found where the smoothed gradient peaks along an axis. The width of each is the spread of
 the gradient magnitude around it, taken along the row or column that carries most of the gradient and
-corrected for the gradient's direction. Two values summarize the widths: the 5th percentile (``blur``, in
+corrected for the gradient's direction. Two values summarize the widths: the 5th percentile (``blur_edge_width``, in
 pixels) and how different horizontal and vertical edges are (``directionality``).
 
 After Liang, Wang, Chen, Ma, Zhao and Gao (2010), "No-reference perceptual image quality metric using
 gradient profiles for JPEG2000", Signal Processing: Image Communication 25, 502-516, Sections 2.1.2 and 2.1.3.
 The percentile summary is a modification of the paper's histogram score.
 
-The same percentile taken over the edge points that lie outside a margin around the annotated boxes is the
-background value (``background_blur``). The edges are found on the whole image, so no filter sees a hole where a
-box was.
+The same percentile taken over the edge points that lie outside a margin around the annotated boxes is the background
+value (``background_blur_edge_width``). The edges are found on the whole image, so no filter sees a hole where a box
+was.
 
-The 5th percentile follows the sharpest edges, so a blur along one axis only (motion blur) moves ``blur``
-weakly and unevenly and shows in ``directionality`` instead. Noise and JPEG artifacts change ``blur`` too, by
-amounts and in directions that depend on the scene, so it cannot tell them from focus.
+The 5th percentile follows the sharpest edges, so a blur along one axis only (motion blur) moves ``blur_edge_width``
+weakly and unevenly and shows in ``blur_edge_directionality`` instead. Noise and JPEG artifacts change
+``blur_edge_width`` too, by amounts and in directions that depend on the scene, so it cannot tell them from focus.
 """
 
 __all__ = []

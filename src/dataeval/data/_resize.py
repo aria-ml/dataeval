@@ -18,21 +18,21 @@ from dataeval.utils.preprocessing import crop_with_fill, normalize_image_shape
 
 ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
 
-# Every dimension statistic reports the resize target rather than the source, and
-# ``sharpness`` measures the interpolation kernel. The blur flags are in pixels at the
-# image's own resolution, so a resize rescales them. Channel count survives; ``HASH`` is
-# deliberately absent, since resize-then-phash is a *better* near-duplicate check across
+# Every dimension statistic reports the resize target rather than the source, and ``sharpness`` measures the
+# interpolation kernel. The blur flags are in pixels at the image's own resolution, so a resize rescales them. Channel
+# count survives; ``HASH`` is deliberately absent, since resize-then-phash is a *better* near-duplicate check across
 # heterogeneous source resolutions. The SPATIAL statistics change too: boxes are clipped to the new canvas and those
-# that fall outside are dropped, and a stretch scales the two axes unequally. PIXEL_SATURATION changes: interpolation
-# moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype endpoint, so an
-# image that declared no range reads NaN. CONTEXT changes too: the ring around a box is made of interpolated pixels,
-# its neighbors are clipped and dropped as for SPATIAL, and a letterbox adds flat bars the ring can reach.
+# that fall outside are dropped, and a stretch scales the two axes unequally. PIXEL_SATURATED_FRACTION changes:
+# interpolation moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype
+# endpoint, so an image that declared no range reads NaN. CONTEXT changes too: the surround of a box is made of
+# interpolated pixels, its neighbors are clipped and dropped as for SPATIAL, and a letterbox adds flat bars the ring can
+# reach.
 _BASE_INVALIDATES = (
     (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
     | ImageStats.VISUAL_SHARPNESS
     | ImageStats.BLUR
     | ImageStats.SPATIAL
-    | ImageStats.PIXEL_SATURATION
+    | ImageStats.PIXEL_SATURATED_FRACTION
     | ImageStats.CONTEXT
 )
 
@@ -132,17 +132,15 @@ class Resize(Operation):
     rather than the data. Run :class:`~dataeval.quality.Outliers` on the *unresized* view
     first if you have not already.
 
-    ``sharpness`` is affected just as sharply and much less visibly: bilinear downsampling
-    smooths, so sharpness after a resize measures the interpolation kernel. Both are
-    declared in ``invalidates``, so the quality evaluators warn rather than report them as
-    data findings. So are the spatial statistics (``ImageStats.SPATIAL``): the boxes are
-    clipped to the new canvas and those left outside it are dropped, so ``box_in_image_fraction``
-    reads 1.0 afterward and a target's neighbors may be gone, and ``mode="stretch"`` scales the
-    two axes by different factors, which a normalized center distance does not survive. So is saturation
-    (``ImageStats.PIXEL_SATURATION``): interpolation moves the values at the edge of a clipped region, and a resize
-    returns floats, which have no dtype endpoint, so an image that declared no range reads NaN.
-    So are the surround statistics (``ImageStats.CONTEXT``): the ring around a box is made of interpolated pixels, its
-    neighbors may be gone, and a letterbox adds bars it can reach.
+    ``sharpness`` is affected just as sharply and much less visibly: bilinear downsampling smooths, so sharpness after a
+    resize measures the interpolation kernel. Both are declared in ``invalidates``, so the quality evaluators warn
+    rather than report them as data findings. So are the spatial statistics (``ImageStats.SPATIAL``): the boxes are
+    clipped to the new canvas and those left outside it are dropped, so ``box_in_image_fraction`` reads 1.0 afterward
+    and a target's neighbors may be gone, and ``mode="stretch"`` scales the two axes by different factors, which a
+    normalized center distance does not survive. So is saturation (``ImageStats.PIXEL_SATURATED_FRACTION``):
+    interpolation moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype
+    endpoint, so an image that declared no range reads NaN. So are the surround statistics (``ImageStats.CONTEXT``): the
+    surround of a box is made of interpolated pixels, its neighbors may be gone, and a letterbox adds bars it can reach.
 
     ``PIXEL_MEAN``/``PIXEL_STD`` are deliberately *not* declared for ``mode="stretch"``.
     Aggressive downsampling does shrink pixel variance, but it is a second-order effect and

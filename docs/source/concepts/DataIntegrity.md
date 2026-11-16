@@ -368,7 +368,8 @@ output identifies whether each row corresponds to a full image or to a specific
 bounding box within an image.
 
 Bands are addressed with `channels=`, which names groups of them and measures
-each group jointly, returning `<group>_<statistic>` columns on the same rows:
+each group jointly, returning `<group>_<statistic>` columns on the same rows (the surround's own columns put the
+surround first, `surround_<group>_intensity_mean`):
 `channels={"r": 0, "g": 1, "b": 2}` for RGB, or
 `channels={"visible": range(0, 30), "nir": range(30, 70)}` for a hyperspectral
 cube. Because they are columns rather than rows, band statistics reach
@@ -402,11 +403,11 @@ statistic describes, the image, and so belong at the `unit` level (see
 - `background_fraction` is always returned. It is the share of the image left unmasked, and a background statistic
   measured over a few percent of an image is noise that looks like a measurement. Read it before the other background
   statistics. Where an image's boxes cover it entirely, every other background statistic for that image is `NaN`.
-- Only `PIXEL`, `VISUAL` and `COLOR` statistics, and `VISUAL_BLUR` as `background_blur`, are computed for the
-  background. A masked region has no meaningful hash and no geometry of its own, so `HASH`, `DIMENSION` and
-  `VISUAL_BLUR_DIRECTIONALITY` flags are computed for the image and its boxes as usual and skipped for the background.
-  `background_blur` pools the edges outside the boxes and a margin around them, so it is not measured over exactly the
-  `background_fraction` of the image. See [Blur statistics](BlurStatistics.md).
+- Only `PIXEL`, `VISUAL` and `COLOR` statistics, and `VISUAL_BLUR_EDGE_WIDTH` as `background_blur_edge_width`, are
+  computed for the background. A masked region has no meaningful hash and no geometry of its own, so `HASH`, `DIMENSION`
+  and `VISUAL_BLUR_EDGE_DIRECTIONALITY` flags are computed for the image and its boxes as usual and skipped for the
+  background. `background_blur_edge_width` pools the edges outside the boxes and a margin around them, so it is not
+  measured over exactly the `background_fraction` of the image. See [Blur statistics](BlurStatistics.md).
 - Boxes are rounded outwards and unioned, so the background excludes slightly more than the annotations strictly cover.
   This is deliberate: a retained pixel is background with high confidence, at the cost of discarding a boundary ring of
   genuine background along with the object.

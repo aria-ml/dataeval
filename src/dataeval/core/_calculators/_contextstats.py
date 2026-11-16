@@ -395,7 +395,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
         }
         specs: dict[str, MeasurementSpec] = {}
         for handler in cls._handlers_for(selected).values():
-            if handler.name in ("surround_mean", "surround_std"):
+            if handler.name in ("surround_intensity_mean", "surround_intensity_std"):
                 specs[handler.name] = surround_spec
             else:
                 specs[handler.name] = MeasurementSpec(
@@ -433,7 +433,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
         if ViewKind.BAND not in view:
             details["surround_candidate_pixels"] = [row.candidate]
             details["surround_retained_pixels"] = [row.retained]
-            details["ring_peer_excluded_fraction"] = [row.excluded]
+            details["surround_peer_excluded_fraction"] = [row.excluded]
         details["surround_measurable_pixels"] = [row.measurable]
         details["surround_valid_fraction"] = [row.surround_valid]
         details["target_valid_fraction"] = [row.target_valid]
@@ -441,7 +441,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
         details["context_range_high"] = [row.high]
         if flags & _RATIOS:
             ratios = self._ratios
-            details["contrast_reason"] = [ratios.reason]
+            details["context_ratio_reason"] = [ratios.reason]
             if flags & ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST:
                 details["target_surround_contrast_floored"] = [ratios.contrast_floored]
             if flags & ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO:
@@ -455,7 +455,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
             "surround_candidate_pixels": -1,
             "surround_retained_pixels": -1,
             "surround_measurable_pixels": -1,
-            "contrast_reason": "",
+            "context_ratio_reason": "",
             "target_surround_contrast_floored": False,
             "signal_clutter_ratio_floored": False,
         }
@@ -469,8 +469,12 @@ class ContextStatCalculator(Calculator[ImageStats]):
         """
         views = ViewKind.WHOLE | ViewKind.BAND
         return {
-            ImageStats.CONTEXT_SURROUND_MEAN: Handler("surround_mean", self._mean, views, ContextNeed.CONTEXT),
-            ImageStats.CONTEXT_SURROUND_STD: Handler("surround_std", self._std, views, ContextNeed.CONTEXT),
+            ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN: Handler(
+                "surround_intensity_mean", self._mean, views, ContextNeed.CONTEXT
+            ),
+            ImageStats.CONTEXT_SURROUND_INTENSITY_STD: Handler(
+                "surround_intensity_std", self._std, views, ContextNeed.CONTEXT
+            ),
             ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST: Handler(
                 "target_surround_contrast", self._contrast, views, ContextNeed.CONTEXT
             ),

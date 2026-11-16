@@ -511,7 +511,10 @@ Two mechanisms make stability observable rather than a matter of trust:
 - Deprecated symbols raise {class}`~dataeval.exceptions.DeprecatedWarning` when
   used, and a dedicated CI test (`docs/tests/test_deprecated_docs.py`) fails the build
   if any deprecated public object lacks a `.. deprecated::` directive in its
-  docstring. A deprecated symbol cannot ship silently. The symbols deprecated in
+  docstring. A deprecated symbol cannot ship silently. The exceptions are the
+  enum aliases `ImageStats.NO_HASH` and `VideoStats.NO_EGO`, deprecated in v1.3 and
+  removed in v2.0: an enum member cannot carry the decorator, so they raise nothing
+  and are marked in their docstrings only. The symbols deprecated in
   v1.1 (notably `ClassifierUncertaintyExtractor`) were removed in v1.2. Deprecated
   in v1.2 and removed in v2.0: `compute_stats` (renamed {func}`.image_stats`)
   and `ClassFilter`. {func}`.compute_ratios` is deprecated in v1.2 and removed
@@ -538,16 +541,16 @@ Experimental ⚠️ (API may change or be removed):
   {class}`~dataeval.protocols.SharpnessMeasure`, the protocol a `blur_measure`
   follows, is experimental with the persistence statistics and raises nothing
   on its own.
-- {func}`.video_stats` with `VideoStats.BLUR_LEVEL`, selected directly, through the `BLUR` group or through `ALL`,
+- {func}`.video_stats` with `VideoStats.BLUR_EDGE_WIDTH`, selected directly, through the `BLUR` group or through `ALL`,
   raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process. The default,
   `VideoStats.BASIC`, never raises it. The column name and the `blur_samples` keyword may change. See
   [Blur statistics](BlurStatistics.md).
-- {func}`.image_stats` with any `ImageStats.BLUR` flag (`VISUAL_BLUR`, `VISUAL_BLUR_DIRECTIONALITY`) raises
+- {func}`.image_stats` with any `ImageStats.BLUR` flag (`VISUAL_BLUR_EDGE_WIDTH`, `VISUAL_BLUR_EDGE_DIRECTIONALITY`) raises
   {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process, and so does a
   {class}`.QualityGate` whose `stat` is one of their columns. `ImageStats.ALL` includes the group and the default of
   {func}`.image_stats` does not, so a default call never raises it. See [Blur statistics](BlurStatistics.md).
 - {func}`.image_stats` with any `ImageStats.COLOR` flag (`VISUAL_COLOR_LIGHTNESS_MEAN`, `VISUAL_COLOR_CHROMA_MEAN`,
-  `VISUAL_COLOR_ACHROMATIC_FRACTION`, `VISUAL_COLOR_HUE_COS`, `VISUAL_COLOR_HUE_SIN`) and the `color_rgb_channels`,
+  `VISUAL_COLOR_ACHROMATIC_FRACTION`, `VISUAL_COLOR_HUE_COS_MEAN`, `VISUAL_COLOR_HUE_SIN_MEAN`) and the `color_rgb_channels`,
   `color_min_pixels` and `color_chroma_threshold` keywords. The column names, the values and the keywords may change. A
   call that measures color raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first such call in a process.
   `ImageStats.ALL` includes the group but measures it only where `color_rgb_channels` is given, so a call that does not
