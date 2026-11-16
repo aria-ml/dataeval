@@ -48,6 +48,7 @@ REQUIRES_REFERENCES: list[tuple[str, str]] = [
     ("core", "mean_endpoint"),
     ("core", "mutual_info"),
     ("core", "noise_immerkaer"),
+    ("core", "noise_pca"),
     ("core", "parity"),
     ("core", "phash"),
     ("core", "phash_d4"),

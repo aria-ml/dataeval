@@ -561,6 +561,17 @@ statistical and computational.
     carry no noise, such as letterbox bars, lower the reading, so compare images of similar content. Correlated,
     signal-dependent, re-encoded and real sensor noise were not measured. See [Noise
     statistics](../concepts/ImageStatistics.md#noise-statistics).
+- - {func}`.noise_pca` ⚠️
+  - The smallest eigenvalue of the covariance of an image's 7x7 patches, after Pyatykh et al. (2013), divided by the
+    lower edge of the Marchenko-Pastur law (1967) for the number of patches used. It omits that paper's selection of
+    blocks and its check of the smallest eigenvalues.
+  - Ground-truth checked on simulated data only (on white Gaussian noise of known level, the median of 200 readings is
+    within 10% of the true variance at 34x34 and 5% at 130x130; constant images, straight edges and stripes read 0;
+    masked pixels on constructed images)
+  - Experimental: the patch size, the floor and the default may change. Never checked on real images or real sensor
+    noise, and how it compares with {func}`.noise_immerkaer` on real images is not established. Fine texture reads as
+    noise. A channel needs 784 clear patches, about a 34x34 region with no masked pixel. The correction assumes noise
+    that is independent from pixel to pixel.
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored
