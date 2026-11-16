@@ -2,7 +2,7 @@ __all__ = []
 
 import warnings
 from collections.abc import Iterable, Iterator, Mapping, Sequence, Sized
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Flag
 from functools import partial, reduce
 from itertools import zip_longest
@@ -207,6 +207,8 @@ class DatumBatchResult:
     object_count: int
     invalid_box_count: int
     warnings_list: list[str]
+    # What each name holds on a row that does not measure it, for the rows of other images that lack the name.
+    empty_values: dict[str, Any] = field(default_factory=dict)
 
 
 def _collect_calculator_stats(
@@ -604,7 +606,7 @@ def _compute_batch(  # noqa: C901
     if per_background:
         _pad_missing_stats(results, datum_empty_values)
 
-    return DatumBatchResult(results, box_count, invalid_box_count, warnings_list)
+    return DatumBatchResult(results, box_count, invalid_box_count, warnings_list, datum_empty_values)
 
 
 def _resolve_channel_groups(
@@ -810,6 +812,20 @@ def _sort(
     return sorted_source_indices, sorted_aggregated_stats
 
 
+def _append_padded(
+    aggregated: dict[str, list[Any]],
+    row: Mapping[str, list[Any]],
+    before: int,
+    rows: int,
+    empty_values: Mapping[str, Any],
+) -> None:
+    """Append one result's `rows` rows, giving every name either side lacks its empty value."""
+    for name in aggregated.keys() - row.keys():
+        aggregated[name].extend([empty_values.get(name, np.nan)] * rows)
+    for name, values in row.items():
+        aggregated.setdefault(name, [empty_values.get(name, np.nan)] * before).extend(values)
+
+
 def _aggregate_batch(
     result: DatumBatchResult,
     source_indices: list[SourceIndex],
@@ -817,12 +833,20 @@ def _aggregate_batch(
     object_count: dict[int, int],
     invalid_box_count: dict[int, int],
     warning_list: list[str],
+    empty_values: dict[str, Any],
 ) -> None:
-    """Extract and aggregate results from a single StatsProcessorOutput."""
+    """Extract and aggregate results from a single StatsProcessorOutput.
+
+    Every row gets every name any image's rows carry, with the name's empty value where it has none, as
+    `_pad_missing_stats` does within one image. An image's rows need not carry the names another image's do: with
+    `per_image=False` and `per_background=True`, an image with no box has only its background row, and no box
+    statistic. Padded here, in the order the rows arrive, so every array stays one-to-one with `source_indices`.
+    """
+    empty_values.update(result.empty_values)
     for r in result.results:
+        before, rows = len(source_indices), len(r.source_indices)
         source_indices.extend(r.source_indices)
-        for stat_name, stat_values in r.stats.items():
-            aggregated_stats.setdefault(stat_name, []).extend(stat_values)
+        _append_padded(aggregated_stats, r.stats, before, rows, empty_values)
 
     if result.results and result.results[0].source_indices:
         img_idx = result.results[0].source_indices[0].item
@@ -1150,6 +1174,7 @@ def image_stats(  # noqa: C901
     invalid_box_count: dict[int, int] = {}
     image_count: int = 0
     warning_list: list[str] = []
+    empty_values: dict[str, Any] = {}
 
     is_object_detection_dataset: bool = False
 
@@ -1380,7 +1405,9 @@ def image_stats(  # noqa: C901
             ),
             _enumerate_datum(images, boxes),
         ):
-            _aggregate_batch(result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list)
+            _aggregate_batch(
+                result, source_indices, aggregated_stats, object_count, invalid_box_count, warning_list, empty_values
+            )
             image_count += 1
 
             if progress_callback:
