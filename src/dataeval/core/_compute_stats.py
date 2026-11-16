@@ -387,9 +387,9 @@ def combine_stats_results(  # noqa: C901
     For a single result, returns its stats and source_index directly
     with empty dataset_steps.
 
-    For multiple results, concatenates stats arrays by key, applies cumulative
-    item offsets to source_index entries (making item indices globally unique
-    across datasets), and computes cumulative dataset_steps boundaries.
+    For multiple results, concatenates stats arrays by key, shifts each result's items past
+    the largest item of the results before it (making item indices globally unique across
+    datasets), and computes cumulative dataset_steps boundaries.
 
     Results that carry rows must agree on every factor's
     :class:`~dataeval.types.MeasurementSpec`, since values measured with different settings
@@ -407,8 +407,10 @@ def combine_stats_results(  # noqa: C901
     tuple[StatsMap, list[SourceIndex], list[int]]
         - stats: Combined statistics mapping (arrays concatenated by key).
         - source_index: Combined source indices with globally unique item values.
-        - dataset_steps: Cumulative boundaries where each dataset ends in the
-          combined arrays. Empty list for a single result.
+        - dataset_steps: Cumulative item boundaries: dataset ``k`` holds the combined items
+          from ``dataset_steps[k - 1]`` (0 for the first) up to ``dataset_steps[k]``. Each
+          result spans its largest item plus one, so the boundaries are row positions only
+          where every item has exactly one row. Empty list for a single result.
 
     Raises
     ------
@@ -468,7 +470,9 @@ def combine_stats_results(  # noqa: C901
         # `_replace` rather than a field-by-field rebuild: only `item` moves, and naming the
         # two that do not is what makes a future field silently dropped here.
         combined_source_index.extend(s._replace(item=s.item + offset) for s in source_index)
-        offset += len(source_index)
+        # Past the result's largest item, not its row count: box rows make more rows than items, and an image with no
+        # row of its own makes fewer, so a row count would leave a gap or put two datasets' items on one number.
+        offset += max((s.item for s in source_index), default=-1) + 1
         dataset_steps.append(offset)
 
     # `None` only where every result was empty, which is an empty result rather than an
