@@ -1,7 +1,7 @@
 [project]
 name = "dataeval"
 dynamic = ["version"]
-description = "DataEval provides a simple interface to characterize image data and its impact on model performance across classification and object-detection tasks"
+description = "DataEval evaluates image and video datasets and their impact on model performance, for classification, object detection and multi-object tracking"
 authors = [
   { name = "Andrew Weng", email = "andrew.weng@ariacoustics.com" },
   { name = "Bill Peria", email = "bill.peria@ariacoustics.com" },

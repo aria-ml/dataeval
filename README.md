@@ -1,11 +1,12 @@
 <!-- markdownlint-disable MD041 -->
 
-![dataeval-logo](docs/source/_static/images/DataEval_ImageText.png)
+![dataeval-logo](https://raw.githubusercontent.com/aria-ml/dataeval/main/docs/source/_static/images/DataEval_ImageText.png)
 
 <!-- :auto badges: -->
 
-[![PyPI - Python Version](https://img.shields.io/pypi/v/dataeval)](https://pypi.org/project/dataeval/)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/dataeval)
+[![PyPI - Version](https://img.shields.io/pypi/v/dataeval)](https://pypi.org/project/dataeval/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/dataeval)](https://anaconda.org/conda-forge/dataeval)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/dataeval)](https://pypi.org/project/dataeval/)
 [![Documentation Status](https://readthedocs.org/projects/dataeval/badge/?version=latest)](https://dataeval.readthedocs.io/en/latest/?badge=latest)
 
 <!-- :auto badges: -->
@@ -17,11 +18,34 @@
 > impactful shifts to deployed models.
 
 The `dataeval` package provides a rigorous and reliable set of tools for developing
-and analyzing computer vision datasets and the resulting impact on models.
+and analyzing image and video datasets, for image classification, object detection
+and multi-object tracking, and the resulting impact on models.
 
 To view our extensive collection of tutorials, how-to's, explanation guides,
 and reference material, please visit our documentation on
 **[Read the Docs](https://dataeval.readthedocs.io/)**
+
+## What's new in v1.2
+
+v1.2, released in November 2026 (latest patch v1.2.1), evaluates image and video datasets
+in context. You can investigate duplicate footage, unusual frames and objects, and metadata
+bias, choose the level of analysis, and trace each finding back to the source video, frame,
+track or detection.
+
+- `Duplicates` finds exact and near copies among frames, segments and whole videos, and
+  footage that crosses a split. `Outliers` judges videos and frames, and tracks and
+  detections with `per_target=True`.
+- `Metadata` describes a tracking dataset at four levels (`sequence`, `unit`, `track` and
+  `instance`) and rolls values up between them, and `Balance`, `Diversity` and `Parity`
+  read it.
+- `split_dataset` splits by video, and `video_stats`, `track_stats` and `ego_stats` measure
+  each video, each track and the camera motion of each frame.
+- Two experimental evaluators: `Feasibility` decides whether a classification target is
+  reachable on a dataset, and `DriftKnownDomains` tells which of several known domains new
+  data is closest to.
+
+See [New in v1.2](https://dataeval.readthedocs.io/en/latest/getting-started/new-in-v1.2.html) for what works on a tracking
+dataset, and the [v1.2 migration notes](https://dataeval.readthedocs.io/en/latest/migration/v1.2.html) before upgrading.
 
 ## Why DataEval?
 
@@ -33,7 +57,8 @@ consequences on AI model performance. Data collected in the wild is noisy,
 often imbalanced, and doesn't always cover the entire spectrum of conditions
 needed for deployment. DataEval provides AI practitioners with a library of
 rigorous, algorithm-backed metrics for performance estimation, bias analysis,
-dataset cleaning and assessment, and data distribution shifts. Throughout
+dataset cleaning and assessment, and data distribution shifts, for still
+images and for video. Throughout
 all stages of the machine learning lifecycle -- from initial data collection
 through operational monitoring -- DataEval identifies data problems before
 they become model failures.
@@ -62,7 +87,7 @@ using MAITE-compliant datasets and models.
 **Python versions:** 3.11 - 3.14
 
 Choose your preferred method of installation below or follow our
-[installation guide](docs/source/getting-started/installation.md).
+[installation guide](https://dataeval.readthedocs.io/en/latest/getting-started/installation.html).
 
 - [Installing with pip](#installing-with-pip)
 - [Installing with uv](#installing-with-uv)
@@ -162,7 +187,8 @@ cd dataeval
 > **Contributing rather than just installing?** Use
 > `uvx --with nox-uv nox -s dev` to build a full development environment — tests,
 > linting, type checking and docs tooling included. See
-> [Development Setup](./CONTRIBUTING.md#development-setup) for the options it takes.
+> [Development Setup](https://github.com/aria-ml/dataeval/blob/main/CONTRIBUTING.md#development-setup)
+> for the options it takes.
 
 #### Using uv
 
@@ -196,6 +222,13 @@ accept either NumPy arrays or [Modular AI Trustworthy Engineering
 If your data is not yet in MAITE format, the sections below show what is
 required and how to wrap a common format, for both image classification and
 object detection tasks.
+
+A tracking dataset holds one video for each item. `Duplicates` and `Outliers` take it
+directly, `Metadata(dataset)` describes it for the bias evaluators, and adapters such as
+`SequenceFrames` and `DetectionCrops` let the tools that read one image or one object at a
+time run on its frames and detections.
+[New in v1.2](https://dataeval.readthedocs.io/en/latest/getting-started/new-in-v1.2.html) says which tool takes
+which form.
 
 #### Image classification dataset
 
@@ -387,33 +420,33 @@ print(result)
 ```
 
 ```text
-shape: (3, 5)
-┌──────────┬───────┬──────────┬────────────────┬─────────────┐
-│ group_id ┆ level ┆ dup_type ┆ item_indices   ┆ methods     │
-│ ---      ┆ ---   ┆ ---      ┆ ---            ┆ ---         │
-│ i64      ┆ str   ┆ str      ┆ list[i64]      ┆ list[str]   │
-╞══════════╪═══════╪══════════╪════════════════╪═════════════╡
-│ 0        ┆ item  ┆ near     ┆ [18586, 39942] ┆ ["cluster"] │
-│ 1        ┆ item  ┆ near     ┆ [23157, 31426] ┆ ["cluster"] │
-│ 2        ┆ item  ┆ near     ┆ [32024, 49135] ┆ ["cluster"] │
-└──────────┴───────┴──────────┴────────────────┴─────────────┘
+shape: (3, 7)
+┌──────────┬───────┬──────────┬────────────────┬─────────────┬────────────┬───────────────────────┐
+│ group_id ┆ level ┆ dup_type ┆ item_indices   ┆ methods     ┆ differs_on ┆ annotation_divergence │
+│ ---      ┆ ---   ┆ ---      ┆ ---            ┆ ---         ┆ ---        ┆ ---                   │
+│ i64      ┆ str   ┆ str      ┆ list[i64]      ┆ list[str]   ┆ list[str]  ┆ f64                   │
+╞══════════╪═══════╪══════════╪════════════════╪═════════════╪════════════╪═══════════════════════╡
+│ 0        ┆ item  ┆ near     ┆ [18586, 39942] ┆ ["cluster"] ┆ null       ┆ null                  │
+│ 1        ┆ item  ┆ near     ┆ [23157, 31426] ┆ ["cluster"] ┆ null       ┆ null                  │
+│ 2        ┆ item  ┆ near     ┆ [32024, 49135] ┆ ["cluster"] ┆ null       ┆ null                  │
+└──────────┴───────┴──────────┴────────────────┴─────────────┴────────────┴───────────────────────┘
 ```
 
 A result with many large groups is a signal that your dataset contains
 repeated collection events. Before training, remove all but one sample from
-each group. See the [deduplication how-to guide](./docs/source/notebooks/h2_deduplicate.py)
+each group. See the [deduplication how-to guide](https://dataeval.readthedocs.io/en/latest/notebooks/h2_deduplicate.html)
 for a complete walkthrough, including how to choose which sample to keep.
 
 ### Where to go next
 
-Not sure what to evaluate first? Use the [Which tool should I use?](./docs/source/getting-started/which-tool.md)
+Not sure what to evaluate first? Use the [Which tool should I use?](https://dataeval.readthedocs.io/en/latest/getting-started/which-tool.html)
 guide to find the right evaluator for your situation.
 
-Know which tool to use, then check out [What data does each tool need?](./docs/source/getting-started/input-requirements.md)
+Know which tool to use, then check out [What data does each tool need?](https://dataeval.readthedocs.io/en/latest/getting-started/input-requirements.html)
 for a quick-reference table of every algorithm's inputs, and the
-[Functional overview](./docs/source/reference/FunctionalOverview.md) for task applicability.
+[Functional overview](https://dataeval.readthedocs.io/en/latest/reference/FunctionalOverview.html) for task applicability.
 
-Want to just explore the documentation? The [Where to go next](./docs/source/getting-started/where-to-go-next.md)
+Want to just explore the documentation? The [Where to go next](https://dataeval.readthedocs.io/en/latest/getting-started/where-to-go-next.html)
 page allows you to jump around between the different areas of the documentation with small summaries of what each page covers.
 
 ---
