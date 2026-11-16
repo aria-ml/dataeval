@@ -504,15 +504,15 @@ statistical and computational.
     annotated boxes and not objects. The distance is directed and center to center, not a gap. The fraction reads 1.0
     on datasets whose annotation tools clip boxes to the image, and after a {class}`.Resize` or {class}`.Crop`. The
     class overlaps read labels, and where a missing label could hide the largest overlap the value is NaN, which is
-    not a guess. Where another box of the image is corrupt, every value is computed from the valid boxes and flagged
-    `incomplete_geometry`, so the largest distances are the least reliable and the covered fraction and the overlaps
-    can be too small. On that aerial footage the covered fraction ran opposite to the dataset's own `occlusion` field (a
-    mean of 0.11 on the boxes the field marks 1 and 0.38 on those it marks 0), and the export does not document that
-    field, so do not read the covered fraction as occlusion. Most of the highest other-class overlaps paired a person
-    class with a bicycle or motor class, which the class names suggest is a rider on the vehicle. No image was
-    inspected, so the run does not show that the largest other-class overlap finds label conflicts. Boxes that mark
-    areas the annotators skipped, passed as a class, raised the covered fraction of the ordinary boxes, so drop them
-    first.
+    not a guess. Where another box of the image is corrupt, every value is computed from the valid boxes and
+    `spatial_incomplete_geometry` is True, so the largest distances are the least reliable and the covered fraction
+    and the overlaps can be too small. On that aerial footage the covered fraction ran opposite to the dataset's own
+    `occlusion` field (a mean of 0.11 on the boxes the field marks 1 and 0.38 on those it marks 0), and the export does
+    not document that field, so do not read the covered fraction as occlusion. Most of the highest other-class overlaps
+    paired a person class with a bicycle or motor class, which the class names suggest is a rider on the vehicle. No
+    image was inspected, so the run does not show that the largest other-class overlap finds label conflicts. Boxes that
+    mark areas the annotators skipped, passed as a class, raised the covered fraction of the ordinary boxes, so drop
+    them first.
 - - {func}`.image_stats` (`ImageStats.CONTEXT`)
   - The intensity of the pixels around a box: the mean and the population standard deviation, over a frame a quarter of
     the box's width and height wide, less the box and less every other valid box, with the intensity mapped to [0, 1]
@@ -534,10 +534,10 @@ statistical and computational.
     default floor of 1/255 under the ratios' denominators fell on the signal-to-clutter ratio of 22 of the 113,760 boxes
     that have a surround, and on the contrast of none (23 of 117,309 with the ignored regions kept). Every target pixel
     of that footage is valid, since the frames are 8-bit, so no box was refused for too few valid target pixels: that
-    rule was exercised on constructed images only. An image of integers with no declared range is read against the
-    interval its own maximum decodes to, so compare images only where the range is declared. The intensity is a mean
-    over the channels, so hue does not show in it. The padding of a quarter, the floor of 32 pixels, the 90% of valid
-    target pixels and the floor of 1/255 were chosen by no study.
+    rule was exercised on constructed images only. Without a declared range only `uint8` data and floats in the two
+    conventions of 0 to 1 and 0 to 255 are read, and any other image is NaN with the status `unknown_range`. The
+    intensity is a mean over the channels, so hue does not show in it. The padding of a quarter, the floor of 32 pixels,
+    the 90% of valid target pixels and the floor of 1/255 were chosen by no study.
 - - {func}`.image_stats` (`ImageStats.COLOR`)
   - The mean lightness and chroma, the share of neutral pixels, and the chroma-weighted direction of the hue of an image,
     a box or the background, in CIELAB (D65, 2-degree observer), read from three channels that the caller declares are sRGB

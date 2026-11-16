@@ -245,16 +245,23 @@ class TestSupport:
         [
             (ring_image(0.6, 0.2), [(NAN, 0, 5, 5)], 0, {}, "invalid_box"),
             (with_infinity(), None, 0, {"declared": None}, "unknown_range"),
-            (ring_image(0.6, 0.2), [(0, 0, 30, 30)], 0, {}, "empty_ring"),
+            (ring_image(0.6, 0.2), [(0, 0, 30, 30)], 0, {}, "empty_surround"),
             (ring_image(0.6, 0.2), None, 0, {"min_pixels": 200}, "insufficient_support"),
             (ring_image(0.6, 0.2), None, None, {}, "not_applicable"),
-            (ring_image(0.6, 0.2), None, 0, {"bands": (5,), "view": ViewKind.BAND}, "insufficient_support"),
+            (ring_image(0.6, 0.2), None, 0, {"bands": (5,), "view": ViewKind.BAND}, "missing_channel"),
         ],
-        ids=["invalid_box", "unknown_range", "empty_ring", "insufficient_support", "not_applicable", "missing_band"],
+        ids=[
+            "invalid_box",
+            "unknown_range",
+            "empty_surround",
+            "insufficient_support",
+            "not_applicable",
+            "missing_channel",
+        ],
     )
     def test_a_surround_that_is_not_measured_gives_nan_and_no_reason(self, datum, boxes, focal, kw, status):
         # Nothing wrong with the target is claimed where the surround is the problem. A band group that names a band
-        # the datum lacks reads a target fraction of 0.0, which must not be mistaken for one.
+        # the datum lacks reads no target at all, which must not be mistaken for a target with too few valid pixels.
         row = measure(datum, boxes, focal, **kw)
         assert row["context_status"] == status
         assert_ratios_are_nan(row)
@@ -263,8 +270,9 @@ class TestSupport:
 
     def test_incomplete_geometry_keeps_both_ratios(self):
         datum = ring_image(0.6, two_valued(0.1, 0.3))
-        row = measure(datum, [BOX, (29, 29, 26, 26)])  # a reversed peer: it may lie in the ring, and the status says so
-        assert row["context_status"] == "incomplete_geometry"
+        row = measure(datum, [BOX, (29, 29, 26, 26)])  # a reversed peer: it may lie in the ring, and the detail says so
+        assert row["context_status"] == "ok"
+        assert row["context_incomplete_geometry"] is True
         assert row["target_surround_contrast"] == pytest.approx(2.0, rel=1e-6)
         assert row["signal_clutter_ratio"] == pytest.approx(4.0, rel=1e-6)
 
@@ -339,6 +347,7 @@ class TestNothingElseMoves:
 
     OLD_DETAILS = {
         "context_status",
+        "context_incomplete_geometry",
         "surround_candidate_pixels",
         "surround_retained_pixels",
         "surround_peer_excluded_fraction",

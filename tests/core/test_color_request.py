@@ -73,11 +73,11 @@ def test_all_per_target_false_warns_what_it_did_before():
     assert sorted(texts(with_color)) == sorted(texts(without))
 
 
-def test_a_request_of_only_color_flags_is_the_no_statistics_case():
-    _, caught = run(ImageStats.COLOR)
-    messages = texts(caught, UserWarning)
-    assert [t for t in messages if "requests no statistics" in t]
-    assert [t for t in messages if "color_rgb_channels" in t]
+def test_a_request_of_only_color_flags_without_channels_raises():
+    with pytest.raises(ValueError, match="color_rgb_channels"):
+        run(ImageStats.COLOR)
+    with pytest.raises(ValueError, match="color_rgb_channels"):
+        run({None: ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN})
 
 
 def test_with_channels_color_warns_experimental_once():

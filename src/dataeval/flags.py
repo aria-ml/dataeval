@@ -19,13 +19,33 @@ class ImageStats(Flag):
     a full-scale reference and reads against the 0-255 display range — which makes one
     picture answer identically whether it arrived as 8-bit, 16-bit or float, and makes the
     answer NaN for data with no such reference, such as an elevation or temperature band.
-    The color statistics are the exception: they read only a declared interval or 8-bit data.
+    The context and color statistics are the exception: they read a declared interval, else 8-bit data against
+    (0, 255) or floating-point data within [0, 1] or [0, 255], and are NaN otherwise.
     See :doc:`/concepts/ImageStatistics`.
 
     A statistic's column is its flag's name after the first underscore, in lower case: `PIXEL_MEAN` gives `mean` and
     `VISUAL_BLUR_EDGE_WIDTH` gives `blur_edge_width`. A channel group's name goes in front of a column and a view's name
     in front of that (`background_nir_mean`), except that the surround's own columns put the surround first
     (`surround_nir_intensity_mean`).
+
+    The statistics added in 1.3 report a status for each row in their details (`blur_status`, `spatial_status`,
+    `saturated_status`, `context_status`, `color_status`). A value is NaN unless its status is `ok`, and every status
+    comes from one list, the first that applies:
+
+    - `not_applicable` : A row the statistic does not define, such as an image's own row for a box statistic
+    - `invalid_box` : The box, as converted, lies outside the image, has zero area or is not finite, which is what
+      `DIMENSION_INVALID_BOX` reports
+    - `reversed_box` : The box has an edge before the one it should follow, and with its edges swapped it is valid,
+      so `DIMENSION_INVALID_BOX` is False for it. Only the spatial and context statistics, which read a box's geometry
+      as given, report it; the pixel and color statistics measure the swapped box
+    - `missing_channel` : The view names a channel the datum does not have
+    - `unknown_range` : No interval to read the values against could be established
+    - `empty_surround` : The box fills its window, so it has no surround (context only)
+    - `insufficient_support` : Too few pixels or values to measure, as each statistic defines it
+    - `ok` : Measured
+
+    `track_steps` uses the same `invalid_box` and `reversed_box`, except that it measures a box outside the frame,
+    since a step between two frames does not depend on the frame's edge.
 
     Individual Stats
     ----------------
@@ -61,6 +81,11 @@ class ImageStats(Flag):
       9 px margin around them
     - `VISUAL_BLUR_EDGE_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
       of their median widths
+
+    A request that includes a blur statistic also returns details: `blur_status`, `ok`, `not_applicable`,
+    `invalid_box`, `missing_channel`, `unknown_range` or `insufficient_support` (which a box that extends past the
+    image reads), and, with `VISUAL_BLUR_EDGE_DIRECTIONALITY`, `blur_edge_directionality_reason`,
+    `insufficient_axis_support` where directionality alone is NaN, else empty.
 
     Known limits: a width is in pixels, so values compare only at one resolution. `image_stats` warns when one call
     requests blur for images of more than one size; `Outliers` calls it once per dataset, so sizes that differ only
@@ -136,19 +161,19 @@ class ImageStats(Flag):
     nearest peer is the neighbor. A request that includes a spatial statistic also returns details, in the result's
     ``details``, one value per row:
 
-    - `spatial_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image,
-      has reversed edges or is not finite (read from the coordinates as given, so a reversed box is `invalid_box`
-      here though `DIMENSION_INVALID_BOX` is False for it, unless the box is a `BoundingBox`, whose constructor has
-      already swapped its edges); `incomplete_geometry`, when another box of the image is
-      reversed or not finite, so a box that could not be placed may be nearer to this one or may overlap it (the value
-      is still computed from the valid boxes; the largest `SPATIAL_NN_DISTANCE_NORM` values may then be too large, and
-      the overlap statistics too small); or `not_applicable`, on an image's own row
+    - `spatial_status` : `ok`, `not_applicable`, `invalid_box` or `reversed_box` (see the statuses above)
+    - `spatial_incomplete_geometry` : True where another box of the image is reversed or not finite, so a box that
+      could not be placed may be nearer to this one or may overlap it. The value is still computed from the valid
+      boxes, and the largest `SPATIAL_NN_DISTANCE_NORM` values may then be too large, and the overlap statistics too
+      small. False wherever the status is not `ok`
     - `nn_distance_norm_target_index` : The nearest neighbor's index among the image's boxes, -1 for none. On equal
       distances the lowest index is nearest
-    - `nn_distance_norm_reason` : `no_neighbor` when the status is `ok` and no other valid box exists, else empty
+    - `nn_distance_norm_reason` : `no_neighbor` when the status is `ok`, `spatial_incomplete_geometry` is False and no
+      other valid box exists, else empty
     - `spatial_peer_count`, `spatial_skipped_count` : With the covered fraction or either class statistic, the number
       of valid peers the box was compared with and the number of boxes left out for having zero area or lying
-      entirely outside the image. A box that is reversed or not finite is in neither count, since it sets the status.
+      entirely outside the image. A box that is reversed or not finite is in neither count; it sets
+      `spatial_incomplete_geometry` on the other boxes.
       -1 where the box is not measured
     - `max_iou_same_class_target_index`, `max_iou_other_class_target_index` : The peer that attains the maximum, by its
       index among the image's boxes, -1 where there is none (the maximum is 0.0 or NaN). On equal values the lowest
@@ -171,9 +196,9 @@ class ImageStats(Flag):
     A request that includes it also returns details, in the result's ``details``, one value per row, named with a band
     group's name in front when the row is a band group's:
 
-    - `saturated_status` : `ok`; `unknown_upper`, when no endpoint resolved; `no_finite_values`, when the view holds
-      no finite value; or `empty_region`, when it holds no position of the datum, as for a box outside the image or a
-      band group the datum cannot supply. The value is NaN unless the status is `ok`
+    - `saturated_status` : `ok`, `not_applicable`, `invalid_box`, `missing_channel`, `unknown_range` (no endpoint
+      resolved) or `insufficient_support` (no position of the datum in the view, as for a background the boxes cover,
+      or no finite value)
     - `saturated_valid_fraction` : The finite values over the positions of the view
     - `saturated_above_range_fraction` : The finite values above the endpoint plus `saturated_atol`, over the finite
       values
@@ -194,9 +219,9 @@ class ImageStats(Flag):
       pixel's intensity is its value mapped to [0, 1] from the interval the view is measured against (see `value_range`
       of :func:`~dataeval.core.image_stats`), averaged over the channels read, so the box and its surround share one
       scale. A pixel counts only when every channel read is finite and inside the interval, and a value outside is never
-      clipped. An object that no box annotates stays in the surround, and an image whose integer values carry no
-      declared interval is read against the interval its own maximum decodes to, so compare images only where the
-      interval is declared
+      clipped. An object that no box annotates stays in the surround. Without a declared interval, unsigned 8-bit data
+      reads against (0, 255) and floating-point data within [0, 1] or [0, 255] against that range, and any other data
+      is NaN with the status `unknown_range`
     - `CONTEXT_SURROUND_INTENSITY_STD` : The population standard deviation (``ddof=0``) of the same intensities
     - `CONTEXT_TARGET_SURROUND_CONTRAST` : How far the box stands from its surround relative to the surround's level,
       ``(mu_t - mu_s) / max(mu_s, floor)``. `mu_s` is `surround_intensity_mean`, and `mu_t` is the mean intensity of the
@@ -219,14 +244,12 @@ class ImageStats(Flag):
     The surround before other boxes are removed, less the box, is the candidate, and the candidate's pixels that no
     other box covers are the retained ones:
 
-    - `context_status` : `ok`; `invalid_box`, when the box itself has zero area, lies entirely outside the image, has
-      reversed edges or is not finite (read from the coordinates as given, as for `spatial_status`); `unknown_range`,
-      when no interval could be established for the view; `empty_ring`, when the box fills its window so that no
-      candidate pixel exists; `insufficient_support`, when fewer than `surround_min_pixels` retained pixels are
-      measurable, which includes a surround that other boxes cover and a band group the datum cannot supply;
-      `incomplete_geometry`, when another box of the image is reversed or not finite, so that pixels of it may lie in
-      the surround (the value is still computed from the valid boxes); or `not_applicable`, on an image's own row. The
-      value is NaN unless the status is `ok` or `incomplete_geometry`
+    - `context_status` : `ok`, `not_applicable`, `invalid_box`, `reversed_box`, `missing_channel`, `unknown_range`,
+      `empty_surround` or `insufficient_support` (fewer than `surround_min_pixels` retained pixels measurable, which
+      includes a surround that other boxes cover)
+    - `context_incomplete_geometry` : True where another box of the image is reversed or not finite, so that pixels
+      of it may lie in the surround; the value is still computed from the valid boxes. False wherever the status is
+      not `ok`
     - `surround_candidate_pixels`, `surround_retained_pixels`, `surround_measurable_pixels` : The candidate pixels,
       the retained ones, and the retained ones measurable in every channel read. -1 where a count does not apply. The
       first two are reported for the unnamed view only, since a band group does not change them
@@ -253,7 +276,8 @@ class ImageStats(Flag):
       never clipped. Each channel is mapped to [0, 1] from that interval, decoded from the sRGB transfer function,
       converted to XYZ with the D65 matrix and to CIELAB with the D65 white and the 2-degree observer. The interval is
       the declared one (the call's `value_range` or the datum's own metadata; a channel group's range does not apply),
-      and without one an unsigned 8-bit datum reads against ``(0, 255)`` and any other datum is NaN
+      and without one the context statistics' rule applies: unsigned 8-bit data against ``(0, 255)``, floating-point
+      data within [0, 1] or [0, 255] against that range, and any other data NaN
     - `VISUAL_COLOR_CHROMA_MEAN` : The mean chroma, ``C = hypot(a*, b*)``, of the valid pixels
     - `VISUAL_COLOR_ACHROMATIC_FRACTION` : The share of valid pixels whose chroma is under `color_chroma_threshold`
     - `VISUAL_COLOR_HUE_COS_MEAN`, `VISUAL_COLOR_HUE_SIN_MEAN` : The coordinates of the chroma-weighted mean hue
@@ -267,8 +291,8 @@ class ImageStats(Flag):
     image, each box and the background, and not for a channel group. A request that includes them also returns
     details, in the result's ``details``, one value per row:
 
-    - `color_status` : `ok`; `missing_band`, where the datum has fewer than two dimensions or lacks a declared channel;
-      `unknown_range`, where no interval applies; or `insufficient_support`. The value is NaN unless the status is `ok`
+    - `color_status` : `ok`, `not_applicable`, `invalid_box`, `missing_channel` (the datum has fewer than two
+      dimensions or lacks a declared channel), `unknown_range` or `insufficient_support`
     - `color_valid_fraction` : The valid pixels over the pixels of the view that lie inside the datum and that the
       background mask does not remove, so a box that leaves the image is judged on the part inside it
     - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the background mask removes.
@@ -342,7 +366,8 @@ class ImageStats(Flag):
     ~ImageStats.CONTEXT & ~ImageStats.COLOR``.
     The `SPATIAL` and `CONTEXT` statistics need box rows, so a request for `ALL` with no box rows returns their columns
     as NaN, without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds
-    them and measures no box rows warns, or raises when it holds nothing else.
+    them and measures no box rows warns. A request that holds nothing else raises when the call has no boxes at all
+    (no `boxes` and none in the dataset, or `per_target=False`).
 
     Examples
     --------

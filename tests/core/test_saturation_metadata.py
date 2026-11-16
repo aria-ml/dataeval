@@ -92,7 +92,7 @@ class TestInThePixelFamily:
     def test_a_float_image_without_a_range_is_nan_and_says_why(self):
         got = image_stats([np.zeros((3, 4, 4), dtype=np.float32)], stats=ImageStats.PIXEL)
         assert np.isnan(got["stats"]["saturated_fraction"][0])
-        assert got.get("details", {})["saturated_status"].tolist() == ["unknown_upper"]
+        assert got.get("details", {})["saturated_status"].tolist() == ["unknown_range"]
 
 
 # Each kind of image: how to make n of them, and the range to declare for them.

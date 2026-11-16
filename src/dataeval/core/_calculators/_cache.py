@@ -154,6 +154,48 @@ class CalculatorCache:
         return self.value_range.is_known and math.isnan(self.value_range.depth)
 
     @cached_property
+    def invalid_box(self) -> bool:
+        """Whether this is a box row whose converted box is outside the image, of zero area or not finite.
+
+        What `DIMENSION_INVALID_BOX` reports, so a status that says ``invalid_box`` never contradicts that column. The
+        converted box has its reversed edges swapped, so a reversed box is measured as its twin. An image row has no
+        box to judge, so it is never one.
+        """
+        return self.has_box and not self.box.is_valid()
+
+    @cached_property
+    def lacks_bands(self) -> bool:
+        """Whether this view is a channel group that names a band the datum does not carry.
+
+        A datum of fewer than two dimensions has no channel axis, so it carries no band.
+        """
+        bands = self.bands
+        if bands is None:
+            return False
+        return self.raw.ndim < 2 or max(bands) >= normalize_image_shape(self.raw).shape[0]
+
+    @cached_property
+    def full_scale(self) -> tuple[float, float] | None:
+        """The interval the context and color statistics map a view's values from to ``[0, 1]``, or None for none.
+
+        A declared interval; else ``(0, 255)`` for unsigned 8-bit data, whatever its maximum; else, for floating-point
+        data, the two conventions the shared decode recognizes, ``(0, 1)`` for values within [0, 1] and ``(0, 255)`` for
+        values within [0, 255]. Integer data of any other type, and Boolean data, have no interval without a
+        declaration: the shared decode reads their own maximum, so two frames of one sensor would read on different
+        scales. A span that overflows has none either, since every pixel would map to 0 or to NaN.
+        """
+        if self.has_declared_range:
+            interval = float(self.value_range.pmin), float(self.value_range.pmax)
+        else:
+            dtype = getattr(self.raw, "dtype", None)
+            if dtype == np.uint8:
+                return 0.0, 255.0
+            if dtype is None or not np.issubdtype(dtype, np.floating) or not self.value_range.is_known:
+                return None
+            interval = float(self.value_range.pmin), float(self.value_range.pmax)
+        return interval if math.isfinite(interval[1] - interval[0]) else None
+
+    @cached_property
     def has_pixels(self) -> bool:
         """Whether the view holds a position that comes from the datum and has not been excluded.
 

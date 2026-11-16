@@ -76,6 +76,18 @@ Two of these are float conventions and not encodings. They are recognized becaus
 arrives as a float array: a `ToTensor`-style pipeline produces the first, and a resize or other interpolation produces
 the second.
 
+Not every statistic uses the decode. Without a declared interval:
+
+| Statistics | Interval |
+| --- | --- |
+| Visual and blur statistics, the histogram, and pixel statistics under `normalize_pixel_values=True` | The decode above |
+| Context and color statistics | `(0, 255)` for `uint8`, and the two float conventions above; any other data is NaN with the status `unknown_range` |
+| `PIXEL_SATURATED_FRACTION` | The maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean data |
+
+The context and color statistics never read an integer image's own maximum, so two frames of one sensor cannot read on
+different scales, and a 12-bit sensor's output in `uint16` needs a declaration. The float conventions still read the
+data's extremes: a 0-255 float image whose values all lie at or below 1 is read as the 0-1 convention.
+
 ## When there is no reference
 
 Some data has none. Elevation below sea level, mean-centered reflectance, temperature
@@ -104,7 +116,8 @@ which is a request to divide by a range that does not exist.
 
 When this happens, a warning names `value_range`, because an all-NaN column is easy to miss.
 
-The [color statistics](#color-statistics) need an interval too, and do not use a decoded one.
+The [color statistics](#color-statistics) and the context statistics need an interval too, by the rule in the table
+above.
 
 ## Statistics that depend on scale
 
@@ -253,9 +266,9 @@ Images are channel-first, as everywhere in DataEval, so an image stored as heigh
 channels. An evaluator such as {class}`.Outliers` cannot take the keyword, so compute with {func}`.image_stats` and pass
 the result to its `from_stats`.
 
-A color needs an absolute scale. The scale is the declared `value_range`, or 255 for an 8-bit image, and it is never
-read off the data's maximum, which would make the same pixels read as different colors. A 16-bit or floating-point image
-needs a declared range, and is NaN with the status `unknown_range` without one.
+A color needs an absolute scale. The scale is the one in [the table above](#where-the-reference-comes-from), never an
+integer image's own maximum, which would make the same pixels read as different colors. A 16-bit image needs a declared
+range, and is NaN with the status `unknown_range` without one.
 
 "Chroma" and "hue" are CIELAB terms and have nothing to do with a codec's chroma subsampling. The lightness is that of
 the sRGB color once its transfer function is undone, which is neither `brightness`, a percentile of display values, nor

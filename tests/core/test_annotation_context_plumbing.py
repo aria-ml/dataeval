@@ -156,9 +156,11 @@ def test_a_two_dimensional_datum_passes_its_extent_and_statuses():
     assert SEEN[0][0].extent == (20, 40)
     assert [(focal, status) for _, focal, _, status in SEEN] == [
         (None, None),
-        (0, "incomplete_geometry"),
-        (1, "invalid_box"),
+        (0, "ok"),
+        (1, "reversed_box"),
     ]
+    # The context handed over still knows the reversed box could not be placed beside the focal one.
+    assert [context.incomplete(focal) for context, focal, *_ in SEEN[1:]] == [True, False]
 
 
 def test_context_needs_ors_the_selected_handlers():

@@ -36,13 +36,21 @@ def _finite(image: NDArray[Any]) -> tuple[NDArray[np.bool_] | None, int]:
     return mask, int(np.count_nonzero(mask))
 
 
-def _status(has_pixels: bool, finite: int, endpoint: tuple[float, str] | None) -> str:
-    """Name why a view has no reading, or ``ok``: no pixels, then no finite value, then no endpoint."""
-    if not has_pixels:
-        return "empty_region"
-    if finite == 0:
-        return "no_finite_values"
-    return "ok" if endpoint is not None else "unknown_upper"
+def _status(cache: "CalculatorCache", finite: int, endpoint: tuple[float, str] | None) -> str:
+    """Name why a view has no reading, or ``ok``, in the shared order of the statuses.
+
+    An invalid box, then a channel group the datum cannot supply, then no endpoint, then nothing to count: no position
+    of the datum in the view (a background the boxes cover) or no finite value in it.
+    """
+    if cache.invalid_box:
+        return "invalid_box"
+    if cache.lacks_bands:
+        return "missing_channel"
+    if endpoint is None:
+        return "unknown_range"
+    if not cache.has_pixels or finite == 0:
+        return "insufficient_support"
+    return "ok"
 
 
 def _counts_at(
@@ -297,7 +305,7 @@ class PixelStatCalculator(Calculator[ImageStats]):
         valid = finite / positions if positions > 0 else np.nan
         endpoint = self._endpoint()
         upper, rule = endpoint or (np.nan, "")
-        status = _status(self.cache.has_pixels, finite, endpoint)
+        status = _status(self.cache, finite, endpoint)
         if status != "ok":
             return _Saturation(status, np.nan, valid, np.nan, upper, rule)
         saturated, above = _counts_at(
@@ -366,9 +374,9 @@ class PixelStatCalculator(Calculator[ImageStats]):
         """Return empty values for pixel statistics."""
         return {
             "histogram": [np.nan] * 256,  # Histogram with 256 bins
-            # A row that does not measure it, such as a box row of a background pass, has no status and no rule. Without
-            # a string default the padded column would hold the text 'nan'.
-            "saturated_status": "",
+            # A row that does not measure it, such as a box row of a background pass, has no rule, and its status says
+            # the view does not apply. Without a string default the padded column would hold the text 'nan'.
+            "saturated_status": "not_applicable",
             "saturated_upper_rule": "",
         }
 

@@ -1,5 +1,6 @@
 __all__ = []
 
+import math
 from functools import cached_property
 from typing import Any
 
@@ -88,6 +89,34 @@ class BlurStatCalculator(Calculator[ImageStats]):
     def _blur(self) -> float:
         """Return the `blur_edge_width` column: the background value in a masked view, the whole picture's otherwise."""
         return self._background if self.cache.exclude is not None else self._values.blur
+
+    @cached_property
+    def _status(self) -> str:
+        """Name why the row has no edge width, or ``ok``, in the shared order of the statuses.
+
+        A box that extends past the image reads `insufficient_support`: the fill outside the image is NaN, and a NaN
+        pixel spreads through the smoothing so that no edge is found.
+        """
+        cache = self.cache
+        if cache.invalid_box:
+            return "invalid_box"
+        if cache.lacks_bands:
+            return "missing_channel"
+        if not cache.value_range.is_known:
+            return "unknown_range"
+        return "ok" if math.isfinite(self._blur()) else "insufficient_support"
+
+    def details(self, flags: ImageStats, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:  # noqa: ARG002
+        """Return the row's status, and why directionality alone is NaN where the edge width has a value."""
+        details: dict[str, list[Any]] = {"blur_status": [self._status]}
+        if flags & ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY:
+            alone = self._status == "ok" and not math.isfinite(self._values.directionality)
+            details["blur_edge_directionality_reason"] = ["insufficient_axis_support" if alone else ""]
+        return details
+
+    def get_empty_values(self) -> dict[str, Any]:
+        """Return the values of the details on a row where no statistic is measured."""
+        return {"blur_status": "not_applicable", "blur_edge_directionality_reason": ""}
 
     def get_applicable_flags(self) -> ImageStats:
         """Return which flags this calculator handles."""

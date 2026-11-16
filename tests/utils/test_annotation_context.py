@@ -36,24 +36,36 @@ def test_kind_table(row, kind):
     assert context([row]).kind.tolist() == [kind]
 
 
-def test_a_focal_with_a_reversed_peer_is_incomplete_and_a_reversed_focal_is_invalid():
+def test_a_focal_with_a_reversed_peer_is_ok_and_incomplete_and_a_reversed_focal_is_reversed_box():
     ctx = context([(5, 5, 15, 15), (10, 0, 2, 10)])
 
-    assert ctx.status(0) == "incomplete_geometry"
-    assert ctx.status(1) == "invalid_box"  # its own defect wins over a peer's
+    assert ctx.status(0) == "ok"
+    assert ctx.incomplete(0)
+    assert ctx.status(1) == "reversed_box"  # its swapped twin (2, 0, 10, 10) lies inside the image
+    assert not ctx.incomplete(1)  # only the other boxes count, not the focal's own defect
+
+
+@pytest.mark.parametrize("row", [(10, 5, 2, 5), (60, 0, 50, 10), (-2, 0, -10, 10)])
+def test_a_reversed_focal_whose_twin_has_zero_area_or_lies_outside_is_invalid_box(row):
+    ctx = context([row])
+
+    assert ctx.kind.tolist() == [Kind.REVERSED]
+    assert ctx.status(0) == "invalid_box"
 
 
 @pytest.mark.parametrize("bad", [(NAN, 0, 10, 10), (0, 0, INF, 10)])
 def test_a_nonfinite_peer_makes_every_valid_focal_incomplete(bad):
     ctx = context([(5, 5, 15, 15), (20, 5, 30, 15), bad])
 
-    assert [ctx.status(i) for i in range(3)] == ["incomplete_geometry", "incomplete_geometry", "invalid_box"]
+    assert [ctx.status(i) for i in range(3)] == ["ok", "ok", "invalid_box"]
+    assert [ctx.incomplete(i) for i in range(3)] == [True, True, False]
 
 
 def test_zero_area_and_outside_peers_are_skipped_and_counted():
     ctx = context([(5, 5, 15, 15), (0, 0, 0, 10), (40, 0, 50, 10)])
 
     assert ctx.status(0) == "ok"
+    assert not ctx.incomplete(0)
     assert ctx.skipped(0) == (1, 1)
     assert ctx.peers(0).size == 0
     assert ctx.skipped(1) == (0, 1)  # the focal itself is not counted
@@ -101,7 +113,7 @@ def test_an_extent_with_no_pixels_makes_every_focal_invalid(extent):
 
 
 @pytest.mark.parametrize("focal", [None, -1, 2, "0"])
-@pytest.mark.parametrize("method", ["status", "peers", "skipped"])
+@pytest.mark.parametrize("method", ["status", "incomplete", "peers", "skipped"])
 def test_a_focal_that_is_not_a_box_index_is_refused(method, focal):
     ctx = context([(5, 5, 15, 15), (1, 1, 9, 9)])
 
@@ -118,6 +130,7 @@ def test_reordering_the_boxes_permutes_kind_and_clipped_and_changes_nothing_else
     np.testing.assert_array_equal(shuffled.kind, base.kind[perm])
     np.testing.assert_array_equal(shuffled.clipped, base.clipped[perm])
     assert [shuffled.status(i) for i in range(len(rows))] == [base.status(p) for p in perm]
+    assert [shuffled.incomplete(i) for i in range(len(rows))] == [base.incomplete(p) for p in perm]
     assert [shuffled.skipped(i) for i in range(len(rows))] == [base.skipped(p) for p in perm]
 
 

@@ -278,13 +278,17 @@ class SpatialStatCalculator(Calculator[ImageStats]):
         """Return the frame's status for this row, and the nearest neighbor's target index and reason for no value."""
         at = self._focal()
         status = _NOT_APPLICABLE if at is None else at[0].status(at[1])
-        details: dict[str, list[Any]] = {"spatial_status": [status]}
+        # A box that could not be placed may lie near this one or over it; the value is still read from the boxes that
+        # could, and this says so. Only a measured row can be incomplete.
+        incomplete = status == "ok" and at is not None and at[0].incomplete(at[1])
+        details: dict[str, list[Any]] = {"spatial_status": [status], "spatial_incomplete_geometry": [incomplete]}
         if flags & ImageStats.SPATIAL_NN_DISTANCE_NORM:
             found = self._nearest
             details["nn_distance_norm_target_index"] = [-1 if found is None else found[0]]
             # Only a frame that can be trusted says "no neighbor": beside a corrupt box the truth is unknown, and the
-            # status already says so.
-            details["nn_distance_norm_reason"] = ["no_neighbor" if found is None and status == "ok" else ""]
+            # incomplete-geometry detail already says so.
+            no_neighbor = found is None and status == "ok" and not incomplete
+            details["nn_distance_norm_reason"] = ["no_neighbor" if no_neighbor else ""]
         if flags & (_COUNTED | ImageStats.SPATIAL_COVERED_FRACTION):
             self._overlap_details(flags, details)
         return details
@@ -330,6 +334,7 @@ class SpatialStatCalculator(Calculator[ImageStats]):
         """Return the values of the details on a row where no statistic is measured."""
         return {
             "spatial_status": _NOT_APPLICABLE,
+            "spatial_incomplete_geometry": False,
             "nn_distance_norm_target_index": -1,
             "nn_distance_norm_reason": "",
             "spatial_peer_count": -1,

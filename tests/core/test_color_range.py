@@ -73,8 +73,10 @@ def test_an_undeclared_uint8_reads_against_255_whatever_its_maximum(maximum: int
     assert got["color_chroma_mean"][0] == pytest.approx(np.hypot(expected[1], expected[2]), rel=1e-5)
 
 
-@pytest.mark.parametrize("dtype", [np.uint16, np.float32, np.float64])
-@pytest.mark.parametrize("maximum", [1, 255, 3000])
+@pytest.mark.parametrize(
+    ("dtype", "maximum"),
+    [(np.uint16, 1), (np.uint16, 255), (np.uint16, 3000), (np.int16, 255), (np.float32, 3000), (np.float64, 3000)],
+)
 def test_an_undeclared_other_dtype_is_unknown_range_and_the_log_says_so(
     dtype: Any, maximum: int, caplog: pytest.LogCaptureFixture
 ):
@@ -85,6 +87,17 @@ def test_an_undeclared_other_dtype_is_unknown_range_and_the_log_says_so(
     assert got["status"] == ["unknown_range"]
     assert all(np.isnan(got[name][0]) for name in STATS)
     assert [r for r in caplog.records if "no value range was declared" in r.getMessage()]
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("scale", [1 / 255, 1.0])
+def test_undeclared_float_data_in_either_convention_reads_as_its_uint8_original(dtype: Any, scale: float):
+    base = picture()
+    original = read([base])
+    converted = read([(base * scale).astype(dtype)])
+    assert converted["status"] == ["ok"]
+    for name in STATS:
+        assert converted[name][0] == pytest.approx(original[name][0], rel=1e-5, abs=1e-6), name
 
 
 def test_the_same_image_stored_four_ways_reads_the_same_once_declared():
@@ -113,8 +126,8 @@ def test_a_value_range_in_datum_metadata_is_read_and_the_call_beats_it():
 
 
 def test_a_datum_with_no_range_beside_one_that_declares_one_reads_each_its_own_way():
-    floats = picture().astype(np.float32) / 255
-    got = read(Sensors([floats, floats], [{"value_range": (0, 1)}, {}]))
+    wide = picture().astype(np.uint16) * 257  # uint16 has no interval without a declaration
+    got = read(Sensors([wide, wide], [{"value_range": (0, 65535)}, {}]))
     assert got["status"] == ["ok", "unknown_range"]
 
 
@@ -127,7 +140,7 @@ def test_a_datum_without_the_declared_channels_is_said_once_with_the_images(capl
     gray = np.full((1, 8, 8), 100, dtype=np.uint8)
     with caplog.at_level(logging.WARNING, logger="dataeval"):
         got = read([gray, picture(), gray])
-    assert got["status"] == ["missing_band", "ok", "missing_band"]
+    assert got["status"] == ["missing_channel", "ok", "missing_channel"]
     (message,) = [r.getMessage() for r in caplog.records if "channels color_rgb_channels names" in r.getMessage()]
     assert message.endswith("indices: 0, 2")
 
@@ -142,12 +155,12 @@ def test_a_declared_range_and_an_8_bit_datum_say_nothing(caplog: pytest.LogCaptu
 
 def test_a_channel_groups_range_does_not_set_colors_range(caplog: pytest.LogCaptureFixture):
     # Color reads the datum's own channels, so the range a group declares for its band view is not its range.
-    floats = picture().astype(np.float32) / 255
+    wide = picture().astype(np.uint16) * 257  # uint16 has no interval without a declaration
     with caplog.at_level(logging.WARNING, logger="dataeval"):
         result = image_stats(
-            [floats],
+            [wide],
             stats={None: ImageStats.COLOR, "g": ImageStats.PIXEL_MEAN},
-            channels={"g": ChannelGroup((0, 1, 2), value_range=(0, 1))},
+            channels={"g": ChannelGroup((0, 1, 2), value_range=(0, 65535))},
             color_rgb_channels=(0, 1, 2),
         )
     assert details_of(result)["color_status"].tolist() == ["unknown_range"]
