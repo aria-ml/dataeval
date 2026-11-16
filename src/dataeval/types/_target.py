@@ -57,7 +57,7 @@ def instance_arrays(
         one confidence per detection whichever layout the target carried, ``nan`` where it
         carried none this detection can be read from; see :func:`own_class_scores`.
     """
-    labels = as_numpy(target.labels).reshape(-1).astype(np.intp)
+    labels = whole_ids(target.labels, "labels")
     count = len(labels)
     boxes = as_numpy(target.boxes).astype(np.float32).reshape(count, 4) if count else np.empty((0, 4), dtype=np.float32)
     return labels, boxes, own_class_scores(getattr(target, "scores", None), labels)
@@ -120,6 +120,46 @@ def own_class_scores(scores: Any, labels: NDArray[np.intp]) -> NDArray[np.float3
     return read
 
 
+def whole_ids(values: Any, what: str, hint: str = "") -> NDArray[np.intp]:
+    """Return `values` flattened as ids, refusing any that is not a whole number a signed id can hold.
+
+    A cast would change such a value without a word: ``uint64`` past the signed range wraps, and its maximum reads as
+    ``-1``, which means no track; a fraction truncates onto its neighbor; NaN and infinity become an arbitrary id.
+
+    Parameters
+    ----------
+    values : Any
+        The ids, in any array-like form.
+    what : str
+        The field they came from, named in the error.
+    hint : str, default ""
+        What to give instead, appended to the error.
+
+    Raises
+    ------
+    ValueError
+        If a value is not a number, not whole or outside the range of ``np.intp``.
+    """
+    array = as_numpy(values).reshape(-1)
+    limits = np.iinfo(np.intp)
+    if array.dtype.kind == "b":
+        bad = np.zeros(len(array), dtype=np.bool_)
+    elif array.dtype.kind in "iu":
+        bad = (array > limits.max) | (array < limits.min)
+    elif array.dtype.kind == "f":
+        # The bounds as floats: the largest id rounds up to 2**63 in float64, which the cast cannot hold.
+        top, bottom = float(limits.max) + 1, float(limits.min)
+        with np.errstate(invalid="ignore"):
+            bad = ~np.isfinite(array) | (array != np.round(array)) | (array >= top) | (array < bottom)
+    else:
+        raise ValueError(f"{what} must be whole numbers, got values of type {array.dtype}. {hint}".rstrip())
+    if bad.any():
+        raise ValueError(
+            f"{what} must be whole numbers from {limits.min} to {limits.max}, got {array[bad][0]!r}. {hint}".rstrip()
+        )
+    return array.astype(np.intp)
+
+
 def track_ids_of(target: Any, count: int) -> NDArray[np.intp]:
     """Read one frame's per-detection track ids, ``-1`` where a detection has no track.
 
@@ -144,7 +184,7 @@ def track_ids_of(target: Any, count: int) -> NDArray[np.intp]:
     ids = getattr(target, "track_ids", None)
     if ids is None:
         return np.full(count, -1, dtype=np.intp)
-    values = as_numpy(ids).reshape(-1).astype(np.intp)
+    values = whole_ids(ids, "track_ids", "Give -1 to a detection no tracker linked.")
     if len(values) == count:
         return values
     if len(values) > count:

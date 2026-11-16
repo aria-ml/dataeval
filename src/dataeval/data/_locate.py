@@ -25,7 +25,7 @@ from dataeval.protocols import (
     _is_protocol_instance,
 )
 from dataeval.types import FactorLevel, FactorLevelSchema, SourceIndex, Track
-from dataeval.types._target import detection_score
+from dataeval.types._target import detection_score, track_ids_of
 from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
 
@@ -1342,14 +1342,7 @@ def _track_ids_of(frame_target: Any) -> list[int]:
     count from its labels and only then reads track ids — and skips the attribute
     entirely for a detection-free frame, which is therefore allowed not to carry it.
     """
-    count = len(as_numpy(frame_target.labels).reshape(-1))
-    if not count:
-        return []
-    ids = getattr(frame_target, "track_ids", None)
-    if ids is None:
-        return [-1] * count
-    values = [int(value) for value in as_numpy(ids).reshape(-1).tolist()]
-    return values[:count] if len(values) >= count else values + [-1] * (count - len(values))
+    return track_ids_of(frame_target, len(as_numpy(frame_target.labels).reshape(-1))).tolist()
 
 
 def _keyed(item: SourceItem) -> int:
