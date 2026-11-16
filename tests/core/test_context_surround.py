@@ -147,9 +147,10 @@ class TestValues:
         # The statistic removes valid boxes, so a box that is not valid is not removed, and the value stays correct.
         row = measure(f2_image(), [*F2_BOXES, peer], 0)
         expected = measure(f2_image(), F2_BOXES, 0)
-        assert row["context_status"] == "incomplete_geometry"
-        assert {k: v for k, v in row.items() if k != "context_status"} == {
-            k: v for k, v in expected.items() if k != "context_status"
+        assert row["context_status"] == expected["context_status"] == "ok"
+        assert (row["context_incomplete_geometry"], expected["context_incomplete_geometry"]) == (True, False)
+        assert {k: v for k, v in row.items() if k != "context_incomplete_geometry"} == {
+            k: v for k, v in expected.items() if k != "context_incomplete_geometry"
         }
 
     def test_f3_a_ring_mostly_covered_stays_finite_and_says_so(self):
@@ -235,10 +236,10 @@ class TestStatuses:
         assert math.isnan(row["surround_intensity_std"])
 
     @pytest.mark.parametrize("box", [(0, 0, 10, 10), None], ids=["filling_box", "full_image_entry"])
-    def test_empty_ring(self, box):
+    def test_empty_surround(self, box):
         # A box that fills its window leaves no surround. A `None` entry is the full-image box.
         row = measure(f2_image(), [box], 0)
-        assert row["context_status"] == "empty_ring"
+        assert row["context_status"] == "empty_surround"
         assert math.isnan(row["surround_intensity_mean"])
         assert (row["surround_candidate_pixels"], row["surround_retained_pixels"]) == (0, 0)
         assert math.isnan(row["surround_peer_excluded_fraction"])

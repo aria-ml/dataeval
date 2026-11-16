@@ -321,7 +321,7 @@ def test_nonfinite_boxes_no_longer_crash_image_stats(per_background):
     assert result["stats"]["invalid_box"].tolist() == [False, True, True]
 
 
-def test_a_reversed_box_is_valid_to_the_legacy_statistics_and_invalid_to_the_context(declare):
+def test_a_reversed_box_is_valid_to_the_legacy_statistics_and_reversed_box_to_the_context(declare):
     seen = declare(ContextNeed.CONTEXT)
 
     result = image_stats(
@@ -333,7 +333,7 @@ def test_a_reversed_box_is_valid_to_the_legacy_statistics_and_invalid_to_the_con
     context, focal = seen[0]
     assert context is not None
     assert focal is not None
-    assert context.status(focal) == "invalid_box"
+    assert context.status(focal) == "reversed_box"
 
 
 def test_legacy_statistics_read_the_converted_box():

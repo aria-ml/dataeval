@@ -270,8 +270,6 @@ class TestStatuses:
             [10.0, 10.0, np.nan, 20.0],
             [10.0, 10.0, np.inf, 20.0],
             [10.0, -np.inf, 20.0, 20.0],
-            [20.0, 10.0, 10.0, 20.0],  # x1 < x0
-            [10.0, 20.0, 20.0, 10.0],  # y1 < y0
             [10.0, 10.0, 10.0, 20.0],  # no width
             [10.0, 10.0, 20.0, 10.0],  # no height
         ],
@@ -279,6 +277,25 @@ class TestStatuses:
     def test_an_invalid_box_at_either_end_is_invalid_box(self, bad):
         assert status(one_track(F([_A], [1]), F([bad], [1]))) == ["first_observation", "invalid_box"]
         assert status(one_track(F([bad], [1]), F([_A], [1]))) == ["first_observation", "invalid_box"]
+
+    @pytest.mark.parametrize(
+        "reversed_box",
+        [
+            [20.0, 10.0, 10.0, 20.0],  # x1 < x0
+            [10.0, 20.0, 20.0, 10.0],  # y1 < y0
+        ],
+    )
+    def test_a_reversed_box_at_either_end_is_reversed_box(self, reversed_box):
+        assert status(one_track(F([_A], [1]), F([reversed_box], [1]))) == ["first_observation", "reversed_box"]
+        assert status(one_track(F([reversed_box], [1]), F([_A], [1]))) == ["first_observation", "reversed_box"]
+
+    def test_an_invalid_box_outranks_a_reversed_one(self):
+        reversed_box, bad = [20.0, 10.0, 10.0, 20.0], [10.0, 10.0, np.nan, 20.0]
+        assert status(one_track(F([reversed_box], [1]), F([bad], [1]))) == ["first_observation", "invalid_box"]
+
+    def test_a_box_outside_the_frame_is_measured(self):
+        outside = [_A[0] + 500.0, _A[1] + 500.0, _A[2] + 500.0, _A[3] + 500.0]
+        assert status(one_track(F([_A], [1]), F([outside], [1]))) == ["first_observation", "ok"]
 
     def test_the_successor_of_an_invalid_box_is_invalid_box_though_its_own_box_is_fine(self):
         bad = [10.0, 10.0, np.nan, 20.0]
@@ -575,29 +592,33 @@ def _reference(sequences: Sequence[Sequence[F]], limit: int) -> list[tuple[str, 
     """Each detection's (status, previous target index, frames between), by remembering every track's last sighting."""
     rows = []
     for frames in sequences:
-        last: dict[int, tuple[int, int, bool, Any]] = {}  # id -> (position, target index, box valid, size)
+        last: dict[int, tuple[int, int, str, Any]] = {}  # id -> (position, target index, box kind, size)
         index = 0
         for position, frame in enumerate(frames):
             for box, track in zip(frame.boxes, frame.ids or [-1] * len(frame.boxes), strict=True):
-                valid = bool(np.isfinite(box).all() and box[2] > box[0] and box[3] > box[1])
+                finite = bool(np.isfinite(box).all())
+                kind = "invalid" if not finite or box[2] == box[0] or box[3] == box[1] else "ok"
+                kind = "reversed" if kind == "ok" and (box[2] < box[0] or box[3] < box[1]) else kind
                 if track < 0:
                     rows.append(("untracked", -1, -1))
                 elif track not in last:
                     rows.append(("first_observation", -1, -1))
                 else:
-                    before, before_index, before_valid, before_size = last[track]
+                    before, before_index, before_kind, before_size = last[track]
                     delta = position - before
                     if delta > limit:
                         name = "gap_exceeds_limit"
-                    elif not (valid and before_valid):
+                    elif "invalid" in (kind, before_kind):
                         name = "invalid_box"
+                    elif "reversed" in (kind, before_kind):
+                        name = "reversed_box"
                     elif frame.size is None or before_size is None or frame.size != before_size:
                         name = "geometry_change"
                     else:
                         name = "ok"
                     rows.append((name, before_index, delta))
                 if track >= 0:
-                    last[track] = (position, index, valid, frame.size)
+                    last[track] = (position, index, kind, frame.size)
                 index += 1
     return rows
 

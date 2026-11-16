@@ -63,22 +63,24 @@ def test_box_in_image_fraction_values():
 
 
 @pytest.mark.parametrize(
-    ("bad", "valid_status"),
+    ("bad", "bad_status", "incomplete"),
     [
-        ((5, 5, 5, 15), "ok"),  # zero area
-        ((50, 0, 60, 10), "ok"),  # entirely outside
-        ((15, 5, 5, 15), "incomplete_geometry"),  # reversed
-        ((NAN, 0, 10, 10), "incomplete_geometry"),  # nonfinite
+        ((5, 5, 5, 15), "invalid_box", False),  # zero area
+        ((50, 0, 60, 10), "invalid_box", False),  # entirely outside
+        ((15, 5, 5, 15), "reversed_box", True),  # reversed, and its twin (5, 5, 15, 15) lies inside the image
+        ((NAN, 0, 10, 10), "invalid_box", True),  # nonfinite
     ],
     ids=["zero_area", "outside", "reversed", "nonfinite"],
 )
-def test_box_in_image_fraction_is_nan_for_an_invalid_box(bad, valid_status):
+def test_box_in_image_fraction_is_nan_for_an_invalid_or_reversed_box(bad, bad_status, incomplete):
     result = spatial([(1, 1, 9, 9), bad], stats=ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION)
 
     fraction = result["stats"]["box_in_image_fraction"]
     assert fraction[0] == 1.0
     assert np.isnan(fraction[1])
-    assert details_of(result)["spatial_status"].tolist() == [valid_status, "invalid_box"]
+    assert details_of(result)["spatial_status"].tolist() == ["ok", bad_status]
+    # Only a box that could not be placed leaves the valid box's frame incomplete; a skipped one does not.
+    assert details_of(result)["spatial_incomplete_geometry"].tolist() == [incomplete, False]
 
 
 def test_image_rows_are_nan_and_not_applicable():
@@ -189,16 +191,21 @@ def test_a_bad_peer_does_not_blank_the_frame():
 
     assert value[:2].tolist() == pytest.approx([20 / np.hypot(10, 10)] * 2, rel=1e-6)
     assert index.tolist() == [1, 0, -1]
-    assert status.tolist() == ["incomplete_geometry", "incomplete_geometry", "invalid_box"]
+    assert status.tolist() == ["ok", "ok", "invalid_box"]
     assert np.isnan(value[2])
     assert reason.tolist() == ["", "", ""]
+    flagged = details_of(spatial([(0, 0, 10, 10), (20, 0, 30, 10), (NAN, 0, 5, 5)], stats=NN))
+    assert flagged["spatial_incomplete_geometry"].tolist() == [True, True, False]
 
 
 def test_a_valid_box_whose_only_other_box_is_corrupt_has_no_value_and_no_reason():
     value, index, reason, status = nn([(0, 0, 10, 10), (10, 0, 2, 10)])
 
     assert np.isnan(value[0])
-    assert (index[0], reason[0], status[0]) == (-1, "", "incomplete_geometry")
+    # The row is ok but incomplete, so it cannot say "no neighbor": the reversed box may be one.
+    assert (index[0], reason[0], status[0]) == (-1, "", "ok")
+    assert status[1] == "reversed_box"
+    assert details_of(spatial([(0, 0, 10, 10), (10, 0, 2, 10)], stats=NN))["spatial_incomplete_geometry"][0]
 
 
 def test_duplicate_boxes_read_zero_and_the_lowest_index_is_nearest():
@@ -239,10 +246,16 @@ def test_only_the_selected_statistics_add_details():
     only_fraction = spatial([(1, 1, 9, 9), (20, 5, 30, 15)], stats=ImageStats.SPATIAL_BOX_IN_IMAGE_FRACTION)
     only_nn = spatial([(1, 1, 9, 9), (20, 5, 30, 15)], stats=NN)
 
-    assert set(details_of(only_fraction)) == {"spatial_status"}
+    assert set(details_of(only_fraction)) == {"spatial_status", "spatial_incomplete_geometry"}
     assert set(only_nn["stats"]) == {"nn_distance_norm"}
-    assert set(details_of(only_nn)) == {"spatial_status", "nn_distance_norm_target_index", "nn_distance_norm_reason"}
+    assert set(details_of(only_nn)) == {
+        "spatial_status",
+        "spatial_incomplete_geometry",
+        "nn_distance_norm_target_index",
+        "nn_distance_norm_reason",
+    }
     assert details_of(only_nn)["nn_distance_norm_target_index"].dtype == np.int64
+    assert details_of(only_nn)["spatial_incomplete_geometry"].dtype == np.bool_
     assert details_of(only_nn)["spatial_status"].dtype.kind == "U"
     assert details_of(only_nn)["nn_distance_norm_reason"].dtype.kind == "U"
 
@@ -253,7 +266,9 @@ def test_a_reversed_bounding_box_reads_ok_because_its_constructor_has_swapped_th
     _, _, _, as_tuple = nn([(10, 0, 0, 10), (30, 0, 40, 10)])
 
     assert as_box.tolist() == ["ok", "ok"]
-    assert as_tuple.tolist() == ["invalid_box", "incomplete_geometry"]
+    assert as_tuple.tolist() == ["reversed_box", "ok"]
+    flagged = details_of(spatial([(10, 0, 0, 10), (30, 0, 40, 10)], stats=NN))["spatial_incomplete_geometry"]
+    assert flagged.tolist() == [False, True]
 
 
 COVERED = ImageStats.SPATIAL_COVERED_FRACTION
@@ -402,9 +417,10 @@ def test_covered_fraction_status_and_counts():
 
     assert value[:2].tolist() == [0.5, 0.5]
     assert np.isnan(value[2:]).all()
-    assert details["spatial_status"].tolist() == ["incomplete_geometry"] * 2 + ["invalid_box"] * 3
+    assert details["spatial_status"].tolist() == ["ok"] * 2 + ["invalid_box"] * 3
+    assert details["spatial_incomplete_geometry"].tolist() == [True] * 2 + [False] * 3
     # A valid row compares the one other valid box and skips the zero-area and outside boxes; the nonfinite box is in
-    # neither count, since it sets the status. A row that is not measured says -1 and not 0.
+    # neither count, since it sets the incomplete-geometry detail. A row that is not measured says -1 and not 0.
     assert details["spatial_peer_count"].tolist() == [1, 1, -1, -1, -1]
     assert details["spatial_skipped_count"].tolist() == [2, 2, -1, -1, -1]
     assert details["covered_fraction_reason"].tolist() == [""] * 5
@@ -431,6 +447,7 @@ def test_a_request_for_covered_fraction_alone_needs_no_labels_and_adds_its_own_d
 
     assert set(details_of(only)) == {
         "spatial_status",
+        "spatial_incomplete_geometry",
         "spatial_peer_count",
         "spatial_skipped_count",
         "covered_fraction_reason",
@@ -553,10 +570,11 @@ def test_class_iou_status_and_unmeasured_rows():
     # Rows: the image, the two trusted boxes beside a corrupt one, and the corrupt one.
     assert details["spatial_status"].tolist() == [
         "not_applicable",
-        "incomplete_geometry",
-        "incomplete_geometry",
+        "ok",
+        "ok",
         "invalid_box",
     ]
+    assert details["spatial_incomplete_geometry"].tolist() == [False, True, True, False]
     assert np.isnan(stats["max_iou_same_class"][[0, 3]]).all()
     assert stats["max_iou_same_class"][1:3].tolist() == pytest.approx([0.6, 0.6], rel=1e-6)
     assert details["max_iou_same_class_target_index"].tolist() == [-1, 1, 0, -1]
@@ -606,6 +624,7 @@ def test_the_class_statistics_add_exactly_their_own_details():
 
     assert set(details_of(only_same)) == {
         "spatial_status",
+        "spatial_incomplete_geometry",
         "spatial_peer_count",
         "spatial_skipped_count",
         "max_iou_same_class_target_index",
@@ -613,6 +632,7 @@ def test_the_class_statistics_add_exactly_their_own_details():
     }
     assert set(details_of(only_other)) == {
         "spatial_status",
+        "spatial_incomplete_geometry",
         "spatial_peer_count",
         "spatial_skipped_count",
         "max_iou_other_class_target_index",

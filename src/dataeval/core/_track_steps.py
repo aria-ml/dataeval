@@ -18,8 +18,16 @@ from dataeval.utils._array import as_numpy
 from dataeval.utils.data import validate_dataset
 
 # A row's status is the first of these that applies, so a code is also its rank.
-_STATUS = ("untracked", "first_observation", "gap_exceeds_limit", "invalid_box", "geometry_change", "ok")
-_UNTRACKED, _FIRST, _GAP, _INVALID, _GEOMETRY, _OK = range(len(_STATUS))
+_STATUS = (
+    "untracked",
+    "first_observation",
+    "gap_exceeds_limit",
+    "invalid_box",
+    "reversed_box",
+    "geometry_change",
+    "ok",
+)
+_UNTRACKED, _FIRST, _GAP, _INVALID, _REVERSED, _GEOMETRY, _OK = range(len(_STATUS))
 _NAMES = np.array(_STATUS, dtype=object)
 
 _FACTORS = (
@@ -137,11 +145,17 @@ def _previous_observation(ids: NDArray[np.int64]) -> NDArray[np.int64]:
     return previous
 
 
-def _valid_boxes(boxes: NDArray[np.float64]) -> NDArray[np.bool_]:
-    """Whether each box is finite, ordered and of positive width and height, as read from the stream."""
+def _box_kinds(boxes: NDArray[np.float64]) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
+    """Return which boxes, as read from the stream, are invalid and which are reversed.
+
+    A box is invalid when it is not finite or has zero width or height, and reversed when it is neither and has an edge
+    before the one it should follow.
+    """
     x0, y0, x1, y1 = boxes.T
     with np.errstate(invalid="ignore"):
-        return np.isfinite(boxes).all(axis=1) & (x1 > x0) & (y1 > y0)
+        invalid = ~np.isfinite(boxes).all(axis=1) | (x1 == x0) | (y1 == y0)
+        reversed_ = ~invalid & ((x1 < x0) | (y1 < y0))
+    return invalid, reversed_
 
 
 def _status_codes(
@@ -155,8 +169,9 @@ def _status_codes(
     same_size = readable[now] & readable[before] & (item.width[now] == item.width[before])
     same_size &= item.height[now] == item.height[before]
     code[now[~same_size]] = _GEOMETRY
-    valid = _valid_boxes(item.boxes)
-    code[now[~(valid[now] & valid[before])]] = _INVALID
+    invalid, reversed_ = _box_kinds(item.boxes)
+    code[now[reversed_[now] | reversed_[before]]] = _REVERSED
+    code[now[invalid[now] | invalid[before]]] = _INVALID
     delta = item.position[now] - item.position[before]
     code[now[delta > limit]] = _GAP
     code[previous < 0] = _FIRST
@@ -337,8 +352,9 @@ def track_steps(source: MultiobjectTrackingDataset, *, max_frame_delta: int = 1)
         - ``step_status``: why a row is or is not measured, the first of ``"untracked"`` (a negative track id, or a
           frame that carries none), ``"first_observation"`` (the id has no earlier detection in this item),
           ``"gap_exceeds_limit"`` (``k`` exceeds `max_frame_delta`), ``"invalid_box"`` (either box is not finite, or
-          has a reversed or zero-width or zero-height side), ``"geometry_change"`` (the two frames' pixel sizes are
-          not both readable and equal) and ``"ok"``.
+          has zero width or zero height), ``"reversed_box"`` (either box has an edge before the one it should follow),
+          ``"geometry_change"`` (the two frames' pixel sizes are not both readable and equal) and ``"ok"``. A box
+          outside the frame is measured, since a step between two frames does not depend on the frame's edge.
         - ``step_dx_px``, ``step_dy_px``: the raw difference between the two box centers in pixels, wherever a
           previous observation exists and both centers are finite, whatever the status.
         - ``step_previous_target_index``: the ``target_index`` of the previous observation, -1 for none.

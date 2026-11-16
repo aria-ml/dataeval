@@ -266,5 +266,6 @@ class TestCombining:
         declared = image_stats(Declared({"value_range": (0, 65535)}), boxes=[[BOX]], stats=CONTEXT, per_image=False)
         undeclared = image_stats(Declared({}), boxes=[[BOX]], stats=CONTEXT, per_image=False)
         assert details_of(declared)["context_range_high"].tolist() == [65535.0]
-        assert details_of(undeclared)["context_range_high"].tolist() == [4095.0]
+        # The undeclared image is uint16, which has no interval without a declaration.
+        assert details_of(undeclared)["context_status"].tolist() == ["unknown_range"]
         combine_stats_results([declared, undeclared])

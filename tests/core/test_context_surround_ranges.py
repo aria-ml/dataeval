@@ -68,13 +68,13 @@ class TestDeclaredRange:
             result = run(image)
         assert details_of(result)["context_status"][0] == "unknown_range"
         assert np.isnan(result["stats"]["surround_intensity_mean"][0])
-        assert any(f"no value range could be established, so {WIDE_NAMES} are NaN" in m for m in messages(caplog))
+        assert any("the context statistics are NaN with the status unknown_range" in m for m in messages(caplog))
 
     def test_an_all_nan_image_reads_unknown_range_and_warns(self, caplog):
         with caplog.at_level(logging.WARNING, logger="dataeval"):
             result = run(np.full(SHAPE, np.nan))
         assert details_of(result)["context_status"][0] == "unknown_range"
-        assert any("no value range could be established" in m for m in messages(caplog))
+        assert any("the context statistics are NaN with the status unknown_range" in m for m in messages(caplog))
 
 
 class TestEncodings:
@@ -95,13 +95,15 @@ class TestEncodings:
                 assert result["stats"][stat][0] == pytest.approx(reference["stats"][stat][0], rel=1e-6), (name, stat)
         assert details_of(reference)["context_range_high"][0] == 255.0
 
-    def test_undeclared_uint16_pictures_record_the_range_each_decoded_to_and_differ_by_that_ratio(self):
+    def test_undeclared_uint16_pictures_are_unknown_and_declared_ones_agree_whatever_their_extremes(self):
         a, b = pattern(2800, 100).astype(np.uint16), pattern(2800, 100).astype(np.uint16)
-        a[0, 0, 0], b[0, 0, 0] = 3000, 5000  # one pixel outside the window: it only decides the decoded range
+        a[0, 0, 0], b[0, 0, 0] = 3000, 5000  # one pixel outside the window: the shared decode would differ by it
         result = image_stats([a, b], boxes=[[BOX], [BOX]], stats=CONTEXT, per_image=False)  # type: ignore[arg-type]
-        assert details_of(result)["context_range_high"].tolist() == [4095.0, 65535.0]
-        mean_a, mean_b = result["stats"]["surround_intensity_mean"]
-        assert mean_a / mean_b == pytest.approx(65535 / 4095, rel=1e-6)  # float32 columns
+        assert details_of(result)["context_status"].tolist() == ["unknown_range", "unknown_range"]
+        assert np.isnan(details_of(result)["context_range_high"]).all()
+        declared = image_stats([a, b], boxes=[[BOX], [BOX]], stats=CONTEXT, per_image=False, value_range=(0, 65535))  # type: ignore[arg-type]
+        mean_a, mean_b = declared["stats"]["surround_intensity_mean"]
+        assert mean_a == pytest.approx(mean_b, rel=1e-6)
 
 
 class Sensors:
@@ -159,18 +161,18 @@ class TestBands:
             assert name in details
             assert column_name("nir_", name) not in details, name
 
-    def test_a_group_naming_a_band_the_datum_lacks_is_insufficient_support_and_the_warning_fires(self, caplog):
+    def test_a_group_naming_a_band_the_datum_lacks_is_missing_channel_and_the_warning_fires(self, caplog):
         group = {"nir": ChannelGroup(7, value_range=(0, 4095))}
         with caplog.at_level(logging.WARNING, logger="dataeval"):
             result = image_stats(
                 [cube()], boxes=[[BOX]], stats=CONTEXT, per_image=False, channels=group, value_range=(0, 65535)
             )
-        assert details_of(result)["nir_context_status"].tolist() == ["insufficient_support"]
-        assert details_of(result)["surround_nir_measurable_pixels"].tolist() == [0]
+        assert details_of(result)["nir_context_status"].tolist() == ["missing_channel"]
+        assert details_of(result)["surround_nir_measurable_pixels"].tolist() == [-1]  # nothing was counted
         assert np.isnan(result["stats"]["surround_nir_intensity_mean"][0])
         assert any("names band 7 but the datum carries 4" in m for m in messages(caplog))
 
-    def test_a_group_naming_a_band_the_datum_lacks_is_insufficient_support_with_no_declared_range_too(self, caplog):
+    def test_a_group_naming_a_band_the_datum_lacks_is_missing_channel_with_no_declared_range_too(self, caplog):
         # Nothing was read for want of the band, which is the reason to give, and not that no interval could be found
         # for the all-NaN stand-in that stands in for it.
         cube = np.random.default_rng(1605).random((5, 60, 80))
@@ -178,8 +180,8 @@ class TestBands:
             result = image_stats(
                 [cube], boxes=[[BOX]], stats=CONTEXT, per_image=False, channels={"bad": ChannelGroup(7)}
             )
-        assert details_of(result)["bad_context_status"].tolist() == ["insufficient_support"]
-        assert details_of(result)["surround_bad_measurable_pixels"].tolist() == [0]
+        assert details_of(result)["bad_context_status"].tolist() == ["missing_channel"]
+        assert details_of(result)["surround_bad_measurable_pixels"].tolist() == [-1]  # nothing was counted
         assert details_of(result)["context_status"].tolist() == ["ok"]  # the unnamed view reads the cube
         assert any("names band 7 but the datum carries 5" in m for m in messages(caplog))
         assert not any("no value range could be established for channel group" in m for m in messages(caplog))
@@ -209,11 +211,12 @@ class TestShapes:
         assert details_of(result)["context_status"].tolist() == ["not_applicable"]
         assert np.isnan(result["stats"]["surround_intensity_mean"][0])
 
-    def test_a_boolean_image_has_intensities_of_zero_and_one(self):
+    def test_a_boolean_image_needs_a_declared_range_and_then_has_intensities_of_zero_and_one(self):
         image = np.broadcast_to(np.arange(80) % 2 == 0, SHAPE).copy()
         window = np.zeros((60, 80), dtype=bool)
         window[2:48, 2:48] = True
         window[10:40, 10:40] = False  # the window less the box
-        result = run(image)
+        assert details_of(run(image))["context_status"][0] == "unknown_range"
+        result = run(image, value_range=(0, 1))
         assert result["stats"]["surround_intensity_mean"][0] == pytest.approx(image[0][window].mean(), rel=1e-6)
         assert details_of(result)["context_range_high"][0] == 1.0

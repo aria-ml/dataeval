@@ -11,14 +11,15 @@ Kinds. Each box gets exactly one :class:`Kind`, and the first match wins in this
 (positive area, ``x1 <= 0``, ``y1 <= 0``, ``x0 >= W`` or ``y0 >= H``, the rule `BoundingBox.is_outside` uses, so a box
 that only touches the edge is outside), else ``VALID``.
 
-Status. ``AnnotationContext.status`` is ``"invalid_box"`` when the focal box's own kind is not ``VALID``, else
-``"incomplete_geometry"`` when any other box in the frame is ``NONFINITE`` or ``REVERSED``, else ``"ok"``. The focal's
-own defect wins over a peer's. Zero-area and outside peers are skipped and counted, and never change the status.
+Status. ``AnnotationContext.status`` describes the focal box alone: ``"reversed_box"`` when it is ``REVERSED`` and its
+swapped twin is neither of zero area nor outside, ``"invalid_box"`` when it is any other kind than ``VALID``, else
+``"ok"``. So ``invalid_box`` means what ``DIMENSION_INVALID_BOX`` means, the converted box outside the image, of zero
+area or not finite. ``AnnotationContext.incomplete`` says whether another box in the frame is ``NONFINITE`` or
+``REVERSED``, so that a box that could not be placed may be near the focal one. Zero-area and outside peers are skipped
+and counted, and change neither.
 
-Three meanings of "invalid" differ and are not interchangeable. `BoundingBox.is_valid` is what
-``DIMENSION_INVALID_BOX`` reads, and `BoundingBox.is_clippable` is what ``invalid_box_count`` counts; both read the
-converted box. The status ``invalid_box`` reads the raw coordinates. An XYXY box with reversed edges is swapped by its
-constructor, so it is valid for the first two and ``REVERSED``, hence ``invalid_box``, for the third.
+`BoundingBox.is_valid` is what ``DIMENSION_INVALID_BOX`` reads, and `BoundingBox.is_clippable` is what
+``invalid_box_count`` counts; both read the converted box, whose constructor swaps reversed edges.
 
 An image with no annotation gets an empty context (``N = 0``) rather than None, so a consumer never branches on it. A
 datum with no spatial extent has extent ``(0, 0)``, which makes every box ``OUTSIDE``. A ``None`` entry inside a box
@@ -251,9 +252,9 @@ class AnnotationContext:
                 "the image row has no focal box."
             )
 
-    def status(self, focal: int) -> Literal["ok", "invalid_box", "incomplete_geometry"]:
+    def status(self, focal: int) -> Literal["ok", "invalid_box", "reversed_box"]:
         """
-        Whether the focal box can be trusted, and whether the frame around it is complete.
+        Whether the focal box itself can be read.
 
         Parameters
         ----------
@@ -262,15 +263,24 @@ class AnnotationContext:
 
         Returns
         -------
-        {"ok", "invalid_box", "incomplete_geometry"}
-            ``invalid_box`` when the focal box is not ``VALID``, else ``incomplete_geometry`` when another box in the
-            frame is ``NONFINITE`` or ``REVERSED``, else ``ok``.
+        {"ok", "invalid_box", "reversed_box"}
+            ``reversed_box`` when the box is ``REVERSED`` and the converted box, which the pixel statistics measure
+            and `DIMENSION_INVALID_BOX` judges, is valid; ``invalid_box`` when it is not ``VALID`` otherwise; else
+            ``ok``.
         """
         self._check(focal)
-        kind = self.kind
-        if kind[focal] != Kind.VALID:
-            return "invalid_box"
-        return "incomplete_geometry" if (kind >= Kind.REVERSED).any() else "ok"
+        kind = self.kind[focal]
+        if kind == Kind.VALID:
+            return "ok"
+        if kind == Kind.REVERSED and self._annotations is not None and self._annotations.boxes[focal].is_valid():
+            return "reversed_box"
+        return "invalid_box"
+
+    def incomplete(self, focal: int) -> bool:
+        """Whether another box in the frame is ``NONFINITE`` or ``REVERSED``, so that it could not be placed."""
+        self._check(focal)
+        others = np.delete(self.kind, focal)
+        return bool((others >= Kind.REVERSED).any())
 
     def peers(self, focal: int) -> NDArray[np.intp]:
         """Return the indices of the ``VALID`` boxes other than `focal`, in index order."""

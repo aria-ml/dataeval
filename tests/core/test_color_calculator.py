@@ -124,18 +124,18 @@ class TestStatuses:
         ],
         ids=["gray", "two_channels", "two_dimensional", "one_dimensional"],
     )
-    def test_a_datum_without_the_declared_channels_is_missing_band(self, datum: np.ndarray):
+    def test_a_datum_without_the_declared_channels_is_missing_channel(self, datum: np.ndarray):
         got = measure(datum)
-        assert got["color_status"] == "missing_band"
+        assert got["color_status"] == "missing_channel"
         assert all(math.isnan(got[name]) for name in STATS)
         assert got["color_valid_pixels"] == -1
         assert got["color_hue_reason"] == ""
 
-    def test_an_index_the_datum_does_not_carry_is_missing_band(self):
-        assert measure(solid((1, 2, 3)), channels=(0, 1, 5))["color_status"] == "missing_band"
+    def test_an_index_the_datum_does_not_carry_is_missing_channel(self):
+        assert measure(solid((1, 2, 3)), channels=(0, 1, 5))["color_status"] == "missing_channel"
 
-    def test_an_undeclared_range_on_anything_but_uint8_is_unknown_range(self):
-        got = measure(np.full((3, 8, 8), 0.5, dtype=np.float32), declared=None)
+    def test_an_undeclared_range_on_integers_other_than_uint8_is_unknown_range(self):
+        got = measure(np.full((3, 8, 8), 500, dtype=np.uint16), declared=None)
         assert got["color_status"] == "unknown_range"
         assert math.isnan(got["color_chroma_mean"])
         assert got["color_valid_pixels"] == -1
@@ -189,10 +189,11 @@ class TestViews:
         assert got["color_valid_fraction"] == 1.0
         assert got["color_status"] == "ok"
 
-    def test_a_box_wholly_outside_the_image_has_nothing_to_measure(self):
+    def test_a_box_wholly_outside_the_image_is_an_invalid_box_with_nothing_counted(self):
         got = measure(solid((255, 0, 0), size=20), box=(30, 30, 40, 40))
-        assert got["color_status"] == "insufficient_support"
-        assert got["color_valid_pixels"] == 0
+        assert got["color_status"] == "invalid_box"
+        assert all(math.isnan(got[name]) for name in STATS)
+        assert got["color_valid_pixels"] == -1
         assert math.isnan(got["color_valid_fraction"])
 
     def test_a_truncated_box_with_invalid_pixels_inside_is_still_judged_on_the_inside(self):
@@ -219,11 +220,11 @@ class TestViews:
         assert got["color_excluded_pixels"] == 16
         assert got["color_valid_pixels"] == 0
 
-    def test_a_missing_band_still_reports_the_exclusion(self):
+    def test_a_missing_channel_still_reports_the_exclusion(self):
         exclude = np.zeros((8, 8), dtype=bool)
         exclude[:2] = True
         got = measure(np.zeros((1, 8, 8), dtype=np.uint8), exclude=exclude, view=ViewKind.MASK)
-        assert got["color_status"] == "missing_band"
+        assert got["color_status"] == "missing_channel"
         assert got["color_excluded_pixels"] == 16
 
 
@@ -244,11 +245,13 @@ class TestThroughImageStats:
         assert set(DETAILS) <= set(details_of(result))
         assert {f"background_{name}" for name in DETAILS} <= set(details_of(result))
         assert set(details_of(result)["color_status"].tolist()) == {"ok"}
+        # The background is defined on the image row alone, so the box row's padding says the view does not apply.
+        assert details_of(result)["background_color_status"].tolist() == ["ok", "not_applicable"]
 
     def test_a_mixed_gray_and_rgb_dataset_reads_each_row_by_its_own_channels(self):
         gray, rgb = np.full((1, 8, 8), 100, dtype=np.uint8), solid((255, 0, 0))
         result = image_stats([gray, rgb], stats=COLOR, color_rgb_channels=(0, 1, 2), value_range=(0, 255))
-        assert details_of(result)["color_status"].tolist() == ["missing_band", "ok"]
+        assert details_of(result)["color_status"].tolist() == ["missing_channel", "ok"]
         assert np.isnan(result["stats"]["color_chroma_mean"][0])
         assert result["stats"]["color_chroma_mean"][1] == pytest.approx(104.55, abs=0.01)
 

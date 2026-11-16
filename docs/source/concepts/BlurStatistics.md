@@ -112,14 +112,17 @@ defect. The subsections give the cases where a value is NaN, what moves it, and 
 
 ### Where the values are NaN
 
-A statistic with no reading reports NaN. `blur_edge_width` and `blur_edge_directionality` are NaN when:
+A statistic with no reading reports NaN, and `blur_status` in the details says why. `blur_edge_width` and
+`blur_edge_directionality` are NaN when:
 
 - The picture has fewer than 100 edge points, as a flat picture, a tiny picture and a tiny bounding box do, or the
-  median edge width is 0.
-- A float image holds even one NaN pixel. The answer is withheld and not computed over the part that is left.
-- A bounding box extends past the border of the image.
-- The data has no value range, such as signed float data. A warning names `value_range`. Declare the interval to get a
-  reading, as [When there is no reference](ImageStatistics.md#when-there-is-no-reference) describes.
+  median edge width is 0 (`insufficient_support`).
+- A float image holds even one NaN pixel. The answer is withheld and not computed over the part that is left
+  (`insufficient_support`).
+- A bounding box extends past the border of the image (`insufficient_support`, while `invalid_box` is False), or lies
+  outside it or has zero area (`invalid_box`).
+- The data has no value range, such as signed float data (`unknown_range`). A warning names `value_range`. Declare the
+  interval to get a reading, as [When there is no reference](ImageStatistics.md#when-there-is-no-reference) describes.
 
 `background_blur_edge_width` has its own list. It is NaN when fewer than 100 edge points lie outside the boxes and their
 margin, as a flat background or boxes that cover most of the image leave, or when the median width of those points is 0.
@@ -128,8 +131,9 @@ the edges are found on the whole image, and when the data has no value range. A 
 clipped to the image and is not a NaN case for the background.
 
 Only `blur_edge_directionality` is NaN when fewer than 50 edge points have a horizontal gradient, when fewer than 50
-have a vertical gradient, or when the median edge width of one axis is 0. An image of vertical stripes reads a finite
-`blur_edge_width` and a NaN `blur_edge_directionality`.
+have a vertical gradient, or when the median edge width of one axis is 0, and `blur_edge_directionality_reason` then
+reads `insufficient_axis_support`. An image of vertical stripes reads a finite `blur_edge_width` and a NaN
+`blur_edge_directionality`.
 
 For a video, a sampled frame with too few edge points or a median edge width of 0 reads NaN and is left out of the
 median, and `blur_edge_width_median` is NaN only when no sampled frame has a finite value. The video path reads the

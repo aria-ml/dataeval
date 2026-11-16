@@ -16,21 +16,22 @@ from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
 from dataeval.types import MeasurementSpec
 from dataeval.utils._annotations import AnnotationContext
-from dataeval.utils.preprocessing import ValueRange, normalize_image_shape
+from dataeval.utils.preprocessing import normalize_image_shape
 
 IntBox = tuple[int, int, int, int]
 
 _NOT_APPLICABLE = "not_applicable"
 _INVALID_BOX = "invalid_box"
+_REVERSED_BOX = "reversed_box"
+_MISSING_CHANNEL = "missing_channel"
 _UNKNOWN_RANGE = "unknown_range"
-_EMPTY_RING = "empty_ring"
+_EMPTY_SURROUND = "empty_surround"
 _INSUFFICIENT_SUPPORT = "insufficient_support"
-_INCOMPLETE_GEOMETRY = "incomplete_geometry"
 _OK = "ok"
 # Why a ratio is NaN while its surround is measured: the target, whose pixels it reads, has too few valid ones.
 _INSUFFICIENT_TARGET_SUPPORT = "insufficient_target_support"
 # The statuses that carry a value: every other one is NaN.
-_MEASURED = (_OK, _INCOMPLETE_GEOMETRY)
+_MEASURED = (_OK,)
 _RATIOS = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
 
 
@@ -228,19 +229,10 @@ def _none(status: str, low: float = math.nan, high: float = math.nan) -> _Surrou
     return _Surround(status, math.nan, math.nan, -1, -1, math.nan, -1, math.nan, math.nan, math.nan, low, high)
 
 
-def _interval(value_range: ValueRange) -> tuple[float, float]:
-    """Return the view's interval, or NaN for both where none could be established or its span overflows.
-
-    A span of infinity would map every pixel to 0 or to NaN, which a status that claims a value must not carry.
-    """
-    low, high = float(value_range.pmin), float(value_range.pmax)
-    return (low, high) if value_range.is_known and math.isfinite(high - low) else (math.nan, math.nan)
-
-
 def _status(frame: str, candidate: int, measurable: int, min_pixels: int) -> str:
     """Name the row's status given the frame's: an empty candidate, then too little support, else the frame's."""
     if candidate == 0:
-        return _EMPTY_RING
+        return _EMPTY_SURROUND
     return _INSUFFICIENT_SUPPORT if measurable < min_pixels else frame
 
 
@@ -251,6 +243,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
+        self.warnings: list[str] = []
 
     def get_applicable_flags(self) -> ImageStats:
         """Return which flags this calculator handles."""
@@ -273,20 +266,12 @@ class ContextStatCalculator(Calculator[ImageStats]):
         retained_mask = ~context.coverage[wy0:wy1, wx0:wx1]
         return _Geometry(regions, retained_mask, candidate, int(np.count_nonzero(retained_mask)))
 
-    def _lacks_bands(self) -> bool:
-        """Whether this view is a band group that names a band the datum does not carry."""
-        bands = self.cache.bands
-        return bands is not None and max(bands) >= normalize_image_shape(self.cache.raw).shape[0]
-
     def _unreadable(self, low: float) -> bool:
-        """Whether the view has no interval to read against. A missing band comes first, as nothing was read for it."""
-        return math.isnan(low) and not self._lacks_bands()
+        """Whether the view has no interval to read against."""
+        return math.isnan(low)
 
     def _read(self, geometry: _Geometry, low: float, high: float) -> Reading:
         """Read the surround's pixels over the channels this view selects."""
-        if self._lacks_bands():
-            # A group the datum cannot supply is measured all-or-nothing, as every other statistic does.
-            return Reading(0, math.nan, math.nan, 0.0, math.nan)
         image = normalize_image_shape(self.cache.raw)
         bands = self.cache.bands
         channels = range(image.shape[0]) if bands is None else bands
@@ -299,13 +284,21 @@ class ContextStatCalculator(Calculator[ImageStats]):
         if at is None:
             return _none(_NOT_APPLICABLE)
         context, focal = at
-        low, high = _interval(self.cache.value_range)
+        low, high = self.cache.full_scale or (math.nan, math.nan)
         frame = context.status(focal)
-        if frame == _INVALID_BOX:
-            return _none(_INVALID_BOX, low, high)
+        if frame in (_INVALID_BOX, _REVERSED_BOX):
+            return _none(frame, low, high)
+        if self.cache.lacks_bands:
+            # A group the datum cannot supply is measured all-or-nothing, as every other statistic does.
+            return _none(_MISSING_CHANNEL, low, high)
         geometry = self._geometry(context, focal)
         excluded = (geometry.candidate - geometry.retained) / geometry.candidate if geometry.candidate else math.nan
         if self._unreadable(low):
+            self.warnings.append(
+                "no value range was declared, so the context statistics are NaN with the status unknown_range. Only "
+                "unsigned 8-bit data, and floating-point data within [0, 1] or [0, 255], have a range without a "
+                "declaration: pass value_range=(low, high), or declare it in the datum's metadata."
+            )
             # The counts come from the geometry alone, so they are still true; nothing can be read against no interval.
             return _none(_UNKNOWN_RANGE)._replace(
                 candidate=geometry.candidate, retained=geometry.retained, excluded=excluded
@@ -427,8 +420,11 @@ class ContextStatCalculator(Calculator[ImageStats]):
         A request for a ratio adds the reason a ratio is NaN for want of target pixels, and whether each ratio selected
         rests on its floor. A request for neither returns the details it always did.
         """
-        row = self._surround
-        details: dict[str, list[Any]] = {"context_status": [row.status]}
+        row, at = self._surround, self._focal()
+        # Another box that could not be placed may lie in the surround; the value is still read from the boxes that
+        # could, and this says so. Only a measured row can be incomplete.
+        incomplete = row.status == _OK and at is not None and at[0].incomplete(at[1])
+        details: dict[str, list[Any]] = {"context_status": [row.status], "context_incomplete_geometry": [incomplete]}
         # The geometry is the same in every band group, so only the unnamed view reports it.
         if ViewKind.BAND not in view:
             details["surround_candidate_pixels"] = [row.candidate]
@@ -452,6 +448,7 @@ class ContextStatCalculator(Calculator[ImageStats]):
         """Return the values of the details on a row where no statistic is measured."""
         return {
             "context_status": _NOT_APPLICABLE,
+            "context_incomplete_geometry": False,
             "surround_candidate_pixels": -1,
             "surround_retained_pixels": -1,
             "surround_measurable_pixels": -1,

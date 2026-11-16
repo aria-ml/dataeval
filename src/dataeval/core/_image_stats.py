@@ -701,8 +701,8 @@ def _compute_batch(  # noqa: C901
             warnings_list.append(f"{source}: {w}")
 
         # Gather every calculator's output for this row onto one row
-        reconciled_stats = _reconcile_stats(calculator_stats)
-        reconciled_details = _reconcile_stats(calculator_details)
+        reconciled_stats = _reconcile_stats(calculator_stats, refuse_duplicates=True)
+        reconciled_details = _reconcile_stats(calculator_details, refuse_duplicates=True)
         datum_empty_values.update(empty_values_map)
 
         source = [SourceIndex(i, i_b if box is not None else None)]
@@ -791,7 +791,6 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
         | ImageStats.VISUAL
         | ImageStats.BLUR
         | ImageStats.DIMENSION_DEPTH
-        | ImageStats.CONTEXT
     )
     if normalize_pixel_values:
         needs_range |= flags & ImageStats.PIXEL
@@ -802,7 +801,7 @@ def _reads_a_range(whole_flags: Flag, group_flags: Mapping[str, Flag], normalize
     """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy."""
     return any(
         _unmeasurable_flags(flags, None, normalize_pixel_values)
-        or flags & (ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.COLOR)
+        or flags & (ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.COLOR | ImageStats.CONTEXT)
         for flags in (whole_flags, *group_flags.values())
     )
 
@@ -1234,9 +1233,9 @@ def image_stats(  # noqa: C901
         each box (if per_target=True).
     per_target : bool, default True
         If True and boxes are provided, compute statistics for each bounding box.
-        Has no effect when boxes is None, except that a request for nothing but `ImageStats.SPATIAL` statistics
-        then raises, since they have no box rows to be measured on. At least one of per_image, per_target or
-        per_background must be True.
+        Has no effect when boxes is None, except that a request for nothing but `ImageStats.SPATIAL` and
+        `ImageStats.CONTEXT` statistics then raises, since they have no box rows to be measured on. At least one of
+        per_image, per_target or per_background must be True.
     per_background : bool, default False
         If True and boxes are provided, additionally compute statistics over each
         image's background — every pixel the image's boxes do not cover — describing
@@ -1335,7 +1334,8 @@ def image_stats(  # noqa: C901
         Leave as None for ordinary imagery. An integer image's range is *decoded* from
         its encoding, and the two conventional float spellings of an image — normalized
         to ``[0, 1]``, or 8-bit values held in a float array — are recognized, so
-        ``uint8``, ``uint16`` and ``ToTensor``-style data all need nothing here.
+        ``uint8``, ``uint16`` and ``ToTensor``-style data all need nothing here, except for the
+        context and color statistics below.
 
         Declare it for data whose dynamic range is a property of the sensor rather than
         of a file format: elevation below sea level, mean-centered reflectance,
@@ -1350,9 +1350,10 @@ def image_stats(  # noqa: C901
         A statistic that does not need an interval is unaffected: an unnormalized mean of
         physical values is a perfectly good mean.
 
-        The color statistics (:attr:`~dataeval.flags.ImageStats.COLOR`) never use the decoded interval, which is read
-        off the data's own maximum: they use the declared one, and 255 for an unsigned 8-bit datum, so a 16-bit or float
-        image needs one declared, and is NaN with the status `unknown_range` without.
+        The context and color statistics (:attr:`~dataeval.flags.ImageStats.CONTEXT`,
+        :attr:`~dataeval.flags.ImageStats.COLOR`) never read an integer image's own maximum: they use the declared
+        interval, else ``(0, 255)`` for ``uint8`` and the two float conventions above, so a ``uint16`` image needs one
+        declared, and is NaN with the status `unknown_range` without.
 
         A dataset can declare the interval image by image instead, as a ``(low, high)`` pair under ``value_range`` in
         each datum's metadata, so one collection can hold sensors of different depths. It is read when a requested
@@ -1472,25 +1473,28 @@ def image_stats(  # noqa: C901
         than 0, `surround_min_pixels` not a whole number of 1 or more, or `context_ratio_floor` not a finite number
         greater than 0 and at most 1, whether or not `stats` requests the statistic they set up, or if the datum
         metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a range.
+        Also if two channel groups, or a channel group and the surround's columns, would give two columns or two
+        details one name, which would otherwise keep only the second. Also if `stats` asks only for color statistics
+        and `color_rgb_channels` is not given.
 
     Warns
     -----
     UserWarning
         If `stats` asks for a spatial or context statistic beside others and the call measures no box rows, so those
-        columns are NaN. Also if `stats` asks for the class statistics beside others and `boxes` is given without
-        `labels`, so every label is missing. A request that holds every statistic of `ImageStats.ALL` that needs no
-        box, less the color statistics where `color_rgb_channels` is not given, does not warn in either case: it asks
-        for everything, and the statistics that cannot be measured read NaN.
-        A third warning is for `saturated_atol` given when `stats` does not request
+        columns are NaN, and if it asks for one at all on data that holds no box, said once per call. Also if `stats`
+        asks for the class statistics beside others and `boxes` is given without `labels`, so every label is missing. A
+        request that holds every statistic of `ImageStats.ALL` that needs no box, less the color statistics where
+        `color_rgb_channels` is not given, does not warn in either case: it asks for everything, and the statistics that
+        cannot be measured read NaN. A third warning is for `saturated_atol` given when `stats` does not request
         `ImageStats.PIXEL_SATURATED_FRACTION`, so the setting is ignored, and a fourth for `surround_padding`,
         `surround_min_pixels` or `context_ratio_floor` given a value other than its default when `stats` requests no
         `ImageStats.CONTEXT` statistic, or for `context_ratio_floor` when `stats` requests neither
         `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only statistics
         that read it. A fifth is for the same of `color_min_pixels`, `color_chroma_threshold` and `color_rgb_channels`
-        when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a color statistic and
-        `color_rgb_channels` is not given, so the color statistics are dropped from the request, once per process; a
-        request that holds every statistic of `ImageStats.ALL` that can be measured logs that and does not warn, and
-        every drop is logged.
+        when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a color statistic beside
+        others and `color_rgb_channels` is not given, so the color statistics are dropped from the request, once per
+        process; a request that holds every statistic of `ImageStats.ALL` that can be measured logs that and does not
+        warn, and every drop is logged.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. Likewise for the first request that measures a color statistic (`ImageStats.COLOR`),
@@ -1794,6 +1798,10 @@ def image_stats(  # noqa: C901
             "compute with image_stats, then call the evaluator's from_stats."
         )
         _logger.info(message)
+        # A request that held nothing but color would measure nothing, which reads as a result: refuse it, as a request
+        # for nothing but box statistics on a call with no box rows is refused.
+        if not requested:
+            raise ValueError(f"stats asks only for color statistics, and {message}")
         if not asks_for_all and "color_dropped" not in _NOTICES_GIVEN:
             _NOTICES_GIVEN.add("color_dropped")
             warnings.warn(message, UserWarning, stacklevel=2)
@@ -2206,6 +2214,15 @@ def image_stats(  # noqa: C901
 
     total_boxes = sum(object_count.values())
     total_invalid = sum(invalid_box_count.values())
+    # The data, not the call, held no box: the box statistics are NaN on every row, which a request short of `ALL`
+    # should hear about once, as it does when the call itself measures no box rows.
+    if peer_flags and per_target and not total_boxes and not asks_for_all:
+        warnings.warn(
+            f"{_flag_names(peer_flags)} have a value only on a box's own row, and this call measured no box rows: the "
+            f"data holds no box, so those columns are NaN.",
+            UserWarning,
+            stacklevel=2,
+        )
     _logger.info(
         "image_stats complete: %d images processed, %d total boxes (%d invalid), %d stats computed",
         image_count,

@@ -17,7 +17,8 @@ from dataeval.types import MeasurementSpec
 from dataeval.utils.preprocessing import normalize_image_shape
 
 _OK = "ok"
-_MISSING_BAND = "missing_band"
+_INVALID_BOX = "invalid_box"
+_MISSING_CHANNEL = "missing_channel"
 _UNKNOWN_RANGE = "unknown_range"
 _INSUFFICIENT_SUPPORT = "insufficient_support"
 _ACHROMATIC = "achromatic"
@@ -69,20 +70,6 @@ def _sums_over(
     return sums
 
 
-def _interval(cache: CalculatorCache) -> tuple[float, float] | None:
-    """Return the interval the view's values are mapped from to ``[0, 1]``, or None where there is none to use.
-
-    The declared one: the call's or the datum's own metadata, and not a channel group's. Without a declaration only an
-    unsigned 8-bit datum has one, ``(0, 255)`` by its dtype, whatever its maximum. The shared decode is not used: it
-    reads the data's own maximum, so the same pixels would read as different colors.
-    """
-    if cache.has_declared_range:
-        return float(cache.value_range.pmin), float(cache.value_range.pmax)
-    if getattr(cache.raw, "dtype", None) == np.uint8:
-        return 0.0, 255.0
-    return None
-
-
 @CalculatorRegistry.register(ImageStats)
 class ColorStatCalculator(Calculator[ImageStats]):
     """Calculator for the color of the image, of a box and of the background, from three declared sRGB channels."""
@@ -98,19 +85,21 @@ class ColorStatCalculator(Calculator[ImageStats]):
 
     def _unmeasured(self, window: Any, excluded: int) -> _Reading | None:
         """Return the reading of a view that cannot be measured, or None where it can, in the order of the statuses."""
+        if self.cache.invalid_box:
+            return _none(_INVALID_BOX, excluded)
         channels = self.cache.settings.color.rgb_channels
         # The window is 2-D for a datum with no box and no mask, so channels come from the normalized shape.
         if channels is None or window.ndim < 2 or max(channels) >= normalize_image_shape(window).shape[0]:
             self.warnings.append(
                 "the datum does not have the channels color_rgb_channels names, so the color statistics are NaN with "
-                "the status missing_band. Name the channels this datum has, or drop the datum from the call."
+                "the status missing_channel. Name the channels this datum has, or drop the datum from the call."
             )
-            return _none(_MISSING_BAND, excluded)
-        if _interval(self.cache) is None:
+            return _none(_MISSING_CHANNEL, excluded)
+        if self.cache.full_scale is None:
             self.warnings.append(
-                "no value range was declared, so the color statistics are NaN with the status unknown_range. Only an "
-                "unsigned 8-bit datum has a range without a declaration: pass value_range=(low, high), or declare "
-                "it in the datum's metadata."
+                "no value range was declared, so the color statistics are NaN with the status unknown_range. Only "
+                "unsigned 8-bit data, and floating-point data within [0, 1] or [0, 255], have a range without a "
+                "declaration: pass value_range=(low, high), or declare it in the datum's metadata."
             )
             return _none(_UNKNOWN_RANGE, excluded)
         return None
@@ -127,7 +116,7 @@ class ColorStatCalculator(Calculator[ImageStats]):
         sums = _sums_over(
             window,
             settings.rgb_channels or (0, 1, 2),
-            _interval(self.cache) or (0.0, 1.0),
+            self.cache.full_scale or (0.0, 1.0),
             settings.chroma_threshold,
         )
         # The pixels the view can measure: those of its window inside the datum, less what the mask removes.
@@ -211,7 +200,12 @@ class ColorStatCalculator(Calculator[ImageStats]):
 
     def get_empty_values(self) -> dict[str, Any]:
         """Return the values of the details on a row where no statistic is measured."""
-        return {"color_status": "", "color_valid_pixels": -1, "color_excluded_pixels": -1, "color_hue_reason": ""}
+        return {
+            "color_status": "not_applicable",
+            "color_valid_pixels": -1,
+            "color_excluded_pixels": -1,
+            "color_hue_reason": "",
+        }
 
     def get_handlers(self) -> dict[ImageStats, Handler]:
         """Return mapping of flags to the statistic each produces.

@@ -154,6 +154,8 @@ class StatsResult(AddressedResult[TFactors]):
 
 def _reconcile_stats(
     calculator_output: list[dict[str, list[Any]]],
+    *,
+    refuse_duplicates: bool = False,
 ) -> dict[str, list[Any]]:
     """Merge every calculator's output for one row into a single mapping.
 
@@ -167,14 +169,16 @@ def _reconcile_stats(
     function placed each at its own position in a row block sized by the datum's channel
     count; with that path gone there is no second position for a value to land at, and a
     name produced by two calculators keeps the last one's answer exactly as it did when
-    both wrote to the same ``channel=None`` slot.
+    both wrote to the same ``channel=None`` slot, unless `refuse_duplicates` is set.
 
     Raises
     ------
     ValueError
         When a calculator returns other than one value per name. Every calculator is
         expected to reduce its region to a single reading; more than one has nowhere to go
-        and would otherwise be silently truncated to the first.
+        and would otherwise be silently truncated to the first. Also, with `refuse_duplicates`,
+        when two outputs give one name, which a view and a channel group, or two channel
+        groups, can do between them: the second would overwrite the first.
     """
     reconciled_stats: dict[str, list[Any]] = {}
     for output in calculator_output:
@@ -186,6 +190,13 @@ def _reconcile_stats(
             raise ValueError(
                 f"Calculator produced {len(first_stat_values)} values for a single row; "
                 f"statistics reduce their region to one value each.",
+            )
+        if refuse_duplicates and (repeated := sorted(reconciled_stats.keys() & output.keys())):
+            raise ValueError(
+                f"two parts of this call produce the column {', '.join(map(repr, repeated))}: a channel group's "
+                f"columns take the group's name in front, and the background's and the surround's take `background_` "
+                f"and `surround_` in front, so a group's name can make one of its columns equal another's. Rename a "
+                f"channel group so that every column name differs.",
             )
         reconciled_stats.update(output)
     return reconciled_stats

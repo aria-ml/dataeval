@@ -129,19 +129,22 @@ def measure(image_boxes: list[tuple[np.ndarray, list[Any]]], **kw: Any) -> dict[
 
 def test_the_calculator_agrees_with_a_per_pixel_oracle_on_200_awkward_boxes():
     dense, sparse = random_boxes(1, 140), random_boxes(2, 60)
-    # Three boxes that are not valid, in the sparse image: they are not removed from any ring, and they say so.
+    # Three boxes that are not valid, in the sparse image: they are not removed from any ring, and they say so. The
+    # reversed one's twin (20, 10, 30, 15) lies inside the image, so it is a reversed box and not an invalid one.
     bad = [(NAN, 0, 5, 5), (30, 10, 20, 15), (5, 5, 5, 9)]
     cases = [(picture(1605), dense), (picture(1606), sparse + bad)]
-    validity = [[True] * len(dense), [True] * len(sparse) + [False] * len(bad)]
-    frames = ["ok", "incomplete_geometry"]  # a frame holding a nonfinite or reversed box says so on every other row
+    own = [["ok"] * len(dense), ["ok"] * len(sparse) + ["invalid_box", "reversed_box", "invalid_box"]]
+    incomplete = [False, True]  # a frame holding a nonfinite or reversed box says so on every other measured row
     columns = measure(cases)
 
     row = 0
     measured = 0
-    for (image, boxes), valid, frame in zip(cases, validity, frames, strict=True):
+    for (image, boxes), statuses, frame_incomplete in zip(cases, own, incomplete, strict=True):
+        valid = [status == "ok" for status in statuses]
         for focal in range(len(boxes)):
             if not valid[focal]:
-                assert columns["context_status"][row] == "invalid_box"
+                assert columns["context_status"][row] == statuses[focal], row
+                assert not columns["context_incomplete_geometry"][row], row
                 row += 1
                 continue
             candidate, retained, measurable, mean, std, excluded = oracle(image, boxes, focal, valid, 0.0, 1.0, 0.25)
@@ -152,8 +155,10 @@ def test_the_calculator_agrees_with_a_per_pixel_oracle_on_200_awkward_boxes():
             # The statistic columns are float32, as every statistic's is.
             np.testing.assert_allclose(columns["surround_intensity_mean"][row], mean, rtol=1e-6, atol=1e-7)
             np.testing.assert_allclose(columns["surround_intensity_std"][row], std, rtol=1e-6, atol=1e-7)
-            expected = "empty_ring" if candidate == 0 else (frame if measurable > 0 else "insufficient_support")
+            expected = "empty_surround" if candidate == 0 else ("ok" if measurable > 0 else "insufficient_support")
             assert columns["context_status"][row] == expected, row
+            # Only a measured row can be incomplete: the value is read from the boxes that could be placed.
+            assert columns["context_incomplete_geometry"][row] == (frame_incomplete and expected == "ok"), row
             measured += measurable > 0
             row += 1
     assert row == len(columns["context_status"]) == 203
@@ -189,11 +194,10 @@ def test_the_ratios_agree_with_a_per_pixel_oracle_on_awkward_boxes():
     bad = [(NAN, 0, 5, 5), (30, 10, 20, 15), (5, 5, 5, 9)]  # not removed from any ring, and they say so
     cases = [(light_picture(1605), dense), (light_picture(1606), sparse + bad), (lit_picture(), LIT_BOXES)]
     validity = [[True] * len(dense), [True] * len(sparse) + [False] * len(bad), [True] * len(LIT_BOXES)]
-    frames = ["ok", "incomplete_geometry", "ok"]
     columns = measure(cases)
 
     row = valued = unsupported = floored = 0
-    for (image, boxes), valid, frame in zip(cases, validity, frames, strict=True):
+    for (image, boxes), valid in zip(cases, validity, strict=True):
         for focal in range(len(boxes)):
             if not valid[focal]:
                 assert math.isnan(columns["target_surround_contrast"][row]), row
@@ -203,8 +207,8 @@ def test_the_ratios_agree_with_a_per_pixel_oracle_on_awkward_boxes():
             candidate, _, measurable, mean, std, _ = oracle(image, boxes, focal, valid, 0.0, 1.0, 0.25)
             fraction, target = target_oracle(image, boxes[focal], 0.0, 1.0)
             assert columns["target_valid_fraction"][row] == pytest.approx(fraction, abs=1e-12), row
-            status = "empty_ring" if candidate == 0 else (frame if measurable > 0 else "insufficient_support")
-            expected = ratio_oracle(fraction, target, mean, std, status in ("ok", "incomplete_geometry"))
+            status = "empty_surround" if candidate == 0 else ("ok" if measurable > 0 else "insufficient_support")
+            expected = ratio_oracle(fraction, target, mean, std, status == "ok")
             # The statistic columns are float32, as every statistic's is.
             for name, value in zip(("target_surround_contrast", "signal_clutter_ratio"), expected[:2], strict=True):
                 np.testing.assert_allclose(columns[name][row], value, rtol=1e-6, atol=1e-6, err_msg=f"{name} {row}")

@@ -186,7 +186,7 @@ class TestEndpointRule:
     @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int64, np.uint64, np.float16, np.float32, np.float64])
     def test_a_signed_integer_a_uint64_and_a_float_have_no_dtype_endpoint(self, dtype: Any):
         row = measure(np.full((1, 3, 3), 1, dtype=dtype))
-        assert row["saturated_status"] == "unknown_upper"
+        assert row["saturated_status"] == "unknown_range"
         assert np.isnan(row["saturated_fraction"])
         assert np.isnan(row["saturated_upper"])
         assert row["saturated_upper_rule"] == ""
@@ -195,7 +195,7 @@ class TestEndpointRule:
 
     def test_floats_in_zero_to_one_need_a_stated_endpoint(self):
         data = np.array([[[0.0, 0.5], [1.0, 1.0]]], dtype=np.float32)
-        assert measure(data)["saturated_status"] == "unknown_upper"
+        assert measure(data)["saturated_status"] == "unknown_range"
         assert measure(data, upper=1)["saturated_fraction"] == 0.5
         assert measure(data, declared=(0, 1))["saturated_fraction"] == 0.5
 
@@ -289,52 +289,57 @@ class TestCounting:
 class TestStatus:
     """Each status, and the values every detail takes under it."""
 
-    def test_a_view_with_no_finite_value_is_no_finite_values_but_still_names_its_endpoint(self):
+    def test_a_view_with_no_finite_value_is_insufficient_support_but_still_names_its_endpoint(self):
         row = measure(np.full((1, 3, 3), np.nan), declared=(0, 1))
-        assert row["saturated_status"] == "no_finite_values"
+        assert row["saturated_status"] == "insufficient_support"
         assert np.isnan(row["saturated_fraction"])
         assert np.isnan(row["saturated_above_range_fraction"])
         assert row["saturated_valid_fraction"] == 0.0
         assert (row["saturated_upper"], row["saturated_upper_rule"]) == (1.0, "declared")
 
-    def test_a_view_of_only_infinities_has_no_finite_values_either(self):
+    def test_a_view_of_only_infinities_is_insufficient_support_either(self):
         row = measure(np.full((1, 3, 3), np.inf), upper=1)
-        assert row["saturated_status"] == "no_finite_values"
+        assert row["saturated_status"] == "insufficient_support"
         assert row["saturated_valid_fraction"] == 0.0
 
-    def test_a_box_wholly_outside_the_image_is_an_empty_region_with_none_of_it_valid(self):
+    def test_a_box_wholly_outside_the_image_is_an_invalid_box_with_none_of_it_valid(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
         row = measure(data, box=box_at(data.shape, 50, 50, 60, 60))
-        assert row["saturated_status"] == "empty_region"
+        assert row["saturated_status"] == "invalid_box"
         assert np.isnan(row["saturated_fraction"])
         assert row["saturated_valid_fraction"] == 0.0
         assert (row["saturated_upper"], row["saturated_upper_rule"]) == (255.0, "dtype")
 
-    def test_a_zero_area_box_is_an_empty_region(self):
+    def test_a_zero_area_box_is_an_invalid_box(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
-        assert measure(data, box=box_at(data.shape, 4, 4, 4, 4))["saturated_status"] == "empty_region"
+        assert measure(data, box=box_at(data.shape, 4, 4, 4, 4))["saturated_status"] == "invalid_box"
 
-    def test_a_window_the_exclusion_covers_entirely_is_an_empty_region_with_no_valid_fraction(self):
+    def test_a_window_the_exclusion_covers_entirely_is_insufficient_support_with_no_valid_fraction(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
         row = measure(data, exclude=np.ones((10, 12), dtype=bool))
-        assert row["saturated_status"] == "empty_region"
+        assert row["saturated_status"] == "insufficient_support"
         assert np.isnan(row["saturated_valid_fraction"])
 
-    def test_a_band_group_the_datum_cannot_supply_is_an_empty_region(self):
+    def test_a_band_group_the_datum_cannot_supply_is_missing_channel(self):
         data = np.zeros((3, 10, 12), dtype=np.uint16)
         row = measure(data, bands=(5,), view=ViewKind.BAND)
-        assert row["saturated_status"] == "empty_region"
+        assert row["saturated_status"] == "missing_channel"
         assert row["saturated_valid_fraction"] == 0.0
 
-    def test_an_empty_region_outranks_an_unknown_endpoint(self):
+    def test_an_invalid_box_outranks_an_unknown_endpoint(self):
         data = np.zeros((3, 10, 12), dtype=np.float32)
         row = measure(data, box=box_at(data.shape, 50, 50, 60, 60))
-        assert row["saturated_status"] == "empty_region"
+        assert row["saturated_status"] == "invalid_box"
         assert np.isnan(row["saturated_upper"])
         assert row["saturated_upper_rule"] == ""
 
-    def test_no_finite_values_outranks_an_unknown_endpoint(self):
-        assert measure(np.full((1, 3, 3), np.nan))["saturated_status"] == "no_finite_values"
+    def test_a_missing_channel_outranks_an_unknown_endpoint(self):
+        row = measure(np.zeros((3, 10, 12), dtype=np.float32), bands=(5,), view=ViewKind.BAND)
+        assert row["saturated_status"] == "missing_channel"
+        assert np.isnan(row["saturated_upper"])
+
+    def test_an_unknown_endpoint_outranks_no_finite_values(self):
+        assert measure(np.full((1, 3, 3), np.nan))["saturated_status"] == "unknown_range"
 
     def test_an_inverted_box_reads_the_window_it_describes(self):
         data = np.full((3, 10, 12), 255, dtype=np.uint8)
@@ -356,13 +361,20 @@ class TestStatus:
         assert row["saturated_fraction"] == 0.5
 
     @pytest.mark.parametrize(
-        "shape",
-        [(), (7,), (10, 12), (2, 3, 10, 12), (3, 0, 0), (0,)],
+        ("shape", "status"),
+        [
+            ((), "ok"),
+            ((7,), "ok"),
+            ((10, 12), "ok"),
+            ((2, 3, 10, 12), "ok"),
+            ((3, 0, 0), "insufficient_support"),  # no position to count
+            ((0,), "insufficient_support"),
+        ],
         ids=["0-d", "1-D", "2-D", "4-D", "zero-size 3-D", "empty 1-D"],
     )
-    def test_degenerate_shapes_answer_without_raising(self, shape: tuple[int, ...]):
+    def test_degenerate_shapes_answer_without_raising(self, shape: tuple[int, ...], status: str):
         row = measure(np.zeros(shape, dtype=np.uint8))
-        assert row["saturated_status"] in {"ok", "empty_region"}
+        assert row["saturated_status"] == status
 
 
 def run(images: list[np.ndarray], **kw: Any) -> tuple[dict[str, Any], dict[str, Any], list[Any]]:
@@ -392,7 +404,7 @@ class TestThroughImageStats:
         assert [s.target for s in index] == [None, 0]
         assert stats["background_saturated_fraction"][0] == 0.0  # the clipped box is outside the background
         assert np.isnan(stats["background_saturated_fraction"][1])
-        assert details["background_saturated_status"].tolist() == ["ok", ""]
+        assert details["background_saturated_status"].tolist() == ["ok", "not_applicable"]
         assert details["background_saturated_upper_rule"].tolist() == ["dtype", ""]
         assert np.isnan(details["background_saturated_upper"][1])
 
@@ -409,11 +421,11 @@ class TestThroughImageStats:
         assert details["nir_saturated_upper_rule"].tolist() == ["declared"]
         assert details["nir_saturated_status"].tolist() == ["ok"]
 
-    def test_a_band_group_the_image_cannot_supply_reports_an_empty_region_beside_a_measured_image(self):
+    def test_a_band_group_the_image_cannot_supply_reports_missing_channel_beside_a_measured_image(self):
         image = np.full((3, 8, 8), 255, dtype=np.uint8)
         stats, details, _ = run([image], channels={"nir": 5})
         assert stats["saturated_fraction"][0] == 1.0
-        assert details["nir_saturated_status"].tolist() == ["empty_region"]
+        assert details["nir_saturated_status"].tolist() == ["missing_channel"]
 
     def test_normalize_pixel_values_changes_nothing(self):
         image = np.random.default_rng(0).integers(0, 256, size=(3, 8, 8), dtype=np.uint8)
