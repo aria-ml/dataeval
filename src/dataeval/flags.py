@@ -25,8 +25,9 @@ class ImageStats(Flag):
 
     A statistic's column is its flag's name after the first underscore, in lower case: `PIXEL_MEAN` gives `mean` and
     `VISUAL_BLUR_EDGE_WIDTH` gives `blur_edge_width`. A channel group's name goes in front of a column and a view's name
-    in front of that (`background_nir_mean`), except that the surround's own columns put the surround first
-    (`surround_nir_intensity_mean`).
+    (`background_`, or `surround_` with `per_surround`) in front of that (`background_nir_mean`,
+    `surround_color_lightness_mean`), except that the context statistics' own surround columns put the surround first
+    (`surround_nir_intensity_mean`). Two parts of a call that would give one name raise.
 
     The statistics added in 1.3 report a status for each row in their details (`blur_status`, `spatial_status`,
     `saturated_status`, `context_status`, `color_status`). A value is NaN unless its status is `ok`, and every status
@@ -236,7 +237,7 @@ class ImageStats(Flag):
     luminance, which gamma and the sensor's response separate from the values. They are not `VISUAL_CONTRAST`, the
     range of an image's percentiles over their mean.
 
-    The surround statistics are NaN on an image's own row, and for a box whose surround holds fewer than
+    The context statistics are NaN on an image's own row, and for a box whose surround holds fewer than
     `surround_min_pixels` such pixels, 32 by default, which a small box can fall under and a box whose window other
     boxes cover always does. A ratio is NaN wherever the surround is. Those settings and the floor are keywords of
     :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes one also returns details, in
@@ -288,19 +289,23 @@ class ImageStats(Flag):
 
     The channels are declared and not detected, so a value is only as true as the declaration, and a view is measured
     only if it holds at least `color_min_pixels` valid pixels and 90% of its pixels are valid. They are defined for the
-    image, each box and the background, and not for a channel group. A request that includes them also returns
+    image, each box, the background and, with `per_surround`, each box's surround, and not for a channel group. The
+    surround is the box widened by `surround_padding` of its width and height on every side, rounded outward and
+    clipped to the image, with every box of the image masked out, so its columns are named `surround_color_*`, and a
+    box whose surround the other boxes cover reads `insufficient_support`. A request that includes them also returns
     details, in the result's ``details``, one value per row:
 
     - `color_status` : `ok`, `not_applicable`, `invalid_box`, `missing_channel` (the datum has fewer than two
       dimensions or lacks a declared channel), `unknown_range` or `insufficient_support`
     - `color_valid_fraction` : The valid pixels over the pixels of the view that lie inside the datum and that the
-      background mask does not remove, so a box that leaves the image is judged on the part inside it
-    - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the background mask removes.
-      -1 where the view is not measured, and the exclusion is still reported
+      view's mask does not remove, so a box that leaves the image is judged on the part inside it
+    - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the view's mask removes. -1
+      where the view is not measured, and the exclusion is still reported
     - `color_hue_reason` : `achromatic` where hue is NaN for want of a chromatic pixel, else empty
 
     The result's ``measurement_specs`` records the declared channels, the settings and the range that the call
-    declared, so `combine_stats_results` refuses results measured with different ones. `QualityGate` does not accept
+    declared, and for the surround its region and `surround_padding`, so `combine_stats_results` refuses results
+    measured with different ones. `QualityGate` does not accept
     them, and `Outliers` and `Duplicates` cannot take the keyword, so compute with `image_stats` and pass the result
     to their ``from_stats``. See :doc:`/concepts/ImageStatistics` for what they do not establish.
 

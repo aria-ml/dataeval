@@ -2,7 +2,7 @@ __all__ = []
 
 import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Flag
 from functools import partial, reduce
 from itertools import chain, repeat, zip_longest
@@ -20,9 +20,11 @@ from dataeval._log import get_logger
 from dataeval.config import get_max_processes
 from dataeval.core._calculators._base import Calculator, ContextNeed, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
+from dataeval.core._calculators._contextstats import surround_regions
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.core._compute_stats import (
     BACKGROUND_PREFIX,
+    SURROUND_PREFIX,
     StatsRequest,
     StatsResult,
     _produced_stat_names,
@@ -204,6 +206,7 @@ class BatchPlan:
     normalize_pixel_values: bool
     per_background: bool
     background_calculators: Sequence[tuple[type[Any], Flag]]
+    surround_calculators: Sequence[tuple[type[Any], Flag]]
     declared_range: tuple[float, float] | None
     reads_range: bool
     band_plans: Mapping[str, BandPlan]
@@ -317,6 +320,59 @@ def _collect_calculator_stats(
             warnings.extend(calculator.warnings)
         del calculator
     return stats_list, details_list, empty_values_map, warnings
+
+
+_NO_SURROUND_ROWS = (
+    "per_surround=True but this call measured no box rows, so every surround_ column is NaN: a surround is measured on "
+    "a box's own row. Pass boxes= (or an object-detection dataset) and leave per_target=True."
+)
+
+
+def _surround_pass(
+    calculators: Sequence[tuple[type[Any], Flag]],
+    datum: NDArray[Any],
+    box: BoundingBox | None,
+    exclude: NDArray[np.bool_] | None,
+    extent: tuple[int, int],
+    *,
+    normalize_pixel_values: bool,
+    value_range: ValueRange,
+    settings: ImageStatsConfig,
+) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any]]:
+    """Measure a row's surround: its box widened by `surround_padding`, with every box of the datum masked out.
+
+    The window is built from the converted box, so a reversed box is measured as its swapped twin. A converted box that
+    is not valid is handed to the cache as it is, and unmasked as on its own row, so a statistic judges ``invalid_box``
+    as `DIMENSION_INVALID_BOX` does and counts nothing excluded from a surround that does not exist.
+    A row with no box has no surround: it is measured over a zero-area box, which every statistic answers at once, and
+    every value is then replaced by its empty value, so the names are those of a measured row.
+    """
+    # ponytail: an unmeasured row is named by a pass over a zero-area box, since a calculator declares its detail names
+    # only by returning them. A class-level declaration of the names would replace it.
+    if box is None:
+        # A datum with no image plane cannot be cropped, and its statistics answer it without a box.
+        region = BoundingBox(0, 0, 0, 0, image_shape=datum.shape) if datum.ndim >= 2 else None
+    elif box.is_valid():
+        window = surround_regions(np.asarray(box.xyxy, dtype=np.float64), extent, settings.surround.padding).window
+        region = BoundingBox(*window, image_shape=datum.shape)
+    else:
+        region, exclude = box, None
+    stats, details, empties, _ = _collect_calculator_stats(
+        calculators,
+        datum,
+        region,
+        normalize_pixel_values=normalize_pixel_values,
+        exclude=exclude,
+        prefix=SURROUND_PREFIX,
+        value_range=value_range,
+        view=ViewKind.SURROUND | ViewKind.MASK,
+        settings=settings,
+    )
+    if box is None:
+        stats = [{name: [empties.get(name, np.nan)] for name in output} for output in stats]
+        details = [{name: [empties.get(name, np.nan)] for name in output} for output in details]
+    # Its warnings are dropped: the row's own pass ran the same statistics on the same datum and said the same.
+    return stats, details, empties
 
 
 def _band_ranges(
@@ -459,6 +515,7 @@ def _compute_batch(  # noqa: C901
     normalize_pixel_values = plan.normalize_pixel_values
     per_background = plan.per_background
     background_calculators = plan.background_calculators
+    surround_calculators = plan.surround_calculators
     band_plans = plan.band_plans
     wide_band_names = plan.wide_band_names
     unmeasurable_names = plan.unmeasurable_names
@@ -529,11 +586,13 @@ def _compute_batch(  # noqa: C901
     # is a region of an image plane — a 1-D datum has none to carve out. `CalculatorCache`
     # already documents `exclude` as ignored below three dimensions, so this only stops
     # the mask being built at all rather than changing what any statistic answers.
-    exclude = boxes_to_mask(datum.shape, boxes or ()) if per_background and datum.ndim >= 2 else None
+    # The surround masks the same boxes, so it reads the same mask.
+    masked = per_background or bool(surround_calculators)
+    exclude = boxes_to_mask(datum.shape, boxes or ()) if masked and datum.ndim >= 2 else None
     # `.all()` is vacuously True for a datum with no pixels, which is an absence of
     # background rather than a full one; `.mean()` on it is NaN and warns. Neither is
     # worth saying, so an empty datum takes neither path.
-    if exclude is not None and exclude.size and exclude.all():
+    if per_background and exclude is not None and exclude.size and exclude.all():
         warnings_list.append(f"{i}: Boxes cover the entire datum, leaving no background to measure")
 
     # Read once per datum for the same reason `value_range` is: a group's interval is a
@@ -694,6 +753,21 @@ def _compute_batch(  # noqa: C901
                 calculator_details.extend(details)
                 empty_values_map.update(empties)
                 calc_warnings.extend(warns)
+
+        if surround_calculators:
+            stats, details, empties = _surround_pass(
+                surround_calculators,
+                datum,
+                box,
+                exclude,
+                extent,
+                normalize_pixel_values=normalize_pixel_values,
+                value_range=value_range,
+                settings=settings,
+            )
+            calculator_stats.extend(stats)
+            calculator_details.extend(details)
+            empty_values_map.update(empties)
 
         # Thread calculator warnings with index context
         for w in calc_warnings:
@@ -1043,6 +1117,13 @@ def _aggregate_batch(
     warning_list.extend(result.warnings_list)
 
 
+def _stamped(spec: MeasurementSpec, view: ViewKind, settings: ImageStatsConfig) -> MeasurementSpec:
+    """Record the surround's region and padding on a spec measured over it, so every family that answers it agrees."""
+    if ViewKind.SURROUND not in view:
+        return spec
+    return replace(spec, region="surround", config={**spec.config, "surround_padding": settings.surround.padding})
+
+
 def _measurement_specs(plan: BatchPlan) -> dict[str, MeasurementSpec]:
     """Return what each column the call's calculators describe was measured with, under the column's own name.
 
@@ -1065,8 +1146,15 @@ def _measurement_specs(plan: BatchPlan) -> dict[str, MeasurementSpec]:
                 band.background_calculators,
                 declared,
             ))
+    if plan.surround_calculators:
+        views.append((
+            SURROUND_PREFIX,
+            ViewKind.SURROUND | ViewKind.MASK,
+            plan.surround_calculators,
+            plan.declared_range,
+        ))
     return {
-        column_name(prefix, name): spec
+        column_name(prefix, name): _stamped(spec, view, plan.settings)
         for prefix, view, calculators, declared in views
         for calculator, flags in calculators
         for name, spec in calculator.measurement_specs(flags, view, plan.settings, declared).items()
@@ -1161,6 +1249,7 @@ def image_stats(  # noqa: C901
     per_image: bool = True,
     per_target: bool = True,
     per_background: bool = False,
+    per_surround: bool = False,
     channels: Mapping[str, ChannelGroupLike] | None = None,
     normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
@@ -1275,12 +1364,21 @@ def image_stats(  # noqa: C901
         .. versionchanged:: 1.3
             Adds ``background_blur_edge_width`` (and ``background_<group>_blur_edge_width``) when `stats` includes
             :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR_EDGE_WIDTH`, which was skipped for the background before.
+    per_surround : bool, default False
+        If True, also measure the color statistics over each box's surround, on the box's own row, as
+        ``surround_color_*`` columns and details. The surround is the box widened by `surround_padding`, as for the
+        context statistics, with every box of the image masked out, and it is judged as the color section of
+        :class:`~dataeval.flags.ImageStats` describes. A small box has a small surround, which reads
+        `insufficient_support` below `color_min_pixels`; an image's own row reads NaN. Experimental, as the color
+        statistics are. :class:`~dataeval.data.DetectionCrops` with ``region="surround"`` crops a different region.
+
+        .. versionadded:: 1.3
     channels : Mapping[str, ChannelGroupLike] or None, default None
         Named groups of bands to measure separately, alongside the whole image.
 
         Each group becomes a set of columns named ``<group>_<statistic>`` on the same rows
-        the unprefixed statistics occupy (the surround's own columns put the surround first,
-        ``surround_<group>_intensity_mean``) — the band-axis counterpart of `per_background`,
+        the unprefixed statistics occupy (see the naming rule in :class:`~dataeval.flags.ImageStats`)
+        — the band-axis counterpart of `per_background`,
         which does the same thing to the spatial axes. The two compose, giving
         ``background_nir_brightness``.
 
@@ -1388,7 +1486,8 @@ def image_stats(  # noqa: C901
         How far the surround of a box reaches past it, as a share of the box's own width and of its height, greater
         than 0. The default and the default of `surround_min_pixels` are the choice of the issue that added the
         statistic and no study picked them, so they are provisional. Checked on every call, and ignored, with a warning,
-        when `stats` requests no `ImageStats.CONTEXT` statistic. Recorded in `measurement_specs`.
+        when `stats` requests no `ImageStats.CONTEXT` statistic and `per_surround` is False. Recorded in
+        `measurement_specs`.
 
         .. versionadded:: 1.3
     surround_min_pixels : int, default 32
@@ -1407,8 +1506,8 @@ def image_stats(  # noqa: C901
         floor under that residue protects nothing; one under 3e-39 overflows the float32 column to infinity. The
         default, one level of an 8-bit image, is the choice of the issue that added the statistics and no study picked
         it, so it is provisional. Checked on every call, and ignored, with a warning, when `stats` requests neither
-        ratio. Recorded in `measurement_specs` with the two ratios and not with the surround statistics, which do not
-        read it.
+        ratio. Recorded in `measurement_specs` with the two ratios and not with the surround's mean and spread, which
+        do not read it.
 
         .. versionadded:: 1.3
     color_rgb_channels : Sequence[int] or None, default None
@@ -1452,7 +1551,7 @@ def image_stats(  # noqa: C901
           `stats`, present only when a requested statistic reports some. They are not statistics. See
           :class:`~dataeval.flags.ImageStats` for the spatial, saturation and context ones
         - measurement_specs: Mapping[str, MeasurementSpec] - What each column that depends on a setting was measured
-          with, present only when a requested statistic records some, as saturation and the surround statistics do.
+          with, present only when a requested statistic records some, as saturation and the context statistics do.
           :func:`~dataeval.core.combine_stats_results` refuses results whose specs differ
 
         Output is sorted by (item_index, box_index) ascending,
@@ -1488,13 +1587,15 @@ def image_stats(  # noqa: C901
         cannot be measured read NaN. A third warning is for `saturated_atol` given when `stats` does not request
         `ImageStats.PIXEL_SATURATED_FRACTION`, so the setting is ignored, and a fourth for `surround_padding`,
         `surround_min_pixels` or `context_ratio_floor` given a value other than its default when `stats` requests no
-        `ImageStats.CONTEXT` statistic, or for `context_ratio_floor` when `stats` requests neither
-        `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only statistics
-        that read it. A fifth is for the same of `color_min_pixels`, `color_chroma_threshold` and `color_rgb_channels`
-        when `stats` requests no `ImageStats.COLOR` statistic. A sixth is when `stats` requests a color statistic beside
-        others and `color_rgb_channels` is not given, so the color statistics are dropped from the request, once per
-        process; a request that holds every statistic of `ImageStats.ALL` that can be measured logs that and does not
-        warn, and every drop is logged.
+        `ImageStats.CONTEXT` statistic (except `surround_padding` with `per_surround`), or for `context_ratio_floor`
+        when `stats` requests neither `ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST` nor
+        `ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO`, the only statistics that read it. A fifth is for the same of
+        `color_min_pixels`, `color_chroma_threshold` and `color_rgb_channels` when `stats` requests no
+        `ImageStats.COLOR` statistic. A sixth is when `stats` requests a color statistic beside others and
+        `color_rgb_channels` is not given, so the color statistics are dropped from the request, once per process; a
+        request that holds every statistic of `ImageStats.ALL` that can be measured logs that and does not warn, and
+        every drop is logged. A seventh is for `per_surround` when no requested statistic is measured over a surround,
+        and otherwise when the call measures no box rows, once per call.
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. Likewise for the first request that measures a color statistic (`ImageStats.COLOR`),
@@ -1841,7 +1942,8 @@ def image_stats(  # noqa: C901
             ("surround_min_pixels", "min_pixels"),
             ("context_ratio_floor", "intensity_floor"),
         )
-        if getattr(given, field) != getattr(defaults, field)
+        # The surround view reads the padding as well.
+        if getattr(given, field) != getattr(defaults, field) and not (per_surround and keyword == "surround_padding")
     ]
     ratios = ImageStats.CONTEXT_TARGET_SURROUND_CONTRAST | ImageStats.CONTEXT_SIGNAL_CLUTTER_RATIO
     if unused and not requested & ImageStats.CONTEXT:
@@ -2051,6 +2153,19 @@ def image_stats(  # noqa: C901
                 stacklevel=2,
             )
 
+    # The surround is measured on box rows by the statistics that declare the view, from the unnamed entry alone.
+    surround_calculators = _calculators_for_view(calculators, ViewKind.SURROUND | ViewKind.MASK) if per_surround else []
+    if per_surround and not surround_calculators:
+        warnings.warn(
+            "per_surround=True but none of the requested statistics are measured over a box's surround, so no "
+            "surround_ column will be returned. Only the color statistics are: request ImageStats.COLOR, in the "
+            "unnamed entry of a stats mapping, with color_rgb_channels.",
+            UserWarning,
+            stacklevel=2,
+        )
+    elif per_surround and not per_target:
+        warnings.warn(_NO_SURROUND_ROWS, UserWarning, stacklevel=2)
+
     # What the request asks beyond each box's own pixels, over every pass that will run: the unnamed view, each band
     # group, and the background of both. Declared per statistic on its handler, so a request that names none builds no
     # context and reads no labels.
@@ -2162,6 +2277,7 @@ def image_stats(  # noqa: C901
         normalize_pixel_values=normalize_pixel_values,
         per_background=per_background,
         background_calculators=background_calculators,
+        surround_calculators=surround_calculators,
         declared_range=value_range,
         reads_range=_reads_a_range(whole_flags, group_flags, normalize_pixel_values),
         band_plans=band_plans,
@@ -2216,6 +2332,8 @@ def image_stats(  # noqa: C901
     total_invalid = sum(invalid_box_count.values())
     # The data, not the call, held no box: the box statistics are NaN on every row, which a request short of `ALL`
     # should hear about once, as it does when the call itself measures no box rows.
+    if surround_calculators and per_target and not total_boxes:
+        warnings.warn(_NO_SURROUND_ROWS, UserWarning, stacklevel=2)
     if peer_flags and per_target and not total_boxes and not asks_for_all:
         warnings.warn(
             f"{_flag_names(peer_flags)} have a value only on a box's own row, and this call measured no box rows: the "

@@ -100,7 +100,7 @@ class SelectChannels(Operation):
     computed per-instance rather than fixed per-class. A luminance mix is a new pixel
     value at every position, so it moves every pixel and visual statistic, the blur
     statistics included, and it is not at a saturation endpoint where one channel was, and
-    it is not the mean over the channels that the surround statistics read --
+    it is not the mean over the channels that the context statistics read --
     all of which the ``"gray"`` form therefore declares.
 
     Examples

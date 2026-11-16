@@ -21,7 +21,7 @@ v1.1
 - - [](v1.3.md)
   - v1.2 to v1.3: experimental blur statistics for `image_stats` (`ImageStats.BLUR`) and `video_stats`
     (`VideoStats.BLUR`), and `Resize`, `SelectChannels("gray")` and `TorchvisionTransform` declare the image ones as
-    invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors, and surround statistics
+    invalidated. Spatial statistics (`ImageStats.SPATIAL`) compare a box with its neighbors, and context statistics
     (`ImageStats.CONTEXT`) read the intensity of the pixels around a box and how far the box stands from it. A
     saturation statistic (`ImageStats.PIXEL_SATURATED_FRACTION`, in `PIXEL`) reports the share of values at a clipping
     endpoint, so the default image statistics gain a column, and `DetectionCrops` declares it invalidated too.

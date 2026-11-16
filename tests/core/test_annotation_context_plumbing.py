@@ -66,6 +66,7 @@ def plan(**overrides: Any) -> BatchPlan:
         "normalize_pixel_values": False,
         "per_background": False,
         "background_calculators": [],
+        "surround_calculators": [],
         "declared_range": None,
         "reads_range": False,
         "band_plans": {},

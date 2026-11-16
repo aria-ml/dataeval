@@ -190,7 +190,7 @@ class Indices(Operation):
     **Keep a plan's items to see them.** Without `exclude`, a plan of whole items keeps exactly the items it
     names, which shows what would be removed: ``View(dataset, Indices(plan))``.
 
-    **It declares the spatial and surround statistics invalidated** (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``)
+    **It declares the spatial and context statistics invalidated** (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``)
     when `exclude` removes rows inside items, because the neighbors a box is measured against are then gone and a target
     reads as isolated, with their pixels back in its surround.
 
