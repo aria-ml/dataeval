@@ -59,7 +59,7 @@ class Crop(Operation):
     invalidates : ImageStats or None, default None
         Override the statistics this operation declares it invalidates. Leave as ``None``
         for the computed default: every dimension statistic except ``channels`` and
-        ``depth``, which a crop preserves, and the spatial and surround statistics, since boxes are
+        ``depth``, which a crop preserves, and the spatial and context statistics, since boxes are
         clipped to the region and those left outside it are dropped. ``PIXEL`` and ``VISUAL`` are
         deliberately not declared — cropping out an overlay makes those statistics *more* faithful.
 

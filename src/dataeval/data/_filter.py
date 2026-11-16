@@ -200,7 +200,7 @@ class Filter(Operation):
     **The vocabulary is unchanged**, so a filtered view keeps every class index; :class:`Relabel` compacts it. The
     detections left behind are renumbered from 0, as after :class:`Indices`.
 
-    **It declares the spatial and surround statistics invalidated** (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``)
+    **It declares the spatial and context statistics invalidated** (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``)
     unless ``drop="items"``, because removing detections removes the neighbors a box is measured against, and a target
     then reads as isolated, with their pixels back in its surround.
 

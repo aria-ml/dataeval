@@ -258,6 +258,11 @@ The color statistics, `color_lightness_mean`, `color_chroma_mean`, `color_achrom
 ⚠️. `ImageStats.ALL` includes them, and `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of {func}`.image_stats`
 do not.
 
+With `per_surround=True` they are also measured over each box's surround, the box widened by `surround_padding` with
+every box of the image masked out, so a box's color can be set beside the color it is seen against
+(`color_lightness_mean` beside `surround_color_lightness_mean`). A small box has a small surround, and one with fewer
+than `color_min_pixels` valid pixels reads NaN with the status `insufficient_support`.
+
 Nothing in the pixels says which channels are red, green and blue, or that they are sRGB, so you declare them with
 `color_rgb_channels`: `(0, 1, 2)` for an RGB image and `(2, 1, 0)` for a BGR one. Without it the color statistics are
 dropped from the request with a notice, and a request for `ImageStats.ALL` leaves them out and logs it. The values are
@@ -321,7 +326,7 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
 the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
-clipped to the new canvas and those left outside it are dropped, the surround statistics, because the surround of a box
+clipped to the new canvas and those left outside it are dropped, the context statistics, because the surround of a box
 is made of interpolated pixels, and the saturation statistic, because a resize returns floats, which have no dtype
 endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
 resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source
@@ -330,9 +335,9 @@ two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. 
 statistics now describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows
 the three responses.
 
-The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, surround and
+The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, context and
 saturation statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"`
-declares the blur, saturation and surround statistics too, because a luminance mix changes which picture is read. Random
+declares the blur, saturation and context statistics too, because a luminance mix changes which picture is read. Random
 transforms are seeded for each datum from the datum's `id`, so the view is stable: the statistics pass, the embedding
 pass and the duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built through
 {class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because provenance records the `repr` of

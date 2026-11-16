@@ -368,8 +368,7 @@ output identifies whether each row corresponds to a full image or to a specific
 bounding box within an image.
 
 Bands are addressed with `channels=`, which names groups of them and measures
-each group jointly, returning `<group>_<statistic>` columns on the same rows (the surround's own columns put the
-surround first, `surround_<group>_intensity_mean`):
+each group jointly, returning `<group>_<statistic>` columns on the same rows:
 `channels={"r": 0, "g": 1, "b": 2}` for RGB, or
 `channels={"visible": range(0, 30), "nir": range(30, 70)}` for a hyperspectral
 cube. Because they are columns rather than rows, band statistics reach

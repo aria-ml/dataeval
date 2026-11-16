@@ -125,7 +125,7 @@ class Relabel(Operation):
         (an image-classification datum whose class is OOV is dropped; an
         object-detection detection that is OOV is dropped, and an image left with
         no detections is dropped unless ``drop_empty=False``). ``"raise"`` raises if
-        any source class is OOV. ``"drop"`` declares the spatial and surround statistics
+        any source class is OOV. ``"drop"`` declares the spatial and context statistics
         (``ImageStats.SPATIAL`` and ``ImageStats.CONTEXT``) invalidated, since the neighbors of a box can be dropped,
         and either value declares the two class statistics (``SPATIAL_MAX_IOU_SAME_CLASS`` and
         ``SPATIAL_MAX_IOU_OTHER_CLASS``), since a relabel changes which boxes share a class.

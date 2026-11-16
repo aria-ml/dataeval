@@ -355,9 +355,10 @@ class ContextStatCalculator(Calculator[ImageStats]):
     ) -> dict[str, MeasurementSpec]:
         """Record each statistic's settings, and the range the call or a channel group declared.
 
-        The surround statistics record the padding and the support floor. A ratio also records the share of valid target
-        pixels it needs and the floor under its denominator, which decide its value, so results of a ratio measured with
-        different ones refuse to combine and results of the surround statistics still combine with older ones.
+        The surround intensity statistics record the padding and the support floor. A ratio also records the share of
+        valid target pixels it needs and the floor under its denominator, which decide its value, so results of a ratio
+        measured with different ones refuse to combine and results of the surround intensity statistics still combine
+        with older ones.
 
         Without a declared range each image's interval is its own metadata's, or what its dtype decodes to, and the spec
         reads the same for all of them, as it does for saturation: the interval each row used is in its details, which

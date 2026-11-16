@@ -210,10 +210,11 @@ class ColorStatCalculator(Calculator[ImageStats]):
     def get_handlers(self) -> dict[ImageStats, Handler]:
         """Return mapping of flags to the statistic each produces.
 
-        Defined over the whole datum and over a masked region, as the issue lists the image, a box and the background,
-        and not over a band group: `color_rgb_channels` indexes the datum's own channels.
+        Defined over the whole datum, over a masked region and over a box's surround, as the issues list the image, a
+        box, the background and the surround, and not over a band group: `color_rgb_channels` indexes the datum's own
+        channels.
         """
-        views = ViewKind.WHOLE | ViewKind.MASK
+        views = ViewKind.WHOLE | ViewKind.MASK | ViewKind.SURROUND
         return {
             ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN: Handler("color_lightness_mean", self._lightness, views),
             ImageStats.VISUAL_COLOR_CHROMA_MEAN: Handler("color_chroma_mean", self._chroma, views),

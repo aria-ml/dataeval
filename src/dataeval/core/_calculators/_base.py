@@ -32,11 +32,16 @@ class ViewKind(Flag):
         A named subset of the channel axis. Statistics that reduce over pixel values
         answer differently per band and so belong here; pure geometry restates the
         unprefixed value under a new name and does not.
+    SURROUND : ViewKind
+        The pixels around a box, which is how ``per_surround`` measures what a box is seen against: the box widened by
+        ``surround_padding`` on every side, with every box of the image masked out. Always passed with `MASK`, so a
+        statistic that answers it reads a masked region. Not in `ALL_VIEWS`: a statistic answers it by declaring it.
     """
 
     WHOLE = auto()
     MASK = auto()
     BAND = auto()
+    SURROUND = auto()
 
 
 # Every view, for a statistic that is a NaN-aware reduction over the values themselves —
