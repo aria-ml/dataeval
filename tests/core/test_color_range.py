@@ -18,7 +18,13 @@ pytestmark = [
     pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning"),
 ]
 
-STATS = ["color_lightness_mean", "color_chroma_mean", "color_achromatic_fraction", "color_hue_cos", "color_hue_sin"]
+STATS = [
+    "color_lightness_mean",
+    "color_chroma_mean",
+    "color_achromatic_fraction",
+    "color_hue_cos_mean",
+    "color_hue_sin_mean",
+]
 
 
 def details_of(result: Any) -> Any:

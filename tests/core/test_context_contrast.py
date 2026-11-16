@@ -34,7 +34,7 @@ BOX = (10, 10, 20, 20)
 RING = 156
 DEFAULT_FLOOR = 1 / 255
 RATIOS = ("target_surround_contrast", "signal_clutter_ratio")
-NEW_DETAILS = ("contrast_reason", "target_surround_contrast_floored", "signal_clutter_ratio_floored")
+NEW_DETAILS = ("context_ratio_reason", "target_surround_contrast_floored", "signal_clutter_ratio_floored")
 
 
 def two_valued(low: float, high: float) -> np.ndarray:
@@ -113,7 +113,7 @@ class TestValues:
         assert row["target_surround_contrast"] == pytest.approx(2.0, rel=1e-6)
         assert row["signal_clutter_ratio"] == pytest.approx(4.0, rel=1e-6)
         assert (row["target_surround_contrast_floored"], row["signal_clutter_ratio_floored"]) == (False, False)
-        assert row["contrast_reason"] == ""
+        assert row["context_ratio_reason"] == ""
 
     def test_the_sign_is_kept(self):
         # a darker target: (0.1 - 0.6) over 0.6, and over the standard deviation 0.1
@@ -133,7 +133,9 @@ class TestValues:
         target[:, :5] = 0.2
         row = measure(ring_image(target, two_valued(0.1, 0.3)), [BOX, (10, 10, 15, 20)])
         assert row["context_status"] == "ok"
-        assert row["surround_mean"] == pytest.approx(0.2, abs=1e-12)  # the peer lies inside the target, not the ring
+        assert row["surround_intensity_mean"] == pytest.approx(
+            0.2, abs=1e-12
+        )  # the peer lies inside the target, not the ring
         assert row["target_surround_contrast"] == pytest.approx(2.0, rel=1e-6)
         assert row["signal_clutter_ratio"] == pytest.approx(4.0, rel=1e-6)
 
@@ -205,32 +207,32 @@ class TestSupport:
     def test_half_a_target_keeps_the_status_and_the_surround_and_drops_the_ratios(self):
         row = measure(self.with_invalid(50))
         assert row["context_status"] == "ok"
-        assert row["surround_mean"] == pytest.approx(0.2, abs=1e-12)
-        assert row["surround_std"] == pytest.approx(0.1, abs=1e-12)
+        assert row["surround_intensity_mean"] == pytest.approx(0.2, abs=1e-12)
+        assert row["surround_intensity_std"] == pytest.approx(0.1, abs=1e-12)
         assert row["target_valid_fraction"] == 0.5
         assert_ratios_are_nan(row)
-        assert row["contrast_reason"] == "insufficient_target_support"
+        assert row["context_ratio_reason"] == "insufficient_target_support"
         assert (row["target_surround_contrast_floored"], row["signal_clutter_ratio_floored"]) == (False, False)
 
     def test_a_fraction_of_exactly_the_minimum_passes_and_just_under_it_does_not(self):
         at, under = measure(self.with_invalid(10)), measure(self.with_invalid(11))
         assert at["target_valid_fraction"] == 0.9
         assert at["target_surround_contrast"] == pytest.approx(2.0, rel=1e-6)
-        assert at["contrast_reason"] == ""
+        assert at["context_ratio_reason"] == ""
         assert math.isnan(under["target_surround_contrast"])
-        assert under["contrast_reason"] == "insufficient_target_support"
+        assert under["context_ratio_reason"] == "insufficient_target_support"
 
     def test_a_target_with_no_valid_pixel_is_not_a_measurement(self):
         row = measure(self.with_invalid(100))
         assert row["target_valid_fraction"] == 0.0
         assert_ratios_are_nan(row)
-        assert row["contrast_reason"] == "insufficient_target_support"
+        assert row["context_ratio_reason"] == "insufficient_target_support"
 
     def test_a_target_with_no_valid_pixel_is_refused_even_where_the_minimum_is_zero(self):
         # The share is 0.0, which a minimum of 0 accepts, but there is no mean to divide by.
         row = measure(self.with_invalid(100), minimum=0.0)
         assert_ratios_are_nan(row)
-        assert row["contrast_reason"] == "insufficient_target_support"
+        assert row["context_ratio_reason"] == "insufficient_target_support"
 
     def test_the_mean_is_over_the_valid_pixels_only(self):
         # 10 pixels outside the interval are not clipped to 1, and not counted: the mean is that of the other 90
@@ -256,7 +258,7 @@ class TestSupport:
         row = measure(datum, boxes, focal, **kw)
         assert row["context_status"] == status
         assert_ratios_are_nan(row)
-        assert row["contrast_reason"] == ""
+        assert row["context_ratio_reason"] == ""
         assert (row["target_surround_contrast_floored"], row["signal_clutter_ratio_floored"]) == (False, False)
 
     def test_incomplete_geometry_keeps_both_ratios(self):
@@ -271,10 +273,10 @@ class TestDetails:
     def test_details_follow_the_flags_that_read_them(self):
         datum = ring_image(0.6, two_valued(0.1, 0.3))
         for flags, expected in (
-            (ImageStats.CONTEXT_SURROUND_MEAN, set()),
-            (ImageStats.CONTEXT_SURROUND_STD, set()),
-            (CONTRAST, {"contrast_reason", "target_surround_contrast_floored"}),
-            (CLUTTER, {"contrast_reason", "signal_clutter_ratio_floored"}),
+            (ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN, set()),
+            (ImageStats.CONTEXT_SURROUND_INTENSITY_STD, set()),
+            (CONTRAST, {"context_ratio_reason", "target_surround_contrast_floored"}),
+            (CLUTTER, {"context_ratio_reason", "signal_clutter_ratio_floored"}),
             (CONTRAST | CLUTTER, set(NEW_DETAILS)),
             (CONTEXT, set(NEW_DETAILS)),
         ):
@@ -301,16 +303,16 @@ class TestDetails:
         details = details_of(result)
         assert details["target_surround_contrast_floored"].dtype == bool
         assert details["signal_clutter_ratio_floored"].dtype == bool
-        assert details["contrast_reason"].dtype.kind == "U"
+        assert details["context_ratio_reason"].dtype.kind == "U"
         assert details["target_surround_contrast_floored"].tolist().count(True) == 1  # the box's row alone
-        assert set(details["contrast_reason"].tolist()) == {""}
-        assert len(details["contrast_reason"]) == 2  # the item's background-only row, and the box
+        assert set(details["context_ratio_reason"].tolist()) == {""}
+        assert len(details["context_ratio_reason"]) == 2  # the item's background-only row, and the box
 
     def test_a_request_for_one_ratio_adds_only_its_own_columns(self):
         result = image_stats([ring_image(0.6, two_valued(0.1, 0.3))], boxes=[[BOX]], stats=CONTRAST, per_image=False)
         assert set(result["stats"]) == {"target_surround_contrast"}
         assert {n for n in details_of(result) if n in NEW_DETAILS} == {
-            "contrast_reason",
+            "context_ratio_reason",
             "target_surround_contrast_floored",
         }
 
@@ -325,7 +327,7 @@ class TestChannelGroups:
         stats, details = result["stats"], details_of(result)
         assert stats["g_target_surround_contrast"][0] == pytest.approx(-0.5 / 0.6, rel=1e-6)
         assert stats["g_signal_clutter_ratio"][0] == pytest.approx(-5.0, rel=1e-6)
-        assert details["g_contrast_reason"].tolist() == [""]
+        assert details["g_context_ratio_reason"].tolist() == [""]
         assert details["g_target_surround_contrast_floored"].tolist() == [False]
         assert details["g_signal_clutter_ratio_floored"].tolist() == [False]
         # the unnamed view reads all three channels, so its values are not the band's
@@ -339,14 +341,14 @@ class TestNothingElseMoves:
         "context_status",
         "surround_candidate_pixels",
         "surround_retained_pixels",
-        "ring_peer_excluded_fraction",
+        "surround_peer_excluded_fraction",
         "surround_measurable_pixels",
         "surround_valid_fraction",
         "target_valid_fraction",
         "context_range_low",
         "context_range_high",
     }
-    SURROUND = ImageStats.CONTEXT_SURROUND_MEAN | ImageStats.CONTEXT_SURROUND_STD
+    SURROUND = ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN | ImageStats.CONTEXT_SURROUND_INTENSITY_STD
 
     @staticmethod
     def run(stats: ImageStats) -> Any:
@@ -355,17 +357,23 @@ class TestNothingElseMoves:
         return image_stats([image], boxes=[boxes], stats=stats, per_image=False)
 
     def test_the_surround_statistics_alone_return_the_columns_details_and_specs_they_always_did(self):
-        result = self.run(ImageStats.CONTEXT_SURROUND_MEAN)
-        assert set(result["stats"]) == {"surround_mean"}
+        result = self.run(ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN)
+        assert set(result["stats"]) == {"surround_intensity_mean"}
         assert set(result["details"]) == self.OLD_DETAILS
-        assert set(result["measurement_specs"]) == {"surround_mean"}
-        assert dict(result["measurement_specs"]["surround_mean"].config) == {"padding": 0.25, "min_pixels": 32}
+        assert set(result["measurement_specs"]) == {"surround_intensity_mean"}
+        assert dict(result["measurement_specs"]["surround_intensity_mean"].config) == {
+            "padding": 0.25,
+            "min_pixels": 32,
+        }
 
     @pytest.mark.parametrize("other", [CONTEXT, CONTRAST, ImageStats.ALL], ids=["context", "contrast", "all"])
     def test_every_older_column_is_equal_whether_or_not_the_ratios_are_requested(self, other):
         plain, more = self.run(self.SURROUND), self.run(other | self.SURROUND)
-        assert more["stats"]["surround_mean"].dtype == plain["stats"]["surround_mean"].dtype
-        for group, names in (("stats", {"surround_mean", "surround_std"}), ("details", self.OLD_DETAILS)):
+        assert more["stats"]["surround_intensity_mean"].dtype == plain["stats"]["surround_intensity_mean"].dtype
+        for group, names in (
+            ("stats", {"surround_intensity_mean", "surround_intensity_std"}),
+            ("details", self.OLD_DETAILS),
+        ):
             for name in names:
                 np.testing.assert_array_equal(plain[group][name], more[group][name], err_msg=f"{group} {name}")
 
@@ -376,7 +384,7 @@ class TestTheFloorKeyword:
         image = ring_image(0.8, np.full(RING, 0.5))  # a constant ring, so the spread is 0 and the floor divides
         floor = DEFAULT_FLOOR if floor is None else floor
         return image_stats(
-            [image], boxes=[[BOX]], stats=stats, per_image=False, value_range=(0.0, 1.0), surround_intensity_floor=floor
+            [image], boxes=[[BOX]], stats=stats, per_image=False, value_range=(0.0, 1.0), context_ratio_floor=floor
         )
 
     def test_the_floor_reaches_the_ratio_and_its_flag(self):
@@ -390,11 +398,11 @@ class TestTheFloorKeyword:
         specs = self.run(0.5)["measurement_specs"]
         assert specs["target_surround_contrast"].config["intensity_floor"] == 0.5
         assert specs["signal_clutter_ratio"].config["intensity_floor"] == 0.5
-        assert "intensity_floor" not in specs["surround_mean"].config
+        assert "intensity_floor" not in specs["surround_intensity_mean"].config
 
     def test_the_floor_changes_no_surround_column(self):
         default, wide = self.run(), self.run(0.5)
-        for name in ("surround_mean", "surround_std"):
+        for name in ("surround_intensity_mean", "surround_intensity_std"):
             np.testing.assert_array_equal(default["stats"][name], wide["stats"][name], err_msg=name)
 
 
@@ -406,7 +414,7 @@ class TestSpecs:
         return dict(result.get("measurement_specs", {}))
 
     def test_the_four_statistics_record_their_specs(self):
-        assert set(self.specs()) == {"surround_mean", "surround_std", *RATIOS}
+        assert set(self.specs()) == {"surround_intensity_mean", "surround_intensity_std", *RATIOS}
 
     def test_the_surround_spec_is_the_one_main_recorded(self):
         old = MeasurementSpec(
@@ -420,7 +428,7 @@ class TestSpecs:
             declared_range=None,
         )
         specs = self.specs()
-        assert specs["surround_mean"] == specs["surround_std"] == old
+        assert specs["surround_intensity_mean"] == specs["surround_intensity_std"] == old
 
     @pytest.mark.parametrize("name", RATIOS)
     def test_a_ratio_records_the_settings_that_decide_its_value(self, name):
@@ -442,6 +450,6 @@ class TestSpecs:
         assert {s.declared_range for s in specs.values()} == {(0.0, 1.0)}
 
     def test_a_request_records_only_the_specs_of_the_statistics_it_holds(self):
-        assert set(self.specs(ImageStats.CONTEXT_SURROUND_MEAN)) == {"surround_mean"}
+        assert set(self.specs(ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN)) == {"surround_intensity_mean"}
         assert set(self.specs(CONTRAST)) == {"target_surround_contrast"}
         assert set(self.specs(CLUTTER)) == {"signal_clutter_ratio"}

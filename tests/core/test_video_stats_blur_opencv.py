@@ -35,7 +35,7 @@ def test_blur_samples_is_ignored_without_a_blur_flag(stats):
     video_stats(cast(Any, [_stream(3)]), stats=stats, blur_samples=0)
 
 
-@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_LEVEL, VideoStats.ALL])
+@pytest.mark.parametrize("stats", [VideoStats.BLUR, VideoStats.BLUR_EDGE_WIDTH, VideoStats.ALL])
 def test_any_blur_flag_or_all_warns_experimental(stats):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -60,7 +60,7 @@ def test_a_persistence_request_does_not_warn_about_blur():
 
 def test_the_blur_warning_is_given_once_per_process():
     with pytest.warns(ExperimentalWarning, match="VideoStats.BLUR"):
-        video_stats(cast(Any, [_stream(3)]), stats=VideoStats.BLUR_LEVEL)
+        video_stats(cast(Any, [_stream(3)]), stats=VideoStats.BLUR_EDGE_WIDTH)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ExperimentalWarning)
         video_stats(cast(Any, [_stream(3)]), stats=VideoStats.BLUR)

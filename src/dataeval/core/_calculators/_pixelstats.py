@@ -320,7 +320,7 @@ class PixelStatCalculator(Calculator[ImageStats]):
         for all of them, since the per-row endpoint is in the details, which are not compared when results are
         combined. Upgrade is recording what each image declared, which would refuse any two collections that differ.
         """
-        if not flags & ImageStats.PIXEL_SATURATION:
+        if not flags & ImageStats.PIXEL_SATURATED_FRACTION:
             return {}
         saturation = settings.saturation
         if declared_range is not None:
@@ -328,7 +328,7 @@ class PixelStatCalculator(Calculator[ImageStats]):
         else:
             policy, declared = "inferred", None
         return {
-            "saturation": MeasurementSpec(
+            "saturated_fraction": MeasurementSpec(
                 algorithm="saturation",
                 version="1",
                 units="fraction",
@@ -344,15 +344,15 @@ class PixelStatCalculator(Calculator[ImageStats]):
 
     def details(self, flags: ImageStats, view: ViewKind = ViewKind.WHOLE) -> dict[str, list[Any]]:  # noqa: ARG002
         """Say how the saturation was measured, when it was asked for."""
-        if not flags & ImageStats.PIXEL_SATURATION:
+        if not flags & ImageStats.PIXEL_SATURATED_FRACTION:
             return {}
         reading = self._saturation
         return {
-            "saturation_status": [reading.status],
-            "saturation_valid_fraction": [reading.valid_fraction],
-            "saturation_above_range_fraction": [reading.above_range_fraction],
-            "saturation_upper": [reading.upper],
-            "saturation_upper_rule": [reading.rule],
+            "saturated_status": [reading.status],
+            "saturated_valid_fraction": [reading.valid_fraction],
+            "saturated_above_range_fraction": [reading.above_range_fraction],
+            "saturated_upper": [reading.upper],
+            "saturated_upper_rule": [reading.rule],
         }
 
     def _histogram(self) -> list[Any]:
@@ -368,8 +368,8 @@ class PixelStatCalculator(Calculator[ImageStats]):
             "histogram": [np.nan] * 256,  # Histogram with 256 bins
             # A row that does not measure it, such as a box row of a background pass, has no status and no rule. Without
             # a string default the padded column would hold the text 'nan'.
-            "saturation_status": "",
-            "saturation_upper_rule": "",
+            "saturated_status": "",
+            "saturated_upper_rule": "",
         }
 
     def get_handlers(self) -> dict[ImageStats, Handler]:
@@ -389,5 +389,5 @@ class PixelStatCalculator(Calculator[ImageStats]):
             ImageStats.PIXEL_MISSING: Handler("missing", self._missing, ALL_VIEWS),
             ImageStats.PIXEL_ZEROS: Handler("zeros", self._zeros, ALL_VIEWS),
             ImageStats.PIXEL_HISTOGRAM: Handler("histogram", self._histogram, ALL_VIEWS),
-            ImageStats.PIXEL_SATURATION: Handler("saturation", self._saturation_fraction, ALL_VIEWS),
+            ImageStats.PIXEL_SATURATED_FRACTION: Handler("saturated_fraction", self._saturation_fraction, ALL_VIEWS),
         }

@@ -6,7 +6,13 @@ from dataeval.flags import ImageStats
 
 pytestmark = pytest.mark.required
 
-COLUMNS = ["color_lightness_mean", "color_chroma_mean", "color_achromatic_fraction", "color_hue_cos", "color_hue_sin"]
+COLUMNS = [
+    "color_lightness_mean",
+    "color_chroma_mean",
+    "color_achromatic_fraction",
+    "color_hue_cos_mean",
+    "color_hue_sin_mean",
+]
 
 
 def test_the_names_split_into_the_issues_column_names():

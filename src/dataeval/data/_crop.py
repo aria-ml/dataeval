@@ -17,7 +17,7 @@ from dataeval.utils.preprocessing import normalize_image_shape
 # than the source. Channel count and bit depth are untouched — a crop is a slice, not a
 # resample — and ``PIXEL``/``VISUAL`` are deliberately absent: cropping out an overlay
 # *improves* those statistics, which is the reason to do it. The SPATIAL and CONTEXT statistics change as well: boxes
-# are clipped to the region and those left outside it are dropped, and a ring is cut by the region's edge.
+# are clipped to the region and those left outside it are dropped, and a surround is cut by the region's edge.
 _INVALIDATES = (
     (ImageStats.DIMENSION & ~(ImageStats.DIMENSION_CHANNELS | ImageStats.DIMENSION_DEPTH))
     | ImageStats.SPATIAL

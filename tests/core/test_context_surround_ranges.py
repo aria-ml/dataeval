@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from dataeval.core import image_stats
+from dataeval.core._compute_stats import column_name
 from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import ChannelGroup
 
@@ -21,7 +22,8 @@ BOX = (10, 10, 40, 40)  # a 30 x 30 box: its window is (2, 2, 48, 48), so 1,216 
 CANDIDATE = 1216
 SHAPE = (3, 60, 80)
 WIDE_NAMES = (
-    "CONTEXT_SURROUND_MEAN, CONTEXT_SURROUND_STD, CONTEXT_TARGET_SURROUND_CONTRAST, CONTEXT_SIGNAL_CLUTTER_RATIO"
+    "CONTEXT_SURROUND_INTENSITY_MEAN, CONTEXT_SURROUND_INTENSITY_STD, CONTEXT_TARGET_SURROUND_CONTRAST, "
+    "CONTEXT_SIGNAL_CLUTTER_RATIO"
 )
 
 
@@ -52,7 +54,7 @@ class TestDeclaredRange:
         image[1, 2, 3] = np.nan
         result = run(image, value_range=(0.0, 1.0))
         details = details_of(result)
-        assert result["stats"]["surround_mean"][0] == pytest.approx(
+        assert result["stats"]["surround_intensity_mean"][0] == pytest.approx(
             0.5, rel=1e-6
         )  # a clipped 1.5 would move it; float32 column
         assert details["surround_measurable_pixels"][0] == CANDIDATE - 2
@@ -65,7 +67,7 @@ class TestDeclaredRange:
         with caplog.at_level(logging.WARNING, logger="dataeval"):
             result = run(image)
         assert details_of(result)["context_status"][0] == "unknown_range"
-        assert np.isnan(result["stats"]["surround_mean"][0])
+        assert np.isnan(result["stats"]["surround_intensity_mean"][0])
         assert any(f"no value range could be established, so {WIDE_NAMES} are NaN" in m for m in messages(caplog))
 
     def test_an_all_nan_image_reads_unknown_range_and_warns(self, caplog):
@@ -89,7 +91,7 @@ class TestEncodings:
         }
         reference = means["uint8"]
         for name, result in means.items():
-            for stat in ("surround_mean", "surround_std"):
+            for stat in ("surround_intensity_mean", "surround_intensity_std"):
                 assert result["stats"][stat][0] == pytest.approx(reference["stats"][stat][0], rel=1e-6), (name, stat)
         assert details_of(reference)["context_range_high"][0] == 255.0
 
@@ -98,7 +100,7 @@ class TestEncodings:
         a[0, 0, 0], b[0, 0, 0] = 3000, 5000  # one pixel outside the window: it only decides the decoded range
         result = image_stats([a, b], boxes=[[BOX], [BOX]], stats=CONTEXT, per_image=False)  # type: ignore[arg-type]
         assert details_of(result)["context_range_high"].tolist() == [4095.0, 65535.0]
-        mean_a, mean_b = result["stats"]["surround_mean"]
+        mean_a, mean_b = result["stats"]["surround_intensity_mean"]
         assert mean_a / mean_b == pytest.approx(65535 / 4095, rel=1e-6)  # float32 columns
 
 
@@ -139,8 +141,10 @@ class TestBands:
             [cube()], boxes=[[BOX]], stats=CONTEXT, per_image=False, channels=self.GROUP, value_range=(0, 65535)
         )
         stats, details = result["stats"], details_of(result)
-        assert stats["nir_surround_mean"][0] == pytest.approx(3000 / 4095, rel=1e-6)
-        assert stats["surround_mean"][0] == pytest.approx((3 * 1000 + 3000) / 4 / 65535, rel=1e-6)  # the whole cube
+        assert stats["surround_nir_intensity_mean"][0] == pytest.approx(3000 / 4095, rel=1e-6)
+        assert stats["surround_intensity_mean"][0] == pytest.approx(
+            (3 * 1000 + 3000) / 4 / 65535, rel=1e-6
+        )  # the whole cube
         assert details["nir_context_status"].tolist() == ["ok"]
         for name in (
             "surround_measurable_pixels",
@@ -149,11 +153,11 @@ class TestBands:
             "context_range_low",
             "context_range_high",
         ):
-            assert f"nir_{name}" in details, name
+            assert column_name("nir_", name) in details, name
         assert details["nir_context_range_high"][0] == 4095.0
-        for name in ("surround_candidate_pixels", "surround_retained_pixels", "ring_peer_excluded_fraction"):
+        for name in ("surround_candidate_pixels", "surround_retained_pixels", "surround_peer_excluded_fraction"):
             assert name in details
-            assert f"nir_{name}" not in details, name
+            assert column_name("nir_", name) not in details, name
 
     def test_a_group_naming_a_band_the_datum_lacks_is_insufficient_support_and_the_warning_fires(self, caplog):
         group = {"nir": ChannelGroup(7, value_range=(0, 4095))}
@@ -162,8 +166,8 @@ class TestBands:
                 [cube()], boxes=[[BOX]], stats=CONTEXT, per_image=False, channels=group, value_range=(0, 65535)
             )
         assert details_of(result)["nir_context_status"].tolist() == ["insufficient_support"]
-        assert details_of(result)["nir_surround_measurable_pixels"].tolist() == [0]
-        assert np.isnan(result["stats"]["nir_surround_mean"][0])
+        assert details_of(result)["surround_nir_measurable_pixels"].tolist() == [0]
+        assert np.isnan(result["stats"]["surround_nir_intensity_mean"][0])
         assert any("names band 7 but the datum carries 4" in m for m in messages(caplog))
 
     def test_a_group_naming_a_band_the_datum_lacks_is_insufficient_support_with_no_declared_range_too(self, caplog):
@@ -175,7 +179,7 @@ class TestBands:
                 [cube], boxes=[[BOX]], stats=CONTEXT, per_image=False, channels={"bad": ChannelGroup(7)}
             )
         assert details_of(result)["bad_context_status"].tolist() == ["insufficient_support"]
-        assert details_of(result)["bad_surround_measurable_pixels"].tolist() == [0]
+        assert details_of(result)["surround_bad_measurable_pixels"].tolist() == [0]
         assert details_of(result)["context_status"].tolist() == ["ok"]  # the unnamed view reads the cube
         assert any("names band 7 but the datum carries 5" in m for m in messages(caplog))
         assert not any("no value range could be established for channel group" in m for m in messages(caplog))
@@ -203,7 +207,7 @@ class TestShapes:
         # Boxes on data with fewer than two dimensions are refused upstream, so such a datum has none.
         result = image_stats([np.arange(10.0)], boxes=[[]], stats=CONTEXT)
         assert details_of(result)["context_status"].tolist() == ["not_applicable"]
-        assert np.isnan(result["stats"]["surround_mean"][0])
+        assert np.isnan(result["stats"]["surround_intensity_mean"][0])
 
     def test_a_boolean_image_has_intensities_of_zero_and_one(self):
         image = np.broadcast_to(np.arange(80) % 2 == 0, SHAPE).copy()
@@ -211,5 +215,5 @@ class TestShapes:
         window[2:48, 2:48] = True
         window[10:40, 10:40] = False  # the window less the box
         result = run(image)
-        assert result["stats"]["surround_mean"][0] == pytest.approx(image[0][window].mean(), rel=1e-6)
+        assert result["stats"]["surround_intensity_mean"][0] == pytest.approx(image[0][window].mean(), rel=1e-6)
         assert details_of(result)["context_range_high"][0] == 1.0

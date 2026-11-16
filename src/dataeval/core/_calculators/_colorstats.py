@@ -30,8 +30,8 @@ _UNITS = {
     "color_lightness_mean": "L*",
     "color_chroma_mean": "C*",
     "color_achromatic_fraction": "fraction",
-    "color_hue_cos": "unit vector component",
-    "color_hue_sin": "unit vector component",
+    "color_hue_cos_mean": "unit vector component",
+    "color_hue_sin_mean": "unit vector component",
 }
 
 
@@ -224,6 +224,6 @@ class ColorStatCalculator(Calculator[ImageStats]):
             ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN: Handler("color_lightness_mean", self._lightness, views),
             ImageStats.VISUAL_COLOR_CHROMA_MEAN: Handler("color_chroma_mean", self._chroma, views),
             ImageStats.VISUAL_COLOR_ACHROMATIC_FRACTION: Handler("color_achromatic_fraction", self._achromatic, views),
-            ImageStats.VISUAL_COLOR_HUE_COS: Handler("color_hue_cos", self._hue_cos, views),
-            ImageStats.VISUAL_COLOR_HUE_SIN: Handler("color_hue_sin", self._hue_sin, views),
+            ImageStats.VISUAL_COLOR_HUE_COS_MEAN: Handler("color_hue_cos_mean", self._hue_cos, views),
+            ImageStats.VISUAL_COLOR_HUE_SIN_MEAN: Handler("color_hue_sin_mean", self._hue_sin, views),
         }

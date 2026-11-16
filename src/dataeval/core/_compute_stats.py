@@ -30,6 +30,23 @@ rather than by position. Adding a row instead is not available: a source index a
 exactly one item-level row per item, and naming it twice is rejected outright.
 """
 
+SURROUND_PREFIX = "surround_"
+"""Name prefix of the columns that describe a box's surround, which go before a channel group's name."""
+
+
+def column_name(prefix: str, name: str) -> str:
+    """Return the column a statistic or detail `name` takes under a view or channel-group `prefix`.
+
+    A surround column puts the surround first and the group after it (``surround_nir_intensity_mean``), as a background
+    column does (``background_nir_mean``); every other column puts the prefix in front
+    (``nir_target_surround_contrast``).
+    """
+    # ponytail: the rule reads the name's `surround_` stem, so any future column named `surround_*` goes view first.
+    # Declare the view on `Handler` and on details instead if a column needs that stem without being the surround's.
+    if prefix and name.startswith(SURROUND_PREFIX):
+        return f"{SURROUND_PREFIX}{prefix}{name.removeprefix(SURROUND_PREFIX)}"
+    return f"{prefix}{name}"
+
 
 StatsRequest = Flag | Mapping[str | None, Flag] | Mapping[str, Flag]
 """What `stats` may be: one flag set for every view, or one flag set per named view.

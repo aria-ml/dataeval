@@ -33,17 +33,17 @@ from tests.core.test_blur import textured
 # warning itself reset the once-per-process record first (`fresh_process`) and catch the warning explicitly.
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
-COLUMNS = ("blur", "blur_directionality")
+COLUMNS = ("blur_edge_width", "blur_edge_directionality")
 
 # The sentence both warnings end on, which names the way to keep the v1.2 columns.
 WAY_OUT = "`ImageStats.ALL` includes the blur statistics, and `ImageStats.ALL & ~ImageStats.BLUR` leaves them out."
 
 # Recorded from `main` before the blur flags, in the order a bare `image_stats` call returns them, and with the
-# `saturation` that v1.3 added to `PIXEL` after the histogram.
+# `saturated_fraction` that v1.3 added to `PIXEL` after the histogram.
 DEFAULT_COLUMNS = """
     offset_x offset_y width height channels size aspect_ratio depth center distance_center distance_edge invalid_box
     rel_offset_x rel_offset_y rel_width rel_height rel_size rel_distance_center rel_distance_edge
-    xxhash phash dhash phash_d4 dhash_d4 mean std var skew kurtosis entropy missing zeros histogram saturation
+    xxhash phash dhash phash_d4 dhash_d4 mean std var skew kurtosis entropy missing zeros histogram saturated_fraction
     brightness contrast darkness sharpness percentiles
 """
 # The ten columns of `ImageStats.BASIC`, which the docs promise to change only after a deprecation and a migration note.
@@ -51,11 +51,11 @@ BASIC_COLUMNS = "aspect_ratio brightness channels contrast height mean sharpness
 OUTLIERS_COLUMNS = "item_index metric_name metric_value direction bound percentile population_mean population_std"
 POPULATION_COLUMNS = "level metric_name method population n judged reason"
 # The 34 columns of `ImageStats.STANDARD` (PIXEL | VISUAL | DIMENSION), which a default `Outliers` run computes: the
-# ones it can judge and the ones it cannot. v1.3 added `saturation` to the 33 of v1.2.
+# ones it can judge and the ones it cannot. v1.3 added `saturated_fraction` to the 33 of v1.2.
 STANDARD_COLUMNS = """
     aspect_ratio brightness center channels contrast darkness depth distance_center distance_edge entropy height
     histogram invalid_box kurtosis mean missing offset_x offset_y percentiles rel_distance_center rel_distance_edge
-    rel_height rel_offset_x rel_offset_y rel_size rel_width saturation sharpness size skew std var width zeros
+    rel_height rel_offset_x rel_offset_y rel_size rel_width saturated_fraction sharpness size skew std var width zeros
 """
 
 
@@ -83,7 +83,7 @@ def stats_of(images, **kwargs):
 
 def test_columns_and_values():
     image = picture()
-    assert ImageStats.BLUR == ImageStats.VISUAL_BLUR | ImageStats.VISUAL_BLUR_DIRECTIONALITY
+    assert ImageStats.BLUR == ImageStats.VISUAL_BLUR_EDGE_WIDTH | ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY
 
     stats = stats_of([image])
 
@@ -109,11 +109,11 @@ def test_blur_is_in_all_and_in_no_smaller_group():
         ImageStats.ALL
         & ~ImageStats.BLUR
         & ~ImageStats.SPATIAL
-        & ~ImageStats.PIXEL_SATURATION
+        & ~ImageStats.PIXEL_SATURATED_FRACTION
         & ~ImageStats.CONTEXT
         & ~ImageStats.COLOR
     )
-    assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATION
+    assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATED_FRACTION
     assert ~ImageStats.ALL == ImageStats.NONE
     for group in (ImageStats.VISUAL, ImageStats.VISUAL_BASIC, ImageStats.STANDARD, ImageStats.BASIC):
         assert not ImageStats.BLUR & group
@@ -144,7 +144,7 @@ def test_all_is_spelled_from_the_families():
         | ImageStats.HASH
         | ImageStats.BLUR
         | ImageStats.SPATIAL
-        | ImageStats.PIXEL_SATURATION
+        | ImageStats.PIXEL_SATURATED_FRACTION
         | ImageStats.CONTEXT
         | ImageStats.COLOR
     )
@@ -154,7 +154,7 @@ def test_all_is_spelled_from_the_families():
 def test_standard_columns_are_a_promise():
     """The 34 names of `ImageStats.STANDARD` are a promise: they change only after a deprecation and a migration note.
 
-    They are the 33 of v1.2 and `saturation`, which v1.3 added to `PIXEL` before `STANDARD` was released.
+    They are the 33 of v1.2 and `saturated_fraction`, which v1.3 added to `PIXEL` before `STANDARD` was released.
 
     A statistic added to `PIXEL`, `VISUAL` or `DIMENSION` makes this test fail. An enum group cannot warn at import, so
     the person who trips it decides: keep the new flag out of `STANDARD` by redefining it, for example
@@ -205,7 +205,7 @@ def test_all_returns_the_blur_columns_and_warns(fresh_process):
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental"):
         stats = image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.CONTEXT)["stats"]
 
-    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturation"}
+    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturated_fraction"}
 
 
 def test_the_experimental_warning_names_the_complement_as_the_way_out(fresh_process):
@@ -247,7 +247,7 @@ def test_nan_rules_through_the_calculator():
         stats = stats_of([image], normalize_pixel_values=False)
         assert all(np.isnan(stats[name][0]) for name in COLUMNS)
 
-    assert QualityGate("blur", min=0.0).two_pass is False
+    assert QualityGate("blur_edge_width", min=0.0).two_pass is False
 
 
 def test_unmeasurable_band_reports_nan():
@@ -277,7 +277,9 @@ def test_nan_pixel_float_image():
     holed = clean.copy()
     holed[:, 100, 100] = np.nan
 
-    assert np.isfinite(stats_of([clean], normalize_pixel_values=False)["blur"][0]), "the picture is measurable"
+    assert np.isfinite(stats_of([clean], normalize_pixel_values=False)["blur_edge_width"][0]), (
+        "the picture is measurable"
+    )
     stats = stats_of([holed], normalize_pixel_values=False)
 
     assert all(np.isnan(stats[name][0]) for name in COLUMNS)
@@ -295,9 +297,9 @@ def test_tiny_box_and_1x1():
     )["stats"]
 
     # One row for the image, then one per box in order
-    assert np.isfinite(result["blur"][0])
-    assert np.isnan(result["blur"][1:3]).all()
-    assert len(result["blur"]) == 4
+    assert np.isfinite(result["blur_edge_width"][0])
+    assert np.isnan(result["blur_edge_width"][1:3]).all()
+    assert len(result["blur_edge_width"]) == 4
     for tiny in (np.full((3, 1, 1), 128, dtype=np.uint8), np.zeros((1, 1)), np.full((1, 3), 7.0)):
         stats = stats_of([tiny], normalize_pixel_values=False)
         assert all(np.isnan(stats[name][0]) for name in COLUMNS)
@@ -315,7 +317,7 @@ def test_uint8_equals_uint16():
     narrow_stats = stats_of([image])
     wide_stats = stats_of([wide])
 
-    assert np.isfinite(narrow_stats["blur"][0])
+    assert np.isfinite(narrow_stats["blur_edge_width"][0])
     for name in COLUMNS:
         assert wide_stats[name][0] == pytest.approx(narrow_stats[name][0], rel=0.01)
 
@@ -345,7 +347,7 @@ def test_bands_and_background():
     assert set(stats) == {name for prefix in ("", "vis_", "nir_") for name in (prefix + c for c in COLUMNS)}
     assert np.isfinite([stats[name][0] for name in stats]).all()
     for prefix, bands in (("", slice(0, 6)), ("vis_", slice(0, 3)), ("nir_", slice(3, 6))):
-        assert stats[f"{prefix}blur"][0] == pytest.approx(blur_stat(gray_of(cube[bands])).blur, rel=1e-6)
+        assert stats[f"{prefix}blur_edge_width"][0] == pytest.approx(blur_stat(gray_of(cube[bands])).blur, rel=1e-6)
 
     background = image_stats(
         [cube],
@@ -356,29 +358,34 @@ def test_bands_and_background():
     )["stats"]
 
     assert {"background_sharpness", "background_vis_sharpness", "background_nir_sharpness"} <= set(background)
-    assert {"background_blur", "background_vis_blur", "background_nir_blur"} <= set(background)
+    assert {"background_blur_edge_width", "background_vis_blur_edge_width", "background_nir_blur_edge_width"} <= set(
+        background
+    )
     assert not [name for name in background if "background" in name and "directionality" in name]
     assert set(COLUMNS) <= set(background), "the unprefixed whole-image columns are still there"
-    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK) == ImageStats.VISUAL_BLUR
-    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK | ViewKind.BAND) == ImageStats.VISUAL_BLUR
+    assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK) == ImageStats.VISUAL_BLUR_EDGE_WIDTH
+    assert (
+        BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.MASK | ViewKind.BAND)
+        == ImageStats.VISUAL_BLUR_EDGE_WIDTH
+    )
     assert BlurStatCalculator.flags_for_view(ImageStats.BLUR, ViewKind.BAND) == ImageStats.BLUR
 
 
 def test_background_with_only_directionality_says_why_it_does_not_apply():
-    """Directionality alone has nothing to compute over a background; the warning names `VISUAL_BLUR` as the way out."""
+    """Directionality alone has nothing to compute over a background; the warning names `VISUAL_BLUR_EDGE_WIDTH`."""
     with pytest.warns(
         UserWarning,
         match=r"none of the requested statistics apply to a background region.*blur directionality is not "
-        r"measured.*ImageStats\.VISUAL_BLUR for it",
+        r"measured.*ImageStats\.VISUAL_BLUR_EDGE_WIDTH for it",
     ):
         result = image_stats(
             [picture()],
             boxes=[[(20, 20, 90, 90)]],
-            stats=ImageStats.VISUAL_BLUR_DIRECTIONALITY,
+            stats=ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY,
             per_background=True,
         )["stats"]
 
-    assert set(result) == {"blur_directionality", "background_fraction"}
+    assert set(result) == {"blur_edge_directionality", "background_fraction"}
 
 
 def test_deterministic_permutes():
@@ -395,7 +402,9 @@ def test_deterministic_permutes():
         assert np.isfinite(forward[name]).all()
         assert np.array_equal(backward[name], forward[name][::-1])
         assert np.array_equal(again[name], forward[name])
-    assert forward["blur"][0] < forward["blur"][1] < forward["blur"][2], "the rows differ, so the reversal shows"
+    assert forward["blur_edge_width"][0] < forward["blur_edge_width"][1] < forward["blur_edge_width"][2], (
+        "the rows differ, so the reversal shows"
+    )
 
 
 @pytest.fixture
@@ -423,7 +432,7 @@ def test_experimental_warning_for_a_band_group_alone(fresh_process):
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental"):
         image_stats(
             [cube],
-            stats={None: ImageStats.PIXEL_MEAN, "ir": ImageStats.VISUAL_BLUR_DIRECTIONALITY},
+            stats={None: ImageStats.PIXEL_MEAN, "ir": ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY},
             channels={"ir": 5},
         )
 
@@ -470,7 +479,7 @@ def test_wide_cube_warns_and_names_blur(caplog):
     messages = [r.getMessage() for r in caplog.records if "measured as a single picture" in r.getMessage()]
     assert len(messages) == 1
     assert "5 bands measured as a single picture for" in messages[0]
-    assert "VISUAL_BLUR" in messages[0]
+    assert "VISUAL_BLUR_EDGE_WIDTH" in messages[0]
 
 
 def test_unmeasurable_names_include_blur(caplog):
@@ -482,7 +491,7 @@ def test_unmeasurable_names_include_blur(caplog):
 
     messages = [r.getMessage() for r in caplog.records if "no value range could be established" in r.getMessage()]
     assert len(messages) == 1
-    assert "VISUAL_BLUR" in messages[0]
+    assert "VISUAL_BLUR_EDGE_WIDTH" in messages[0]
 
 
 def sized(height: int, width: int, bands: int = 3) -> np.ndarray:
@@ -525,7 +534,7 @@ def test_mixed_sizes_warn_for_a_band_group_alone():
     with pytest.warns(UserWarning, match="of 2 different image sizes"):
         image_stats(
             images,
-            stats={None: ImageStats.PIXEL_MEAN, "ir": ImageStats.VISUAL_BLUR_DIRECTIONALITY},
+            stats={None: ImageStats.PIXEL_MEAN, "ir": ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY},
             channels={"ir": 5},
         )
 

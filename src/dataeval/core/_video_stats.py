@@ -320,7 +320,7 @@ def video_stats(  # noqa: C901
     camera, and then the still rest of the frame reads near 1. ``blur_map_raw`` is the natural
     log of how much each cell softens the same content, so ``log(0.5)`` means half the
     sharpness. Both blur maps are relative to the video's own average, so a lens that is soft
-    everywhere alike reads 0. ``blur_level`` gives an absolute whole-frame edge width in pixels.
+    everywhere alike reads 0. ``blur_edge_width_median`` gives an absolute whole-frame edge width in pixels.
     It is a different measure from the maps' and does not combine with them. ``blur_map``
     subtracts the map's own trend over `blur_sigma` cells, which removes blur wider than about
     `blur_sigma` cells, such as haze across half the lens, and part of a defect about that
@@ -339,20 +339,20 @@ def video_stats(  # noqa: C901
     long the video is. :meth:`~dataeval.Metadata.add_factors` skips the maps, as it skips every
     statistic with more than one value per row.
 
-    **Blur (experimental).** Selecting `BLUR_LEVEL`, directly, through the `BLUR` group or through `ALL`, raises
+    **Blur (experimental).** Selecting `BLUR_EDGE_WIDTH`, directly, through the `BLUR` group or through `ALL`, raises
     :class:`~dataeval.exceptions.ExperimentalWarning` once per process, and the column name and the `blur_samples`
-    keyword may change. ``blur_level`` is the median of the finite per-frame values of the measurement behind the
-    ``blur`` of :func:`image_stats`, over at most `blur_samples` frames spread evenly over the video. A frame is
-    measured when it joins the sample and may be dropped when the sample outgrows it, so more than `blur_samples`
-    frames can be measured. A frame is read as 8-bit gray (Rec. 601 luma), shrunk to a short side of 720 pixels and
-    never enlarged, and a video reads only frames of its first frame's size, logging a sampled frame of another
-    size. A width is in pixels at the measured size, so a call that measures videos at more than one short side
+    keyword may change. ``blur_edge_width_median`` is the median of the finite per-frame values of the measurement
+    behind the ``blur_edge_width`` of :func:`image_stats`, over at most `blur_samples` frames spread evenly over the
+    video. A frame is measured when it joins the sample and may be dropped when the sample outgrows it, so more than
+    `blur_samples` frames can be measured. A frame is read as 8-bit gray (Rec. 601 luma), shrunk to a short side of 720
+    pixels and never enlarged, and a video reads only frames of its first frame's size, logging a sampled frame of
+    another size. A width is in pixels at the measured size, so a call that measures videos at more than one short side
     warns once. Whether videos of different native sizes compare was not tested, and 720 is provisional.
-    :func:`image_stats` measures a frame at its own size and averages a color frame's bands, so above a short side
-    of 720 its values are at another scale, and for a color frame they differ slightly even at the same size. The
-    limits of `ImageStats.VISUAL_BLUR` apply, among them that a soft 8-bit frame at low contrast reads sharper than
-    at full contrast. The column is NaN when no sampled frame has a finite value. It does not say how much the blur
-    varies within a video. The evidence is 11 clips with simulated blur and no human-rated blur. See
+    :func:`image_stats` measures a frame at its own size and averages a color frame's bands, so above a short side of
+    720 its values are at another scale, and for a color frame they differ slightly even at the same size. The limits of
+    `ImageStats.VISUAL_BLUR_EDGE_WIDTH` apply, among them that a soft 8-bit frame at low contrast reads sharper than at
+    full contrast. The column is NaN when no sampled frame has a finite value. It does not say how much the blur varies
+    within a video. The evidence is 11 clips with simulated blur and no human-rated blur. See
     :doc:`/concepts/BlurStatistics`.
 
     **Parallelism.** Videos are measured concurrently, one per worker thread, when

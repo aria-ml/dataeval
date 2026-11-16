@@ -86,7 +86,7 @@ def _framed(arrays: Sequence[Any]) -> list[_Frame]:
 
 
 def _repeats(arrays: Sequence[Any]) -> Any:
-    return frame_stats(_framed(arrays), stats=FrameStats.EXACT_REPEAT)
+    return frame_stats(_framed(arrays), stats=FrameStats.REPEAT_EXACT)
 
 
 class TestElapsedTime:
@@ -346,7 +346,7 @@ class TestExactRepeat:
 
     def test_the_last_frame_is_released_when_a_video_finishes(self):
         """`run_videos` keeps every video's consumer, so none may keep a copy of its last frame."""
-        rows = _measure_video(FrameStats.EXACT_REPEAT, cast(Any, _framed([_BASE, _BASE.copy(), _BASE.copy()])))
+        rows = _measure_video(FrameStats.REPEAT_EXACT, cast(Any, _framed([_BASE, _BASE.copy(), _BASE.copy()])))
         assert rows._previous is None  # pyright: ignore[reportPrivateUsage]
         assert rows.repeat == [pytest.approx(np.nan, nan_ok=True), 1.0, 1.0]
 
@@ -360,7 +360,7 @@ class TestExactRepeat:
                     buffer[0, 0, 0] = 9
                 yield _Frame(buffer, k / 30, k)
 
-        result = frame_stats(reused(), stats=FrameStats.EXACT_REPEAT)
+        result = frame_stats(reused(), stats=FrameStats.REPEAT_EXACT)
         np.testing.assert_array_equal(result["stats"]["repeat_frame"], [np.nan, 1.0, 0.0, 1.0])
 
     def test_each_frame_is_decoded_once_and_only_the_previous_is_held(self):
@@ -384,7 +384,7 @@ class TestExactRepeat:
                 yield _Counting(pixels, k / 30, k)
                 del pixels
 
-        frame_stats(stream(), stats=FrameStats.EXACT_REPEAT)
+        frame_stats(stream(), stats=FrameStats.REPEAT_EXACT)
         assert reads == [1] * 6
 
 
@@ -392,7 +392,7 @@ class TestSelection:
     def test_each_selection_returns_only_its_own_columns_details_and_rollups(self):
         frames = _framed([_BASE, _BASE.copy()])
         timing = frame_stats(frames, stats=FrameStats.TIMING)
-        repeat = frame_stats(frames, stats=FrameStats.EXACT_REPEAT)
+        repeat = frame_stats(frames, stats=FrameStats.REPEAT_EXACT)
         both = frame_stats(frames)  # the default is ALL
 
         assert set(timing["stats"]) == {"elapsed_time_s"}
@@ -410,7 +410,7 @@ class TestSelection:
         x, y = np.zeros((1, 2, 2), np.uint8), np.ones((1, 2, 2), np.uint8)
         ds = _mot([_framed([x, x, y, y, y]), _framed([x])])
         md = Metadata(ds)
-        md.add_factors(frame_stats(ds, stats=FrameStats.EXACT_REPEAT))
+        md.add_factors(frame_stats(ds, stats=FrameStats.REPEAT_EXACT))
         fractions = md.rows_at("sequence")["repeat_frame_fraction"].to_list()
         assert fractions[0] == pytest.approx(3 / 4)  # repeats [nan, 1, 0, 1, 1]
         assert fractions[1] is None or np.isnan(fractions[1])  # a one-frame sequence has nothing to compare

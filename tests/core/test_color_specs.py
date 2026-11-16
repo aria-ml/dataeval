@@ -20,8 +20,8 @@ UNITS = {
     "color_lightness_mean": "L*",
     "color_chroma_mean": "C*",
     "color_achromatic_fraction": "fraction",
-    "color_hue_cos": "unit vector component",
-    "color_hue_sin": "unit vector component",
+    "color_hue_cos_mean": "unit vector component",
+    "color_hue_sin_mean": "unit vector component",
 }
 
 
@@ -57,7 +57,7 @@ def test_an_undeclared_range_is_recorded_as_inferred():
 
 
 def test_the_thresholds_and_the_channel_order_are_recorded():
-    spec = specs_of(color_rgb_channels=[2, 1, 0], color_min_pixels=10, color_chroma_threshold=5.0)["color_hue_cos"]
+    spec = specs_of(color_rgb_channels=[2, 1, 0], color_min_pixels=10, color_chroma_threshold=5.0)["color_hue_cos_mean"]
     assert spec.rgb_channels == (2, 1, 0)
     assert (dict(spec.config)["min_pixels"], dict(spec.config)["chroma_threshold"]) == (10, 5.0)
 

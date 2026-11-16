@@ -148,10 +148,10 @@ def test_the_calculator_agrees_with_a_per_pixel_oracle_on_200_awkward_boxes():
             assert columns["surround_candidate_pixels"][row] == candidate, row
             assert columns["surround_retained_pixels"][row] == retained, row
             assert columns["surround_measurable_pixels"][row] == measurable, row
-            np.testing.assert_allclose(columns["ring_peer_excluded_fraction"][row], excluded, rtol=0, atol=1e-12)
+            np.testing.assert_allclose(columns["surround_peer_excluded_fraction"][row], excluded, rtol=0, atol=1e-12)
             # The statistic columns are float32, as every statistic's is.
-            np.testing.assert_allclose(columns["surround_mean"][row], mean, rtol=1e-6, atol=1e-7)
-            np.testing.assert_allclose(columns["surround_std"][row], std, rtol=1e-6, atol=1e-7)
+            np.testing.assert_allclose(columns["surround_intensity_mean"][row], mean, rtol=1e-6, atol=1e-7)
+            np.testing.assert_allclose(columns["surround_intensity_std"][row], std, rtol=1e-6, atol=1e-7)
             expected = "empty_ring" if candidate == 0 else (frame if measurable > 0 else "insufficient_support")
             assert columns["context_status"][row] == expected, row
             measured += measurable > 0
@@ -197,7 +197,7 @@ def test_the_ratios_agree_with_a_per_pixel_oracle_on_awkward_boxes():
         for focal in range(len(boxes)):
             if not valid[focal]:
                 assert math.isnan(columns["target_surround_contrast"][row]), row
-                assert columns["contrast_reason"][row] == "", row
+                assert columns["context_ratio_reason"][row] == "", row
                 row += 1
                 continue
             candidate, _, measurable, mean, std, _ = oracle(image, boxes, focal, valid, 0.0, 1.0, 0.25)
@@ -210,7 +210,7 @@ def test_the_ratios_agree_with_a_per_pixel_oracle_on_awkward_boxes():
                 np.testing.assert_allclose(columns[name][row], value, rtol=1e-6, atol=1e-6, err_msg=f"{name} {row}")
             assert columns["target_surround_contrast_floored"][row] == expected[2], row
             assert columns["signal_clutter_ratio_floored"][row] == expected[3], row
-            assert columns["contrast_reason"][row] == expected[4], row
+            assert columns["context_ratio_reason"][row] == expected[4], row
             valued += not math.isnan(expected[0])
             unsupported += expected[4] == "insufficient_target_support"
             floored += bool(expected[2] or expected[3])
@@ -229,7 +229,7 @@ def test_the_boxes_were_awkward_enough_to_matter():
     cut = sum(1 for x0, y0, x1, y1 in boxes if x0 < 0 or y0 < 0 or x1 > WIDTH or y1 > HEIGHT)
     assert cut > 20  # boxes whose own coordinates leave the image, so their windows are clipped
     columns = measure([(picture(1605), boxes)])
-    assert (columns["ring_peer_excluded_fraction"] > 0).sum() > 40  # peers took part of many rings
+    assert (columns["surround_peer_excluded_fraction"] > 0).sum() > 40  # peers took part of many rings
 
 
 def test_reordering_the_boxes_permutes_the_rows_and_changes_nothing_else():
