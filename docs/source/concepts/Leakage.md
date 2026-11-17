@@ -210,6 +210,8 @@ reusable-holdout mechanism of [Dwork et al. (2015)](#ref4).
 
 ### Tutorials
 
+- [Check drone footage before you train a detector](../notebooks/tt_check_drone_footage.py): measuring how much of
+  each real drone video repeats itself, and why a split by video keeps near-copies on one side
 - [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py): finding train-test leakage between the
   sequences of a tracking dataset
 

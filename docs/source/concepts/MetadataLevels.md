@@ -523,6 +523,8 @@ what granularity was this measured?" is a level question.
   everything on this page worked end to end on an aerial detection dataset: the same
   factor reporting two distributions, `at` and `inherited`, `agg`, `where` versus
   `having`, and the bias question that can only be asked once a level is chosen.
+- [Check drone footage before you train a detector](../notebooks/tt_check_drone_footage.py): counting a real
+  tracking dataset at the video, frame, track and detection levels, and reading camera motion per frame.
 - [Compare objects to their surroundings](../notebooks/tt_compare_objects_to_surroundings.py): the background is
   stored at the unit level and reaches the instance rows beneath it.
 

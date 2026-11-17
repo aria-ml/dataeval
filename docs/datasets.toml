@@ -25,3 +25,7 @@ image_set = "test"
 [[dataset]]
 loader = "maite_datasets.object_detection.SeaDrone"
 image_set = "val"
+
+[[dataset]]
+loader = "maite_datasets.multiobject_tracking.VisDroneMOT"
+image_set = "val"

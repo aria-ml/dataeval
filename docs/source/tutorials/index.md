@@ -37,6 +37,7 @@ local checkout.
 ../notebooks/tt_analyze_across_levels.py
 ../notebooks/tt_augmentation_duplicates.py
 ../notebooks/tt_identify_duplicate_video.py
+../notebooks/tt_check_drone_footage.py
 ../notebooks/tt_compare_objects_to_surroundings.py
 ```
 
@@ -77,6 +78,10 @@ local checkout.
   - Learn how to find duplicate video, train-test leakage and redundant footage in a
     multi-object tracking dataset, and how to read what each detection reports.
   - [![Open In Colab][colab-badge]][vdupe-colab]
+* - [](../notebooks/tt_check_drone_footage.py)
+  - Learn how to check real drone footage for what may hinder training a vehicle detector: how many distinct
+    views it holds, how the camera moves, whether labels stay consistent and how large the vehicles are.
+  - [![Open In Colab][colab-badge]][drone-colab]
 * - [](../notebooks/tt_compare_objects_to_surroundings.py)
   - Compare detections against their surroundings and against each other
     to find hard-to-see objects and background shortcuts.
@@ -95,6 +100,7 @@ local checkout.
 [levels-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_analyze_across_levels.ipynb
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_augmentation_duplicates.ipynb
 [vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_identify_duplicate_video.ipynb
+[drone-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_check_drone_footage.ipynb
 [surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_compare_objects_to_surroundings.ipynb
 
 <!-- markdownlint-enable MD053 -->
