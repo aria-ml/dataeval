@@ -874,10 +874,16 @@ def _unmeasurable_flags(flags: Flag, declared: tuple[float, float] | None, norma
 
 
 def _reads_a_range(whole_flags: Flag, group_flags: Mapping[str, Flag], normalize_pixel_values: bool) -> bool:
-    """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy."""
+    """Whether any view of the call asks for a statistic that reads the interval a datum's values occupy.
+
+    The noise statistics read one only when normalizing, and are not among `_unmeasurable_flags`: they read the full
+    scale, not the decoded range, and say for themselves when there is none.
+    """
+    reads = ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.COLOR | ImageStats.CONTEXT
+    if normalize_pixel_values:
+        reads |= ImageStats.NOISE
     return any(
-        _unmeasurable_flags(flags, None, normalize_pixel_values)
-        or flags & (ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.COLOR | ImageStats.CONTEXT)
+        _unmeasurable_flags(flags, None, normalize_pixel_values) or flags & reads
         for flags in (whole_flags, *group_flags.values())
     )
 
@@ -1362,8 +1368,8 @@ def image_stats(  # noqa: C901
         background statistic measured over a few percent of an image is noise wearing
         a measurement's clothes.
 
-        Only :attr:`~dataeval.flags.ImageStats.PIXEL`, :attr:`~dataeval.flags.ImageStats.VISUAL` and
-        :attr:`~dataeval.flags.ImageStats.COLOR` statistics and
+        Only :attr:`~dataeval.flags.ImageStats.PIXEL`, :attr:`~dataeval.flags.ImageStats.VISUAL`,
+        :attr:`~dataeval.flags.ImageStats.COLOR` and :attr:`~dataeval.flags.ImageStats.NOISE` statistics and
         :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR_EDGE_WIDTH` are computed for the background; any hash,
         dimension, spatial or blur directionality statistics in `stats` are computed for the image and its boxes as
         usual and skipped for the background, which has no meaningful hash and no geometry of its own.
@@ -1388,12 +1394,14 @@ def image_stats(  # noqa: C901
             Adds ``background_blur_edge_width`` (and ``background_<group>_blur_edge_width``) when `stats` includes
             :attr:`~dataeval.flags.ImageStats.VISUAL_BLUR_EDGE_WIDTH`, which was skipped for the background before.
     per_surround : bool, default False
-        If True, also measure the color statistics over each box's surround, on the box's own row, as
-        ``surround_color_*`` columns and details. The surround is the box widened by `surround_padding`, as for the
-        context statistics, with every box of the image masked out, and it is judged as the color section of
-        :class:`~dataeval.flags.ImageStats` describes. A small box has a small surround, which reads
-        `insufficient_support` below `color_min_pixels`; an image's own row reads NaN. Experimental, as the color
-        statistics are. :class:`~dataeval.data.DetectionCrops` with ``region="surround"`` crops a different region.
+        If True, also measure the color and noise statistics over each box's surround, on the box's own row, as
+        ``surround_color_*`` and ``surround_noise_*`` columns and details. The surround is the box widened by
+        `surround_padding`, as for the context statistics, with every box of the image masked out, and it is judged as
+        the color and noise sections of :class:`~dataeval.flags.ImageStats` describe. A small box has a small surround,
+        which reads `insufficient_support` below `color_min_pixels`, or below 64 valid 3x3 neighborhoods for noise; an
+        image's own row reads NaN. Experimental, whichever statistics it measures: the first call that requests a
+        statistic it measures raises :class:`~dataeval.exceptions.ExperimentalWarning`, once per process.
+        :class:`~dataeval.data.DetectionCrops` with ``region="surround"`` crops a different region.
 
         .. versionadded:: 1.3
     channels : Mapping[str, ChannelGroupLike] or None, default None
@@ -1440,8 +1448,14 @@ def image_stats(  # noqa: C901
         bit depths — an 8-bit and a 16-bit copy of one picture otherwise report means
         differing by a factor of 257.
 
-        Affects the pixel family only, and within it only `PIXEL_MEAN`, `PIXEL_STD` and
-        `PIXEL_VAR`; the rest are already scale-free.
+        Affects the pixel statistics only, and among them only `PIXEL_MEAN`, `PIXEL_STD`, `PIXEL_VAR` and the noise
+        statistics (`ImageStats.NOISE`); the rest are already scale-free. The noise statistics are divided by the full
+        scale instead: a declared range, else ``(0, 255)`` for unsigned 8-bit data, else ``(0, 1)`` or ``(0, 255)`` for
+        floating-point data within it. Other data reads NaN with the status `unknown_range` until its range is
+        declared, since a range decoded from an integer image's own maximum would put two images of one sensor on
+        different scales. The float conventions do read the image's own values: noise added to 0-1 data and not
+        clipped puts values above 1, which reads that image on ``(0, 255)``, 255 times too small, and a value below 0
+        leaves it `unknown_range`. Declare `value_range` for floating-point data.
         :attr:`~dataeval.flags.ImageStats.VISUAL` statistics ignore it entirely — they
         always report against the display range, so they are comparable across encodings
         either way. Prefer `VISUAL_BRIGHTNESS` over a normalized `PIXEL_MEAN` when the
@@ -1456,7 +1470,7 @@ def image_stats(  # noqa: C901
         its encoding, and the two conventional float spellings of an image — normalized
         to ``[0, 1]``, or 8-bit values held in a float array — are recognized, so
         ``uint8``, ``uint16`` and ``ToTensor``-style data all need nothing here, except for the
-        context and color statistics below.
+        context and color statistics, and the noise statistics under `normalize_pixel_values`, below.
 
         Declare it for data whose dynamic range is a property of the sensor rather than
         of a file format: elevation below sea level, mean-centered reflectance,
@@ -1474,7 +1488,8 @@ def image_stats(  # noqa: C901
         The context and color statistics (:attr:`~dataeval.flags.ImageStats.CONTEXT`,
         :attr:`~dataeval.flags.ImageStats.COLOR`) never read an integer image's own maximum: they use the declared
         interval, else ``(0, 255)`` for ``uint8`` and the two float conventions above, so a ``uint16`` image needs one
-        declared, and is NaN with the status `unknown_range` without.
+        declared, and is NaN with the status `unknown_range` without. So do the noise statistics
+        (:attr:`~dataeval.flags.ImageStats.NOISE`) under `normalize_pixel_values`.
 
         A dataset can declare the interval image by image instead, as a ``(low, high)`` pair under ``value_range`` in
         each datum's metadata, so one collection can hold sensors of different depths. It is read when a requested
@@ -1572,7 +1587,7 @@ def image_stats(  # noqa: C901
         - stats: Mapping[str, Sequence[Any]] - Mapping of statistic names to sequences of computed values
         - details: Mapping[str, NDArray] - Facts about how the statistics were measured, one value per row of
           `stats`, present only when a requested statistic reports some. They are not statistics. See
-          :class:`~dataeval.flags.ImageStats` for the spatial, saturation and context ones
+          :class:`~dataeval.flags.ImageStats` for the spatial, saturation, context, color and noise ones
         - measurement_specs: Mapping[str, MeasurementSpec] - What each column that depends on a setting was measured
           with, present only when a requested statistic records some, as saturation and the context statistics do.
           :func:`~dataeval.core.combine_stats_results` refuses results whose specs differ
@@ -1622,8 +1637,9 @@ def image_stats(  # noqa: C901
     ExperimentalWarning
         Once per process, on the first request that includes a blur statistic (`ImageStats.BLUR`).
         `ImageStats.ALL` holds it. Likewise for the first request that measures a color statistic (`ImageStats.COLOR`),
-        which `ImageStats.ALL` does only where `color_rgb_channels` is given. The spatial statistics are stable and
-        raise none.
+        which `ImageStats.ALL` does only where `color_rgb_channels` is given, and for the first call with
+        `per_surround` that requests a statistic measured over the surround. The spatial and noise statistics are
+        stable and raise none.
 
     Notes
     -----
@@ -2172,7 +2188,7 @@ def image_stats(  # noqa: C901
                 f"so only '{BACKGROUND_PREFIX}fraction' will be returned. A background is a region with "
                 f"part of it masked out, which hash statistics are not stable under, which dimension "
                 f"statistics do not describe and over which blur directionality is not measured; request "
-                f"ImageStats.PIXEL, ImageStats.VISUAL or ImageStats.VISUAL_BLUR_EDGE_WIDTH for it.",
+                f"ImageStats.PIXEL, ImageStats.VISUAL, ImageStats.NOISE or ImageStats.VISUAL_BLUR_EDGE_WIDTH for it.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -2182,13 +2198,19 @@ def image_stats(  # noqa: C901
     if per_surround and not surround_calculators:
         warnings.warn(
             "per_surround=True but none of the requested statistics are measured over a box's surround, so no "
-            "surround_ column will be returned. Only the color statistics are: request ImageStats.COLOR, in the "
-            "unnamed entry of a stats mapping, with color_rgb_channels.",
+            "surround_ column will be returned. Only the color and noise statistics are: request ImageStats.COLOR, "
+            "with color_rgb_channels, or ImageStats.NOISE, in the unnamed entry of a stats mapping.",
             UserWarning,
             stacklevel=2,
         )
     elif per_surround and not per_target:
         warnings.warn(_NO_SURROUND_ROWS, UserWarning, stacklevel=2)
+    # The view is experimental whichever statistics answer it, so it warns for itself, once per process.
+    if surround_calculators:
+        warn_experimental_once(
+            "per_surround",
+            details="The region it measures and the names of its columns may change.",
+        )
 
     # What the request asks beyond each box's own pixels, over every pass that will run: the unnamed view, each band
     # group, and the background of both. Declared per statistic on its handler, so a request that names none builds no

@@ -27,6 +27,7 @@ __all__ = [
     "LocalPanelResult",
     "MSTResult",
     "MutualInfoResult",
+    "NoiseResult",
     "NullModelMetrics",
     "NullModelMetricsResult",
     "OntologyValidationResult",
@@ -92,6 +93,7 @@ __all__ = [
     "mean_endpoint",
     "mutual_info",
     "mutual_info_classwise",
+    "noise_immerkaer",
     "nullmodel_accuracy",
     "nullmodel_fpr",
     "nullmodel_precision",
@@ -185,6 +187,7 @@ from dataeval.core._local_panels import LocalPanelResult, fit_partition, local_p
 from dataeval.core._metadata_insights import factor_deviation, factor_predictors
 from dataeval.core._mst import MSTResult, compute_neighbors, minimum_spanning_tree
 from dataeval.core._mutual_info import MutualInfoResult, mutual_info, mutual_info_classwise
+from dataeval.core._noise import NoiseResult, noise_immerkaer
 from dataeval.core._nullmodel import (
     NullModelMetrics,
     NullModelMetricsResult,

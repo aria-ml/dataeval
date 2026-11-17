@@ -104,6 +104,7 @@ def test_blur_is_in_all_and_in_no_smaller_group():
         | ImageStats.SPATIAL
         | ImageStats.CONTEXT
         | ImageStats.COLOR
+        | ImageStats.NOISE
     )
     v12 = (
         ImageStats.ALL
@@ -112,6 +113,7 @@ def test_blur_is_in_all_and_in_no_smaller_group():
         & ~ImageStats.PIXEL_SATURATED_FRACTION
         & ~ImageStats.CONTEXT
         & ~ImageStats.COLOR
+        & ~ImageStats.NOISE
     )
     assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATED_FRACTION
     assert ~ImageStats.ALL == ImageStats.NONE
@@ -147,6 +149,7 @@ def test_all_is_spelled_from_the_families():
         | ImageStats.PIXEL_SATURATED_FRACTION
         | ImageStats.CONTEXT
         | ImageStats.COLOR
+        | ImageStats.NOISE
     )
     assert families == ImageStats.ALL
 
@@ -200,12 +203,12 @@ def test_all_returns_the_blur_columns_and_warns(fresh_process):
     """The default leaves blur out, but a request for `ALL` is a request for it, so it warns like any blur flag.
 
     The spatial and context statistics need boxes and have their own tests, so they are left out here. `ALL` holds the
-    saturation statistic too, so its column comes with the rest.
+    saturation and noise statistics too, so their columns come with the rest.
     """
     with pytest.warns(ExperimentalWarning, match=r"'ImageStats\.BLUR' is experimental"):
         stats = image_stats([picture()], stats=ImageStats.ALL & ~ImageStats.SPATIAL & ~ImageStats.CONTEXT)["stats"]
 
-    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturated_fraction"}
+    assert set(stats) == set(DEFAULT_COLUMNS.split()) | set(COLUMNS) | {"saturated_fraction", "noise_std", "noise_var"}
 
 
 def test_the_experimental_warning_names_the_complement_as_the_way_out(fresh_process):

@@ -47,6 +47,7 @@ REQUIRES_REFERENCES: list[tuple[str, str]] = [
     ("core", "local_panel_bound"),
     ("core", "mean_endpoint"),
     ("core", "mutual_info"),
+    ("core", "noise_immerkaer"),
     ("core", "parity"),
     ("core", "phash"),
     ("core", "phash_d4"),

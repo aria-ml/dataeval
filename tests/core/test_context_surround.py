@@ -93,6 +93,7 @@ class TestFlags:
             & ~ImageStats.PIXEL_SATURATED_FRACTION
             & ~CONTEXT
             & ~ImageStats.COLOR
+            & ~ImageStats.NOISE
         )
         assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATED_FRACTION
 
