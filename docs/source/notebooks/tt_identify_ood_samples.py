@@ -97,14 +97,14 @@
 try:
     import google.colab  # noqa: F401
 
-    # %pip install -q dataeval maite-datasets torchvision plotly
+    # %pip install -q dataeval maite-datasets torchvision plotly "dataeval-plots>=0.0.20"
 except Exception:
     pass
 
 # %%
 from typing import cast
 
-import matplotlib.pyplot as plt
+import dataeval_plots as dep
 import numpy as np
 import plotly.express as px
 import plotly.io as pio
@@ -198,14 +198,12 @@ scenarios = {"Noisy": noisy, "Blurred": blurred, "Aerial": aerial, "Unseen famil
 # %%
 # Show six images of each kind
 rows = {"In-distribution": test_in, **scenarios}
-fig, axes = plt.subplots(len(rows), 6, figsize=(9, 8))
-for row, (title, images) in enumerate(rows.items()):
-    for col in range(6):
-        axes[row, col].imshow(images[col * 40].squeeze(), cmap="gray", vmin=0, vmax=1)
-        axes[row, col].axis("off")
-    axes[row, 0].set_title(title, loc="left", fontweight="bold")
-plt.tight_layout()
-plt.show()
+dep.plot(
+    [np.clip(images[col * 40], 0, 1) for images in rows.values() for col in range(6)],
+    figsize=(9, 8),
+    images_per_row=6,
+    titles=[title if col == 0 else "" for title in rows for col in range(6)],
+)
 
 # %% [markdown]
 # ## K-nearest neighbors (KNN) for OOD detection
@@ -499,17 +497,14 @@ def reconstruct(detector, images):
 
 shown = {"In-distribution": clean, "Noisy": noisy, "Blurred": blurred, "Aerial": aerial}
 errors = {}
-fig, axes = plt.subplots(len(shown), 2, figsize=(4, 8))
-for row, (kind, images) in enumerate(shown.items()):
+pairs, titles = [], []
+for kind, images in shown.items():
     reconstructions = reconstruct(ood_ae, images)
     errors[kind] = float(np.mean((images - reconstructions) ** 2))
-    for col, image in enumerate([images[0], reconstructions[0]]):
-        axes[row, col].imshow(image.squeeze(), cmap="gray", vmin=0, vmax=1)
-        axes[row, col].axis("off")
-    axes[row, 0].set_title(kind, loc="left", fontweight="bold")
-    axes[row, 1].set_title(f"mean error {errors[kind]:.4f}")
-plt.tight_layout()
-plt.show()
+    # Show the reconstruction clipped to [0, 1], since the autoencoder's output is not bounded; the error uses it as is
+    pairs += [np.clip(images[0], 0, 1), np.clip(reconstructions[0], 0, 1)]
+    titles += [kind, f"mean error {errors[kind]:.4f}"]
+dep.plot(pairs, figsize=(4, 8), images_per_row=2, titles=titles)
 
 # %% [markdown]
 # ### Understanding reconstructions

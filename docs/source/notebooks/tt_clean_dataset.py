@@ -68,7 +68,7 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets
+    # %pip install -q dataeval maite-datasets "dataeval-plots>=0.0.20"
 except Exception:
     pass
 
@@ -100,19 +100,17 @@ set_max_processes(4)
 # %%
 # Helper method to plot sample images by class
 def plot_sample_images_by_class(dataset, image_indices_per_class) -> None:
-    import matplotlib.pyplot as plt
-
-    # Plot random images from each category
-    _, axs = plt.subplots(6, 4, figsize=(8, 12))
-
-    for ax, (category, indices) in zip(axs.flat, image_indices_per_class.items(), strict=False):
-        # Randomly select an index from the list of indices
-        ax.imshow(dataset[rng.choice(indices)][0].transpose(1, 2, 0))
-        ax.set_title(dataset.index2label[category])
-        ax.axis("off")
-
-    plt.tight_layout()
-    plt.show()
+    # Plot one random image from each category
+    categories = list(image_indices_per_class)
+    display(
+        plot(
+            dataset,
+            figsize=(8, 12),
+            indices=[rng.choice(image_indices_per_class[category]) for category in categories],
+            images_per_row=4,
+            titles=[dataset.index2label[category] for category in categories],
+        )
+    )
 
 
 # Helper method to plot images of interest
@@ -652,20 +650,14 @@ display(duplicates.data().filter(pl.col("dataset_indices").list.contains(1)))
 # change with orientation, and the D4 hashes match them.
 
 # %%
-import matplotlib.pyplot as plt
-
 # Each row holds an image from the dataset and the copy that was added to it
-fig, axs = plt.subplots(2, 2, figsize=(10, 7))
 rotated = [(100, dupes[4], "rotated 90°"), (200, dupes[5], "rotated 180° and mirrored")]
-for row, (source, copy, change) in zip(axs, rotated, strict=True):
-    row[0].imshow(ds[source][0].transpose(1, 2, 0))
-    row[0].set_title(f"Dataset image {source}")
-    row[1].imshow(copy.transpose(1, 2, 0))
-    row[1].set_title(f"Added copy, {change}")
-for ax in axs.flat:
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
+plot(
+    [image for source, copy, _ in rotated for image in (ds[source][0], copy)],
+    figsize=(10, 7),
+    images_per_row=2,
+    titles=[title for source, _, change in rotated for title in (f"Dataset image {source}", f"Added copy, {change}")],
+)
 
 # %% [markdown]
 # By using `ImageStats.HASH` (which computes both basic and D4 hashes), you can distinguish between same-orientation

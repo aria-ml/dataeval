@@ -82,7 +82,7 @@ except Exception:
     pass
 
 # %%
-import matplotlib.pyplot as plt
+import dataeval_plots as dep
 import numpy as np
 import plotly.express as px
 import plotly.io as pio
@@ -320,13 +320,13 @@ print(f"embedded {len(degraded)} degraded copies of the {len(operational_idx):,}
 
 # %%
 picture = Degraded(lambda image, index: image)[5][0]
-fig, axes = plt.subplots(1, len(conditions) + 1, figsize=(16, 2.4))
-for ax, (name, degrade) in zip(axes, {"Original": lambda image, index: image, **conditions}.items(), strict=True):
-    ax.imshow(np.transpose(degrade(picture, 5), (1, 2, 0)))
-    ax.set_title(name, fontsize=9)
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
+shown = {"Original": lambda image, index: image, **conditions}
+dep.plot(
+    [degrade(picture, 5) for degrade in shown.values()],
+    figsize=(16, 2.4),
+    images_per_row=len(shown),
+    titles=list(shown),
+)
 
 # %% [markdown]
 # ## Compare the alarms with the accuracy
