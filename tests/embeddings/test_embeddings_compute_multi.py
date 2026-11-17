@@ -368,3 +368,86 @@ def test_a_memmap_child_used_on_other_data_keeps_its_rows(tmp_path):
     assert np.array_equal(child[:], before)
     assert not np.array_equal(other[:], before)
     assert np.array_equal(called, other[:])
+
+
+class _CountedModel(torch.nn.Module):
+    """Flatten, Linear(16, 4), ReLU, Linear(4, 3), with fixed weights, counting its forward passes."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        torch.manual_seed(7)
+        self.net = torch.nn.Sequential(
+            torch.nn.Flatten(), torch.nn.Linear(16, 4), torch.nn.ReLU(), torch.nn.Linear(4, 3)
+        )
+        self.forwards = 0
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.forwards += 1
+        return self.net(x)
+
+
+def test_a_torch_layers_runs_one_forward_per_batch_for_all_its_layers():
+    from dataeval.extractors import TorchLayers
+
+    model = _CountedModel()
+    layers = TorchLayers(model, ["net.1", "net.3"], device="cpu")
+    children = Embeddings.compute_multi(_Dataset(), {"m": layers}, batch_size=4)
+    assert model.forwards == 3
+    assert list(children) == ["m/net.1", "m/net.3"]
+    for layer in ("net.1", "net.3"):
+        solo = TorchExtractor(model, layer_name=layer, device="cpu")
+        assert np.array_equal(children[f"m/{layer}"][:], _solo(solo)), layer
+
+
+def test_a_torch_layers_beside_a_solo_extractor_of_its_model():
+    from dataeval.extractors import TorchLayers
+
+    model = _CountedModel()
+    ways = {
+        "m": TorchLayers(model, ["net.1", "net.3"], device="cpu"),
+        "solo": TorchExtractor(model, layer_name="net.1", device="cpu"),
+    }
+    children = Embeddings.compute_multi(_Dataset(), ways, batch_size=4)
+    assert model.forwards == 6
+    assert np.array_equal(children["solo"][:], children["m/net.1"][:])
+    assert sum(len(m._forward_hooks) + len(m._forward_pre_hooks) for m in model.modules()) == 0
+
+
+def test_expanded_keys_that_collide_raise():
+    from dataeval.extractors import TorchLayers
+
+    dataset = _Dataset()
+    ways = {"m/net.1": FlattenExtractor(), "m": TorchLayers(_CountedModel(), ["net.1"], device="cpu")}
+    with pytest.raises(ValueError, match="twice"):
+        Embeddings.compute_multi(dataset, ways, batch_size=4)
+    assert dataset.total == 0
+
+
+def test_a_torch_layers_batch_size_enters_the_rule():
+    from dataeval.extractors import TorchLayers
+
+    model = _CountedModel()
+    with pytest.raises(ValueError, match="batch_size"):
+        Embeddings.compute_multi(
+            _Dataset(),
+            {"m": TorchLayers(model, ["net.1"], device="cpu", batch_size=4), "t": _torch(3, batch_size=8)},
+        )
+    children = Embeddings.compute_multi(_Dataset(), {"m": TorchLayers(model, ["net.1"], device="cpu", batch_size=4)})
+    assert children["m/net.1"].batch_size == 4
+
+
+def test_an_error_in_a_torch_layers_names_its_key():
+    from dataeval.extractors import TorchLayers
+
+    class _Skips(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.flat = torch.nn.Flatten()
+            self.unused = torch.nn.Linear(16, 2)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.flat(x)
+
+    with pytest.raises(RuntimeError, match="did not run") as raised:
+        Embeddings.compute_multi(_Dataset(), {"m": TorchLayers(_Skips(), ["unused"], device="cpu")}, batch_size=4)
+    assert "'m'" in _notes(raised.value)

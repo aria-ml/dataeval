@@ -33,10 +33,10 @@ v1.1
     `frame_stats` measures the time between frames and exact repeats, `track_stats` returns two more columns, the
     longest gap and the net heading of a track, and an experimental `track_steps` measures the step each detection takes
     from where its track was last seen. An experimental `View(record_reads=True)` lets `Metadata` reuse what an earlier
-    pass read. An experimental `set_load_threads` loads dataset items in several threads while `Embeddings`,
-    `Metadata` and `Filter` read a dataset. An experimental `Embeddings.compute_multi` computes several extractors'
-    embeddings from one read of a dataset. An experimental `noise_pca` estimates each channel's noise from the
-    covariance of its 7x7 patches.
+    pass read. An experimental `set_load_threads` loads dataset items in several threads while `Embeddings`, `Metadata`
+    and `Filter` read a dataset. An experimental `Embeddings.compute_multi` computes several extractors' embeddings from
+    one read of a dataset, and an experimental `TorchLayers` reads several layers of one torch model in one forward pass
+    for it. An experimental `noise_pca` estimates each channel's noise from the covariance of its 7x7 patches.
 - - [](v1.2.md)
   - v1.1 to v1.2: the removal of everything v1.1 deprecated (metadata level shims, the
     `selection` module, `per_channel` and the renamed preprocessing helpers, the
