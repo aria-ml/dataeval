@@ -43,7 +43,7 @@
 #
 # ## What you will need
 #
-# - A Python environment with `dataeval[opencv]`, `maite-datasets[hf]>=0.0.25` and `matplotlib` installed
+# - A Python environment with `dataeval[opencv]`, `maite-datasets[hf]>=0.0.25` and `dataeval-plots>=0.0.19` installed
 # - About 2 GB of free disk space for the 1.7 GB dataset
 # - Time for the first download: about 26 minutes without a Hugging Face token, less with one
 # - About 10 minutes to run the notebook on a CPU, after the download
@@ -74,19 +74,19 @@ try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval[opencv] "maite-datasets[hf]>=0.0.25" matplotlib
+    # %pip install -q dataeval[opencv] "maite-datasets[hf]>=0.0.25" "dataeval-plots>=0.0.19"
 except Exception:
     pass
 
 # %%
 import warnings
 
+import dataeval_plots as dep
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 from IPython.display import display
 from maite_datasets.multiobject_tracking import VisDroneMOT
-from matplotlib.patches import Rectangle
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
@@ -298,14 +298,14 @@ plt.show()
 road_frames = SequenceFrames(View(dataset, Indices([road_item])))
 least = road.sort("blur_edge_directionality")["frame"][0]
 most = road.sort("blur_edge_directionality")["frame"][-1]
-fig, axes = plt.subplots(1, 2, figsize=(12, 3.6))
-for ax, index, title in zip(axes, (least, most), ("least lopsided", "most lopsided"), strict=True):
-    image = np.moveaxis(np.asarray(road_frames[int(index)][0]), 0, -1)
-    ax.imshow(image)
-    ax.set_title(f"frame {index}, {title}")
-    ax.axis("off")
-fig.tight_layout()
-plt.show()
+dep.plot(
+    road_frames,
+    figsize=(12, 3.6),
+    indices=[int(least), int(most)],
+    images_per_row=2,
+    titles=[f"frame {least}, least lopsided", f"frame {most}, most lopsided"],
+    boxes=False,
+)
 
 # %% [markdown]
 # This video also zooms the most of the seven, so the same vehicle appears at different sizes within one flight. The
@@ -394,30 +394,21 @@ def window(item: int, around: list[list[float]], pad: int) -> tuple[int, int, in
     return x0, y0, x1, y1
 
 
-def show(ax, item: int, frame: int, area: tuple[int, int, int, int], box: list[float] | None, title: str) -> None:
-    """Draw one area of one frame of one video, with a box in red where there is one."""
-    image = np.moveaxis(np.asarray(SequenceFrames(View(dataset, Indices([item])))[frame][0]), 0, -1)
-    x0, y0, x1, y1 = area
-    ax.imshow(image[y0:y1, x0:x1])
-    if box is not None:
-        ax.add_patch(
-            Rectangle((box[0] - x0, box[1] - y0), box[2] - box[0], box[3] - box[1], fill=False, ec="red", lw=2)
-        )
-    ax.set_title(title)
-    ax.axis("off")
-
-
 night_item = item_of["uav0000117_02622_v"]
 path = track_path(night_item, 87)
 after = path.filter(pl.col("class_label") != pl.col("class_label").shift(1)).row(0, named=True)
 before = path.filter(pl.col("frame") < after["frame"]).row(-1, named=True)
 area = window(night_item, [before["box"], after["box"]], pad=60)
-fig, axes = plt.subplots(1, 2, figsize=(7, 3.2))
-for ax, row in zip(axes, (before, after), strict=True):
-    label = dataset.index2label[row["class_label"]]
-    show(ax, night_item, row["frame"], area, row["box"], f"frame {row['frame']}: {label}")
-fig.tight_layout()
-plt.show()
+dep.plot(
+    SequenceFrames(View(dataset, Indices([night_item]))),
+    figsize=(7, 3.2),
+    indices=[before["frame"], after["frame"]],
+    images_per_row=2,
+    titles=[f"frame {row['frame']}: {dataset.index2label[row['class_label']]}" for row in (before, after)],
+    boxes=[[before["box"]], [after["box"]]],
+    region=area,
+    box_color="red",
+)
 
 # %% [markdown]
 # The vehicle, partly behind a yellow car, looks the same in both frames. The change may be a borderline call between
@@ -439,14 +430,36 @@ shots = (
     (middle, None, "no box"),
     (back["frame"], back["box"], "labeled again"),
 )
-fig, axes = plt.subplots(1, 3, figsize=(10, 3.2))
-for ax, (frame, box, label) in zip(axes, shots, strict=True):
-    show(ax, road_item, frame, area, box, f"frame {frame}: {label}")
-fig.tight_layout()
-plt.show()
+dep.plot(
+    SequenceFrames(View(dataset, Indices([road_item]))),
+    figsize=(10, 3.2),
+    indices=[frame for frame, _, _ in shots],
+    images_per_row=3,
+    titles=[f"frame {frame}: {label}" for frame, _, label in shots],
+    boxes=[[box] if box is not None else [] for _, box, _ in shots],
+    region=area,
+    box_color="red",
+)
 
 # %% [markdown]
-# In the middle frame the van is still in plain view, between where it was last labeled and where it is labeled again,
+# Three still frames can miss a moment when the van is hidden. The animation below plays every frame from the last
+# labeled one to the one labeled again, cropped to the same area.
+#
+
+# %%
+gap = list(range(last["frame"], back["frame"] + 1))
+gif = dep.animate(
+    SequenceFrames(View(dataset, Indices([road_item]))),
+    indices=gap,
+    boxes=[[last["box"]]] + [[]] * (len(gap) - 2) + [[back["box"]]],
+    region=area,
+    box_color="red",
+    fps=4,
+)
+display(gif)
+
+# %% [markdown]
+# In every frame of the gap the van is in plain view, close to where it was last labeled and where it is labeled again,
 # yet it carries no box. Here the gap looks like a missed label rather than a vehicle that was hidden or left the frame.
 # Other gaps need the same look before you decide what they are.
 # [Measure frames and tracks in a tracking dataset](./h2_measure_frames_and_tracks.py) measures gaps and the steps
@@ -470,6 +483,7 @@ assert gapped[item_of["uav0000117_02622_v"]] == (0, 28)
 assert after["frame"] - before["frame"] == 1
 assert {dataset.index2label[before["class_label"]], dataset.index2label[after["class_label"]]} == {"car", "van"}
 assert back["frame"] - last["frame"] - 1 == 12
+assert len(gif.data) < 2_000_000
 
 # %% [markdown]
 # ## Check the size and crowding of the vehicles
