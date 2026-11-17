@@ -58,13 +58,7 @@ class TestHueNames:
 
 
 class TestSaturatedFractionNames:
-    DETAILS = {
-        "saturated_status",
-        "saturated_valid_fraction",
-        "saturated_above_range_fraction",
-        "saturated_upper",
-        "saturated_upper_rule",
-    }
+    DETAILS = {"saturated_status", "saturated_above_range_fraction", "saturated_upper"}
 
     def test_flag(self):
         assert ImageStats.PIXEL_SATURATED_FRACTION in ImageStats.PIXEL
@@ -94,7 +88,7 @@ class TestSaturatedFractionNames:
     def test_quality_gate_refusal_names_the_column(self):
         from dataeval.data import QualityGate
 
-        with pytest.raises(ValueError, match="Nor is .saturated_fraction., because it needs an endpoint"):
+        with pytest.raises(ValueError, match="Nor is .saturated_fraction., because data other than uint8 or float"):
             QualityGate("saturated_fraction", min=0.0)
 
 

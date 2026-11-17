@@ -40,16 +40,17 @@ def test_names_once_reserved_for_the_surround_measure_without_a_warning(image):
 
 
 def test_two_details_of_one_name_raise(image):
-    # Saturation on a group `surround` and CONTEXT's surround detail on a group `saturated` both give
-    # `surround_saturated_valid_fraction`; before the check the second overwrote the first without a word.
-    with pytest.raises(ValueError, match="surround_saturated_valid_fraction"):
+    # CONTEXT's surround detail on a group `x_target` (view first) and its box detail on a group `surround_x` (group
+    # first) both give `surround_x_target_valid_fraction`; before the check the second overwrote the first without a
+    # word.
+    with pytest.raises(ValueError, match="surround_x_target_valid_fraction"):
         image_stats(
             [image],
             boxes=[[[10, 10, 40, 40]]],
             labels=[[0]],
             stats={
-                "surround": ImageStats.PIXEL_SATURATED_FRACTION,
-                "saturated": ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN,
+                "surround_x": ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN,
+                "x_target": ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN,
             },
-            channels={"surround": [0], "saturated": [1]},
+            channels={"surround_x": [0], "x_target": [1]},
         )

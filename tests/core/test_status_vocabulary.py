@@ -155,7 +155,7 @@ class TestFamilyStatuses:
     def test_saturation_without_an_endpoint_is_unknown_range(self):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            result = image_stats([np.full((3, 8, 8), 0.5)], stats=ImageStats.PIXEL_SATURATED_FRACTION)
+            result = image_stats([np.full((3, 8, 8), 1, dtype=np.uint16)], stats=ImageStats.PIXEL_SATURATED_FRACTION)
         assert statuses(result, "saturated_status") == ["unknown_range"]
 
     def test_saturation_of_an_all_nan_view_or_a_covered_background_is_insufficient_support(self):

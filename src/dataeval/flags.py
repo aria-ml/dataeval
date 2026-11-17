@@ -19,8 +19,8 @@ class ImageStats(Flag):
     a full-scale reference and reads against the 0-255 display range — which makes one
     picture answer identically whether it arrived as 8-bit, 16-bit or float, and makes the
     answer NaN for data with no such reference, such as an elevation or temperature band.
-    The context and color statistics are the exception: they read a declared interval, else 8-bit data against
-    (0, 255) or floating-point data within [0, 1] or [0, 255], and are NaN otherwise.
+    The context, color and saturation statistics are the exception: they read a declared interval, else 8-bit data
+    against (0, 255) or floating-point data within [0, 1] or [0, 255], and are NaN otherwise.
     See :doc:`/concepts/ImageStatistics`.
 
     A statistic's column is its flag's name after the first underscore, in lower case: `PIXEL_MEAN` gives `mean` and
@@ -188,11 +188,11 @@ class ImageStats(Flag):
 
     - `PIXEL_SATURATED_FRACTION` : The share of finite raw values that sit at the endpoint, within `saturated_atol`. It
       counts channel values, not spatial pixels, so an image clipped in one channel of three reads 1/3. The endpoint is
-      never read from the data. It is the upper bound of a declared `value_range`, as :func:`~dataeval.core.image_stats`
-      resolves one for each image, else the maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean
-      data, else it is unknown and the value is NaN. Data of 12 bits stored in uint16 therefore reads against 65535
-      unless its range is declared as ``(0, 4095)``. Finite values above the endpoint stay in the denominator and are
-      not counted
+      never read from the data's maximum. It is the upper bound of the interval the context and color statistics
+      read: a declared `value_range`, as :func:`~dataeval.core.image_stats` resolves one for each image, else 255 for
+      ``uint8`` data, else 1 or 255 for floating-point data within [0, 1] or [0, 255], else it is unknown and the value
+      is NaN. Data of 12 bits stored in uint16 therefore reads NaN until its range is declared as ``(0, 4095)``. Finite
+      values above the endpoint stay in the denominator and are not counted
 
     A request that includes it also returns details, in the result's ``details``, one value per row, named with a band
     group's name in front when the row is a band group's:
@@ -200,17 +200,15 @@ class ImageStats(Flag):
     - `saturated_status` : `ok`, `not_applicable`, `invalid_box`, `missing_channel`, `unknown_range` (no endpoint
       resolved) or `insufficient_support` (no position of the datum in the view, as for a background the boxes cover,
       or no finite value)
-    - `saturated_valid_fraction` : The finite values over the positions of the view
     - `saturated_above_range_fraction` : The finite values above the endpoint plus `saturated_atol`, over the finite
-      values
+      values. A share above 0 says the declared range is narrower than the data
     - `saturated_upper` : The endpoint used, NaN when none resolved
-    - `saturated_upper_rule` : What supplied it, `declared` or `dtype`, and empty when none did
 
     The result's ``measurement_specs`` records `saturated_atol` and a range that the call or a channel group declared,
     so `combine_stats_results` refuses results measured with different ones. A range an image's own metadata declares
-    and the endpoint a dtype supplies are in the details, which are not compared, so a collection of ``uint8`` images
-    and a collection of ``uint16`` ones still combine. `QualityGate` does not accept it, since a gate measures frames
-    with no datum metadata to declare a range in.
+    and the endpoint the dtype or a float convention supplies are in the details, which are not compared, so a
+    collection of ``uint8`` images and a collection of float ones still combine. `QualityGate` does not accept it,
+    since a gate measures frames with no datum metadata to declare a range in.
 
     Context Statistics (the intensity of the pixels around a box, in `CONTEXT`):
 

@@ -84,15 +84,14 @@ Not every statistic uses the decode. Without a declared interval:
 | Statistics | Interval |
 | --- | --- |
 | Visual and blur statistics, the histogram, and the other pixel statistics under `normalize_pixel_values=True` | The decode above |
-| Context and color statistics, and the noise statistics under `normalize_pixel_values=True` | `(0, 255)` for `uint8`, and the two float conventions above; any other data is NaN with the status `unknown_range` |
-| `PIXEL_SATURATED_FRACTION` | The maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean data |
+| Context, color and saturation statistics, and the noise statistics under `normalize_pixel_values=True` | `(0, 255)` for `uint8`, and the two float conventions above; any other data is NaN with the status `unknown_range` |
 
-The context and color statistics, and the noise statistics when normalized, never read an integer image's own maximum,
-so two frames of one sensor cannot read on different scales, and a 12-bit sensor's output in `uint16` needs a
-declaration. The float conventions still read the data's extremes: a 0-255 float image whose values all lie at or below
-1 is read as the 0-1 convention. The reverse matters for the noise statistics: noise added to a 0-1 float image and not
-clipped puts some values above 1, which reads that image on the 0-255 convention and its noise 255 times too small, and
-a value below 0 leaves it with no interval. Declare `value_range` for floating-point data.
+The context, color and saturation statistics, and the noise statistics when normalized, never read an integer image's
+own maximum, so two frames of one sensor cannot read on different scales, and a 12-bit sensor's output in `uint16`
+needs a declaration. The float conventions still read the data's extremes: a 0-255 float image whose values all lie at
+or below 1 is read as the 0-1 convention. The reverse matters for the noise statistics: noise added to a 0-1 float
+image and not clipped puts some values above 1, which reads that image on the 0-255 convention and its noise 255 times
+too small, and a value below 0 leaves it with no interval. Declare `value_range` for floating-point data.
 
 ## When there is no reference
 
@@ -227,11 +226,11 @@ channel reads 1/3, and an RGBA image reads at least 1/4 for its opaque alpha cha
 [group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values
 above the endpoint stay in the denominator, are not counted as saturated, and are reported separately.
 
-DataEval does not decode the endpoint from the data. It is the upper bound of the declared `value_range`, then the
-maximum of an unsigned integer dtype, and the value is NaN when none applies. A depth decoded from the data depends on
-the data's own maximum, so one sensor's images could be read against different endpoints. Twelve-bit data stored in
-`uint16`, which the table above decodes as 4095 for scaling, is therefore measured against 65535 and reads 0.0 unless
-its range is declared as `(0, 4095)`.
+DataEval does not decode the endpoint from the data. It is the upper bound of the interval that
+[the table above](#where-the-reference-comes-from) gives the context, color and saturation statistics, and the value is
+NaN when none applies. A depth decoded from the data depends on the data's own maximum, so one sensor's images could be
+read against different endpoints. Twelve-bit data stored in `uint16`, which the table above decodes as 4095 for
+scaling, therefore reads NaN until its range is declared as `(0, 4095)`.
 
 A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
 floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the

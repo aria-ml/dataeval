@@ -18,10 +18,8 @@ class _Saturation(NamedTuple):
 
     status: str
     saturation: float
-    valid_fraction: float
     above_range_fraction: float
     upper: float
-    rule: str
 
 
 def _finite(image: NDArray[Any]) -> tuple[NDArray[np.bool_] | None, int]:
@@ -36,7 +34,7 @@ def _finite(image: NDArray[Any]) -> tuple[NDArray[np.bool_] | None, int]:
     return mask, int(np.count_nonzero(mask))
 
 
-def _status(cache: "CalculatorCache", finite: int, endpoint: tuple[float, str] | None) -> str:
+def _status(cache: "CalculatorCache", finite: int, endpoint: float | None) -> str:
     """Name why a view has no reading, or ``ok``, in the shared order of the statuses.
 
     An invalid box, then a channel group the datum cannot supply, then no endpoint, then nothing to count: no position
@@ -277,41 +275,32 @@ class PixelStatCalculator(Calculator[ImageStats]):
         # would answer a question nobody asked.
         return self._as_fraction(np.count_nonzero(self.cache.image == 0))
 
-    def _endpoint(self) -> tuple[float, str] | None:
-        """Return the clipping endpoint and what supplied it, or None when nothing did.
-
-        In the order the statistic defines: a range declared for this view, by the call, a channel group or the image's
-        own metadata, then the maximum of the datum's unsigned integer dtype, 1 for a Boolean one. Never the observed
-        maximum, and never `value_range` when it was decoded from the data, which would read 12-bit values in uint16 as
-        4095 and so call a clipped image unclipped, or the reverse.
-        """
-        if self.cache.has_declared_range:
-            return float(self.cache.value_range.pmax), "declared"
-        dtype = self.cache.raw.dtype
-        if dtype.kind == "b":
-            return 1.0, "dtype"
-        # ponytail: uint64 is counted in float64, which cannot tell values within 2**11 of its maximum apart, so it has
-        # no dtype endpoint. No sensor writes it. Upgrade is an integer comparison path for that dtype.
-        if dtype.kind == "u" and dtype.itemsize <= 4:
-            return float(np.iinfo(dtype).max), "dtype"
-        return None
-
     @cached_property
     def _saturation(self) -> _Saturation:
-        """Read the view once, for both the statistic and the details that describe it."""
+        """Read the view once, for both the statistic and the details that describe it.
+
+        The endpoint is the upper bound of the interval the context and color statistics read (`full_scale`), never
+        the observed maximum, which would read 12-bit values in uint16 as 4095 and so call a clipped image unclipped,
+        or the reverse.
+        """
         image = self.cache.image
         finite_mask, finite = _finite(image)
-        positions = image.size - self.cache.excluded_total
-        valid = finite / positions if positions > 0 else np.nan
-        endpoint = self._endpoint()
-        upper, rule = endpoint or (np.nan, "")
+        scale = self.cache.full_scale
+        endpoint = None if scale is None else scale[1]
         status = _status(self.cache, finite, endpoint)
+        if status == "unknown_range":
+            self.warnings.append(
+                "no value range was declared, so the saturated fraction is NaN with the status unknown_range. Only "
+                "unsigned 8-bit data, and floating-point data within [0, 1] or [0, 255], have a range without a "
+                "declaration: pass value_range=(low, high), or declare it in the datum's metadata."
+            )
+        upper = np.nan if endpoint is None else endpoint
         if status != "ok":
-            return _Saturation(status, np.nan, valid, np.nan, upper, rule)
+            return _Saturation(status, np.nan, np.nan, upper)
         saturated, above = _counts_at(
             image, finite_mask, self.cache.raw.dtype, upper, self.cache.settings.saturation.atol
         )
-        return _Saturation(status, saturated / finite, valid, above / finite, upper, rule)
+        return _Saturation(status, saturated / finite, above / finite, upper)
 
     @classmethod
     def measurement_specs(
@@ -323,10 +312,11 @@ class PixelStatCalculator(Calculator[ImageStats]):
     ) -> dict[str, MeasurementSpec]:
         """Record the saturation setting and the range the call or a channel group declared.
 
-        Without a declared range the endpoint is left to each image, from its own metadata or its dtype. ponytail: that
-        endpoint differs between images, and between a uint8 and a uint16 collection, while the spec reads the same
-        for all of them, since the per-row endpoint is in the details, which are not compared when results are
-        combined. Upgrade is recording what each image declared, which would refuse any two collections that differ.
+        Without a declared range the endpoint is left to each image, from its own metadata, its dtype or its float
+        convention. ponytail: that endpoint differs between images, and between a uint8 and a float collection, while
+        the spec reads the same for all of them, since the per-row endpoint is in the details, which are not compared
+        when results are combined. Upgrade is recording what each image declared, which would refuse any two
+        collections that differ.
         """
         if not flags & ImageStats.PIXEL_SATURATED_FRACTION:
             return {}
@@ -357,10 +347,8 @@ class PixelStatCalculator(Calculator[ImageStats]):
         reading = self._saturation
         return {
             "saturated_status": [reading.status],
-            "saturated_valid_fraction": [reading.valid_fraction],
             "saturated_above_range_fraction": [reading.above_range_fraction],
             "saturated_upper": [reading.upper],
-            "saturated_upper_rule": [reading.rule],
         }
 
     def _histogram(self) -> list[Any]:
@@ -374,10 +362,9 @@ class PixelStatCalculator(Calculator[ImageStats]):
         """Return empty values for pixel statistics."""
         return {
             "histogram": [np.nan] * 256,  # Histogram with 256 bins
-            # A row that does not measure it, such as a box row of a background pass, has no rule, and its status says
-            # the view does not apply. Without a string default the padded column would hold the text 'nan'.
+            # A row that does not measure it, such as a box row of a background pass: its status says the view does
+            # not apply. Without a string default the padded column would hold the text 'nan'.
             "saturated_status": "not_applicable",
-            "saturated_upper_rule": "",
         }
 
     def get_handlers(self) -> dict[ImageStats, Handler]:

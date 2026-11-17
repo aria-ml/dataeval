@@ -35,7 +35,7 @@ STANDARD_STATS = """
     brightness contrast darkness sharpness percentiles
 """
 SATURATED_DETAILS = """
-    saturated_status saturated_valid_fraction saturated_above_range_fraction saturated_upper saturated_upper_rule
+    saturated_status saturated_above_range_fraction saturated_upper
 """
 BASIC_STATS = "width height channels aspect_ratio mean std var brightness contrast sharpness"
 STANDARD_HASH_STATS = """
@@ -63,7 +63,7 @@ ALL_DETAILS = """
     surround_peer_excluded_fraction surround_measurable_pixels surround_valid_fraction target_valid_fraction
     context_range_low context_range_high context_ratio_reason target_surround_contrast_floored
     signal_clutter_ratio_floored
-    saturated_status saturated_valid_fraction saturated_above_range_fraction saturated_upper saturated_upper_rule
+    saturated_status saturated_above_range_fraction saturated_upper
     spatial_status spatial_incomplete_geometry nn_distance_norm_target_index nn_distance_norm_reason
     spatial_peer_count spatial_skipped_count covered_fraction_reason max_iou_same_class_target_index
     max_iou_same_class_reason max_iou_other_class_target_index max_iou_other_class_label max_iou_other_class_reason
