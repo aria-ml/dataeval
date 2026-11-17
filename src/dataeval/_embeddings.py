@@ -19,6 +19,7 @@ from dataeval._log import get_logger
 from dataeval.config import get_load_threads, resolve_batch_size
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.extractors import FlattenExtractor
+from dataeval.extractors._videotorch import _is_mirrored, _mirror
 from dataeval.protocols import (
     AnnotatedDataset,
     Array,
@@ -149,14 +150,28 @@ def _memmap_for_all(children: Mapping[str, "Embeddings"], rows: Mapping[str, NDA
     return _exceeds_memory(estimated, first.memory_threshold)
 
 
-def _extract_each(children: Mapping[str, "Embeddings"], images: Sequence[Any]) -> dict[str, NDArray[Any]]:
-    """Run every child's extractor on its own views of one batch, naming the extractor in any error it raises."""
-    if len(children) > 1:
+def _mirrored(children: Mapping[str, "Embeddings"]) -> dict[str, Any]:
+    """Return the video extractors that share one walk of each video, when there are at least two of them."""
+    mirrored = {key: child._extractor for key, child in children.items() if _is_mirrored(child._extractor)}
+    return mirrored if len(mirrored) > 1 else {}
+
+
+def _extract_each(
+    children: Mapping[str, "Embeddings"], indices: Sequence[int], images: Sequence[Any]
+) -> dict[str, NDArray[Any]]:
+    """Run every child's extractor on its own views of one batch, naming the extractor in any error it raises.
+
+    Two or more `VideoTorchExtractor`s share one walk of each video, so they count as one reader of a one-shot stream.
+    """
+    mirrored = _mirrored(children)
+    if len(children) - len(mirrored) + bool(mirrored) > 1:
         _refuse_one_shot(images)
+    outputs = _mirror(mirrored, _private_copies(images), indices) if mirrored else {}
     rows: dict[str, NDArray[Any]] = {}
     for key, child in children.items():
         try:
-            rows[key] = child._rows(child._extractor(_private_copies(images)), len(images))
+            raw = outputs[key] if key in outputs else child._extractor(_private_copies(images))
+            rows[key] = child._rows(raw, len(images))
         except Exception as error:
             error.add_note(f"Raised by the extractor {key!r} given to Embeddings.compute_multi.")
             raise
@@ -170,7 +185,7 @@ def _fill_together(children: Mapping[str, "Embeddings"], size: int, progress_cal
     use_memmap: bool | None = None
     for start in range(0, total, size):
         indices = list(range(start, min(start + size, total)))
-        rows = _extract_each(children, first._fetch_images(indices))
+        rows = _extract_each(children, indices, first._fetch_images(indices))
         if use_memmap is None:
             use_memmap = _memmap_for_all(children, rows)
         for key, child in children.items():
@@ -596,8 +611,9 @@ class Embeddings(Array, FeatureExtractor):
         Compute the embeddings of several extractors in one pass over a dataset, reading each item once.
 
         Each batch of `dataset` is read once and given to every extractor in turn, in the order of `extractors`, before
-        the next batch is read. Each extractor's embeddings become an ordinary :class:`Embeddings`, equal to the one it
-        gives on its own with the same batch size, unless it draws random numbers, which it then draws in another order.
+        the next batch is read. Two or more video extractors run first, together, as the Notes describe. Each
+        extractor's embeddings become an ordinary :class:`Embeddings`, equal to the one it gives on its own with the
+        same batch size, unless it draws random numbers, which it then draws in another order.
 
         Parameters
         ----------
@@ -642,9 +658,15 @@ class Embeddings(Array, FeatureExtractor):
 
         Each :class:`~dataeval.extractors.TorchExtractor` runs its own forward pass, also when several share a model,
         and every extractor's model is held in memory for the whole pass. :func:`~dataeval.config.set_load_threads`
-        applies to the reads, and the extractors run on the calling thread. A video stream is walked once by each
-        extractor that receives it, so it must be one that can be walked again. Each embedding is tested equal to the
+        applies to the reads, and the extractors run on the calling thread. Each embedding is tested equal to the
         extractor's own result on the CPU; a GPU and Windows are untested.
+
+        Two or more :class:`~dataeval.extractors.VideoTorchExtractor` share one walk of each video: each frame is read
+        once and given to every one of them, and no more than one clip of it is held for each. A video that is sliced
+        into clips rather than walked, such as a tensor, is in memory already, and each of them slices its own copy of
+        a NumPy array or a tensor. Any other extractor
+        walks the video again, and so does a subclass of :class:`~dataeval.extractors.VideoTorchExtractor` that
+        overrides its call. A one-shot stream is refused only when more than one walk of it would be needed.
 
         This raises :class:`~dataeval.exceptions.ExperimentalWarning` on the first call in a process.
 
