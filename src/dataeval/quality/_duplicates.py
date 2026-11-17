@@ -2592,7 +2592,7 @@ def _frame_targets_of(measured: SequenceFrames) -> Iterator[tuple[int, int, Any]
             yield position, sequence, tracks[int(frame)]
 
 
-def _targets_of(measured: Any) -> Iterator[tuple[int, Any, Any]]:
+def _targets_of(measured: Any, first: Any = None) -> Iterator[tuple[int, Any, Any]]:
     """Yield each item's index, image, and target, reading targets and never a video frame.
 
     Only for a per-item dataset. An object-detection dataset, an image dataset, or a bare array
@@ -2606,13 +2606,30 @@ def _targets_of(measured: Any) -> Iterator[tuple[int, Any, Any]]:
     The image comes back alongside the target rather than being fetched again for its shape.
     ``__getitem__`` is a decode for a disk-backed dataset. The annotation axis runs on every
     annotated evaluation. So asking twice would double that cost for nothing.
+
+    `first`, when given, is item 0 as the caller already read it, so the walk does not read it again.
     """
     if not _is_protocol_instance(measured, Dataset):
         return
     for index in range(len(measured)):
-        datum = measured[index]
+        datum = first if index == 0 and first is not None else measured[index]
         if isinstance(datum, tuple) and len(datum) == 3:
             yield index, datum[0], datum[1]
+
+
+def _first_detection_datum(measured: Any) -> Any:
+    """Return item 0 when it is a detection datum, so the dataset can carry annotations, and None when it cannot.
+
+    A per-item dataset holds one kind of item. Unless its first item is an ``(item, target, metadata)`` triple with an
+    object-detection target, no item has an annotation, which is what :func:`_annotated_frames` would find for each one
+    after decoding it. Empty and non-dataset input carry none either.
+    """
+    if not _is_protocol_instance(measured, Dataset) or len(measured) == 0:
+        return None
+    first = measured[0]
+    if not (isinstance(first, tuple) and len(first) == 3):
+        return None
+    return first if _is_protocol_instance(first[1], ObjectDetectionTarget) else None
 
 
 def _annotated_frames(target: Any) -> list[tuple[Any, Any, Any]]:
@@ -2715,6 +2732,11 @@ def _annotation_sources(measured: Any) -> dict[int, _AnnotationSource]:
     Returns an empty mapping when the dataset carries no annotation. That is what makes the
     annotation axis self-disabling rather than an error for a plain image dataset.
 
+    A dataset holds one kind of item, so the first item decides whether to walk at all. Unless it is an
+    ``(item, target, metadata)`` triple whose target is an object-detection target, no item has an annotation, and
+    walking would decode every image to find that out. That is the whole cost of the axis for a classification or
+    image-only dataset, so it is one read of item 0 there, and a detection dataset is walked exactly as before.
+
     Kept whole rather than reduced to a digest on the spot. Two callers want two different things
     from one walk. :func:`_annotation_digests` wants the fingerprint that groups identical
     annotations. :func:`_measure_divergence` wants the boxes themselves, to say by how much
@@ -2739,8 +2761,14 @@ def _annotation_sources(measured: Any) -> dict[int, _AnnotationSource]:
         return _multi_annotation_sources(measured)
     if isinstance(measured, SequenceFrames):
         return _sequence_sources(measured)
+    first = _first_detection_datum(measured)
+    return {} if first is None else _detection_sources(measured, first)
+
+
+def _detection_sources(measured: Any, first: Any) -> dict[int, _AnnotationSource]:
+    """Walk a detection dataset once, reading each item's annotation off its target. `first` is item 0, already read."""
     sources: dict[int, _AnnotationSource] = {}
-    for item_index, image, target in _targets_of(measured):
+    for item_index, image, target in _targets_of(measured, first):
         frames = _annotated_frames(target)
         if not frames:
             continue
