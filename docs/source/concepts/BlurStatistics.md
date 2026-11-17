@@ -283,7 +283,7 @@ and for a color frame they differ from `blur_edge_width_median` even at the same
 
 ## Related concept pages
 
-- [Image statistics](ImageStatistics.md): the pixel and visual statistics, the value range and the transforms that
+- [Image statistics](ImageStatistics.md): the image statistic families, the value range and the transforms that
   invalidate statistics
 - [Data integrity](DataIntegrity.md): the evaluators these statistics feed
 - [Metadata levels](MetadataLevels.md): how a per-frame statistic is rolled up to each video

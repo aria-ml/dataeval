@@ -469,7 +469,7 @@ statistical and computational.
 - - {func}`.image_stats`, {func}`.combine_stats_results`,
     {func}`.compute_ratios`
   - Image statistics vocabulary. See
-    [Image statistics in integrity checks](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks).
+    [Statistic families](../concepts/ImageStatistics.md#statistic-families).
   - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
   - Descriptive only. A statistic being unusual is not evidence a sample is
     bad. Every pixel counts, so a part of the vehicle in frame shifts the
@@ -555,8 +555,12 @@ statistical and computational.
 - - {func}`.noise_immerkaer` and {func}`.image_stats` (`ImageStats.NOISE`)
   - The noise estimator of [Immerkær (1996)](https://doi.org/10.1006/cviu.1996.0060): the mean absolute response to a
     3x3 mask of second differences, scaled to the standard deviation of white Gaussian noise.
-  - Ground-truth checked (white Gaussian noise of known variance on simulated images, a hand-worked impulse, and
-    lossless FFV1 video of a synthetic scene with known noise added; simulated noise only)
+  - Ground-truth checked (on white Gaussian noise added to a flat image of 256 x 256 pixels, the estimate is within 5%
+    of the standard deviation of the noise added and its square within 10% of the variance; on lossless FFV1 8-bit
+    video of a synthetic scene with moving shapes, with noise of standard deviation 4, 8 and 16 of 255 levels added,
+    the median reading over the frames rises with the noise, and at 8 and 16 levels the median over the frames of the
+    variance above the clean clip's reading is within 10% of the variance added; a hand-worked impulse; simulated
+    noise only)
   - Descriptive only. Texture and edges that are not parallel to a side of the image read as noise, and pixels that
     carry no noise, such as letterbox bars, lower the reading, so compare images of similar content. Correlated,
     signal-dependent, re-encoded and real sensor noise were not measured. See [Noise
