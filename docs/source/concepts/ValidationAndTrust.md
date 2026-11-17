@@ -590,6 +590,9 @@ Experimental ⚠️ (API may change or be removed):
 - {func}`.set_load_threads` and {func}`.use_load_threads` raise {class}`~dataeval.exceptions.ExperimentalWarning` the
   first time either is given more than one thread in a process. The names, and which reads the setting covers, may
   change. With the default, None, or one thread they raise nothing.
+- {meth}`.Embeddings.compute_multi` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a
+  process. Its name, and what it shares between extractors, may change. An {class}`.Embeddings` built without it raises
+  nothing.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,
