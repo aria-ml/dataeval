@@ -19,10 +19,18 @@ docs:
     # rest: it validates the shared inputs and the source files each notebook imports against the
     # actual restored cache and removes the cached outputs of only the stale notebooks. Checking the
     # cache, not the previous commit, means a skipped or canceled pipeline cannot leave stale outputs.
+    # Merge request pipelines are best effort instead: they start from the restored cache and
+    # re-execute only the notebooks whose code cells changed, so main's builds are the only ones that
+    # pay for a widely imported file. The merge train pipeline still runs the check, as the gate.
     - |
+      BEST_EFFORT=
+      if [ "$CI_PIPELINE_SOURCE" = merge_request_event ] && [ "$CI_MERGE_REQUEST_EVENT_TYPE" != merge_train ]; then
+        BEST_EFFORT=1
+        echo "Docs cache: best effort on a merge request pipeline; skipping the execution-input check."
+      fi
       if [ -z "$DOCS_CLEAN" ]; then
         bash docs/fetch-docs-cache.sh || true
-        if ! uv run --no-project python docs/notebook_cache_inputs.py check; then
+        if [ -z "$BEST_EFFORT" ] && ! uv run --no-project python docs/notebook_cache_inputs.py check; then
           DOCS_CLEAN='-- clean'
         fi
       fi
@@ -42,7 +50,12 @@ docs:
     - uvx nox -P "$DOCS_PYTHON_VERSION" -e docs $DOCS_CLEAN
     # Stamp only after a successful build; the manifest travels with the cache
     # to docs-artifacts/<ref>, including when a later build falls back to main.
-    - uv run --no-project python docs/notebook_cache_inputs.py record
+    # A best-effort build leaves the manifest alone: it keeps describing the tree the cached
+    # outputs were last validated against, so the merge train check computes the right difference.
+    - |
+      if [ -z "$BEST_EFFORT" ]; then
+        uv run --no-project python docs/notebook_cache_inputs.py record
+      fi
     - bash docs/push-docs-cache.sh
   after_script:
     # The Kubernetes cache helper can run as a different uid. Hugging Face tree
