@@ -353,7 +353,8 @@ def set_load_threads(threads: int | None) -> None:
     """
     Set how many threads load dataset items at once.
 
-    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset.
+    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset, and so does
+    :class:`~dataeval.data.Filter` given `where`, which reads every item once.
 
     Parameters
     ----------
@@ -376,9 +377,10 @@ def set_load_threads(threads: int | None) -> None:
     raising. Results and their order are unchanged. Threads help when each read takes more than a few milliseconds and
     releases the GIL, such as decoding a large image, and can be slower than the serial loop when reads are short. A
     random transform inside the dataset draws from shared random state, so seeded results can differ between runs. A
-    multi-object tracking dataset is always read serially, and so is a :class:`~dataeval.data.View` record. Evaluators
-    that build their own :class:`~dataeval.Embeddings` or :class:`~dataeval.Metadata` use the setting too. It is not
-    tested with datasets that land their data on a GPU, or on Windows or macOS.
+    multi-object tracking dataset is always read serially, and so is a :class:`~dataeval.data.View` record. A transform
+    that a :class:`~dataeval.data.View` applies runs in those threads too, so one you wrote must be safe for that.
+    Evaluators that build their own :class:`~dataeval.Embeddings` or :class:`~dataeval.Metadata` use the setting too. It
+    is not tested with datasets that land their data on a GPU, or on Windows or macOS.
 
     Setting more than one thread raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
 

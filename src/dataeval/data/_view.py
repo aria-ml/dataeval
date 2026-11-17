@@ -9,10 +9,13 @@ from numpy.typing import NDArray
 
 from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
+from dataeval.config import get_load_threads
 from dataeval.data._reads import Reads, recordable, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
+from dataeval.types._task import detect_task
+from dataeval.utils._internal import read_ordered
 from dataeval.utils.data import DatasetKind, validate_dataset
 
 _logger = get_logger(__name__)
@@ -319,8 +322,20 @@ class View(AnnotatedDataset[_TDatum]):
                 len(wanted),
                 len(missing),
             )
-        for index in missing:
-            reads[index] = skeleton(self.read(index))
+        threads = get_load_threads()
+        if threads is not None and threads > 1 and len(missing) > 2:
+            # The first item is read here, on the calling thread: it names the task, and a tracking dataset is read
+            # serially, as the Metadata walk reads one. The pixels are dropped inside each thread, so only skeletons
+            # wait for the loop.
+            reads[missing[0]] = head = skeleton(self.read(missing[0]))
+            rest = missing[1:]
+            parallel = None if detect_task(head[1]) == "MOT" else threads
+            loaded = read_ordered(lambda index: skeleton(self.read(index)), rest, parallel, ahead=4 * threads)
+            for index, datum in zip(rest, loaded, strict=True):
+                reads[index] = datum
+        else:
+            for index in missing:
+                reads[index] = skeleton(self.read(index))
         self._reads = reads
         return [reads[index] for index in self.selection]
 
