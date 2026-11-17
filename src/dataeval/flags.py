@@ -30,8 +30,8 @@ class ImageStats(Flag):
     (`surround_nir_intensity_mean`). Two parts of a call that would give one name raise.
 
     The statistics added in 1.3 report a status for each row in their details (`blur_status`, `spatial_status`,
-    `saturated_status`, `context_status`, `color_status`). A value is NaN unless its status is `ok`, and every status
-    comes from one list, the first that applies:
+    `saturated_status`, `context_status`, `color_status`, `noise_status`). A value is NaN unless its status is `ok`,
+    and every status comes from one list, the first that applies:
 
     - `not_applicable` : A row the statistic does not define, such as an image's own row for a box statistic
     - `invalid_box` : The box, as converted, lies outside the image, has zero area or is not finite, which is what
@@ -309,6 +309,31 @@ class ImageStats(Flag):
     them, and `Outliers` and `Duplicates` cannot take the keyword, so compute with `image_stats` and pass the result
     to their ``from_stats``. See :doc:`/concepts/ImageStatistics` for what they do not establish.
 
+    Noise Statistics (estimated from the pixels alone, in `NOISE`):
+
+    - `PIXEL_NOISE_STD` : The estimated standard deviation of additive white Gaussian noise, the square root of
+      `PIXEL_NOISE_VAR`
+    - `PIXEL_NOISE_VAR` : The mean over the view's channels of each channel's estimated noise variance. Each channel is
+      read with Immerkaer's estimator, :func:`~dataeval.core.noise_immerkaer`, over the 3x3 neighborhoods that hold no
+      NaN and no masked pixel, so a masked or missing pixel creates no edge
+
+    A channel needs at least 64 valid neighborhoods, which a square region first has at 10x10, and that floor is fixed.
+    The values are in the data's own units. With `normalize_pixel_values` they are divided by the full scale: a
+    declared range, else ``(0, 255)`` for unsigned 8-bit data, else ``(0, 1)`` or ``(0, 255)`` for floating-point data
+    within it, and any other data is NaN with the status `unknown_range`. The float conventions read each image's own
+    values, so declare `value_range` for floating-point data: unclipped noise on 0-1 data moves an image to
+    ``(0, 255)``. They are defined for the image, each box, the
+    background, each channel group and, with `per_surround`, each box's surround, so a call with
+    ``channels={"r": 0, "g": 1, "b": 2}`` adds a reading of each channel beside the joint one. What a reading can and
+    cannot tell is in the Notes of :func:`~dataeval.core.noise_immerkaer`. A request that includes them also returns
+    details, in the result's ``details``, one value per row, named for a band group as the columns are:
+
+    - `noise_status` : `ok`, `not_applicable`, `invalid_box`, `missing_channel`, `unknown_range` or
+      `insufficient_support` (a channel with fewer than 64 valid neighborhoods, as in a square view under 10x10, a datum
+      with no image plane or a background the boxes cover)
+    - `noise_neighborhoods` : The fewest valid neighborhoods of any channel of the view, 0 where it has none, and -1
+      where the view is not read
+
     Convenience Groups
     ------------------
     Sub-groups:
@@ -328,7 +353,8 @@ class ImageStats(Flag):
     Full Categories:
 
     - `NONE` : No statistics
-    - `PIXEL` : All pixel statistics, including `PIXEL_SATURATED_FRACTION`
+    - `PIXEL` : All pixel statistics, including `PIXEL_SATURATED_FRACTION`. The noise statistics are pixel statistics
+      too, in their own opt-in group `NOISE`, outside `PIXEL`
     - `VISUAL` : The core visual statistics. The blur and color statistics are visual statistics too, in their own
       opt-in groups `BLUR` and `COLOR`, outside `VISUAL`
     - `DIMENSION` : All dimension statistics
@@ -345,14 +371,15 @@ class ImageStats(Flag):
       boxes, and are NaN on every other row
     - `COLOR` : The five experimental color statistics. They are measured only where
       `color_rgb_channels` is given, and are dropped from a request, with a notice, where it is not
+    - `NOISE` : The two noise statistics, `PIXEL_NOISE_STD` and `PIXEL_NOISE_VAR`
     - `BASIC` : Mean, std, var, brightness, contrast, sharpness, width, height, channels and aspect ratio
       (`PIXEL_BASIC`, `VISUAL_BASIC` and `DIMENSION_BASIC`), with no hashes. Its columns change only after a
       deprecation and a migration note. A subset of what `image_stats` computes when given no `stats`, so cheaper to
       compute, and the set to start from
     - `ALL` : Every statistic in this release, including the experimental blur and color statistics, the spatial
-      statistics and the context statistics. A later release can add statistics to it. The color statistics are
-      measured only where `color_rgb_channels` is given. Name `BASIC`, `STANDARD` or single statistics when the
-      columns must not change
+      statistics, the context statistics and the noise statistics. A later release can add statistics to it. The
+      color statistics are measured only where `color_rgb_channels` is given. Name `BASIC`, `STANDARD` or single
+      statistics when the columns must not change
 
     Notes
     -----
@@ -360,15 +387,15 @@ class ImageStats(Flag):
     automatically during processing.
 
     .. versionadded:: 1.3
-        The `BLUR`, `SPATIAL`, `CONTEXT` and `COLOR` statistics, `PIXEL_SATURATED_FRACTION`, and the `STANDARD` and
-        `BASIC` groups.
+        The `BLUR`, `SPATIAL`, `CONTEXT`, `COLOR` and `NOISE` statistics, `PIXEL_SATURATED_FRACTION`, and the
+        `STANDARD` and `BASIC` groups.
 
     .. deprecated:: 1.3
         `NO_HASH`, the v1.2 name of `STANDARD`. It is removed in 2.0.
 
     What `ALL` held in v1.2 is
     ``ImageStats.ALL & ~ImageStats.BLUR & ~ImageStats.SPATIAL & ~ImageStats.PIXEL_SATURATED_FRACTION &
-    ~ImageStats.CONTEXT & ~ImageStats.COLOR``.
+    ~ImageStats.CONTEXT & ~ImageStats.COLOR & ~ImageStats.NOISE``.
     The `SPATIAL` and `CONTEXT` statistics need box rows, so a request for `ALL` with no box rows returns their columns
     as NaN, without a warning, as a statistic reads NaN on any row it cannot measure. Any other request that holds
     them and measures no box rows warns. A request that holds nothing else raises when the call has no boxes at all
@@ -391,8 +418,9 @@ class ImageStats(Flag):
     # - One prefix per family. A member's column is its name after the first underscore, lowercased, so the name must
     #   parse to a column that says what it measures and collides with no other (a new noise family cannot be
     #   `NOISE_STD`, which parses to `std`).
-    # - `BLUR` and `COLOR` are opt-in groups of visual statistics outside `VISUAL`; their members carry `VISUAL_` so
-    #   that the column keeps the family word (`blur_edge_width`, `color_lightness_mean`).
+    # - `BLUR` and `COLOR` are opt-in groups of visual statistics outside `VISUAL`, and `NOISE` one of pixel statistics
+    #   outside `PIXEL`; their members carry `VISUAL_` or `PIXEL_` so that the column keeps the family word
+    #   (`blur_edge_width`, `color_lightness_mean`, `noise_std`).
     # - A detail's stem is its family, its sub-category or the shared stem of the statistics it covers; `<stem>_status`
     #   is a row's state and `<stem>_reason` one statistic's own NaN cause. A keyword's prefix names what it configures.
     # - Members are appended, never inserted, so that no flag value moves.
@@ -479,6 +507,11 @@ class ImageStats(Flag):
     VISUAL_COLOR_HUE_COS_MEAN = auto()
     VISUAL_COLOR_HUE_SIN_MEAN = auto()
 
+    # ===== NOISE =====
+    # Appended after the color flags so that no flag value moves.
+    PIXEL_NOISE_STD = auto()
+    PIXEL_NOISE_VAR = auto()
+
     # ===== COARSE-GRAINED GROUPS =====
     # Full category groups
     PIXEL = (
@@ -549,6 +582,9 @@ class ImageStats(Flag):
         | VISUAL_COLOR_HUE_SIN_MEAN
     )
 
+    # Kept out of PIXEL, so the default request and Outliers' default keep their columns and their speed
+    NOISE = PIXEL_NOISE_STD | PIXEL_NOISE_VAR
+
     # Convenience sub-groups
     PIXEL_BASIC = PIXEL_MEAN | PIXEL_STD | PIXEL_VAR
     PIXEL_DISTRIBUTION = PIXEL_SKEW | PIXEL_KURTOSIS | PIXEL_ENTROPY | PIXEL_HISTOGRAM
@@ -590,7 +626,7 @@ class ImageStats(Flag):
     BASIC = PIXEL_BASIC | VISUAL_BASIC | DIMENSION_BASIC
 
     # Ultimate convenience, spelled from the families so that a change to STANDARD cannot take a statistic out of it
-    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL | CONTEXT | COLOR
+    ALL = PIXEL | VISUAL | DIMENSION | HASH | BLUR | SPATIAL | CONTEXT | COLOR | NOISE
 
 
 class VideoStats(Flag):

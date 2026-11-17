@@ -69,6 +69,7 @@ class TestBoxRule:
             (ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN, "context_status"),
             (ImageStats.PIXEL_SATURATED_FRACTION, "saturated_status"),
             (ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN, "color_status"),
+            (ImageStats.PIXEL_NOISE_STD, "noise_status"),
         ],
     )
     def test_outside_zero_area_and_nan_boxes_are_invalid_box_in_every_new_family(self, flag, status):
@@ -81,6 +82,7 @@ class TestBoxRule:
         [
             (ImageStats.PIXEL_SATURATED_FRACTION, "saturated_fraction", "saturated_status"),
             (ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN, "color_lightness_mean", "color_status"),
+            (ImageStats.PIXEL_NOISE_STD, "noise_std", "noise_status"),
         ],
     )
     def test_pixel_families_measure_a_reversed_box_as_its_twin(self, flag, column, status):
@@ -98,11 +100,12 @@ class TestBoxRule:
             ImageStats.DIMENSION_INVALID_BOX
             | ImageStats.SPATIAL
             | ImageStats.CONTEXT
-            | ImageStats.PIXEL_SATURATED_FRACTION,
+            | ImageStats.PIXEL_SATURATED_FRACTION
+            | ImageStats.NOISE,
             per_image=False,
         )
         column = [bool(v) for v in result["stats"]["invalid_box"]]
-        for name in ("spatial_status", "context_status", "saturated_status"):
+        for name in ("spatial_status", "context_status", "saturated_status", "noise_status"):
             for flagged, status in zip(column, statuses(result, name), strict=True):
                 assert (status == "invalid_box") == flagged, (name, status, flagged)
 
@@ -138,6 +141,7 @@ class TestFamilyStatuses:
         [
             (ImageStats.CONTEXT_SURROUND_INTENSITY_MEAN, "far_context_status"),
             (ImageStats.PIXEL_SATURATED_FRACTION, "far_saturated_status"),
+            (ImageStats.PIXEL_NOISE_STD, "far_noise_status"),
         ],
     )
     def test_a_channel_group_the_datum_cannot_supply_is_missing_channel(self, flag, status):
@@ -169,6 +173,7 @@ class TestFamilyStatuses:
         [
             (ImageStats.PIXEL_SATURATED_FRACTION, "background_saturated_status"),
             (ImageStats.VISUAL_COLOR_LIGHTNESS_MEAN, "background_color_status"),
+            (ImageStats.PIXEL_NOISE_STD, "background_noise_status"),
         ],
     )
     def test_a_status_on_a_row_its_view_does_not_define_is_not_applicable(self, flag, status):
@@ -197,6 +202,7 @@ class TestEveryFamily:
             "context_status": ["surround_intensity_mean"],
             "saturated_status": ["saturated_fraction"],
             "color_status": ["color_lightness_mean"],
+            "noise_status": ["noise_std", "noise_var"],
         }
         for status_name, columns in families.items():
             for prefix in ("", "background_", "rg_", "far_"):
@@ -218,6 +224,7 @@ class TestEveryFamily:
     [
         (ImageStats.PIXEL_SATURATED_FRACTION, "g_saturated_status"),
         (ImageStats.VISUAL_BLUR_EDGE_WIDTH, "g_blur_status"),
+        (ImageStats.PIXEL_NOISE_STD, "g_noise_status"),
     ],
 )
 def test_a_channel_group_on_a_one_dimensional_datum_is_missing_channel(stats, status):

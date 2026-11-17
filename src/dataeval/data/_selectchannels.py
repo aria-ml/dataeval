@@ -100,7 +100,8 @@ class SelectChannels(Operation):
     computed per-instance rather than fixed per-class. A luminance mix is a new pixel
     value at every position, so it moves every pixel and visual statistic, the blur
     statistics included, and it is not at a saturation endpoint where one channel was, and
-    it is not the mean over the channels that the context statistics read --
+    it is not the mean over the channels that the context statistics read, and averaging
+    the channels lowers the noise the noise statistics read --
     all of which the ``"gray"`` form therefore declares.
 
     Examples
@@ -142,6 +143,7 @@ class SelectChannels(Operation):
                 | ImageStats.VISUAL
                 | ImageStats.BLUR
                 | ImageStats.CONTEXT
+                | ImageStats.NOISE
             )
         return ImageStats.DIMENSION_CHANNELS
 

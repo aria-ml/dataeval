@@ -143,3 +143,15 @@ class TestCoreFunctional:
         uniform: dict = result["uniform_random"]  # pyright: ignore[reportAssignmentType]
         assert uniform["multiclass_accuracy"] == pytest.approx(1 / 3)
         assert all(0.0 <= metrics["precision_micro"] <= 1.0 for metrics in result.values())  # pyright: ignore[reportIndexIssue]
+
+    def test_noise_immerkaer_estimates_noise_per_channel(self):
+        from dataeval.core import noise_immerkaer
+
+        rng = np.random.default_rng(0)
+        sigmas = np.array([1.0, 2.0, 4.0])
+        image = 100.0 + sigmas[:, None, None] * rng.standard_normal((3, 128, 128))
+        image[:, 10:20, 10:20] = np.nan  # a masked 10x10 block removes the 12x12 windows that touch it
+
+        result = noise_immerkaer(image)
+        assert result["support"].tolist() == [126 * 126 - 12 * 12] * 3
+        np.testing.assert_allclose(result["noise_std"], sigmas, rtol=0.05)

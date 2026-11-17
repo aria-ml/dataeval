@@ -186,6 +186,7 @@ class TestResizeInvalidates:
         | ImageStats.VISUAL_SHARPNESS
         | ImageStats.BLUR
         | ImageStats.PIXEL_SATURATED_FRACTION
+        | ImageStats.NOISE
     )
     PAD_EXTRA = (
         ImageStats.PIXEL_ZEROS

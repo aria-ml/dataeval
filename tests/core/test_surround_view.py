@@ -1,4 +1,4 @@
-"""The surround view: the color statistics over each box's surround, on that box's row (#1616)."""
+"""The surround view: the color and noise statistics over each box's surround, on that box's row (#1616, #1608)."""
 
 import warnings
 from typing import Any
@@ -180,8 +180,9 @@ class TestNothingElseMoves:
             for name in base[part]:
                 np.testing.assert_array_equal(off[part][name], base[part][name])
                 np.testing.assert_array_equal(on[part][name], base[part][name])
-        assert set(on["stats"]) - set(base["stats"]) == set(SURROUND_STATS)
-        assert set(on["details"]) - set(base["details"]) == set(SURROUND_DETAILS)
+        noise = {"surround_noise_std", "surround_noise_var"}, {"surround_noise_status", "surround_noise_neighborhoods"}
+        assert set(on["stats"]) - set(base["stats"]) == set(SURROUND_STATS) | noise[0]
+        assert set(on["details"]) - set(base["details"]) == set(SURROUND_DETAILS) | noise[1]
 
 
 def test_a_datum_with_no_image_plane_carries_the_names_without_raising():
@@ -240,7 +241,8 @@ class TestWarnings:
     @pytest.mark.parametrize(
         "kwargs",
         [
-            {"stats": ImageStats.ALL, "color_rgb_channels": None},
+            # The noise statistics answer the surround, so `ALL` without them or channels holds nothing that does.
+            {"stats": ImageStats.ALL & ~ImageStats.NOISE, "color_rgb_channels": None},
             {"stats": ImageStats.PIXEL_MEAN},
             {"stats": {"g": ImageStats.COLOR}, "channels": {"g": [0, 1, 2]}},
         ],

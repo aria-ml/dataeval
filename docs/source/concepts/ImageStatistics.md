@@ -1,7 +1,10 @@
+<!-- markdownlint-disable MD051 -->
+
 # Image statistics
 
 {func}`.image_stats` measures four families of statistics about an image (pixel, visual, dimension, and hash), plus
-the experimental [blur statistics](BlurStatistics.md) and [color statistics](#color-statistics). Two of the families,
+the experimental [blur statistics](BlurStatistics.md) and [color statistics](#color-statistics), and the
+[noise statistics](#noise-statistics). Two of the families,
 pixel and visual, answer different kinds of questions, and the distinction determines whether a value can be compared
 across a dataset. The flags and their
 parameters are in {func}`~dataeval.core.image_stats`, and the full statistic list is in
@@ -80,13 +83,16 @@ Not every statistic uses the decode. Without a declared interval:
 
 | Statistics | Interval |
 | --- | --- |
-| Visual and blur statistics, the histogram, and pixel statistics under `normalize_pixel_values=True` | The decode above |
-| Context and color statistics | `(0, 255)` for `uint8`, and the two float conventions above; any other data is NaN with the status `unknown_range` |
+| Visual and blur statistics, the histogram, and the other pixel statistics under `normalize_pixel_values=True` | The decode above |
+| Context and color statistics, and the noise statistics under `normalize_pixel_values=True` | `(0, 255)` for `uint8`, and the two float conventions above; any other data is NaN with the status `unknown_range` |
 | `PIXEL_SATURATED_FRACTION` | The maximum of an unsigned integer dtype of 32 bits or fewer, or 1 for Boolean data |
 
-The context and color statistics never read an integer image's own maximum, so two frames of one sensor cannot read on
-different scales, and a 12-bit sensor's output in `uint16` needs a declaration. The float conventions still read the
-data's extremes: a 0-255 float image whose values all lie at or below 1 is read as the 0-1 convention.
+The context and color statistics, and the noise statistics when normalized, never read an integer image's own maximum,
+so two frames of one sensor cannot read on different scales, and a 12-bit sensor's output in `uint16` needs a
+declaration. The float conventions still read the data's extremes: a 0-255 float image whose values all lie at or below
+1 is read as the 0-1 convention. The reverse matters for the noise statistics: noise added to a 0-1 float image and not
+clipped puts some values above 1, which reads that image on the 0-255 convention and its noise 255 times too small, and
+a value below 0 leaves it with no interval. Declare `value_range` for floating-point data.
 
 ## When there is no reference
 
@@ -121,18 +127,19 @@ above.
 
 ## Statistics that depend on scale
 
-Few statistics depend on scale. Of the pixel family, only three change when the values
-are rescaled:
+Few statistics depend on scale. Of the pixel statistics, only five change when the values are rescaled:
 
 | Changes with scale | Already scale-free |
 | --- | --- |
 | `mean`, `std`, `var` | `skew`, `kurtosis` (standardized moments) |
-| | `entropy`, `histogram` (binned over the reference either way) |
+| `noise_std`, `noise_var` | `entropy`, `histogram` (binned over the reference either way) |
 | | `missing`, `zeros`, `saturated_fraction` (counts) |
 
-`normalize_pixel_values=True` exists for those three, and only for them. It divides by
-the same reference the visual family uses, which makes a pixel distribution comparable
-across bit depths.
+`normalize_pixel_values=True` exists for those five, and only for them. It divides `mean`, `std` and `var` by the same
+reference the visual family uses, which makes a pixel distribution comparable across bit depths. It divides the
+[noise statistics](#noise-statistics) by the interval the context and color statistics read, in
+[the table above](#where-the-reference-comes-from), so data with no such interval reads NaN with the status
+`unknown_range`.
 
 It does not change visual statistics, which are already scaled to the display range.
 
@@ -229,6 +236,47 @@ its range is declared as `(0, 4095)`.
 A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
 floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the
 endpoint, and `saturated_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
+
+## Noise statistics
+
+`ImageStats.PIXEL_NOISE_STD` and `ImageStats.PIXEL_NOISE_VAR` are pixel statistics that estimate the standard deviation
+and the variance of **additive white Gaussian noise**, noise that is independent from pixel to pixel and normally
+distributed with one variance, from the pixels alone. They are stable and form the group `ImageStats.NOISE`.
+`ImageStats.ALL` includes them, and `ImageStats.PIXEL`, `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of
+{func}`.image_stats` do not.
+
+DataEval reads each channel $I$ with the estimator of Immerkær ([1996](#ref1)). The channel is convolved with a mask
+that takes the second difference along the rows and then along the columns, and the estimate is the mean absolute
+response, scaled:
+
+$$
+M = \begin{bmatrix} 1 & -2 & 1 \\ -2 & 4 & -2 \\ 1 & -2 & 1 \end{bmatrix}, \qquad
+\hat{\sigma} = \sqrt{\frac{\pi}{2}} \, \frac{1}{6} \, \operatorname{mean} \lvert I * M \rvert .
+$$
+
+The squared coefficients of $M$ sum to 36, so on white Gaussian noise of standard deviation $\sigma$ each response has
+a standard deviation of $6\sigma$ and an absolute value whose mean is $6\sigma\sqrt{2/\pi}$. The mean runs over the
+3x3 neighborhoods that hold no NaN and no masked pixel, so a masked or missing pixel creates no edge. `noise_var` is the
+mean of the channels' $\hat{\sigma}^2$ and `noise_std` is its square root. A channel needs at least 64 valid 3x3
+neighborhoods, which a square region first has at 10x10, and reads NaN with the status `insufficient_support` below
+that. The values are in the data's own units, and `normalize_pixel_values=True` divides them by an interval, as
+[Statistics that depend on scale](#statistics-that-depend-on-scale) describes. They are measured for the image, each
+box, the background and each channel group, and with `per_surround=True` over each box's surround, a view that is
+experimental ⚠️. {func}`~dataeval.core.noise_immerkaer` computes the estimate for one array.
+
+In DataEval's tests, on white Gaussian noise added to a flat image of 256 x 256 pixels, the estimate is within 5% of the
+standard deviation of the noise added and its square within 10% of the variance. On lossless 8-bit video of a synthetic
+scene with moving shapes, with noise of standard deviation 4, 8 and 16 of 255 levels added, the median reading over the
+frames rises with the noise, and at 8 and 16 levels the median over the frames of the variance above the clean clip's
+reading is within 10% of the variance added. All of this noise is simulated.
+
+A difference between readings provides evidence of a difference in noise only between images of the same content. Fine
+detail of the scene itself, or **texture**, and edges that are not parallel to a side of the image add to a reading, and
+pixels that carry no noise, such as letterbox bars or a clipped area, lower it. A high value, and an image that
+{class}`.Outliers` flags on one, can therefore come from the content as well as from noise. A single reading over a
+small region is widely spread, so compare the distributions of many readings. The Notes of
+{func}`~dataeval.core.noise_immerkaer` state the patterns the mask removes, what raises or lowers a reading, and the
+kinds of noise that were not measured.
 
 ## The target-surround ratios
 
@@ -328,21 +376,23 @@ Every operation declares the statistics it invalidates. A resize makes the dimen
 the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
 clipped to the new canvas and those left outside it are dropped, the context statistics, because the surround of a box
 is made of interpolated pixels, and the saturation statistic, because a resize returns floats, which have no dtype
-endpoint. It leaves the other pixel statistics, the channel count and the hashes alone, so
+endpoint. It changes the noise statistics too, because interpolation smooths the noise and a letterbox adds flat bars.
+It leaves the other pixel statistics, the channel count and the hashes alone, so
 resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source
 resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the
 two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated
 statistics now describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows
 the three responses.
 
-The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, context and
-saturation statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels` with `"gray"`
-declares the blur, saturation and context statistics too, because a luminance mix changes which picture is read. Random
-transforms are seeded for each datum from the datum's `id`, so the view is stable: the statistics pass, the embedding
-pass and the duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built through
-{class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because provenance records the `repr` of
-each operation. A curated operation has a `repr` you can paste back. A `v2.Compose([...])` has a multi-line `repr`, and
-a lambda inside one records nothing recoverable. This is one more reason to prefer the curated operations.
+The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, context,
+saturation and noise statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels`
+with `"gray"` declares the blur, saturation, context and noise statistics too, because a luminance mix changes which
+picture is read. Random transforms are seeded for each datum from the datum's `id`, so the view is stable: the
+statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice gives identical
+bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because
+provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
+`v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is one more
+reason to prefer the curated operations.
 
 ## Related concept pages
 
@@ -357,3 +407,8 @@ a lambda inside one records nothing recoverable. This is one more reason to pref
   that each group is measured separately
 - [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates
   and the three ways to respond
+
+## References
+
+1. [Immerkær, J. (1996). Fast noise variance estimation. *Computer Vision and Image Understanding*, 64(2), 300-302.
+   doi: 10.1006/cviu.1996.0060 [paper](https://doi.org/10.1006/cviu.1996.0060)]{#ref1}

@@ -26,7 +26,7 @@ ResizeMode: TypeAlias = Literal["stretch", "pad", "crop"]
 # interpolation moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype
 # endpoint, so an image that declared no range reads NaN. CONTEXT changes too: the surround of a box is made of
 # interpolated pixels, its neighbors are clipped and dropped as for SPATIAL, and a letterbox adds flat bars the ring can
-# reach.
+# reach. NOISE changes: interpolation smooths the noise, and a letterbox adds flat bars that read none.
 _BASE_INVALIDATES = (
     (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
     | ImageStats.VISUAL_SHARPNESS
@@ -34,6 +34,7 @@ _BASE_INVALIDATES = (
     | ImageStats.SPATIAL
     | ImageStats.PIXEL_SATURATED_FRACTION
     | ImageStats.CONTEXT
+    | ImageStats.NOISE
 )
 
 # Letterbox padding adds a block of flat fill pixels, which moves every percentile-derived
@@ -141,6 +142,8 @@ class Resize(Operation):
     interpolation moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype
     endpoint, so an image that declared no range reads NaN. So are the context statistics (``ImageStats.CONTEXT``): the
     surround of a box is made of interpolated pixels, its neighbors may be gone, and a letterbox adds bars it can reach.
+    So are the noise statistics (``ImageStats.NOISE``): interpolation smooths the noise, and a letterbox adds flat bars
+    that read none and pull the estimate down.
 
     ``PIXEL_MEAN``/``PIXEL_STD`` are deliberately *not* declared for ``mode="stretch"``.
     Aggressive downsampling does shrink pixel variance, but it is a second-order effect and

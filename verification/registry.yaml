@@ -158,8 +158,8 @@ requirements:
     its data-preparation helpers (`dataeval.utils`) for integrators who compose their own workflows.
   criteria:
   - '`dataeval.core` provides stateless functions for hashing, clustering, mutual information, divergence, minimum
-    spanning tree and neighbors, label errors and parity, ranking, and null-model metrics; each returns a structured
-    result.'
+    spanning tree and neighbors, label errors and parity, ranking, null-model metrics, and noise estimation; each returns
+    a structured result.'
   - '`dataeval.utils` provides thresholding (`ConstantThreshold`, `ZScoreThreshold`, `ModifiedZScoreThreshold`,
     `IQRThreshold`, `AdaptiveThreshold`), bounding-box and image preparation, dataset-shape validation, ONNX embedding-layer
     handling, and the PyTorch models, loss, and training helpers used by model-based evaluators.'
@@ -657,6 +657,12 @@ test_cases:
     - core::test_label_parity_and_factor_parity
     - core::test_rank_functions_return_full_ranking
     - core::test_nullmodel_metrics
+  - do: Call `noise_immerkaer` on a three-channel image of white Gaussian noise with a known standard deviation and
+      some pixels masked with NaN.
+    expect: It returns one estimate per channel near the known standard deviation, and leaves out every 3x3
+      neighborhood that holds a masked pixel.
+    tests:
+    - core::test_noise_immerkaer_estimates_noise_per_channel
   - do: Call the threshold helpers.
     expect: Each returns `(lower, upper)` bounds for an array.
     tests:

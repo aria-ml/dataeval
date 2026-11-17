@@ -136,9 +136,14 @@ class TestInvalidatedStats:
 
 @pytest.mark.required
 class TestInvalidatedStatsCrossesNonViewBarrier:
-    def test_crops_declares_dimension_except_channels_and_saturation(self):
-        # Every datum is cropped and resized, and a resize moves the values that sat at a saturation endpoint.
-        expected = (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.PIXEL_SATURATED_FRACTION
+    def test_crops_declares_dimension_except_channels_saturation_and_noise(self):
+        # Every datum is cropped and resized, and a resize moves the values that sat at a saturation endpoint and
+        # smooths the noise.
+        expected = (
+            (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS)
+            | ImageStats.PIXEL_SATURATED_FRACTION
+            | ImageStats.NOISE
+        )
         assert DetectionCrops.invalidates == expected
         assert invalidated_stats(DetectionCrops(_ODDataset())) == expected
 

@@ -3,6 +3,7 @@ from dataeval.core._calculators._colorstats import ColorStatCalculator
 from dataeval.core._calculators._contextstats import ContextStatCalculator
 from dataeval.core._calculators._dimensionstats import DimensionStatCalculator
 from dataeval.core._calculators._hashstats import HashStatCalculator
+from dataeval.core._calculators._noisestats import NoiseStatCalculator
 from dataeval.core._calculators._pixelstats import PixelStatCalculator
 from dataeval.core._calculators._spatialstats import SpatialStatCalculator
 from dataeval.core._calculators._visualstats import VisualStatCalculator
@@ -16,6 +17,7 @@ all(
         ContextStatCalculator,
         DimensionStatCalculator,
         HashStatCalculator,
+        NoiseStatCalculator,
         PixelStatCalculator,
         SpatialStatCalculator,
         VisualStatCalculator,

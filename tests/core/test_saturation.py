@@ -47,11 +47,12 @@ class TestFlag:
         ] == ["PIXEL_SATURATED_FRACTION"]
 
     def test_no_existing_flag_moved_and_the_new_one_is_appended(self):
-        # The CONTEXT and COLOR flags were appended after it by later changes, and have tests of their own.
+        # The CONTEXT, COLOR and NOISE flags were appended after it by later changes, and have tests of their own.
         members = {
             m.name: m.value
             for m in ImageStats
-            if m.name != "PIXEL_SATURATED_FRACTION" and not (m.name or "").startswith(("CONTEXT_", "VISUAL_COLOR_"))
+            if m.name != "PIXEL_SATURATED_FRACTION"
+            and not (m.name or "").startswith(("CONTEXT_", "VISUAL_COLOR_", "PIXEL_NOISE_"))
         }
         assert members == _EXISTING_VALUES
         assert ImageStats.PIXEL_SATURATED_FRACTION.value == 2 * max(_EXISTING_VALUES.values())
@@ -81,6 +82,7 @@ class TestFlag:
             & ~ImageStats.PIXEL_SATURATED_FRACTION
             & ~ImageStats.CONTEXT
             & ~ImageStats.COLOR
+            & ~ImageStats.NOISE
         )
         assert v12 == (ImageStats.STANDARD | ImageStats.HASH) & ~ImageStats.PIXEL_SATURATED_FRACTION
 

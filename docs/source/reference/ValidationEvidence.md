@@ -552,6 +552,15 @@ statistical and computational.
     for green and 9.2 for blue, and 30 levels reads 12.3, 20.6 and 17.3, so a pixel with one channel 16 levels off the
     others still counts as neutral. Video in a
     gamma other than sRGB, wide-gamut files, chroma subsampling and real imagery were not measured.
+- - {func}`.noise_immerkaer` and {func}`.image_stats` (`ImageStats.NOISE`)
+  - The noise estimator of [Immerkær (1996)](https://doi.org/10.1006/cviu.1996.0060): the mean absolute response to a
+    3x3 mask of second differences, scaled to the standard deviation of white Gaussian noise.
+  - Ground-truth checked (white Gaussian noise of known variance on simulated images, a hand-worked impulse, and
+    lossless FFV1 video of a synthetic scene with known noise added; simulated noise only)
+  - Descriptive only. Texture and edges that are not parallel to a side of the image read as noise, and pixels that
+    carry no noise, such as letterbox bars, lower the reading, so compare images of similar content. Correlated,
+    signal-dependent, re-encoded and real sensor noise were not measured. See [Noise
+    statistics](../concepts/ImageStatistics.md#noise-statistics).
 - - {func}`.track_stats`
   - Per-track statistics for video sequences.
   - Anchored

@@ -376,12 +376,12 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     # Every datum is a re-framed sub-image — a crop, plus a resize to square unless
     # square="off" — so every dimension statistic describes the crop policy rather than
     # the source image. Channel count is the one dimension stat that survives. The resize also moves the values that
-    # sat at a saturation endpoint. A class attribute rather than a property because it does not vary with the
-    # constructor arguments: every crop policy invalidates the same set, so `square="off"`, which does not resize, is
-    # declared conservatively.
+    # sat at a saturation endpoint, and smooths the noise. A class attribute rather than a property because it does not
+    # vary with the constructor arguments: every crop policy invalidates the same set, so `square="off"`, which does not
+    # resize, is declared conservatively.
     invalidates: ImageStats = (
-        ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS
-    ) | ImageStats.PIXEL_SATURATED_FRACTION
+        (ImageStats.DIMENSION & ~ImageStats.DIMENSION_CHANNELS) | ImageStats.PIXEL_SATURATED_FRACTION | ImageStats.NOISE
+    )
 
     @requires_maite_dataset("dataset", expected="object_detection")
     def __init__(
