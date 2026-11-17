@@ -192,6 +192,11 @@ class Filter(Operation):
     null too; ``altitude IS NULL`` keeps them. Booleans are stored as integers, so write ``flag = true``, not ``flag``.
     A column name holding spaces is double-quoted, as SQL does: ``"time of day" = 'night'``.
 
+    **Reading.** A `where` predicate reads each item, image included, to learn its target and metadata, so it costs a
+    pass over the dataset whatever it keeps. :func:`~dataeval.config.set_load_threads` loads those reads in several
+    threads. To select on values you already hold in an array, give :class:`Indices` the positions of the items in this
+    dataset, which does not walk the dataset to decide.
+
     **Multi-object tracking.** A predicate about frames can keep the videos holding a matching frame
     (``drop="items"``) but cannot remove frames from a video: present the frames as items with :class:`SequenceFrames`
     first. A detection no tracker linked has no track, so a predicate about tracks leaves it in place; one that also

@@ -1,5 +1,5 @@
-"""`load_threads` loads several dataset items at once in the two whole-dataset walks, `Embeddings` and `Metadata`, and
-leaves every result and the order of reads exactly as they were when it is not set."""
+"""`load_threads` loads several dataset items at once in the three whole-dataset passes, `Embeddings`, `Metadata` and
+`Filter(where=...)`, and leaves every result and the order of reads exactly as they were when it is not set."""
 
 import threading
 import time
@@ -14,6 +14,7 @@ from dataeval import Embeddings, Metadata
 from dataeval import _experimental as experimental_module
 from dataeval.bias import Balance
 from dataeval.config import get_load_threads, set_load_threads, use_load_threads
+from dataeval.data import Filter, View
 from dataeval.exceptions import ExperimentalWarning
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import DatasetMetadata, DatumMetadata
@@ -178,8 +179,6 @@ class TestMetadataWalk:
         assert_frame_equal(threaded, serial)
 
     def test_a_view_record_is_read_serially(self):
-        from dataeval.data import Filter, View
-
         dataset = _SlowImages(delay=0)
         # The predicate structures every item, so the view keeps its record.
         view = View(dataset, Filter("\"group\" = 'x'"))
@@ -192,10 +191,99 @@ class TestMetadataWalk:
         assert_frame_equal(frame, Metadata(View(_SlowImages(delay=0), Filter("\"group\" = 'x'"))).dataframe)
 
 
+class _RecordingVideos(FactorVideos):
+    """Multi-object tracking videos that record which thread read each one."""
+
+    def __init__(self, *args: Any) -> None:
+        super().__init__(*args)
+        self.idents: list[int] = []
+
+    def __getitem__(self, index: int) -> Any:
+        self.idents.append(threading.get_ident())
+        return super().__getitem__(index)
+
+
+class TestFilter:
+    """`Filter(where=...)` reads every item once to structure the view, and loads those reads in threads too."""
+
+    WHERE = "\"group\" = 'x'"
+
+    def test_the_default_reads_in_order_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0)
+        View(dataset, Filter(self.WHERE))
+        assert dataset.off_main_thread == 0
+        assert dataset.order[-N:] == list(range(N))
+
+    def test_threads_give_the_same_view_and_metadata_faster(self):
+        start = time.perf_counter()
+        serial = View(_SlowImages(), Filter(self.WHERE))
+        serial_time = time.perf_counter() - start
+
+        dataset = _SlowImages()
+        with use_load_threads(4):
+            start = time.perf_counter()
+            threaded = View(dataset, Filter(self.WHERE))
+            threaded_time = time.perf_counter() - start
+
+        assert threaded.selection == serial.selection
+        assert_frame_equal(Metadata(threaded).dataframe, Metadata(serial).dataframe)
+        assert dataset.off_main_thread > 0
+        assert threaded_time < 0.6 * serial_time
+
+    def test_item_zero_is_read_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            View(dataset, Filter(self.WHERE))
+        assert dataset.idents[0] == threading.get_ident()
+
+    def test_the_view_keeps_the_same_record_and_metadata_then_reads_nothing_again(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            view = View(dataset, Filter(self.WHERE))
+        assert dataset.off_main_thread > 0
+        assert view._reads is not None
+        assert set(view._reads) == set(range(0, N, 2))
+        before = len(dataset.order)
+        frame = Metadata(view).dataframe
+        assert len(dataset.order) - before <= 1  # the probe of item 0, and nothing is read again
+        assert_frame_equal(frame, Metadata(View(_SlowImages(delay=0), Filter(self.WHERE))).dataframe)
+
+    def test_an_item_that_cannot_be_read_raises_the_same_error(self):
+        class Broken(_SlowImages):
+            def __getitem__(self, index: int) -> Any:
+                if index == 9:
+                    raise RuntimeError("item 9 is unreadable")
+                return super().__getitem__(index)
+
+        with pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(Broken(delay=0), Filter(self.WHERE))
+        with use_load_threads(4), pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(Broken(delay=0), Filter(self.WHERE))
+
+    def test_a_tracking_dataset_is_filtered_serially_and_gives_the_same_view(self):
+        serial = View(FactorVideos(VIDEOS, VIDEO_FACTORS), Filter("weather = 'rain'"))
+        dataset = _RecordingVideos(VIDEOS, VIDEO_FACTORS)
+        with use_load_threads(4):
+            threaded = View(dataset, Filter("weather = 'rain'"))
+        assert threaded.selection == serial.selection == [0, 2]
+        assert set(dataset.idents) == {threading.get_ident()}
+
+    def test_a_transform_the_view_applies_runs_in_the_threads(self):
+        seen: set[int] = set()
+
+        def record(datum: Any) -> Any:
+            seen.add(threading.get_ident())
+            return datum
+
+        view = View(_SlowImages(delay=0.002))
+        view.map(record)
+        with use_load_threads(4):
+            Filter(self.WHERE).apply(view)
+        assert seen - {threading.get_ident()}
+
+
 class TestWithTheReadRecord:
     def test_threaded_embeddings_fill_a_views_record_and_metadata_then_reads_nothing_again(self):
-        from dataeval.data import View
-
         dataset = _SlowImages(delay=0.002)
         view = View(dataset, record_reads=True)
         with use_load_threads(4):
