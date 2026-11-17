@@ -3,15 +3,18 @@
 __all__ = ["Embeddings"]
 
 import os
+import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Self
 
 import numpy as np
 import psutil
+import torch
 import xxhash as xxh
 from numpy.typing import NDArray
 
+from dataeval._experimental import experimental
 from dataeval._log import get_logger
 from dataeval.config import get_load_threads, resolve_batch_size
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
@@ -27,6 +30,153 @@ from dataeval.utils._internal import read_ordered
 from dataeval.utils.data import requires_maite_dataset, unwrap_image
 
 _logger = get_logger(__name__)
+
+
+def _exceeds_memory(estimated_bytes: int, memory_threshold: float) -> bool:
+    """Whether `estimated_bytes` exceed `memory_threshold` of the memory available now, logging when they do."""
+    available_memory = psutil.virtual_memory().available
+    use_memmap = bool(estimated_bytes > available_memory * memory_threshold)
+    if use_memmap:
+        _logger.info(
+            f"Using memory-mapped storage: estimated size {estimated_bytes / 1e9:.2f}GB "
+            f"exceeds {memory_threshold * 100:.0f}% of available memory "
+            f"({available_memory / 1e9:.2f}GB)",
+        )
+    return use_memmap
+
+
+def _private_copies(items: Sequence[Any]) -> list[Any]:
+    """Give one extractor its own copy of a batch, so that writing into its input cannot change what the next reads.
+
+    A NumPy array is copied and a tensor is cloned. A read-only view would not do: `torch.from_numpy` and
+    `torch.as_tensor` ignore NumPy's write flag. Anything else, such as a list, an image object or a video stream,
+    passes as it is.
+    """
+    copies: list[Any] = []
+    for item in items:
+        if isinstance(item, np.ndarray):
+            copies.append(item.copy())
+        elif isinstance(item, torch.Tensor):
+            copies.append(item.clone())
+        else:
+            copies.append(item)
+    return copies
+
+
+def _refuse_one_shot(items: Sequence[Any]) -> None:
+    """Raise when an item is an iterator, which only the first of several extractors could walk."""
+    if any(isinstance(item, Iterator) for item in items):
+        raise ValueError(
+            "An item is a one-shot stream, an iterator, which only one extractor can walk. Give "
+            "Embeddings.compute_multi a dataset whose items can be walked again, such as a list of frames or a stream "
+            "that decodes afresh on each walk, or compute each extractor on its own."
+        )
+
+
+def _check_extractors(dataset: Any, extractors: Mapping[str, Any]) -> None:
+    """Refuse what `Embeddings.compute_multi` cannot run, before anything is read."""
+    if dataset is None or not extractors:
+        raise ValueError("Embeddings.compute_multi needs a dataset to read and at least one extractor.")
+    for key, extractor in extractors.items():
+        if isinstance(extractor, Embeddings):
+            raise TypeError(
+                f"The extractor {key!r} is an Embeddings. Pass its extractor instead, so it is computed in this pass."
+            )
+        if not callable(extractor):
+            raise TypeError(f"The extractor {key!r} is not callable: it is a {type(extractor).__name__}.")
+
+
+def _agreed_batch_size(extractors: Mapping[str, Any], batch_size: int | None) -> int:
+    """Resolve each extractor's batch size as it would be alone, and raise unless they agree."""
+    sizes = {key: resolve_batch_size(batch_size, getattr(e, "batch_size", None)) for key, e in extractors.items()}
+    if len(set(sizes.values())) > 1:
+        listed = ", ".join(f"{key!r}: {size}" for key, size in sizes.items())
+        raise ValueError(
+            f"The extractors resolve to different batch sizes ({listed}). Pass batch_size so that every extractor "
+            "sees the same batches."
+        )
+    return next(iter(sizes.values()))
+
+
+def _directory_name(key: str) -> str:
+    """Return the directory name for one key, with anything but letters, digits, '.', '_' and '-' made '_'."""
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", key)
+    if name in ("", ".", ".."):
+        raise ValueError(
+            f"The key {key!r} names no directory to store its embeddings in. Use a key with a letter or digit."
+        )
+    return name
+
+
+def _root_directory(path: Path | str) -> Path:
+    root = Path(os.path.abspath(path))
+    if root.exists() and not root.is_dir():
+        raise ValueError(
+            f"path {str(root)!r} is not a directory. Embeddings.compute_multi stores each extractor's embeddings in "
+            "a directory of its own under path."
+        )
+    return root
+
+
+def _child_directories(path: Path | str | None, keys: Iterable[str]) -> dict[str, Path | None]:
+    """Make one directory under `path` for each key, refusing keys that name none or the same one.
+
+    Each child is given its directory as its `path`, so it names its file inside from its own hash, which covers the
+    dataset. The key keeps extractors apart, and the hash keeps datasets apart.
+    """
+    if path is None:
+        return dict.fromkeys(keys)
+    root = _root_directory(path)
+    named: dict[Path, str] = {}
+    for key in keys:
+        directory = root / _directory_name(key)
+        if directory in named:
+            raise ValueError(
+                f"The keys {named[directory]!r} and {key!r} name the same directory, {directory.name!r}, under path."
+            )
+        named[directory] = key
+    for directory in named:
+        directory.mkdir(parents=True, exist_ok=True)
+    return {key: directory for directory, key in named.items()}
+
+
+def _memmap_for_all(children: Mapping[str, "Embeddings"], rows: Mapping[str, NDArray[Any]]) -> bool:
+    """Whether the children's stores, together, are too large for memory, decided once from their first rows."""
+    first = next(iter(children.values()))
+    if first._path is None:
+        return False
+    estimated = sum(child._estimated_bytes(rows[key].shape[1:]) for key, child in children.items())
+    return _exceeds_memory(estimated, first.memory_threshold)
+
+
+def _extract_each(children: Mapping[str, "Embeddings"], images: Sequence[Any]) -> dict[str, NDArray[Any]]:
+    """Run every child's extractor on its own views of one batch, naming the extractor in any error it raises."""
+    if len(children) > 1:
+        _refuse_one_shot(images)
+    rows: dict[str, NDArray[Any]] = {}
+    for key, child in children.items():
+        try:
+            rows[key] = child._rows(child._extractor(_private_copies(images)), len(images))
+        except Exception as error:
+            error.add_note(f"Raised by the extractor {key!r} given to Embeddings.compute_multi.")
+            raise
+    return rows
+
+
+def _fill_together(children: Mapping[str, "Embeddings"], size: int, progress_callback: ProgressCallback | None) -> None:
+    """Read each batch once and store every child's rows for it, reporting progress once per batch."""
+    first = next(iter(children.values()))
+    total = len(first)
+    use_memmap: bool | None = None
+    for start in range(0, total, size):
+        indices = list(range(start, min(start + size, total)))
+        rows = _extract_each(children, first._fetch_images(indices))
+        if use_memmap is None:
+            use_memmap = _memmap_for_all(children, rows)
+        for key, child in children.items():
+            child._ingest(indices, rows[key], use_memmap=use_memmap)
+        if progress_callback:
+            progress_callback(indices[-1] + 1, total=total)
 
 
 class Embeddings(Array, FeatureExtractor):
@@ -368,29 +518,15 @@ class Embeddings(Array, FeatureExtractor):
         """Determine if memmap should be used based on estimated size."""
         if self._path is None:
             return False
+        return _exceeds_memory(self._estimated_bytes(embedding_shape), self.memory_threshold)
 
+    def _estimated_bytes(self, embedding_shape: tuple[int, ...]) -> int:
+        """Bytes a store of float32 rows of `embedding_shape` takes for the bound dataset."""
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
+        return int(len(self._dataset) * np.prod(embedding_shape) * np.dtype(np.float32).itemsize)
 
-        n_samples = len(self._dataset)
-        bytes_per_element = np.dtype(np.float32).itemsize  # Assume float32
-        estimated_bytes = n_samples * np.prod(embedding_shape) * bytes_per_element
-
-        available_memory = psutil.virtual_memory().available
-        threshold_bytes = available_memory * self.memory_threshold
-
-        use_memmap = bool(estimated_bytes > threshold_bytes)
-
-        if use_memmap:
-            _logger.info(
-                f"Using memory-mapped storage: estimated size {estimated_bytes / 1e9:.2f}GB "
-                f"exceeds {self.memory_threshold * 100:.0f}% of available memory "
-                f"({available_memory / 1e9:.2f}GB)",
-            )
-
-        return use_memmap
-
-    def _initialize_storage(self, sample_embedding: NDArray[Any]) -> None:
+    def _initialize_storage(self, sample_embedding: NDArray[Any], use_memmap: bool | None = None) -> None:
         """Initialize storage backend (in-memory or memmap) based on size."""
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
@@ -401,7 +537,7 @@ class Embeddings(Array, FeatureExtractor):
         dtype = sample_embedding.dtype
 
         if self._path is not None:
-            self._use_memmap = self._should_use_memmap(embedding_shape)
+            self._use_memmap = self._should_use_memmap(embedding_shape) if use_memmap is None else use_memmap
 
             if self._use_memmap:
                 # Create memory-mapped file
@@ -439,6 +575,105 @@ class Embeddings(Array, FeatureExtractor):
             memory_threshold=self.memory_threshold,
             progress_callback=self._progress_callback,
         )
+
+    @classmethod
+    @experimental
+    def compute_multi(
+        cls,
+        dataset: ImageDataset,
+        extractors: Mapping[str, FeatureExtractor],
+        *,
+        batch_size: int | None = None,
+        path: Path | str | None = None,
+        memory_threshold: float = 0.8,
+        progress_callback: ProgressCallback | None = None,
+    ) -> dict[str, Self]:
+        """
+        Compute the embeddings of several extractors in one pass over a dataset, reading each item once.
+
+        Each batch of `dataset` is read once and given to every extractor in turn, in the order of `extractors`, before
+        the next batch is read. Each extractor's embeddings become an ordinary :class:`Embeddings`, equal to the one it
+        gives on its own with the same batch size, unless it draws random numbers, which it then draws in another order.
+
+        Parameters
+        ----------
+        dataset : ImageClassificationDataset or ObjectDetectionDataset
+            Dataset that provides the images.
+        extractors : Mapping[str, FeatureExtractor]
+            The extractors, each under the key its embeddings are returned under.
+        batch_size : int or None, default None
+            Number of items read and embedded at a time. None takes each extractor's own `batch_size`, or else the
+            global default, and the extractors must then agree.
+        path : Path, str or None, default None
+            Directory with one directory under it for each key. The embeddings are stored there as memory-mapped files
+            when all of them together exceed `memory_threshold` of the available memory, and are otherwise kept in
+            memory until an :class:`Embeddings` is saved. None keeps them in memory.
+        memory_threshold : float, default 0.8
+            Share of the available memory that the embeddings of all the extractors may take together before they are
+            stored as memory-mapped files under `path`.
+        progress_callback : ProgressCallback or None, default None
+            Called once per batch with the number of items done and the total. Each returned :class:`Embeddings`
+            keeps it, as it keeps the other settings.
+
+        Returns
+        -------
+        dict[str, Embeddings]
+            One computed :class:`Embeddings` for each key, in the order of `extractors`.
+
+        Raises
+        ------
+        ValueError
+            When there is no dataset or no extractor, when the extractors' batch sizes differ and `batch_size` is not
+            given, when a key names no directory or two keys name the same one, when `path` is a file, or when an item
+            is a one-shot stream that more than one extractor would walk.
+        TypeError
+            When an extractor is an :class:`Embeddings` or is not callable.
+
+        Notes
+        -----
+        Each extractor gets its own copy of every NumPy image and tensor in a batch, so one that changes its input in
+        place cannot change what the next one reads. Any other item, such as a list of frames, an image object or a
+        video stream, is passed as it is, and an extractor that changes it in place changes it for the next. An error
+        raised by an extractor carries a note that names its key, and nothing is returned.
+
+        Each :class:`~dataeval.extractors.TorchExtractor` runs its own forward pass, also when several share a model,
+        and every extractor's model is held in memory for the whole pass. :func:`~dataeval.config.set_load_threads`
+        applies to the reads, and the extractors run on the calling thread. A video stream is walked once by each
+        extractor that receives it, so it must be one that can be walked again. Each embedding is tested equal to the
+        extractor's own result on the CPU; a GPU and Windows are untested.
+
+        This raises :class:`~dataeval.exceptions.ExperimentalWarning` on the first call in a process.
+
+        .. versionadded:: 1.3
+
+        Examples
+        --------
+        >>> from dataeval import Embeddings
+        >>> from dataeval.extractors import FlattenExtractor, TorchExtractor
+        >>>
+        >>> extractors = {"flat": FlattenExtractor(), "model": TorchExtractor(my_model)}
+        >>> children = Embeddings.compute_multi(train_dataset, extractors, batch_size=32)
+        >>> list(children)
+        ['flat', 'model']
+        >>> children["model"].shape
+        (40, 32)
+        """
+        _check_extractors(dataset, extractors)
+        size = _agreed_batch_size(extractors, batch_size)
+        directories = _child_directories(path, extractors)
+        children = {
+            key: cls(
+                dataset,
+                extractor=extractor,
+                batch_size=size,
+                path=directories[key],
+                memory_threshold=memory_threshold,
+                progress_callback=progress_callback,
+            )
+            for key, extractor in extractors.items()
+        }
+        _fill_together(children, size, progress_callback)
+        return children
 
     def save(self, path: Path | str | None = None) -> None:
         """
@@ -540,6 +775,23 @@ class Embeddings(Array, FeatureExtractor):
             raise ShapeMismatchError(f"{name} returned {got} for a batch of {expected} images. {advice}")
         return rows
 
+    def _ingest(self, indices: Sequence[int], rows: NDArray[Any], *, use_memmap: bool | None = None) -> None:
+        """Store `rows`, already checked by `_rows`, as the embeddings of `indices`.
+
+        The first call initializes the storage: `use_memmap` None decides between memory and a memmap as the
+        storage always has, and True or False makes the choice for it.
+        """
+        if self._embeddings.size == 0:
+            self._initialize_storage(rows[0], use_memmap)
+
+        for i, idx in enumerate(indices):
+            self._embeddings[idx] = rows[i]
+        self._cached_idx.update(indices)
+
+        # Flush memmap writes (cheap operation)
+        if isinstance(self._embeddings, np.memmap):
+            self._embeddings.flush()
+
     def _batch(self, indices: Sequence[int]) -> Iterator[NDArray[Any]]:  # noqa: C901
         """Process indices in batches using the extractor."""
         if self._dataset is None:
@@ -564,21 +816,8 @@ class Embeddings(Array, FeatureExtractor):
                 # Fetch images from dataset
                 batch_images = self._fetch_images(batch_idx)
 
-                # Extract features
-                embeddings = self._rows(self._extractor(batch_images), len(batch_idx))
-
-                # Initialize storage on first batch
-                if self._embeddings.size == 0:
-                    self._initialize_storage(embeddings[0])
-
-                # Store embeddings
-                for i, idx in enumerate(batch_idx):
-                    self._embeddings[idx] = embeddings[i]
-                self._cached_idx.update(batch_idx)
-
-                # Flush memmap writes (cheap operation)
-                if isinstance(self._embeddings, np.memmap):
-                    self._embeddings.flush()
+                # Extract features and store them
+                self._ingest(batch_idx, self._rows(self._extractor(batch_images), len(batch_idx)))
 
                 # Report progress
                 processed += len(batch_idx)

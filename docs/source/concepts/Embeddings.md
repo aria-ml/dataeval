@@ -114,7 +114,8 @@ objective shapes which patterns the embeddings emphasize, and the embeddings des
 
 A classifier ends in a layer that outputs class scores, and class scores are not image features. Select the layer
 before the classifier: name it in `layer_name` for {class}`.TorchExtractor`, or call
-{func}`~dataeval.utils.onnx.to_encoding_model` on the exported model for {class}`.OnnxExtractor`.
+{func}`~dataeval.utils.onnx.to_encoding_model` on the exported model for {class}`.OnnxExtractor`. To compare layers or
+models, {meth}`.Embeddings.compute_multi` computes each extractor's embeddings from one read of the dataset.
 
 ### Put model preprocessing in the extractor
 
