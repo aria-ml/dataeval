@@ -418,7 +418,9 @@ class Embeddings(Array, FeatureExtractor):
         Create new Embeddings instance with a different dataset.
 
         Generate a new Embeddings object using the same extractor and configuration
-        but with a different dataset.
+        but with a different dataset. With a path, the new instance stores its embeddings
+        in the same directory, in a file named for its own dataset, so it never writes
+        to this instance's file.
 
         Parameters
         ----------
@@ -434,7 +436,9 @@ class Embeddings(Array, FeatureExtractor):
             dataset,
             extractor=self._extractor,
             batch_size=self._batch_size,
-            path=self._path,
+            # The directory, not this instance's file: the new instance names its own file from its own hash, which
+            # covers the dataset, so a memmap here is not overwritten and a saved file is not replaced.
+            path=None if self._path is None else self._path.parent,
             memory_threshold=self.memory_threshold,
             progress_callback=self._progress_callback,
         )
