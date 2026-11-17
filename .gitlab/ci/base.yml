@@ -194,7 +194,8 @@ stages:
     - if: $CI_COMMIT_TAG
     # Keep the scheduled clean rebuild for changes outside the repository
     # (datasets, model downloads, etc.). Other builds validate the restored
-    # cache's execution inputs in the docs job before reusing notebook outputs.
+    # cache's execution inputs in the docs job before reusing notebook outputs,
+    # except a merge request pipeline, which is best effort (see the docs job).
     - if: $CI_PIPELINE_SOURCE == 'schedule' && $CI_COMMIT_BRANCH == 'main'
       variables:
         DOCS_CLEAN: '-- clean'

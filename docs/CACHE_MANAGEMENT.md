@@ -126,9 +126,10 @@ Normal main, merge request, and tag builds reuse cached notebook outputs when th
 Jupyter's code-cell hashes decide which individual notebooks need execution, so a notebook edit reruns that notebook
 without clearing every other result. Prose edits reuse existing outputs; Sphinx still rebuilds the site.
 
-`docs/notebook_cache_inputs.py` stores `execution-inputs.json` inside `.jupyter_cache` after a successful GitLab build.
-It compares file contents and execution settings against that restored manifest, rather than just the previous commit.
-Canceled or skipped builds therefore cannot hide changes that the saved cache has never executed against.
+`docs/notebook_cache_inputs.py` stores `execution-inputs.json` inside `.jupyter_cache` after a successful GitLab build,
+except on a merge request. It compares file contents and execution settings against that restored manifest, rather than
+just the previous commit. Canceled or skipped builds therefore cannot hide changes that the saved cache has never
+executed against.
 
 A clean run is required when any shared execution input changes:
 
@@ -141,6 +142,15 @@ A clean run is required when any shared execution input changes:
 The exact input paths and environment variables are listed in `docs/notebook_cache_inputs.py`.
 Generated and ignored files such as `_version.py` and bytecode do not invalidate the cache. An older cache without
 a manifest requires one clean build to initialize it. The `+skipdocsclean` commit marker is no longer needed.
+
+Merge request pipelines are best effort. They start from the cache of the merge request's branch, or from
+`docs-artifacts/main` on the first run (from the latest version artifact of the release line for a merge request into
+a `release/v*` branch), and re-execute only the notebooks whose code cells changed. They skip the check above and leave
+`execution-inputs.json` as they found it, so it still describes the tree the cached outputs were last validated
+against. A merge request that changes the library can therefore show notebook outputs that are older than its code,
+and the assertion cells in the notebooks that are not re-executed do not run. The merge train pipeline, release
+branches and tags run the check, so a notebook that a change breaks or whose numbers move fails there. Merge request
+caches are never used to seed a release branch or a tag.
 
 Scheduled main builds (`DOCS_NIGHTLY`) still force a clean run to refresh external datasets and model downloads.
 To request a clean build manually, set the pipeline variable `DOCS_CLEAN` to `-- clean`.

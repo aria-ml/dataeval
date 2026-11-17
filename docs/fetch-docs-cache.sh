@@ -151,6 +151,9 @@ if ! fetch_cache "$ARTIFACT_BRANCH"; then
         VERSION_FALLBACK=$(find_version_fallback "$BRANCH_NAME") || true
     elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
         VERSION_FALLBACK=$(find_release_branch_fallback "$BRANCH_NAME") || true
+    elif [[ "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" =~ ^release/v ]]; then
+        # A merge request into a release branch builds that release line, not main's newer tree.
+        VERSION_FALLBACK=$(find_release_branch_fallback "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME") || true
     fi
 
     if [ -n "$VERSION_FALLBACK" ]; then
