@@ -338,3 +338,33 @@ def test_with_plenty_of_memory_a_path_holds_no_file_until_save(tmp_path):
     child.save()
     assert child._path is not None
     assert child._path.exists()
+
+
+def test_video_ways_share_one_walk():
+    from dataeval.extractors import VideoTorchExtractor
+    from tests.extractors.test_videotorch_extractor import MockProcessor, MockVideoModel, ReplayableStream, make_video
+
+    def video_way(num_frames: int) -> VideoTorchExtractor:
+        return VideoTorchExtractor(MockVideoModel(num_frames=num_frames), processor=MockProcessor(), device="cpu")
+
+    def walker(batch: list[Any]) -> np.ndarray:
+        return np.stack([np.array([sum(1 for _ in item)], dtype=np.float32) for item in batch])
+
+    streams = [ReplayableStream(make_video(9)) for _ in range(4)]
+    ways = {"a": video_way(4), "b": video_way(3), "walker": walker}
+    Embeddings.compute_multi(_Dataset(size=4, make=lambda i: streams[i]), ways, batch_size=2)
+    assert [stream.walks for stream in streams] == [2, 2, 2, 2]
+
+
+def test_a_memmap_child_used_on_other_data_keeps_its_rows(tmp_path):
+    children = Embeddings.compute_multi(
+        _Dataset(), {"flat": FlattenExtractor()}, batch_size=4, path=tmp_path, memory_threshold=0.0
+    )
+    child = children["flat"]
+    assert isinstance(child._embeddings, np.memmap)
+    before = np.array(child[:])
+    other = child.new(_Dataset(make=_other)).compute()
+    called = np.asarray(child(_Dataset(make=_other)))
+    assert np.array_equal(child[:], before)
+    assert not np.array_equal(other[:], before)
+    assert np.array_equal(called, other[:])

@@ -2,13 +2,15 @@
 
 __all__ = ["VideoTorchExtractor"]
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import nullcontext
+from dataclasses import dataclass
 from itertools import islice
 from typing import Any
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from torch.amp.autocast_mode import autocast
 
 from dataeval._log import get_logger
@@ -88,6 +90,19 @@ def _layer_value(captured: Any) -> Any:
     """
     tensor = _tensor_of(captured)
     return captured if tensor is None else tensor
+
+
+@dataclass
+class _Running:
+    """One video's clip aggregate while its clips are pushed, and how many there were."""
+
+    aggregate: torch.Tensor | None = None
+    n_clips: int = 0
+
+
+def _is_sliced(video: Any) -> bool:
+    """Whether a video is cut into clips by slicing, as an array is unless it is a rank-4 NumPy array, not walked."""
+    return isinstance(video, Array) and not (isinstance(video, np.ndarray) and video.ndim == 4)
 
 
 def _resolve_num_frames(model: torch.nn.Module, num_frames: int | None) -> int:
@@ -354,7 +369,7 @@ class VideoTorchExtractor:
             any rank but 4 a slice of it. A trailing incomplete clip is skipped.
         """
         n = self._num_frames
-        if isinstance(video, Array) and not (isinstance(video, np.ndarray) and video.ndim == 4):
+        if _is_sliced(video):
             # Sliced as is: the layout an array of any other rank has always reached the processor in.
             chunks: Iterator[Any] = (video[start : start + n] for start in range(0, len(video), n))
         else:
@@ -393,32 +408,50 @@ class VideoTorchExtractor:
         ValueError
             When `clips` is empty: the video is too short to fill even one clip.
         """
-        first = next(clips, None)
-        if first is None:
+        running = self._start()
+        for clip_frames in clips:
+            self._push(running, clip_frames)
+        return self._finish(running, video_idx)
+
+    def _start(self) -> "_Running":
+        """Begin one video's running aggregate, with no clip in it yet."""
+        return _Running()
+
+    def _push(self, running: "_Running", clip_frames: Any) -> None:
+        """Embed one clip and fold it into `running` with the `clip_aggregation` combine."""
+        embedding = self._embed_clip(clip_frames)
+        running.n_clips += 1
+        if running.aggregate is None:
+            # Cloned so the accumulator owns its memory: the pooled embedding can be a view of
+            # the model's output, which the in-place ``mean`` combine would otherwise write to.
+            running.aggregate = embedding.clone()
+            return
+        running.aggregate = _CLIP_AGGREGATION[self._clip_aggregation](running.aggregate, embedding)
+        self._relieve_memory(running.n_clips)
+
+    def _finish(self, running: "_Running", video_idx: int) -> torch.Tensor:
+        """Return the video's embedding from `running`.
+
+        Raises
+        ------
+        ValueError
+            When no clip was pushed: the video is too short to fill even one clip.
+        """
+        if running.aggregate is None:
             raise ValueError(
                 f"Video at index {video_idx} is shorter than one clip of {self._num_frames} "
                 "frames, so it yields no embedding, and the result is read by position. "
                 "Drop the video from the dataset, or lower num_frames.",
             )
 
-        combine = _CLIP_AGGREGATION[self._clip_aggregation]
-        # Cloned so the accumulator owns its memory: the pooled embedding can be a view of
-        # the model's output, which the in-place ``mean`` combine would otherwise write to.
-        running_aggregate = self._embed_clip(first).clone()
-
-        n_clips = 1
-        for n_clips, clip_frames in enumerate(clips, start=2):
-            running_aggregate = combine(running_aggregate, self._embed_clip(clip_frames))
-            self._relieve_memory(n_clips)
-
-        if n_clips > _LONG_VIDEO_CLIPS:
-            _logger.info(f"Processed long video {video_idx + 1} with {n_clips} clips")
+        if running.n_clips > _LONG_VIDEO_CLIPS:
+            _logger.info(f"Processed long video {video_idx + 1} with {running.n_clips} clips")
 
         # Finalize aggregation
         if self._clip_aggregation == "mean":
-            running_aggregate.div_(n_clips)  # In-place division
+            running.aggregate.div_(running.n_clips)  # In-place division
 
-        return running_aggregate
+        return running.aggregate
 
     def _embed_clip(self, clip_frames: list) -> torch.Tensor:
         """Preprocess one clip and run it through the model."""
@@ -547,3 +580,118 @@ class VideoTorchExtractor:
         pooling_info = f", pooling={self._pooling!r}"
         clip_info = f", num_frames={self._num_frames}, clip_aggregation={self._clip_aggregation!r}"
         return f"VideoTorchExtractor(device={self.device}{layer_info}{processor_info}{pooling_info}{clip_info})"
+
+
+def _is_mirrored(extractor: object) -> bool:
+    """Whether `extractor` can share a walk of each video: a `VideoTorchExtractor` whose call is its own."""
+    return type(extractor).__call__ is VideoTorchExtractor.__call__
+
+
+def _note(error: Exception, key: str, dataset_index: int) -> None:
+    error.add_note(f"Raised by the extractor {key!r} for the video at dataset index {dataset_index}.")
+
+
+def _push_noted(extractor: VideoTorchExtractor, running: _Running, clip: Any, key: str, dataset_index: int) -> None:
+    try:
+        extractor._push(running, clip)
+    except Exception as error:
+        _note(error, key, dataset_index)
+        raise
+
+
+def _own_copy(item: Any) -> Any:
+    """Return a copy of a NumPy array or a tensor, and anything else as it is."""
+    if isinstance(item, np.ndarray):
+        return item.copy()
+    if isinstance(item, torch.Tensor):
+        return item.clone()
+    return item
+
+
+def _clip_for(extractor: VideoTorchExtractor, window: list[Any]) -> list[Any]:
+    """Return the frames one extractor's clip is made from, copied where it could write into frames others share.
+
+    Without a processor the frames are stacked into a new array before anything else sees them. A processor is given
+    the frames themselves, and the other extractors' windows hold the same ones.
+    """
+    return window if extractor._processor is None else [_own_copy(frame) for frame in window]
+
+
+def _feed(
+    extractors: Mapping[str, VideoTorchExtractor],
+    windows: dict[str, list[Any]],
+    running: Mapping[str, _Running],
+    frame: Any,
+    dataset_index: int,
+) -> None:
+    """Add one frame to each extractor's clip window, and push each window that fills."""
+    for key, extractor in extractors.items():
+        windows[key].append(frame)
+        if len(windows[key]) == extractor.num_frames:
+            _push_noted(extractor, running[key], _clip_for(extractor, windows[key]), key, dataset_index)
+            windows[key] = []
+
+
+def _walk_once(
+    extractors: Mapping[str, VideoTorchExtractor], video: Any, running: Mapping[str, _Running], dataset_index: int
+) -> None:
+    """Walk `video` once, converting each frame once and feeding it to every extractor's own clip window."""
+    windows: dict[str, list[Any]] = {key: [] for key in extractors}
+    for frame in video:
+        _feed(extractors, windows, running, _frame_of(frame), dataset_index)
+    for key, window in windows.items():
+        if window:
+            _logger.debug(f"Skipping incomplete clip with {len(window)}/{extractors[key].num_frames} frames")
+
+
+def _push_sliced(
+    extractors: Mapping[str, VideoTorchExtractor], video: Any, running: Mapping[str, _Running], dataset_index: int
+) -> None:
+    """Push the clips of a video that is sliced, not walked: it is in memory, so each extractor slices it alone."""
+    for key, extractor in extractors.items():
+        _push_slices(extractor, video, running[key], key, dataset_index)
+
+
+def _push_slices(extractor: VideoTorchExtractor, video: Any, running: _Running, key: str, dataset_index: int) -> None:
+    """Push one extractor's clips of a sliced video, cut from its own copy of a NumPy array or a tensor.
+
+    The copy keeps a transform that writes in place from changing the video for the next extractor: a clip sliced from
+    an array reaches the model without a copy of its own. It lives only while this extractor runs. An array of
+    another type is sliced as it is, as `Embeddings.compute_multi` passes it.
+    """
+    for clip in extractor._split_video_into_clips(_own_copy(video)):
+        _push_noted(extractor, running, clip, key, dataset_index)
+
+
+def _embed_video(
+    extractors: Mapping[str, VideoTorchExtractor], video: Any, position: int, dataset_index: int
+) -> dict[str, torch.Tensor]:
+    """Embed one video with every extractor, walking it at most once."""
+    running = {key: extractor._start() for key, extractor in extractors.items()}
+    if _is_sliced(video):
+        _push_sliced(extractors, video, running, dataset_index)
+    else:
+        _walk_once(extractors, video, running, dataset_index)
+    finished: dict[str, torch.Tensor] = {}
+    for key, extractor in extractors.items():
+        try:
+            finished[key] = extractor._finish(running[key], position).cpu()
+        except ValueError as error:
+            _note(error, key, dataset_index)
+            raise
+    return finished
+
+
+def _mirror(
+    extractors: Mapping[str, VideoTorchExtractor], videos: Sequence[Any], indices: Sequence[int]
+) -> dict[str, NDArray[np.float32]]:
+    """Embed `videos` with every extractor, walking each video once, and return one row per video for each key.
+
+    A video that is sliced into clips rather than walked, an array, is in memory already, so each extractor slices it as
+    it does alone. Each result equals the extractor's own call on `videos`.
+    """
+    rows: dict[str, list[torch.Tensor]] = {key: [] for key in extractors}
+    for position, video in enumerate(videos):
+        for key, row in _embed_video(extractors, video, position, indices[position]).items():
+            rows[key].append(row)
+    return {key: torch.stack(r).numpy() if r else np.empty((0,), dtype=np.float32) for key, r in rows.items()}
