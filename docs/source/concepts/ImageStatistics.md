@@ -2,13 +2,47 @@
 
 # Image statistics
 
-{func}`.image_stats` measures four families of statistics about an image (pixel, visual, dimension, and hash), plus
-the experimental [blur statistics](BlurStatistics.md) and [color statistics](#color-statistics), and the
-[noise statistics](#noise-statistics). Two of the families,
-pixel and visual, answer different kinds of questions, and the distinction determines whether a value can be compared
-across a dataset. The flags and their
-parameters are in {func}`~dataeval.core.image_stats`, and the full statistic list is in
-{class}`~dataeval.flags.ImageStats`.
+{func}`.image_stats` measures images and the boxes annotated in them. Its statistics fall into families, which the
+[map of families](#statistic-families) lists. Four questions decide how to read a family's values: what it measures,
+what a result can support, what it cannot establish, and when a value can be compared across a dataset.
+{class}`~dataeval.flags.ImageStats` lists every statistic, and {func}`~dataeval.core.image_stats` gives the parameters.
+
+A statistic read outside its scope gives a wrong comparison. A brightness compared across two sensors includes the
+difference between the cameras as well as between the scenes, and a blur width compared across two resolutions
+includes the difference in resolution. Each family below states the condition under which its values compare.
+
+Every statistic is descriptive. A value describes the data and is not evidence that a sample is bad, so an unusual
+value is a reason to look at a sample and not a finding about it.
+[Validation evidence](../reference/ValidationEvidence.md#image-statistics-and-hashing) records how each family was
+checked.
+
+## Statistic families
+
+| Family | What it measures | Rows |
+| --- | --- | --- |
+| [Pixel](#pixel-statistics) (`PIXEL`) | The stored values: their moments, histogram and entropy, and the shares that are missing, zero or at a clipping endpoint | Image and box |
+| [Noise](#noise-statistics) (`NOISE`) | The level of additive white Gaussian noise, estimated from the pixels | Image and box |
+| [Visual](#visual-statistics) (`VISUAL`) | Appearance on the 0–255 display range: brightness, darkness, contrast and sharpness | Image and box |
+| [Blur](#blur-statistics) (`BLUR`) ⚠️ | The width of the sharpest edges in pixels, and how horizontal and vertical edges differ | Image and box |
+| [Color](#color-statistics) (`COLOR`) ⚠️ | Lightness, chroma, the share of neutral pixels and the mean hue, in CIELAB, from channels declared as sRGB | Image and box |
+| [Dimension](#dimension-statistics) (`DIMENSION`) | Size, shape, position, channel count and bit depth, in pixels and relative to the image | Image and box |
+| [Hash](#hash-statistics) (`HASH`) | Exact and perceptual hashes of the content | Image and box |
+| [Spatial](#spatial-statistics) (`SPATIAL`) | A box against the other boxes of its image and the image's edges | Box only |
+| [Context](#context-statistics) (`CONTEXT`) | The intensity around a box, and how far the box stands from it | Box only |
+
+⚠️ marks an experimental family, whose names and values may change.
+
+Each statistic is measured over a **region** of an image: the whole image, a box, the background or the surround of a
+box. The API reference calls a region a view; on this page a view is a {class}`.View`. Five points apply across the
+families:
+
+- A column holds image rows and box rows together, so compare an image with an image and a box with a box.
+- A box row measures the whole rectangle, including any background inside a loose box.
+- Several families also measure the background, the pixels outside every box, under a `background_` name.
+  [Data integrity](DataIntegrity.md#image-statistics-in-integrity-checks) defines that region.
+- A value that a statistic cannot measure is NaN, not 0, and several families report why in a status detail.
+- Any column can become a factor in {class}`.Metadata`. {class}`.Outliers` flags images and boxes whose values are
+  unusual, and {class}`.Duplicates` compares the hashes.
 
 ## Raw values and visual interpretation
 
@@ -33,7 +67,7 @@ as the image gets brighter:
 | `float` in [0, 1] | 61.0 | 191.0 | 112.11 |
 | `float` in [0, 255] | 61.0 | 191.0 | 112.11 |
 
-and why its pixel statistics differ:
+The pixel statistics of the same picture differ:
 
 | Encoding | `mean` | `std` |
 | --- | --- | --- |
@@ -95,13 +129,12 @@ too small, and a value below 0 leaves it with no interval. Declare `value_range`
 
 ## When there is no reference
 
-Some data has none. Elevation below sea level, mean-centered reflectance, temperature
-in Celsius, a 16-bit band holding physical units: the dynamic range of these is a
-property of the sensor, not of a file format, and nothing about the array reveals it.
-There is no encoding to decode.
+Some data has none, such as elevation below sea level, mean-centered reflectance, temperature in Celsius or a 16-bit
+band holding physical units. The dynamic range of such data is a property of the sensor, not of a file format, and
+nothing about the array reveals it. There is no encoding to decode.
 
-For that data, visual statistics report NaN. This is not an error: "how bright is this elevation map" has no answer,
-and NaN represents an unknown value. Pixel statistics (and other statistics that do not rely on an interval) are
+For that data, visual statistics report NaN. This is not an error. The question of how bright an elevation map is has no
+answer, and NaN represents an unknown value. Pixel statistics (and other statistics that do not rely on an interval) are
 unaffected, because the mean of a temperature band is a valid mean.
 
 Declare the interval to get a reading back:
@@ -119,10 +152,10 @@ Pixel statistics that need an interval also answer NaN: `PIXEL_HISTOGRAM`,
 `PIXEL_ENTROPY`, and the rest of the statistics under `normalize_pixel_values=True`,
 which is a request to divide by a range that does not exist.
 
-When this happens, a warning names `value_range`, because an all-NaN column is easy to miss.
+When this happens, a warning names `value_range`.
 
-The [color statistics](#color-statistics) and the context statistics need an interval too, by the rule in the table
-above.
+The statistics in the second row of [the table above](#where-the-reference-comes-from) need an interval too, by the
+rule that row gives.
 
 ## Statistics that depend on scale
 
@@ -134,7 +167,7 @@ Few statistics depend on scale. Of the pixel statistics, only five change when t
 | `noise_std`, `noise_var` | `entropy`, `histogram` (binned over the reference either way) |
 | | `missing`, `zeros`, `saturated_fraction` (counts) |
 
-`normalize_pixel_values=True` exists for those five, and only for them. It divides `mean`, `std` and `var` by the same
+`normalize_pixel_values=True` applies to those five only. It divides `mean`, `std` and `var` by the same
 reference the visual family uses, which makes a pixel distribution comparable across bit depths. It divides the
 [noise statistics](#noise-statistics) by the interval the context and color statistics read, in
 [the table above](#where-the-reference-comes-from), so data with no such interval reads NaN with the status
@@ -142,67 +175,7 @@ reference the visual family uses, which makes a pixel distribution comparable ac
 
 It does not change visual statistics, which are already scaled to the display range.
 
-## Definitions of selected statistics
-
-Each row below states what {func}`.image_stats` computes for a statistic whose name does not give its definition.
-
-:::{list-table}
-:widths: 28 72
-:header-rows: 1
-
-- - Statistic
-  - What it measures
-- - `VISUAL_BRIGHTNESS`
-  - The 25th percentile of the display values, which is the lower quartile.
-- - `VISUAL_DARKNESS`
-  - The 75th percentile of the display values, which is the upper quartile. It is at least `VISUAL_BRIGHTNESS` and
-    rises as the image gets brighter. The picture in the first table above reads 61 for brightness and 191 for
-    darkness.
-- - `VISUAL_CONTRAST`
-  - The range of the five reported percentiles (0, 25, 50, 75 and 100) divided by their mean: (max − min) / mean. The
-    result has no units. The range runs from the darkest pixel to the brightest, so one extreme pixel raises it. It
-    describes one image or box, and is not the `CONTEXT` contrast, which compares a box with its surround.
-- - `PIXEL_ENTROPY`
-  - The Shannon entropy, in nats, of the 256-bin histogram of the pixel values. It describes how the values spread
-    across their range. Rearranging the pixels leaves it unchanged, so it does not measure texture.
-- - `PIXEL_KURTOSIS`
-  - Excess kurtosis, the fourth standardized moment minus 3, so a normal distribution of values reads 0.
-- - `DIMENSION_ASPECT_RATIO`
-  - 1 − short side / long side of the box. The value is positive for a box wider than it is tall and negative for a
-    taller box. A square reads 0, a 2:1 box 0.5 and a 1:2 box −0.5, and every value lies between −1 and 1.
-- - `DIMENSION_DISTANCE_EDGE`
-  - The smallest of the four absolute gaps between the box and the image edges, in pixels. The value is unsigned, so a
-    box that extends past an edge reads as a positive distance, as one inside the image does, and the value does not
-    say whether the box lies inside.
-- - `CONTEXT_SURROUND_INTENSITY_MEAN` and `CONTEXT_SURROUND_INTENSITY_STD`
-  - The mean and the population standard deviation of the intensity of the pixels around a box: a frame a quarter of the
-    box's width and height wide, less the box and less every other valid box. Intensity is the value mapped to [0, 1]
-    from the image's interval and averaged over the channels, and a pixel counts only if every channel lies in the
-    interval. This reads one box's own neighborhood, where the `background_` prefix below pools the pixels outside every
-    box over the whole image, and an object that no box annotates stays in the neighborhood.
-- - `CONTEXT_TARGET_SURROUND_CONTRAST` and `CONTEXT_SIGNAL_CLUTTER_RATIO`
-  - How far a box's own mean intensity stands from its surround's, relative to the surround's level
-    (`target_surround_contrast`) and to its spread (`signal_clutter_ratio`). The sign says whether the box is brighter or
-    darker than its surround. A floor under each denominator keeps a dark or flat surround from giving a huge value, and
-    the details record where it decided. The {class}`.ImageStats` docstring gives the formulas, and
-    [the section below](#the-target-surround-ratios) the limits.
-- - `VISUAL_COLOR_LIGHTNESS_MEAN` and `VISUAL_COLOR_CHROMA_MEAN`
-  - The mean lightness and the mean chroma of the pixels in the CIELAB color space, read from three channels that you
-    declare are sRGB red, green and blue. Lightness runs from 0 for black to 100 for white, and chroma is 0 for a neutral
-    pixel and grows with how colorful it is. See [the section below](#color-statistics).
-- - `VISUAL_COLOR_ACHROMATIC_FRACTION`
-  - The share of pixels whose chroma is under a threshold, 12 by default, so that they count as neutral.
-- - `VISUAL_COLOR_HUE_COS_MEAN` and `VISUAL_COLOR_HUE_SIN_MEAN`
-  - The direction of the average hue of the colorful pixels, weighted so that a more colorful pixel counts more. The two
-    are the coordinates of that direction on the color wheel, and are NaN where no pixel is colorful.
-- - Background statistics (the `background_` prefix)
-  - The same statistics measured over the pixels outside every annotated box, and `background_blur_edge_width`, which
-    pools the edges outside the boxes. The boxes are unioned, so the values describe the scene. See [Image statistics in
-    integrity checks](DataIntegrity.md#image-statistics-in-integrity-checks).
-
-:::
-
-## Choosing between them
+## Choosing between pixel and visual statistics
 
 Use a visual statistic when the question is about appearance and you want one answer across a dataset that mixes
 encodings, such as which images are unusually dark, which are blurry, or whether the test set is shot in different
@@ -211,20 +184,37 @@ as the scene, as described above.
 
 Use a pixel statistic when the question is about the values themselves, such as what fraction of the values are zero or
 [saturated](#saturation-at-a-clipping-endpoint), how widely they spread across their range, or whether there are NaNs.
-Where the dataset is uniformly encoded, which is common, its raw values are already comparable and nothing extra is
-needed.
+Where the dataset is uniformly encoded, its raw values are already comparable and nothing extra is needed.
 
 Where a dataset mixes encodings and you want comparable pixel distributions, pass
 `normalize_pixel_values=True`. Check whether `VISUAL_BRIGHTNESS` answers the question
 more directly; a normalized `PIXEL_MEAN` is often a less direct route to the same result.
 
-## Saturation at a clipping endpoint
+## Pixel statistics
+
+The pixel statistics reduce the stored values in their own units: their mean, spread and shape, a 256-bin histogram,
+and the shares of values that are missing, zero or at a clipping endpoint. Two of them need a definition:
+
+- Entropy is the Shannon entropy, in nats, of the 256-bin histogram. It describes how the values spread across
+  their range. Rearranging the pixels leaves it unchanged, so it does not measure texture.
+- Kurtosis is excess kurtosis, the fourth standardized moment minus 3, so a normal distribution of values reads 0.
+
+A pixel statistic answers a question about the data, such as whether a file holds NaNs or how widely its values spread.
+It does not describe appearance. The same picture can have a mean of 126.88 in one encoding and 32607.54 in another,
+as [the tables above](#raw-values-and-visual-interpretation) show. Values compare across images of one encoding. Across
+encodings, the statistics that change with scale compare only when normalized, as
+[Statistics that depend on scale](#statistics-that-depend-on-scale) describes, and the others are already scale-free.
+
+Use the pixel statistics to check the stored data, such as a dataset that mixes bit depths or a pipeline step that
+introduced missing values.
+
+### Saturation at a clipping endpoint
 
 `ImageStats.PIXEL_SATURATED_FRACTION` is a pixel statistic: the share of finite raw values that lie within a tolerance
 of a clipping endpoint. It counts channel values as stored, and not pixels or colors, so an RGB image clipped in one
-channel reads 1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. Measure the color bands as a named
-[group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's column to leave it out. Values
-above the endpoint stay in the denominator, are not counted as saturated, and are reported separately.
+channel reads 1/3, and an RGBA image reads at least 1/4 for its opaque alpha channel. To leave the alpha channel out,
+measure the color bands as a named [group of channels](../notebooks/h2_measure_channel_groups.py) and read that group's
+column. Values above the endpoint stay in the denominator and are not counted as saturated.
 
 DataEval does not decode the endpoint from the data. It is the upper bound of the interval that
 [the table above](#where-the-reference-comes-from) gives the context, color and saturation statistics, and the value is
@@ -233,16 +223,14 @@ read against different endpoints. Twelve-bit data stored in `uint16`, which the 
 scaling, therefore reads NaN until its range is declared as `(0, 4095)`.
 
 A reading of 0.0 shows that no value sits at the stated endpoint and does not establish that an image is unclipped. On
-floating-point data that has been resized or otherwise computed on, a clipped region may not land exactly on the
-endpoint, and `saturated_atol` sets a tolerance. {func}`.image_stats` gives the rule order and the details.
+floating-point data that has been resized or otherwise computed on, a clipped region may land slightly off the
+endpoint, so such data needs a tolerance, which {func}`.image_stats` describes.
 
 ## Noise statistics
 
-`ImageStats.PIXEL_NOISE_STD` and `ImageStats.PIXEL_NOISE_VAR` are pixel statistics that estimate the standard deviation
-and the variance of **additive white Gaussian noise**, noise that is independent from pixel to pixel and normally
-distributed with one variance, from the pixels alone. They are stable and form the group `ImageStats.NOISE`.
-`ImageStats.ALL` includes them, and `ImageStats.PIXEL`, `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of
-{func}`.image_stats` do not.
+The noise statistics estimate the standard deviation and the variance of **additive white Gaussian noise**, noise that
+is independent from pixel to pixel and normally distributed with one variance, from the pixels alone. They are pixel
+statistics, in the data's own units.
 
 DataEval reads each channel $I$ with the estimator of Immerkær ([1996](#ref1)). The channel is convolved with a mask
 that takes the second difference along the rows and then along the columns, and the estimate is the mean absolute
@@ -256,108 +244,205 @@ $$
 The squared coefficients of $M$ sum to 36, so on white Gaussian noise of standard deviation $\sigma$ each response has
 a standard deviation of $6\sigma$ and an absolute value whose mean is $6\sigma\sqrt{2/\pi}$. The mean runs over the
 3x3 neighborhoods that hold no NaN and no masked pixel, so a masked or missing pixel creates no edge. `noise_var` is the
-mean of the channels' $\hat{\sigma}^2$ and `noise_std` is its square root. A channel needs at least 64 valid 3x3
-neighborhoods, which a square region first has at 10x10, and reads NaN with the status `insufficient_support` below
-that. The values are in the data's own units, and `normalize_pixel_values=True` divides them by an interval, as
-[Statistics that depend on scale](#statistics-that-depend-on-scale) describes. They are measured for the image, each
-box, the background and each channel group, and with `per_surround=True` over each box's surround, a view that is
-experimental ⚠️. {func}`~dataeval.core.noise_immerkaer` computes the estimate for one array.
-
-In DataEval's tests, on white Gaussian noise added to a flat image of 256 x 256 pixels, the estimate is within 5% of the
-standard deviation of the noise added and its square within 10% of the variance. On lossless 8-bit video of a synthetic
-scene with moving shapes, with noise of standard deviation 4, 8 and 16 of 255 levels added, the median reading over the
-frames rises with the noise, and at 8 and 16 levels the median over the frames of the variance above the clean clip's
-reading is within 10% of the variance added. All of this noise is simulated.
+mean of the channels' $\hat{\sigma}^2$ and `noise_std` is its square root. A small region has too few neighborhoods to
+read, so a small box can read NaN. Normalized values are divided by an interval, as
+[Statistics that depend on scale](#statistics-that-depend-on-scale) describes. The noise of a box's
+[surround](#context-statistics) can be measured too. {func}`~dataeval.core.noise_immerkaer` computes the estimate for
+one array.
 
 A difference between readings provides evidence of a difference in noise only between images of the same content. Fine
-detail of the scene itself, or **texture**, and edges that are not parallel to a side of the image add to a reading, and
+detail of the scene itself, or texture, and edges that are not parallel to a side of the image add to a reading, and
 pixels that carry no noise, such as letterbox bars or a clipped area, lower it. A high value, and an image that
 {class}`.Outliers` flags on one, can therefore come from the content as well as from noise. A single reading over a
-small region is widely spread, so compare the distributions of many readings. The Notes of
-{func}`~dataeval.core.noise_immerkaer` state the patterns the mask removes, what raises or lowers a reading, and the
-kinds of noise that were not measured.
+small region is widely spread, so compare the distributions of many readings. The estimator was checked on simulated
+noise only. The Notes of {func}`~dataeval.core.noise_immerkaer` state the patterns the mask removes, what raises or
+lowers a reading, and the kinds of noise that were not measured.
 
-## The target-surround ratios
+Use the noise statistics to compare the noise of images of the same content, such as the frames of one fixed camera at
+different gains.
 
-`target_surround_contrast` and `signal_clutter_ratio` compare a box's mean intensity with the pixels around it, as a
-difference over a reference level, in the manner of a Weber contrast. The intensity is the encoded value mapped to
-[0, 1], so the ratios are not contrasts of physical luminance, which gamma and the sensor's response separate from the
-stored values. Four limits decide what a value can support.
+## Visual statistics
 
-- The box is the target. Its mean covers every pixel of the box, including the pixels of overlapping neighbors and of
-  background inside a loose box, so a loose box reads nearer its surround than the object does.
-- The intensity is averaged over the channels, so a box that differs from its surround in hue and not in brightness
-  reads near 0.
-- A dark or flat surround puts a small number under the division. Each denominator has a floor, 1/255 by default, so a
-  value never exceeds 255 in size at the default, and where the floor was used the details say so: the value is then
-  mostly the difference over the floor, and says little of the surround.
-- Intensity is `(value - low) / (high - low)`, so when a declared range does not start at 0 the denominator of the
-  contrast depends on that low end. Declare the range where images are compared.
+The visual statistics read the values against the full-scale reference, on the 0–255 display range. Four of them need a
+definition:
 
-A box with fewer than 90% of its pixels valid reads NaN for both ratios, with the surround kept, since a mean over a
-small part of a box describes the part and not the box. {class}`.Outliers` with `ImageStats.ALL` and `per_target=True`
-judges the two ratios too, and both are signed.
+- Brightness is the 25th percentile of the display values, the lower quartile.
+- Darkness is the 75th percentile, the upper quartile. It is at least the brightness, and it rises as the image
+  gets brighter.
+- Contrast is the range of the five reported percentiles (0, 25, 50, 75 and 100) divided by their mean,
+  (max − min) / mean, and has no units. The range runs from the darkest pixel to the brightest, so one extreme pixel
+  raises it. It describes one image or box, and is not the context contrast, which compares a box with its surround.
+- Sharpness is the spread of edge magnitudes from a 3x3 edge kernel.
+
+A visual statistic answers a question about appearance, with one answer however the picture is stored. It cannot
+separate the scene from the camera, as [Raw values and visual interpretation](#raw-values-and-visual-interpretation)
+describes, and it is NaN for data with [no reference](#when-there-is-no-reference). Values compare across encodings
+that have a reference. Between images from different sensors, a difference includes the cameras. A resize makes
+sharpness measure the interpolation kernel, as
+[the transforms section](#transforms-and-the-statistics-they-invalidate) describes.
+
+Use the visual statistics for questions about appearance across a dataset that mixes encodings.
+
+## Blur statistics
+
+The blur statistics are visual statistics that measure the width of the sharpest edges in pixels, and how much the
+widths of horizontal and vertical edges differ. They are experimental ⚠️. A width is in pixels at the image's own
+resolution, so values compare only at one resolution, and only between images of similar contrast. They are not a
+calibrated level of defocus. [Blur statistics](BlurStatistics.md) describes the method and its limits.
+
+Use the blur statistics to compare focus within footage of one resolution.
 
 ## Color statistics
 
-The color statistics, `color_lightness_mean`, `color_chroma_mean`, `color_achromatic_fraction`, `color_hue_cos_mean` and
-`color_hue_sin_mean`, measure the color of an image, a box or the background in the CIELAB color space. They are experimental
-⚠️. `ImageStats.ALL` includes them, and `ImageStats.STANDARD`, `ImageStats.BASIC` and the default of {func}`.image_stats`
-do not.
+The color statistics are visual statistics that measure the color of an image, a box or the background in the CIELAB
+color space: the mean lightness and chroma, the share of neutral pixels, and the mean hue. They are experimental ⚠️.
+The color of a box's [surround](#context-statistics) can be measured too.
 
-With `per_surround=True` they are also measured over each box's surround, the box widened by `surround_padding` with
-every box of the image masked out, so a box's color can be set beside the color it is seen against
-(`color_lightness_mean` beside `surround_color_lightness_mean`). A small box has a small surround, and one with fewer
-than `color_min_pixels` valid pixels reads NaN with the status `insufficient_support`.
-
-Nothing in the pixels says which channels are red, green and blue, or that they are sRGB, so you declare them with
-`color_rgb_channels`: `(0, 1, 2)` for an RGB image and `(2, 1, 0)` for a BGR one. Without it the color statistics are
-dropped from the request with a notice, and a request for `ImageStats.ALL` leaves them out and logs it. The values are
-only as true as the declaration: a false-color or thermal image read as sRGB gives numbers that have no color meaning.
-Images are channel-first, as everywhere in DataEval, so an image stored as height, width and channels reads as that many
-channels. An evaluator such as {class}`.Outliers` cannot take the keyword, so compute with {func}`.image_stats` and pass
-the result to its `from_stats`.
+Nothing in the pixels says which channels are red, green and blue, or that they are sRGB, so the caller declares them,
+and the color statistics are not computed without that declaration. The values are only as true as the declaration: a
+false-color or thermal image read as sRGB gives numbers that have no color meaning.
 
 A color needs an absolute scale. The scale is the one in [the table above](#where-the-reference-comes-from), never an
-integer image's own maximum, which would make the same pixels read as different colors. A 16-bit image needs a declared
-range, and is NaN with the status `unknown_range` without one.
+integer image's own maximum, which would make the same pixels read as different colors. A 16-bit image therefore needs
+a declared range.
 
-"Chroma" and "hue" are CIELAB terms and have nothing to do with a codec's chroma subsampling. The lightness is that of
-the sRGB color once its transfer function is undone, which is neither `brightness`, a percentile of display values, nor
-`mean`, a mean of stored values.
+Lightness runs from 0 for black to 100 for white. Chroma is 0 for a neutral pixel and grows with how colorful it
+is, and the share of neutral pixels counts those whose chroma is under a threshold. "Chroma" and "hue" are CIELAB terms
+and have nothing to do with a codec's chroma subsampling. The lightness is that of the sRGB color once its transfer
+function is undone, which is neither `brightness`, a percentile of display values, nor `mean`, a mean of stored values.
 
-Hue is a position on the color wheel, and an average of angles misleads because the wheel is a circle: the mean of 350
-and 10 degrees is 0, not 180. `color_hue_cos_mean` and `color_hue_sin_mean` are the coordinates of the average direction
-of the colorful pixels, weighted so that a more colorful pixel counts more. The point lies near the rim when those
-pixels share one hue and near the center when their hues are mixed, and `atan2(color_hue_sin_mean, color_hue_cos_mean)`
-gives the mean angle where it is not near the center.
+Hue is a position on the color wheel, which is a circle, so an average of angles misleads. The arithmetic mean of 350
+and 10 degrees is 180, while the two hues lie on either side of 0. `color_hue_cos_mean` and `color_hue_sin_mean` are the
+coordinates of the average direction of the colorful pixels, weighted so that a more colorful pixel counts more. The
+point lies near the rim when those pixels share one hue and near the center when their hues are mixed, and
+`atan2(color_hue_sin_mean, color_hue_cos_mean)` gives the mean angle where it is not near the center. Both are NaN where
+no pixel is colorful.
 
-The threshold between neutral and colorful, `color_chroma_threshold`, is a default chosen without study data and is
-provisional. On a mid gray, one channel 16 of 255 levels above the other two reads a chroma of 6.5 for red, 11.1 for green
-and 9.2 for blue, and 30 levels reads 12.3, 20.6 and 17.3, so at the default a pixel with one channel well off the others
-can still count as neutral.
+The threshold between neutral and colorful is a default chosen without study data and is provisional.
 
 The statistics describe stored color, so a difference between two sets of images can be a difference in the scene, the
 camera or its white balance, and they cannot tell these apart. Video in a gamma other than sRGB, wide-gamut files and
 chroma subsampling were not measured, and the statistics read all of them as sRGB.
 
-## Blur statistics
+Use the color statistics to compare the color of sets of images from one camera and one white balance, such as a train
+and a test split.
 
-The blur statistics, `blur_edge_width` and `blur_edge_directionality`, measure the width of edges in pixels. They are
-experimental ⚠️. `ImageStats.ALL` includes them, and `ImageStats.VISUAL` and the default of {func}`.image_stats` do not.
-[Blur statistics](BlurStatistics.md) describes them.
+## Dimension statistics
+
+The dimension statistics describe the geometry of an image or a box: its width, height, area, aspect ratio and offset,
+the distances from its center to the image's center and from its sides to the image's edges, its channel count and its
+bit depth. Two of them need a definition:
+
+- Aspect ratio is 1 − short side / long side, positive for a box wider than it is tall and negative for a taller
+  one. A square reads 0, a 2:1 box 0.5 and a 1:2 box −0.5, and every value lies between −1 and 1.
+- Distance to the edge is the smallest of the four absolute gaps between the box and the image edges, in pixels. It
+  is unsigned, so a box that extends past an edge reads as a positive distance, as one inside the image does. The
+  [spatial statistics](#spatial-statistics) give the share of a box inside the image, which tells the two apart.
+
+The statistics in pixels compare at one resolution. Their relative forms place a box within its image, as a fraction of
+the image's width, height, area or half-diagonal, so they compare boxes across resolutions. On an image's own row they
+read the whole frame, such as a relative size of 1. A resize makes the statistics report the resize target, as
+[the transforms section](#transforms-and-the-statistics-they-invalidate) describes. The bit depth is decoded from the
+data, or from a declared interval as [When there is no reference](#when-there-is-no-reference) describes.
+
+The statistics describe geometry as it was stored or annotated. An unusual size or aspect ratio is a reason to inspect a
+box or an image, and does not show that the box was drawn wrongly or the image resized.
+
+Use the dimension statistics to check that images and boxes have the sizes and shapes the dataset should have.
+
+## Hash statistics
+
+The hash statistics summarize content as hashes. xxHash is an exact hash of the stored bytes. pHash and dHash are
+perceptual hashes, which give similar values for images that look alike after compression, a small crop or a change of
+brightness, and their D4 variants also match the eight rotations and flips of a square. Two hashes compare only within
+one hash type.
+
+A matching exact hash is evidence of identical bytes and not a guarantee of it, since a non-cryptographic hash can
+collide. A close perceptual hash says two images look alike, not that one was made from the other, and it does not
+survive arbitrary warping or rotation by other angles.
+[Duplicate detection](DataIntegrity.md#duplicate-detection-hashing-and-clustering) describes the methods, and
+{class}`.Duplicates` uses them.
+
+Use the hash statistics to look for exact and near copies within a dataset or across its splits.
+
+## Spatial statistics
+
+The spatial statistics measure a box against the other boxes of its image and against the image's edges, so they have
+values on box rows only. They are:
+
+- the distance from the box's center to the center of the nearest other box, over the box's own diagonal;
+- the share of the box's area inside the image;
+- the share of the box's area that the other boxes cover;
+- the largest intersection over union of the box with another box of its class, and with a box of another class.
+
+Boxes are rectangles, and an object that nobody annotated covers nothing, so the statistics describe the annotations
+and not the objects. The covered fraction is not occlusion: it counts the area of the box that other boxes cover, and
+does not say which object lies in front. The distance is center to center, not the gap between two boxes, and it is
+directed, since each box divides by its own diagonal, so two boxes can read different distances to each other.
+
+A large overlap with a box of another class marks a pair that may be two objects, such as a rider on a bicycle, or two
+annotations of one object, which can be a conflicting label. The class overlaps need class labels, and passing labels
+to them is experimental ⚠️. Where a missing label could hide the largest overlap, the value is NaN, not a guess.
+
+The ratios are scale-free, so they compare across resolutions. The share inside the image depends on whether the
+annotation tool clips boxes to the image: it reads 1.0 wherever the boxes were clipped, including after a
+{class}`.Resize` or a {class}`.Crop`.
+
+Use the spatial statistics to choose boxes for annotation review, such as crowded boxes, boxes cut by the image edge
+and boxes that lie on a box of another class.
+
+## Context statistics
+
+The context statistics compare a box with its **surround**: a frame around the box, whose width is a fixed share of
+the box's width and height, less the box and less every other box of the image. They have values on box rows only. The
+surround mean and standard deviation describe the intensity of the surround, where intensity is the value mapped to
+[0, 1] from the image's interval and averaged over the channels, and a pixel counts only if every channel lies in the
+interval. The surround is one box's own neighborhood, while the background pools the pixels outside every box over the
+whole image.
+
+An object that no box annotates stays in the surround, and a box near the image edge reads a surround that the edge has
+cut. A small box, or one whose surround the other boxes cover, has too few surround pixels to read and is NaN.
+
+The color and noise statistics can also be measured over each box's surround, beside the box's own values. That
+measurement is experimental ⚠️.
+
+Values compare across images measured against one interval, and across boxes annotated by one convention, since a
+loose box reads nearer its surround than a tight one.
+
+Use the context statistics to compare objects with what they are seen against, such as one class over different
+backgrounds.
+
+### The target-surround ratios
+
+`target_surround_contrast` and `signal_clutter_ratio` compare a box's mean intensity with its surround's, as a
+difference relative to the surround's level and to its spread, in the manner of a Weber contrast. The sign says
+whether the box is brighter or darker than its surround. The intensity is the encoded value mapped to [0, 1], so the
+ratios are not contrasts of physical luminance, which gamma and the sensor's response separate from the stored values.
+{class}`.ImageStats` gives the formulas. Four limits decide what a value can support.
+
+- The box is the target. Its mean covers every pixel of the box, including the pixels of overlapping neighbors and of
+  background inside a loose box, so a loose box reads nearer its surround than the object does.
+- The intensity is averaged over the channels, so a box that differs from its surround in hue and not in brightness
+  reads near 0.
+- A dark or flat surround puts a small number under the division. Each denominator has a floor, and where the floor
+  was used the details say so: the value is then mostly the difference over the floor, and says little of the surround.
+- Intensity is `(value - low) / (high - low)`, so when a declared range does not start at 0 the denominator of the
+  contrast depends on that low end. Declare the range where images are compared.
+
+A ratio near 0 therefore does not establish that an object is hard to see, and a large one does not establish that it
+is easy to find.
 
 ## Transforms and the statistics they invalidate
 
-A transform can be placed in the view or in the extractor, and choosing the wrong placement fails silently. Model
-preprocessing placed in the view is seen by every evaluator: {class}`.Outliers` then reports brightness and contrast on
-ImageNet-normalized tensors, which do not describe the data. Dataset-defining manipulation placed in the extractor is
-seen only by the embeddings: if 512 × 512 tiles are what ships, the statistics still describe source-resolution imagery,
-which does not ship.
+A transform can be placed in the view or in the extractor, and the wrong placement raises no error. Model
+preprocessing placed in the view is seen by every evaluator, so {class}`.Outliers` then reports brightness and contrast
+on ImageNet-normalized tensors, which do not describe the data. Dataset-defining manipulation placed in the extractor is
+seen only by the embeddings. If 512 × 512 tiles are what ships, the statistics still describe source-resolution
+imagery, which does not ship.
 
-Two questions place a transform. Does an evaluator that never touches your model need to see it? If so, it belongs in
-the {class}`.View`, and if not, in the extractor's `transforms=`. Is it deterministic, with an unambiguous rewrite of
-the targets? If so, use a curated operation, and if not, {class}`.TorchvisionTransform`.
+Two properties place a transform. Place it in the {class}`.View` when an evaluator that never touches the model must
+see it, and in the extractor's `transforms=` otherwise. Use a curated operation for a deterministic transform with an
+unambiguous rewrite of the targets, and {class}`.TorchvisionTransform` for any other.
 
 | Kind | Example | Placement |
 | --- | --- | --- |
@@ -372,26 +457,29 @@ sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
-the blur statistics, which are edge widths in pixels. It also changes the spatial statistics, because the boxes are
-clipped to the new canvas and those left outside it are dropped, the context statistics, because the surround of a box
-is made of interpolated pixels, and the saturation statistic, because a resize returns floats, which have no dtype
-endpoint. It changes the noise statistics too, because interpolation smooths the noise and a letterbox adds flat bars.
-It leaves the other pixel statistics, the channel count and the hashes alone, so
-resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions than hashing at source
-resolution. The quality evaluators intersect the declaration with the {class}`.ImageStats` you asked for, and where the
-two overlap they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated
-statistics now describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows
-the three responses.
+the blur statistics, which are edge widths in pixels. It changes the spatial statistics, because the boxes are clipped
+to the new canvas and those left outside it are dropped. It changes the context statistics, because the surround of a
+box is made of interpolated pixels. It changes the saturation statistic, because a resize returns floats, which take
+their endpoint from a float convention read off the data's extremes. It changes the noise statistics, because
+interpolation smooths the noise and a letterbox adds flat bars. It leaves the other pixel statistics, the channel count
+and the hashes alone, so resize-then-hash may be a better near-duplicate check across heterogeneous source resolutions
+than hashing at source resolution.
+
+The quality evaluators intersect the declaration with the requested {class}`.ImageStats`, and where the two overlap
+they raise a {class}`~dataeval.exceptions.StatsInvalidatedWarning`. Nothing is blocked. The invalidated statistics now
+describe the transform. [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py) shows the three
+responses.
 
 The declarations are conservative. {class}`.TorchvisionTransform` declares `ImageStats.ALL`, the spatial, context,
 saturation and noise statistics included, because an arbitrary transform can move anything. {class}`.SelectChannels`
 with `"gray"` declares the blur, saturation, context and noise statistics too, because a luminance mix changes which
-picture is read. Random transforms are seeded for each datum from the datum's `id`, so the view is stable: the
-statistics pass, the embedding pass and the duplicates pass see the same pixels, and iterating twice gives identical
-bytes. A view built through {class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because
-provenance records the `repr` of each operation. A curated operation has a `repr` you can paste back. A
-`v2.Compose([...])` has a multi-line `repr`, and a lambda inside one records nothing recoverable. This is one more
-reason to prefer the curated operations.
+picture is read.
+
+Random transforms are seeded for each datum from the datum's `id`, so the view is stable. The statistics pass, the
+embedding pass and the duplicates pass see the same pixels, and iterating twice gives identical bytes. A view built
+through {class}`.TorchvisionTransform` may not be reconstructable from its sidecar, because provenance records the
+`repr` of each operation. The `repr` of a curated operation can be pasted back to rebuild it. A `v2.Compose([...])` has
+a multi-line `repr`, and a lambda inside one records nothing recoverable.
 
 ## Related concept pages
 
@@ -406,6 +494,20 @@ reason to prefer the curated operations.
   that each group is measured separately
 - [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates
   and the three ways to respond
+- [Specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py):
+  statistics of images, boxes and the background region
+- [Add intrinsic factors to Metadata](../notebooks/h2_add_intrinsic_factors.py): pixel and visual statistics as
+  metadata factors
+- [Find crowded, truncated and conflicting annotations](../notebooks/h2_find_annotation_review_candidates.py): the
+  spatial statistics as an annotation review list
+- [Identify duplicates](../notebooks/h2_deduplicate.py): the hashes behind exact and near-duplicate detection
+
+### Tutorials
+
+- [Clean a dataset](../notebooks/tt_clean_dataset.py): the pixel, visual and dimension statistics through
+  {class}`.Outliers`
+- [Compare objects to their surroundings](../notebooks/tt_compare_objects_to_surroundings.py): box statistics beside
+  the statistics of the background region
 
 ## References
 

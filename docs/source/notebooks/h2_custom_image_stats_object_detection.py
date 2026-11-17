@@ -17,7 +17,7 @@
 # # Specify custom statistics on object detection datasets
 #
 # When you analyze an object detection dataset, you often need
-# [image statistics](../concepts/DataIntegrity.md#image-statistics-in-integrity-checks) at three granularities:
+# [image statistics](../concepts/ImageStatistics.md#statistic-families) at three granularities:
 # whole images, individual bounding boxes, and the background that no box covers. {func}`.image_stats` with
 # {class}`.ImageStats` flags measures each region, and {class}`.Metadata` places every value on the row it describes.
 #

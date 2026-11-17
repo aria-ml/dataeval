@@ -22,8 +22,8 @@ BlurStatistics
 :header-rows: 0
 
 - - [](ImageStatistics.md)
-  - The pixel, visual, dimension and hash statistics that {func}`.image_stats` computes, and when a value can be
-    compared across a dataset.
+  - The statistics that {func}`.image_stats` computes for images and boxes, what each family can show, and when a
+    value can be compared across a dataset.
 - - [](BlurStatistics.md)
   - How blur is measured as edge width in pixels for images and videos, and the limits of that measurement.
 

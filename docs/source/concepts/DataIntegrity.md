@@ -340,40 +340,10 @@ behind its defaults.
 
 ### Image statistics in integrity checks
 
-{func}`.image_stats` is the underlying computation engine for image
-statistics in DataEval. It accepts any iterable of images or a MAITE-compliant
-`Dataset` and computes whichever statistics are requested via the
-{class}`.ImageStats` flag parameter. `ImageStats` is a selector, not a
-processor: it is a `Flag` enum whose values you combine with bitwise OR to
-specify which statistics you want, and `image_stats` handles the rest.
-
-The four flag categories and their integrity signals:
-
-| Category    | Key statistics                                     | Integrity signal                                                |
-| ----------- | -------------------------------------------------- | --------------------------------------------------------------- |
-| `PIXEL`     | Mean, std, entropy, skewness, kurtosis, saturation | Corrupted, near-empty or clipped frames; distribution anomalies |
-| `VISUAL`    | Brightness, contrast, sharpness, darkness          | Exposure and focus failures; sensor artifacts                   |
-| `DIMENSION` | Width, height, aspect ratio, channels, bit depth   | Incorrectly resized, cropped, or re-encoded samples             |
-| `HASH`      | xxHash, pHash, dHash (+ D4 variants)               | Exact and near-duplicate detection (used by `Duplicates`)       |
-
-Some flags have dependencies that are resolved automatically: requesting
-`PIXEL_ENTROPY` also enables `PIXEL_HISTOGRAM` (which entropy requires);
-requesting `VISUAL_BRIGHTNESS`, `VISUAL_CONTRAST`, or `VISUAL_DARKNESS`
-also enables `VISUAL_PERCENTILES`.
-
-For object detection datasets, `image_stats` can compute statistics separately
-for each bounding box (`per_target=True`, the default when boxes are present)
-and for the full image (`per_image=True`). The `source_index` field in the
-output identifies whether each row corresponds to a full image or to a specific
-bounding box within an image.
-
-Bands are addressed with `channels=`, which names groups of them and measures
-each group jointly, returning `<group>_<statistic>` columns on the same rows:
-`channels={"r": 0, "g": 1, "b": 2}` for RGB, or
-`channels={"visible": range(0, 30), "nir": range(30, 70)}` for a hyperspectral
-cube. Because they are columns rather than rows, band statistics reach
-{class}`.Metadata` and are visible to {class}`.Balance` and {class}`.Diversity`
-like any other factor.
+{func}`.image_stats` computes the statistics that the integrity evaluators read.
+[Image statistics](ImageStatistics.md#statistic-families) maps the families and says what each can support. Statistics
+of named groups of bands are columns rather than rows, so they reach {class}`.Metadata` and are visible to
+{class}`.Balance` and {class}`.Diversity` like any other factor.
 
 Object detection datasets can also be measured on the pixels that are not
 annotated. `per_background=True` unions every box in an image into a mask,
@@ -402,11 +372,10 @@ statistic describes, the image, and so belong at the `unit` level (see
 - `background_fraction` is always returned. It is the share of the image left unmasked, and a background statistic
   measured over a few percent of an image is noise that looks like a measurement. Read it before the other background
   statistics. Where an image's boxes cover it entirely, every other background statistic for that image is `NaN`.
-- Only `PIXEL`, `VISUAL`, `COLOR` and `NOISE` statistics, and `VISUAL_BLUR_EDGE_WIDTH` as `background_blur_edge_width`,
-  are computed for the background. A masked region has no meaningful hash and no geometry of its own, so `HASH`,
-  `DIMENSION` and `VISUAL_BLUR_EDGE_DIRECTIONALITY` flags are computed for the image and its boxes as usual and skipped
-  for the background. `background_blur_edge_width` pools the edges outside the boxes and a margin around them, so it is
-  not measured over exactly the `background_fraction` of the image. See [Blur statistics](BlurStatistics.md).
+- A masked region has no meaningful hash and no geometry of its own, so the hash and dimension statistics are computed
+  for the image and its boxes and not for the background. `background_blur_edge_width` pools the edges outside the
+  boxes and a margin around them, so it is not measured over exactly the `background_fraction` of the image. See
+  [Blur statistics](BlurStatistics.md).
 - Boxes are rounded outwards and unioned, so the background excludes slightly more than the annotations strictly cover.
   This is deliberate: a retained pixel is background with high confidence, at the cost of discarding a boundary ring of
   genuine background along with the object.
