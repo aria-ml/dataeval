@@ -90,6 +90,12 @@ class TestRowContract:
         with pytest.raises(TypeError, match=r"ClasswiseUncertaintyExtractor returned a dict, not an array"):
             Embeddings(IMAGES, extractor=extractor, batch_size=4)[:]  # pyright: ignore[reportArgumentType]
 
+    def test_a_dict_points_at_compute_multi_for_several_embeddings_of_each_item(self):
+        scorer = ScoresExtractor(Detector([2]))
+        extractor = ClasswiseUncertaintyExtractor(scorer, preds_type="probs")
+        with pytest.raises(TypeError, match=r"Embeddings\.compute_multi.*TorchLayers"):
+            Embeddings(IMAGES, extractor=extractor, batch_size=4)[:]  # pyright: ignore[reportArgumentType]
+
     def test_one_row_per_image_still_works(self):
         embeddings = Embeddings(IMAGES, extractor=FlattenExtractor(), batch_size=3)
         assert np.asarray(embeddings).shape == (8, 16)

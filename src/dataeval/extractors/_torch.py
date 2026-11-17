@@ -289,21 +289,38 @@ class TorchExtractor(ReprMixin):
         if not self._warned_host_copy:
             self._warned_host_copy = warn_if_pulled_to_cpu("TorchExtractor", batch, self.device)
 
+    def _forward_layers(
+        self, images: list[torch.Tensor], batch_size: int, layers: Mapping[str, torch.nn.Module]
+    ) -> dict[str, list[torch.Tensor]]:
+        """Run the model once per batch and return what each of `layers` gave, batch by batch, on the host.
+
+        The one path a hooked layer is read through, whether by this extractor alone or by `TorchLayers` with others.
+        """
+        outputs: dict[str, list[torch.Tensor]] = {name: [] for name in layers}
+        for start in range(0, len(images), batch_size):
+            input_tensor = torch.stack(images[start : start + batch_size])
+            self._warn_if_pulled_to_cpu(input_tensor)
+            input_tensor = input_tensor.to(self.device)
+            with torch.no_grad():
+                captured = _capture(
+                    self._model, input_tensor, layers, use_output=self._use_output, convert=_first_tensor
+                )
+            for name in layers:
+                # A second unwrap, as the single-layer path always made: a layer that returns ((a, b), c) gives a.
+                outputs[name].append(_first_tensor(captured[name]).detach().cpu())
+        return outputs
+
     def _extract_features(self, images: list[torch.Tensor], batch_size: int) -> list[torch.Tensor]:
         """Extract features from a list of torch tensors."""
+        if self._layers:
+            return next(iter(self._forward_layers(images, batch_size, self._layers).values()))
         outputs: list[torch.Tensor] = []
         for start in range(0, len(images), batch_size):
             input_tensor = torch.stack(images[start : start + batch_size])
             self._warn_if_pulled_to_cpu(input_tensor)
             input_tensor = input_tensor.to(self.device)
             with torch.no_grad():
-                if self._layers:
-                    captured = _capture(
-                        self._model, input_tensor, self._layers, use_output=self._use_output, convert=_first_tensor
-                    )
-                    output = next(iter(captured.values()))
-                else:
-                    output = self._model(input_tensor)
+                output = self._model(input_tensor)
             postprocess_fn = self._postprocess_fn
             if postprocess_fn is not None:
                 decoded = postprocess_fn(output)

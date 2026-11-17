@@ -76,7 +76,8 @@ requirements:
   - '`FlattenExtractor`, `TorchExtractor`, `OnnxExtractor`, `BoVWExtractor`, `UncertaintyExtractor`, and `ClasswiseUncertaintyExtractor`
     each return one embedding row per dataset item.'
   - '`OnnxExtractor` output matches the source model''s output and can be passed to the drift detectors.'
-  - All extractors satisfy the `FeatureExtractor` protocol (`__call__(data) -> Array`).
+  - Every extractor except `TorchLayers`, which `Embeddings.compute_multi` takes, satisfies the `FeatureExtractor`
+    protocol (`__call__(data) -> Array`).
 - id: FR-4
   name: Dataset Selection
   description: DataEval shall let a user narrow, reorder, or rebalance a MAITE dataset without copying it and without

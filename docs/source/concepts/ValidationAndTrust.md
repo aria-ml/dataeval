@@ -138,6 +138,11 @@ with `postprocess_fn`.
     With `postprocess_fn` set, the extractor returns one row for each detection
     and does not fit {class}`.Embeddings`. See
     [Keep one row for each item](Embeddings.md#keep-one-row-for-each-item).
+- - {class}`.TorchLayers`
+  - Several hooked layers of one `torch.nn.Module`, read in one forward pass per batch, each as its own
+    {class}`.Embeddings`, for {meth}`.Embeddings.compute_multi`.
+  - Everything above for {class}`.TorchExtractor`: each layer gives what its own extractor gives. It cannot be called,
+    so {class}`.Embeddings` and the evaluators do not take it.
 - - {class}`.OnnxExtractor`
   - The same, executed through ONNX Runtime, with lazy model loading and
     automatic provider selection (CUDA, then CoreML, then CPU).
@@ -593,6 +598,8 @@ Experimental ⚠️ (API may change or be removed):
 - {meth}`.Embeddings.compute_multi` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a
   process. Its name, and what it shares between extractors, may change. An {class}`.Embeddings` built without it raises
   nothing.
+- {class}`.TorchLayers` raises {class}`~dataeval.exceptions.ExperimentalWarning` the first time one is constructed in a
+  process. Its name, its arguments and the keys its layers are stored under may change.
 - The inputs of {class}`.Feasibility` ({class}`.TargetSpec` and
   {class}`.Allowances`), the core
   functions behind its bounds ({func}`.ap_lower_staircase`,

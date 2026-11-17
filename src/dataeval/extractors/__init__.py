@@ -11,6 +11,7 @@ __all__ = [
     "FlattenExtractor",
     "OnnxExtractor",
     "TorchExtractor",
+    "TorchLayers",
     "BoVWExtractor",
     "UncertaintyExtractor",
     "ClasswiseUncertaintyExtractor",
@@ -24,6 +25,7 @@ from dataeval.extractors._geometry import DetectionGeometryExtractor
 from dataeval.extractors._onnx import OnnxExtractor
 from dataeval.extractors._scores import ScoresExtractor
 from dataeval.extractors._torch import TorchExtractor
+from dataeval.extractors._torch_layers import TorchLayers
 from dataeval.extractors._uncertainty import (
     ClasswiseUncertaintyExtractor,
     UncertaintyExtractor,

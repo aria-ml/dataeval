@@ -18,7 +18,7 @@ from dataeval._experimental import experimental
 from dataeval._log import get_logger
 from dataeval.config import get_load_threads, resolve_batch_size
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
-from dataeval.extractors import FlattenExtractor
+from dataeval.extractors import FlattenExtractor, TorchLayers
 from dataeval.extractors._videotorch import _is_mirrored, _mirror
 from dataeval.protocols import (
     AnnotatedDataset,
@@ -83,8 +83,32 @@ def _check_extractors(dataset: Any, extractors: Mapping[str, Any]) -> None:
             raise TypeError(
                 f"The extractor {key!r} is an Embeddings. Pass its extractor instead, so it is computed in this pass."
             )
-        if not callable(extractor):
+        if not callable(extractor) and not isinstance(extractor, TorchLayers):
             raise TypeError(f"The extractor {key!r} is not callable: it is a {type(extractor).__name__}.")
+
+
+_Groups = dict[str, tuple[TorchLayers, dict[str, str]]]
+"""Each `TorchLayers` given to `Embeddings.compute_multi`, by its key, with the child key of each of its layers."""
+
+
+def _add_way(ways: dict[str, Any], key: str, extractor: Any) -> None:
+    if key in ways:
+        raise ValueError(f"The key {key!r} is given twice: once directly, and once as a layer of a TorchLayers.")
+    ways[key] = extractor
+
+
+def _expand(extractors: Mapping[str, Any]) -> tuple[dict[str, Any], _Groups]:
+    """Give each layer of a `TorchLayers` a key of its own, `<key>/<layer>`, read by a single-layer extractor."""
+    ways: dict[str, Any] = {}
+    groups: _Groups = {}
+    for key, extractor in extractors.items():
+        if not isinstance(extractor, TorchLayers):
+            _add_way(ways, key, extractor)
+            continue
+        groups[key] = (extractor, {layer: f"{key}/{layer}" for layer in extractor.layer_names})
+        for layer, child_key in groups[key][1].items():
+            _add_way(ways, child_key, extractor.solo(layer))
+    return ways, groups
 
 
 def _agreed_batch_size(extractors: Mapping[str, Any], batch_size: int | None) -> int:
@@ -156,17 +180,34 @@ def _mirrored(children: Mapping[str, "Embeddings"]) -> dict[str, Any]:
     return mirrored if len(mirrored) > 1 else {}
 
 
-def _extract_each(
-    children: Mapping[str, "Embeddings"], indices: Sequence[int], images: Sequence[Any]
-) -> dict[str, NDArray[Any]]:
-    """Run every child's extractor on its own views of one batch, naming the extractor in any error it raises.
+def _shared_outputs(
+    mirrored: Mapping[str, Any], groups: _Groups, indices: Sequence[int], images: Sequence[Any]
+) -> dict[str, Any]:
+    """Run, once each, what several children share: the walk of the mirrored videos, and each `TorchLayers`."""
+    outputs: dict[str, Any] = _mirror(mirrored, _private_copies(images), indices) if mirrored else {}
+    for entry, (layers, child_keys) in groups.items():
+        try:
+            read = layers.extract(_private_copies(images))
+        except Exception as error:
+            error.add_note(f"Raised by the TorchLayers {entry!r} given to Embeddings.compute_multi.")
+            raise
+        outputs.update({child_key: read[layer] for layer, child_key in child_keys.items()})
+    return outputs
 
-    Two or more `VideoTorchExtractor`s share one walk of each video, so they count as one reader of a one-shot stream.
+
+def _extract_each(
+    children: Mapping[str, "Embeddings"], indices: Sequence[int], images: Sequence[Any], groups: _Groups
+) -> dict[str, NDArray[Any]]:
+    """Run every child's extractor on its own copies of one batch, naming the extractor in any error it raises.
+
+    Two or more `VideoTorchExtractor`s share one walk of each video, and the layers of one `TorchLayers` share one
+    forward pass, so each counts as one reader of a one-shot stream.
     """
-    mirrored = _mirrored(children)
-    if len(children) - len(mirrored) + bool(mirrored) > 1:
+    grouped = {child_key for _, child_keys in groups.values() for child_key in child_keys.values()}
+    mirrored = _mirrored({key: child for key, child in children.items() if key not in grouped})
+    if len(children) - len(grouped) - len(mirrored) + len(groups) + bool(mirrored) > 1:
         _refuse_one_shot(images)
-    outputs = _mirror(mirrored, _private_copies(images), indices) if mirrored else {}
+    outputs = _shared_outputs(mirrored, groups, indices, images)
     rows: dict[str, NDArray[Any]] = {}
     for key, child in children.items():
         try:
@@ -178,14 +219,16 @@ def _extract_each(
     return rows
 
 
-def _fill_together(children: Mapping[str, "Embeddings"], size: int, progress_callback: ProgressCallback | None) -> None:
+def _fill_together(
+    children: Mapping[str, "Embeddings"], size: int, progress_callback: ProgressCallback | None, groups: _Groups
+) -> None:
     """Read each batch once and store every child's rows for it, reporting progress once per batch."""
     first = next(iter(children.values()))
     total = len(first)
     use_memmap: bool | None = None
     for start in range(0, total, size):
         indices = list(range(start, min(start + size, total)))
-        rows = _extract_each(children, indices, first._fetch_images(indices))
+        rows = _extract_each(children, indices, first._fetch_images(indices), groups)
         if use_memmap is None:
             use_memmap = _memmap_for_all(children, rows)
         for key, child in children.items():
@@ -293,6 +336,11 @@ class Embeddings(Array, FeatureExtractor):
         memory_threshold: float = 0.8,
         progress_callback: ProgressCallback | None = None,
     ) -> None:
+        if extractor is not None and not callable(extractor):
+            raise TypeError(
+                f"extractor must be callable, and a {type(extractor).__name__} is not. A TorchLayers, which reads "
+                "several layers of one model in one forward pass, is given to Embeddings.compute_multi instead."
+            )
         self._extractor = extractor if extractor is not None else FlattenExtractor()
         self._batch_size = resolve_batch_size(batch_size, getattr(self._extractor, "batch_size", None))
         self.memory_threshold = max(0.0, min(1.0, memory_threshold))
@@ -600,7 +648,7 @@ class Embeddings(Array, FeatureExtractor):
     def compute_multi(
         cls,
         dataset: ImageDataset,
-        extractors: Mapping[str, FeatureExtractor],
+        extractors: Mapping[str, FeatureExtractor | TorchLayers],
         *,
         batch_size: int | None = None,
         path: Path | str | None = None,
@@ -611,7 +659,8 @@ class Embeddings(Array, FeatureExtractor):
         Compute the embeddings of several extractors in one pass over a dataset, reading each item once.
 
         Each batch of `dataset` is read once and given to every extractor in turn, in the order of `extractors`, before
-        the next batch is read. Two or more video extractors run first, together, as the Notes describe. Each
+        the next batch is read. Two or more video extractors, and each :class:`~dataeval.extractors.TorchLayers`, run
+        first, as the Notes describe. Each
         extractor's embeddings become an ordinary :class:`Embeddings`, equal to the one it gives on its own with the
         same batch size, unless it draws random numbers, which it then draws in another order.
 
@@ -619,8 +668,10 @@ class Embeddings(Array, FeatureExtractor):
         ----------
         dataset : ImageClassificationDataset or ObjectDetectionDataset
             Dataset that provides the images.
-        extractors : Mapping[str, FeatureExtractor]
-            The extractors, each under the key its embeddings are returned under.
+        extractors : Mapping[str, FeatureExtractor | TorchLayers]
+            The extractors, each under the key its embeddings are returned under. A
+            :class:`~dataeval.extractors.TorchLayers` returns one :class:`Embeddings` for each of its layers, under
+            ``"<key>/<layer>"``.
         batch_size : int or None, default None
             Number of items read and embedded at a time. None takes each extractor's own `batch_size`, or else the
             global default, and the extractors must then agree.
@@ -644,10 +695,11 @@ class Embeddings(Array, FeatureExtractor):
         ------
         ValueError
             When there is no dataset or no extractor, when the extractors' batch sizes differ and `batch_size` is not
-            given, when a key names no directory or two keys name the same one, when `path` is a file, or when an item
-            is a one-shot stream that more than one extractor would walk.
+            given, when a key is given twice, when a key names no directory or two keys name the same one, when `path`
+            is a file, or when an item is a one-shot stream that more than one extractor would walk.
         TypeError
-            When an extractor is an :class:`Embeddings` or is not callable.
+            When an extractor is an :class:`Embeddings`, or is neither callable nor a
+            :class:`~dataeval.extractors.TorchLayers`.
 
         Notes
         -----
@@ -656,8 +708,9 @@ class Embeddings(Array, FeatureExtractor):
         video stream, is passed as it is, and an extractor that changes it in place changes it for the next. An error
         raised by an extractor carries a note that names its key, and nothing is returned.
 
-        Each :class:`~dataeval.extractors.TorchExtractor` runs its own forward pass, also when several share a model,
-        and every extractor's model is held in memory for the whole pass. :func:`~dataeval.config.set_load_threads`
+        Each :class:`~dataeval.extractors.TorchExtractor` runs its own forward pass, also when several share a model;
+        a :class:`~dataeval.extractors.TorchLayers` reads all its layers in one forward pass per batch. Every
+        extractor's model is held in memory for the whole pass. :func:`~dataeval.config.set_load_threads`
         applies to the reads, and the extractors run on the calling thread. Each embedding is tested equal to the
         extractor's own result on the CPU; a GPU and Windows are untested.
 
@@ -686,7 +739,8 @@ class Embeddings(Array, FeatureExtractor):
         """
         _check_extractors(dataset, extractors)
         size = _agreed_batch_size(extractors, batch_size)
-        directories = _child_directories(path, extractors)
+        ways, groups = _expand(extractors)
+        directories = _child_directories(path, ways)
         children = {
             key: cls(
                 dataset,
@@ -696,9 +750,9 @@ class Embeddings(Array, FeatureExtractor):
                 memory_threshold=memory_threshold,
                 progress_callback=progress_callback,
             )
-            for key, extractor in extractors.items()
+            for key, extractor in ways.items()
         }
-        _fill_together(children, size, progress_callback)
+        _fill_together(children, size, progress_callback, groups)
         return children
 
     def save(self, path: Path | str | None = None) -> None:
@@ -794,7 +848,11 @@ class Embeddings(Array, FeatureExtractor):
             "the extractor itself, to a drift detector."
         )
         if isinstance(raw, Mapping):
-            raise TypeError(f"{name} returned a {type(raw).__name__}, not an array. {advice}")
+            several = (
+                "To store several embeddings of each item, such as several layers of one model, give the extractors to "
+                "Embeddings.compute_multi, with the layers of one torch model as a TorchLayers."
+            )
+            raise TypeError(f"{name} returned a {type(raw).__name__}, not an array. {advice} {several}")
         rows = np.asarray(raw)
         if rows.ndim == 0 or len(rows) != expected:
             got = "a single value" if rows.ndim == 0 else f"{len(rows)} rows"
