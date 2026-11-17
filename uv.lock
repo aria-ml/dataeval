@@ -1187,7 +1187,7 @@ dev = [
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.24" },
+    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.25" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "nox", specifier = ">=2025.5.1" },
@@ -1229,7 +1229,7 @@ docs = [
     { name = "jupyter-cache", specifier = ">=1.0" },
     { name = "jupyter-client", specifier = ">=8.6.0" },
     { name = "jupytext", specifier = ">=1.19.1" },
-    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.24" },
+    { name = "maite-datasets", extras = ["hf"], specifier = ">=0.0.25" },
     { name = "markupsafe", specifier = ">=3,<3.0.2" },
     { name = "myst-nb", specifier = ">=1.0" },
     { name = "numpy", specifier = ">=1.24.2" },
@@ -2437,7 +2437,7 @@ wheels = [
 
 [[package]]
 name = "maite-datasets"
-version = "0.0.24"
+version = "0.0.25"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "defusedxml" },
@@ -2451,9 +2451,9 @@ dependencies = [
     { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu126') or (extra == 'extra-8-dataeval-cpu' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-cu126' and extra == 'extra-8-dataeval-cu130') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu126') or (extra == 'extra-8-dataeval-onnx' and extra == 'extra-8-dataeval-onnx-cu130') or (extra == 'extra-8-dataeval-onnx-cu126' and extra == 'extra-8-dataeval-onnx-cu130')" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/69/076c3eeba09c21b99e5947e9ea268abaff68e3967c2ae9f55ffef5ee31fa/maite_datasets-0.0.24.tar.gz", hash = "sha256:2b585e3f223a514bb5bca44f7beb38da397a77d712771f98fcff2277052e7425", size = 141534, upload-time = "2026-09-18T18:02:26.819Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/38/f767b403fc2e8901598ba5329dfdf1a4b350fd31f5398959152d345b56fa/maite_datasets-0.0.25.tar.gz", hash = "sha256:ea2be54cf878696580121210cac037ba0b144fbe708543e1eb3fe1afd67ffb05", size = 144594, upload-time = "2026-11-14T03:45:58.247Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/bc/dd8e257d39ce644e53537eace2de35ba68d9cdcb895eda74833612800ed5/maite_datasets-0.0.24-py3-none-any.whl", hash = "sha256:8de1285f344da73abe638938266934b86799f0e879e11288669fb3e2812b1f5f", size = 171075, upload-time = "2026-09-18T18:02:25.071Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/ea/2b4eca25dcada87f5d9fbee278171d68350120c8d41d9c59d9947eb145ff/maite_datasets-0.0.25-py3-none-any.whl", hash = "sha256:22a81703a17f8857568015d49b26627498c6535f0dd760e8728b0e1696c79f23", size = 175379, upload-time = "2026-11-14T03:45:56.889Z" },
 ]
 
 [package.optional-dependencies]

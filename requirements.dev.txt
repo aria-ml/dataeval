@@ -1118,9 +1118,9 @@ maite==0.9.5 \
     # via
     #   dataeval
     #   maite-datasets
-maite-datasets==0.0.24 \
-    --hash=sha256:2b585e3f223a514bb5bca44f7beb38da397a77d712771f98fcff2277052e7425 \
-    --hash=sha256:8de1285f344da73abe638938266934b86799f0e879e11288669fb3e2812b1f5f
+maite-datasets==0.0.25 \
+    --hash=sha256:22a81703a17f8857568015d49b26627498c6535f0dd760e8728b0e1696c79f23 \
+    --hash=sha256:ea2be54cf878696580121210cac037ba0b144fbe708543e1eb3fe1afd67ffb05
 markdown-it-py==4.2.0 \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
     --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
