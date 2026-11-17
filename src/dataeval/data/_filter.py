@@ -16,7 +16,7 @@ from dataeval._metadata._filters import evaluate
 from dataeval._metadata._store import LevelStore
 from dataeval._metadata._structurers import select_structurer
 from dataeval.data._indices import _dropper, _Within
-from dataeval.data._reads import Reads
+from dataeval.data._reads import Reads, recordable, skeleton
 from dataeval.data._video_proxies import _FrameTracksTarget
 from dataeval.data._view import Operation, Transform, View
 from dataeval.flags import ImageStats
@@ -53,6 +53,11 @@ def _predicate(  # noqa: C901
     if classes is not None:
         parts.append(pl.col("class_label").is_in([int(label) for label in classes]))
     return parts[0] if len(parts) == 1 else parts[0] & parts[1]
+
+
+def _without_pixels(datum: Any) -> Any:
+    """Return `datum` without its pixels, unless it is a tracking datum, whose frames a target read never decodes."""
+    return skeleton(datum) if recordable(datum) else datum
 
 
 _KINDS: dict[str, DatasetKind] = {"IC": "classification", "OD": "object_detection", "MOT": "multiobject_tracking"}
@@ -192,10 +197,10 @@ class Filter(Operation):
     null too; ``altitude IS NULL`` keeps them. Booleans are stored as integers, so write ``flag = true``, not ``flag``.
     A column name holding spaces is double-quoted, as SQL does: ``"time of day" = 'night'``.
 
-    **Reading.** A `where` predicate reads each item, image included, to learn its target and metadata, so it costs a
-    pass over the dataset whatever it keeps. :func:`~dataeval.config.set_load_threads` loads those reads in several
-    threads. To select on values you already hold in an array, give :class:`Indices` the positions of the items in this
-    dataset, which does not walk the dataset to decide.
+    **Reading.** A `where` predicate, or `classes` given alone, reads each item, image included, to learn its target and
+    metadata, so it costs a pass over the dataset whatever it keeps. :func:`~dataeval.config.set_load_threads` loads
+    those reads in several threads. To select on values you already hold in an array, give :class:`Indices` the
+    positions of the items in this dataset, which does not walk the dataset to decide.
 
     **Multi-object tracking.** A predicate about frames can keep the videos holding a matching frame
     (``drop="items"``) but cannot remove frames from a video: present the frames as items with :class:`SequenceFrames`
@@ -294,7 +299,7 @@ class Filter(Operation):
         mask: Transform | None = None
         old = list(view.selection)
         cache = view._reads  # held before a transform of this filter clears it
-        datums = view._skeletons() if cache is not None else (view.read(index) for index in old)
+        datums = view._skeletons() if cache is not None else view._read_each(old, _without_pixels)
         for index, datum in zip(old, datums, strict=True):
             target = datum[1]
             if isinstance(target, Array):
