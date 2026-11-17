@@ -13,7 +13,7 @@ from torch.amp.autocast_mode import autocast
 
 from dataeval._log import get_logger
 from dataeval.config import get_device
-from dataeval.extractors._torch import get_valid_layer, normalize_transforms
+from dataeval.extractors._torch import _capture, get_valid_layer, normalize_transforms
 from dataeval.protocols import Array, DeviceLike, Transform
 from dataeval.utils._array import as_numpy
 from dataeval.utils.preprocessing import normalize_image_shape
@@ -80,6 +80,16 @@ def _tensor_of(model_output: Any) -> Any:  # noqa: C901
     return None
 
 
+def _layer_value(captured: Any) -> Any:
+    """Return the tensor in what a hooked layer gave, or what it gave as it came.
+
+    An unrecognized output is kept rather than discarded: the layer was named by the caller,
+    who knows what it produces better than this does.
+    """
+    tensor = _tensor_of(captured)
+    return captured if tensor is None else tensor
+
+
 def _resolve_num_frames(model: torch.nn.Module, num_frames: int | None) -> int:
     """Settle on the clip length, from the argument or from the model's own config."""
     if num_frames is None:
@@ -133,8 +143,10 @@ class VideoTorchExtractor:
     layer_name : str or None, default None
         Layer to extract embeddings from. When None, uses model output.
     use_output : bool, default True
-        If True, captures layer output; if False, captures layer input.
-        Only used when layer_name is specified.
+        If True, captures layer output; if False, captures layer input, as the layer
+        receives it, before an in-place layer such as ``ReLU(inplace=True)`` can overwrite
+        it. Only used when layer_name is specified. The layer is hooked only while the
+        model runs, so the extractor leaves nothing registered on the model.
     pooling : str, default "first"
         Pooling strategy for sequence outputs within each clip. Options:
         - "mean": Average pool across temporal dimension
@@ -225,11 +237,10 @@ class VideoTorchExtractor:
         self._model = model.to(self.device).eval()
         self._num_frames = _resolve_num_frames(model, num_frames)
 
-        # Setup hook for intermediate layer extraction
-        self._captured_output: Any = None
+        # The layer to capture, validated now and hooked only for the length of each forward pass
+        self._layers: dict[str, torch.nn.Module] = {}
         if layer_name is not None:
-            target_layer = get_valid_layer(layer_name, model)
-            target_layer.register_forward_hook(self._hook_fn)
+            self._layers[layer_name] = get_valid_layer(layer_name, model)
             _logger.debug(f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}.")
 
     @property
@@ -256,16 +267,6 @@ class VideoTorchExtractor:
     def num_frames(self) -> int:
         """Number of frames per clip."""
         return self._num_frames
-
-    def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor, ...], output: Any) -> None:
-        """Forward hook to capture layer input or output."""
-        captured = _tensor_of(output) if self._use_output else inputs[0]
-        if captured is None:
-            # Unrecognized output kept as it came, rather than discarded: the layer was
-            # named by the caller, who knows what it produces better than this does.
-            self._captured_output = output
-        else:
-            self._captured_output = captured.detach().clone()
 
     def _apply_pooling(self, embeddings: torch.Tensor) -> torch.Tensor:
         """
@@ -430,19 +431,14 @@ class VideoTorchExtractor:
         """Run one clip through the model and return the tensor to pool.
 
         With a hooked layer the value comes from the hook rather than from the return
-        value, so the capture is cleared first: a forward pass that never reaches the
-        layer would otherwise hand back the *previous* clip's activations as if they were
-        this one's, and every clip after it would read as a copy of the last one that ran.
+        value. Each clip captures afresh, so a forward pass that never reaches the layer
+        raises rather than handing back the previous clip's activations as this one's.
         """
-        if self._layer_name:
-            self._captured_output = None
-            self._model(clip_tensor)
-            if self._captured_output is None:
-                raise RuntimeError(
-                    f"Layer {self._layer_name!r} did not run during the forward pass, so there is "
-                    "nothing to extract from it.",
-                )
-            return self._captured_output
+        if self._layers:
+            captured = _capture(
+                self._model, clip_tensor, self._layers, use_output=self._use_output, convert=_layer_value
+            )
+            return next(iter(captured.values()))
 
         model_output = self._model(clip_tensor)
         output = _tensor_of(model_output)

@@ -9,6 +9,7 @@ import torch
 
 from dataeval import Embeddings
 from dataeval.extractors import FlattenExtractor, TorchExtractor
+from dataeval.extractors._torch import _capture, _first_tensor
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata
 
 
@@ -269,41 +270,25 @@ class TestEmbeddings:
         # Verify they contain the same data
         assert np.allclose(output_result, input_result)
 
-    def test_hook_fn_captures_output(self, sequential_model):
-        """Test that _hook_fn correctly captures output when use_output=True."""
-        extractor = TorchExtractor(sequential_model, layer_name="2", use_output=True, device="cpu")
+    def test_capture_takes_the_layer_output(self, sequential_model):
+        """`_capture` returns the hooked layer's output, detached from the graph."""
+        sample = torch.ones(1, 1, 3, 3, requires_grad=True)
+        layers = {"2": sequential_model[2]}
+        captured = _capture(sequential_model, sample, layers, use_output=True, convert=_first_tensor)["2"]
 
-        # Simulate what happens during forward pass
-        sample_input = torch.ones(1, 4, 3, 3)
-        sample_output = torch.ones(1, 36)  # Flattened output
+        assert captured.shape == (1, 36)
+        assert torch.allclose(captured, sequential_model[:3](sample))
+        assert not captured.requires_grad
 
-        # Call hook function directly
-        extractor._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
+    def test_capture_takes_the_layer_input(self, sequential_model):
+        """`_capture` returns the hooked layer's input, not its output, when `use_output` is False."""
+        sample = torch.ones(1, 1, 3, 3, requires_grad=True)
+        layers = {"2": sequential_model[2]}
+        captured = _capture(sequential_model, sample, layers, use_output=False, convert=_first_tensor)["2"]
 
-        # Verify output was captured
-        assert extractor._captured_output is not None
-        assert extractor._captured_output.shape == sample_output.shape
-        assert torch.allclose(extractor._captured_output, sample_output)
-
-        # Verify it's detached (no gradient tracking)
-        assert not extractor._captured_output.requires_grad
-
-    def test_hook_fn_captures_input(self, sequential_model):
-        """Test that _hook_fn correctly captures input when use_output=False."""
-        extractor = TorchExtractor(sequential_model, layer_name="2", use_output=False, device="cpu")
-
-        # Simulate what happens during forward pass
-        sample_input = torch.ones(1, 4, 3, 3)
-        sample_output = torch.ones(1, 36)
-
-        # Call hook function directly
-        extractor._hook_fn(torch.nn.Identity(), (sample_input,), sample_output)
-
-        # Verify input was captured, not output
-        assert extractor._captured_output is not None
-        assert extractor._captured_output.shape == sample_input.shape
-        assert torch.allclose(extractor._captured_output, sample_input)
-        assert not extractor._captured_output.requires_grad
+        assert captured.shape == (1, 4, 3, 3)
+        assert torch.allclose(captured, sequential_model[:2](sample))
+        assert not captured.requires_grad
 
     def test_get_valid_layer_returns_module(self, sequential_model):
         """Test that _get_valid_layer returns correct module."""
@@ -346,9 +331,6 @@ class TestEmbeddings:
         # Should be output of flatten layer (layer "2"), not final linear layer
         assert result.shape == (2, 36)  # Flattened: 4 channels * 3 * 3
         assert isinstance(result, np.ndarray)
-
-        # Verify captured_output was populated
-        assert extractor._captured_output is not None
 
     def test_call_preserves_batch_dimension(self, torch_ic_ds, sequential_model):
         """Test that __call__ correctly handles different batch sizes."""
