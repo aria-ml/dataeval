@@ -58,7 +58,7 @@
 #   - `maite-datasets`
 #   - `opencv-python` or `opencv-python-headless`
 #   - `torchvision`
-#   - `matplotlib`
+#   - `dataeval-plots>=0.0.20`
 
 # %% [markdown]
 # ## Introduction
@@ -85,7 +85,7 @@
 try:
     import google.colab  # noqa: F401
 
-    # %pip install -q dataeval maite-datasets opencv-python-headless torchvision
+    # %pip install -q dataeval maite-datasets opencv-python-headless torchvision "dataeval-plots>=0.0.20"
 except Exception:
     pass
 
@@ -93,6 +93,7 @@ except Exception:
 from numbers import Number
 from typing import cast
 
+import dataeval_plots as dep
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -140,12 +141,7 @@ photos = [
 ]
 
 # Display six of the images
-fig, axes = plt.subplots(1, 6, figsize=(14, 2.5))
-for ax, photo in zip(axes, photos, strict=False):
-    ax.imshow(np.transpose(photo, (1, 2, 0)))
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
+dep.plot(photos[:6], figsize=(14, 2.5), images_per_row=6)
 
 # %% [markdown]
 # ## Defining Torchvision transformations
@@ -260,13 +256,7 @@ print(f"Created {len(images)} images: {N_PHOTOS} originals and {len(images) - N_
 # %%
 # Visualize a sample of transformations of the first image
 sample = [0, 2, 5, 6, 9, 10, 15, 17, 20, 25, 28, 30]
-fig, axes = plt.subplots(2, 6, figsize=(14, 5))
-for ax, i in zip(axes.flatten(), sample, strict=True):
-    ax.imshow(np.transpose(images[i], (1, 2, 0)))
-    ax.set_title(f"[{i}] {labels[i]}", fontsize=9)
-    ax.axis("off")
-plt.tight_layout()
-plt.show()
+dep.plot(images, figsize=(14, 5), indices=sample, images_per_row=6, titles=[f"[{i}] {labels[i]}" for i in sample])
 
 # %% [markdown]
 # ## Running near-duplicate detection

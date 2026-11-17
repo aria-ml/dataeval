@@ -26,21 +26,21 @@
 # - trace a finding through a {class}`.View` back to the untransformed data on disk
 # - turn findings into factors so bias and balance analysis can see them
 #
-# You need `dataeval`, `maite-datasets` and `matplotlib`. This guide uses SeaDrone.
+# You need `dataeval`, `maite-datasets` and `dataeval-plots>=0.0.20`. This guide uses SeaDrone.
 
 # %% tags=["remove_cell"]
 try:
     import google.colab  # noqa: F401
 
     # specify the version of DataEval (==X.XX.X) for versions other than the latest
-    # %pip install -q dataeval maite-datasets matplotlib
+    # %pip install -q dataeval maite-datasets "dataeval-plots>=0.0.20"
 except Exception:
     pass
 
 # %%
 from collections import Counter
 
-import matplotlib.pyplot as plt
+import dataeval_plots as dep
 import numpy as np
 from maite_datasets.object_detection import SeaDrone
 
@@ -125,24 +125,15 @@ print(f"  image = {found.pixels.shape}")
 # of what you need to judge a finding, and {meth}`.SourceItem.crop` is the cut-out.
 
 
-# %% tags=["hide-input"]
-def show(axis, pixels, title, box=None):
-    """Draw a (C, H, W) array, optionally with a box on it."""
-    axis.imshow(np.transpose(pixels, (1, 2, 0)).astype(np.uint8))
-    axis.set_title(title, fontsize=9)
-    axis.axis("off")
-    if box is not None:
-        x0, y0, x1, y1 = box
-        axis.add_patch(plt.Rectangle((x0, y0), x1 - x0, y1 - y0, fill=False, color="red", linewidth=1.5))
-
-
 # %%
-fig, axes = plt.subplots(1, 3, figsize=(11, 3.5))
-show(axes[0], found.pixels, f"item {found.item_index}: the scene", box=found.box)
-show(axes[1], found.crop(), "crop(): the detection")
-show(axes[2], found.crop(region="context", padding=1.0), "crop(context, padding=1.0)")
-plt.tight_layout()
-plt.show()
+dep.plot(
+    [found.pixels, found.crop(), found.crop(region="context", padding=1.0)],
+    figsize=(11, 3.5),
+    titles=[f"item {found.item_index}: the scene", "crop(): the detection", "crop(context, padding=1.0)"],
+    boxes=[[found.box], [], []],
+    box_color="red",
+    max_size=600,  # scale the scene down before drawing its box, so the box stays visible
+)
 
 # %% [markdown]
 # `crop()` shares its implementation with {class}`.DetectionCrops`, but the defaults differ: `crop()` leaves the
