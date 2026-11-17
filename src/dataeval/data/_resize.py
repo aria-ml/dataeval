@@ -139,11 +139,11 @@ class Resize(Operation):
     clipped to the new canvas and those left outside it are dropped, so ``box_in_image_fraction`` reads 1.0 afterward
     and a target's neighbors may be gone, and ``mode="stretch"`` scales the two axes by different factors, which a
     normalized center distance does not survive. So is saturation (``ImageStats.PIXEL_SATURATED_FRACTION``):
-    interpolation moves the values at the edge of a clipped region, and a resize returns floats, which have no dtype
-    endpoint, so an image that declared no range reads NaN. So are the context statistics (``ImageStats.CONTEXT``): the
-    surround of a box is made of interpolated pixels, its neighbors may be gone, and a letterbox adds bars it can reach.
-    So are the noise statistics (``ImageStats.NOISE``): interpolation smooths the noise, and a letterbox adds flat bars
-    that read none and pull the estimate down.
+    interpolation moves the values at the edge of a clipped region, and a resize returns floats, which take their
+    endpoint from a float convention, read off the data's extremes, rather than from the dtype. So are the context
+    statistics (``ImageStats.CONTEXT``): the surround of a box is made of interpolated pixels, its neighbors may be
+    gone, and a letterbox adds bars it can reach. So are the noise statistics (``ImageStats.NOISE``): interpolation
+    smooths the noise, and a letterbox adds flat bars that read none and pull the estimate down.
 
     ``PIXEL_MEAN``/``PIXEL_STD`` are deliberately *not* declared for ``mode="stretch"``.
     Aggressive downsampling does shrink pixel variance, but it is a second-order effect and

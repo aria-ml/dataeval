@@ -1513,11 +1513,11 @@ def image_stats(  # noqa: C901
     saturated_atol : float, default 0.0
         How far from the endpoint a value may sit and still count as saturated, at least 0. The default is exact
         equality, which a float image that went through arithmetic rarely meets, so set a tolerance for one. The
-        endpoint is the upper bound of the declared `value_range`, else the maximum of an unsigned integer dtype of 32
-        bits or fewer, or 1 for Boolean data, else it is unknown and the statistic is NaN. It is never read from the
-        data, so 12-bit data stored in ``uint16`` is measured against 65535 unless its range is declared as
-        ``(0, 4095)``. The value is checked on every call, and ignored, with a warning, when `stats` does not request
-        ``PIXEL_SATURATED_FRACTION``.
+        endpoint is the upper bound of the declared `value_range`, else 255 for ``uint8`` data, else 1 or 255 for
+        floating-point data within [0, 1] or [0, 255], else it is unknown and the statistic is NaN, as for the context
+        and color statistics. It is never read from the data's maximum, so 12-bit data stored in ``uint16`` is NaN
+        until its range is declared as ``(0, 4095)``. The value is checked on every call, and ignored, with a warning,
+        when `stats` does not request ``PIXEL_SATURATED_FRACTION``.
 
         .. versionadded:: 1.3
     surround_padding : float, default 0.25
@@ -1779,13 +1779,12 @@ def image_stats(  # noqa: C901
     >>> found["details"]["max_iou_other_class_target_index"].tolist()
     [1, 0, -1]
 
-    Measure the share of values at a clipping endpoint. The endpoint is never read from the data, so values that fill
-    12 bits and sit in a ``uint16`` array are measured against 65535 until the range is stated, here in the datum's
-    metadata:
+    Measure the share of values at a clipping endpoint. The endpoint is never read from the data's maximum, so values
+    that fill 12 bits and sit in a ``uint16`` array have none until the range is stated, here in the datum's metadata:
 
     >>> pixels = np.full((1, 4, 4), 4095, dtype=np.uint16)
     >>> image_stats([pixels], stats=ImageStats.PIXEL_SATURATED_FRACTION)["stats"]["saturated_fraction"].tolist()
-    [0.0]
+    [nan]
     >>> class Sensor:
     ...     metadata = {"id": "sensor"}
     ...

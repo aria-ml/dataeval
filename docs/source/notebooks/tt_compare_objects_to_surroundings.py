@@ -28,7 +28,7 @@
 # ## What you will do
 #
 # - Compute image statistics for the whole frame, individual bounding boxes, and the masked background.
-# - Calculate a per-detection separation score to find camouflaged objects.
+# - Calculate a per-detection separation score to find objects about as bright as the scene behind them.
 # - Compare scene-relative ratios that stay meaningful across different lighting conditions.
 # - Evaluate dataset balance and mutual information to detect background shortcut risks.
 
@@ -195,8 +195,9 @@ print(f"mean |background - whole image| brightness: {drift:.3f}")
 # brightness beside the brightness of the scene behind it. That is the reason for storing the background at the level it
 # was measured at.
 #
-# Their difference is a per-detection separation score: how far the object sits from its
-# surroundings. Near zero means the object is, in brightness terms, camouflaged.
+# Their difference is a per-detection separation score: how far the object's brightness sits from the brightness of
+# the scene behind it. Near zero means the two are about equally bright. That alone does not make an object hard to
+# see: the box also holds some of the water around the object, and the score compares neither color nor texture.
 
 # %%
 labels = metadata.index2label

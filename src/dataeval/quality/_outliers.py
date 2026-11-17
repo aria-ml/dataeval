@@ -630,17 +630,18 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> results = outliers.evaluate(dataset)
         >>> summary = results.aggregate_by_metric()
         >>> summary
-        shape: (4, 2)
-        ┌─────────────┬───────┐
-        │ metric_name ┆ Total │
-        │ ---         ┆ ---   │
-        │ cat         ┆ u32   │
-        ╞═════════════╪═══════╡
-        │ entropy     ┆ 4     │
-        │ mean        ┆ 4     │
-        │ std         ┆ 4     │
-        │ var         ┆ 4     │
-        └─────────────┴───────┘
+        shape: (5, 2)
+        ┌────────────────────┬───────┐
+        │ metric_name        ┆ Total │
+        │ ---                ┆ ---   │
+        │ cat                ┆ u32   │
+        ╞════════════════════╪═══════╡
+        │ entropy            ┆ 4     │
+        │ mean               ┆ 4     │
+        │ std                ┆ 4     │
+        │ var                ┆ 4     │
+        │ saturated_fraction ┆ 1     │
+        └────────────────────┴───────┘
         """
         if "dataset_index" in self.data().columns:
             raise ValueError("Aggregation by metric only works with output from a single dataset.")
@@ -689,7 +690,7 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         >>> results = outliers.evaluate(dataset, per_target=True)
         >>> summary = results.aggregate_by_item()
         >>> summary.head(10)
-        shape: (10, 22)
+        shape: (10, 24)
         ┌────────────┬────────────┬────────────┬────────────┬───┬──────────┬──────────┬────────────┬───────┐
         │ item_index ┆ target_ind ┆ instance_b ┆ instance_c ┆ … ┆ unit_std ┆ unit_var ┆ unit_zeros ┆ Total │
         │ ---        ┆ ex         ┆ rightness  ┆ ontrast    ┆   ┆ ---      ┆ ---      ┆ ---        ┆ ---   │
@@ -698,14 +699,14 @@ class OutliersOutput(DataFrameOutput, Generic[TOutliers]):
         ╞════════════╪════════════╪════════════╪════════════╪═══╪══════════╪══════════╪════════════╪═══════╡
         │ 0          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 1          ┆ 1     │
         │ 2          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 1          ┆ 1     │
+        │ 4          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 1     │
         │ 7          ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
         │ 7          ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
+        │ 10         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 1     │
         │ 11         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
         │ 11         ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
-        │ 18         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 1        ┆ 1        ┆ 0          ┆ 8     │
-        │ 18         ┆ 0          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
-        │ 18         ┆ 1          ┆ 1          ┆ 1          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 8     │
-        │ 19         ┆ 0          ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 2     │
+        │ 13         ┆ null       ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 1     │
+        │ 13         ┆ 0          ┆ 0          ┆ 0          ┆ … ┆ 0        ┆ 0        ┆ 0          ┆ 1     │
         └────────────┴────────────┴────────────┴────────────┴───┴──────────┴──────────┴────────────┴───────┘
         """
         if "dataset_index" in self.data().columns:
@@ -2605,22 +2606,22 @@ class Outliers(Evaluator):
         >>> results = outliers.from_stats(stats)
         >>> results.head(10).select("item_index", "metric_name", "metric_value")
         shape: (10, 3)
-        ┌────────────┬─────────────┬──────────────┐
-        │ item_index ┆ metric_name ┆ metric_value │
-        │ ---        ┆ ---         ┆ ---          │
-        │ i64        ┆ cat         ┆ f64          │
-        ╞════════════╪═════════════╪══════════════╡
-        │ 7          ┆ entropy     ┆ 0.0          │
-        │ 7          ┆ mean        ┆ 0.98         │
-        │ 7          ┆ std         ┆ 0.0          │
-        │ 7          ┆ var         ┆ 0.0          │
-        │ 8          ┆ skew        ┆ 0.062311     │
-        │ 11         ┆ entropy     ┆ 0.0          │
-        │ 11         ┆ mean        ┆ 0.98         │
-        │ 11         ┆ std         ┆ 0.0          │
-        │ 11         ┆ var         ┆ 0.0          │
-        │ 18         ┆ entropy     ┆ 0.0          │
-        └────────────┴─────────────┴──────────────┘
+        ┌────────────┬────────────────────┬──────────────┐
+        │ item_index ┆ metric_name        ┆ metric_value │
+        │ ---        ┆ ---                ┆ ---          │
+        │ i64        ┆ cat                ┆ f64          │
+        ╞════════════╪════════════════════╪══════════════╡
+        │ 7          ┆ entropy            ┆ 0.0          │
+        │ 7          ┆ mean               ┆ 0.98         │
+        │ 7          ┆ std                ┆ 0.0          │
+        │ 7          ┆ var                ┆ 0.0          │
+        │ 8          ┆ skew               ┆ 0.062311     │
+        │ 11         ┆ entropy            ┆ 0.0          │
+        │ 11         ┆ mean               ┆ 0.98         │
+        │ 11         ┆ std                ┆ 0.0          │
+        │ 11         ┆ var                ┆ 0.0          │
+        │ 14         ┆ saturated_fraction ┆ 0.000163     │
+        └────────────┴────────────────────┴──────────────┘
         """
         combined_stats, combined_source_index, dataset_steps = combine_stats_results(stats)
 
@@ -3315,33 +3316,33 @@ class Outliers(Evaluator):
         >>> results = outliers.evaluate(images)
         >>> results.head(6).select("item_index", "metric_name", "metric_value")
         shape: (6, 3)
-        ┌────────────┬─────────────┬──────────────┐
-        │ item_index ┆ metric_name ┆ metric_value │
-        │ ---        ┆ ---         ┆ ---          │
-        │ i64        ┆ cat         ┆ f64          │
-        ╞════════════╪═════════════╪══════════════╡
-        │ 0          ┆ zeros       ┆ 0.000081     │
-        │ 2          ┆ zeros       ┆ 0.000081     │
-        │ 7          ┆ brightness  ┆ 249.900009   │
-        │ 7          ┆ contrast    ┆ 0.0          │
-        │ 7          ┆ darkness    ┆ 249.900009   │
-        │ 7          ┆ entropy     ┆ 0.0          │
-        └────────────┴─────────────┴──────────────┘
+        ┌────────────┬────────────────────┬──────────────┐
+        │ item_index ┆ metric_name        ┆ metric_value │
+        │ ---        ┆ ---                ┆ ---          │
+        │ i64        ┆ cat                ┆ f64          │
+        ╞════════════╪════════════════════╪══════════════╡
+        │ 0          ┆ zeros              ┆ 0.000081     │
+        │ 2          ┆ zeros              ┆ 0.000081     │
+        │ 4          ┆ saturated_fraction ┆ 0.000081     │
+        │ 7          ┆ brightness         ┆ 249.900009   │
+        │ 7          ┆ contrast           ┆ 0.0          │
+        │ 7          ┆ darkness           ┆ 249.900009   │
+        └────────────┴────────────────────┴──────────────┘
 
         Every row also carries the frame of reference it was judged against:
 
         >>> results.head(4).select("metric_name", "direction", "bound", "percentile")
         shape: (4, 4)
-        ┌─────────────┬───────────┬────────────┬────────────┐
-        │ metric_name ┆ direction ┆ bound      ┆ percentile │
-        │ ---         ┆ ---       ┆ ---        ┆ ---        │
-        │ cat         ┆ cat       ┆ f64        ┆ f64        │
-        ╞═════════════╪═══════════╪════════════╪════════════╡
-        │ zeros       ┆ upper     ┆ 0.000048   ┆ 92.0       │
-        │ zeros       ┆ upper     ┆ 0.000048   ┆ 92.0       │
-        │ brightness  ┆ upper     ┆ 114.368277 ┆ 96.0       │
-        │ contrast    ┆ lower     ┆ 0.886324   ┆ 4.0        │
-        └─────────────┴───────────┴────────────┴────────────┘
+        ┌────────────────────┬───────────┬────────────┬────────────┐
+        │ metric_name        ┆ direction ┆ bound      ┆ percentile │
+        │ ---                ┆ ---       ┆ ---        ┆ ---        │
+        │ cat                ┆ cat       ┆ f64        ┆ f64        │
+        ╞════════════════════╪═══════════╪════════════╪════════════╡
+        │ zeros              ┆ upper     ┆ 0.000048   ┆ 92.0       │
+        │ zeros              ┆ upper     ┆ 0.000048   ┆ 92.0       │
+        │ saturated_fraction ┆ upper     ┆ 0.000054   ┆ 91.0       │
+        │ brightness         ┆ upper     ┆ 114.368277 ┆ 96.0       │
+        └────────────────────┴───────────┴────────────┴────────────┘
 
         Evaluate two or more datasets (cross-dataset detection):
 

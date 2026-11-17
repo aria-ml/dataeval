@@ -129,11 +129,12 @@ class TestCombining:
         with pytest.raises(ValueError, match="range_policy"):
             combine_stats_results([run(U16, value_range=(0, 4095)), run(U16)])
 
-    def test_two_dtypes_under_the_dtype_rule_still_combine(self):
+    def test_two_dtypes_without_a_declaration_still_combine(self):
         # The stated limit: both specs read as undeclared, and the endpoint each row used is in the details, which
         # are not compared. Pinned so that closing the gap is a decision and not an accident.
         stats, _, _ = combine_stats_results([run(U8), run(U16)])
-        assert stats["saturated_fraction"].tolist() == [1.0, 0.0]
+        assert stats["saturated_fraction"][0] == 1.0
+        assert np.isnan(stats["saturated_fraction"][1])  # uint16 has no endpoint without a declaration
 
 
 class Declared:
@@ -156,5 +157,5 @@ class TestPerImageDeclarations:
         # The stated limit: the endpoint each row used is in the details, which are not compared.
         declared, undeclared = run(Declared(value_range=(0, 4095))), run(Declared())
         assert declared["details"]["saturated_upper"].tolist() == [4095.0]
-        assert undeclared["details"]["saturated_upper"].tolist() == [65535.0]
+        assert np.isnan(undeclared["details"]["saturated_upper"][0])
         combine_stats_results([declared, undeclared])

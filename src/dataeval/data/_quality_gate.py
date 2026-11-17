@@ -193,8 +193,8 @@ class QualityGate(FrameSelector):
                 f"QualityGate: stat must name a numeric scalar image_stats statistic, one of "
                 f"{', '.join(_numeric_scalar_stats())}; got {stat!r}. A statistic that compares a box with its peers "
                 f"is not accepted, because a gate measures whole frames, which have no boxes. Nor is "
-                f"'saturated_fraction', because it needs an endpoint declared in datum metadata, which a gate has none "
-                f"of. Nor is a color "
+                f"'saturated_fraction', because data other than uint8 or float needs an endpoint declared in datum "
+                f"metadata, which a gate has none of. Nor is a color "
                 f"statistic, because it is measured only from channels declared to be sRGB red, green and blue, which "
                 f"a gate has none of."
             )

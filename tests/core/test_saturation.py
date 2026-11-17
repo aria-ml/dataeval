@@ -92,13 +92,7 @@ class TestFlag:
         assert names == ["saturated_fraction"]
 
 
-DETAILS = {
-    "saturated_status",
-    "saturated_valid_fraction",
-    "saturated_above_range_fraction",
-    "saturated_upper",
-    "saturated_upper_rule",
-}
+DETAILS = {"saturated_status", "saturated_above_range_fraction", "saturated_upper"}
 
 
 def measure(
@@ -136,70 +130,62 @@ def box_at(shape: tuple[int, ...], x0: int, y0: int, x1: int, y1: int) -> Boundi
 
 @pytest.mark.required
 class TestEndpointRule:
-    """The endpoint comes from a declared range or the dtype, in that order, and never from the data."""
+    """The endpoint is the upper bound of the interval the context and color statistics read, never the data's maximum.
+
+    A declared range; else 255 for ``uint8``; else 1 or 255 for floats within [0, 1] or [0, 255]; else none.
+    """
 
     def test_the_upper_bound_of_a_declared_range_is_the_endpoint_wherever_the_data_sits(self):
         row = measure(np.full((1, 4, 4), 200, dtype=np.uint8), declared=(0, 200))
-        assert (row["saturated_fraction"], row["saturated_upper"], row["saturated_upper_rule"]) == (
-            1.0,
-            200.0,
-            "declared",
-        )
+        assert (row["saturated_fraction"], row["saturated_upper"]) == (1.0, 200.0)
 
-    def test_a_declared_range_wins_over_the_dtype(self):
+    def test_a_declared_range_gives_any_integer_dtype_an_endpoint(self):
         row = measure(np.full((1, 4, 4), 4095, dtype=np.uint16), declared=(0, 4095))
-        assert (row["saturated_fraction"], row["saturated_upper"], row["saturated_upper_rule"]) == (
-            1.0,
-            4095.0,
-            "declared",
-        )
+        assert (row["saturated_status"], row["saturated_fraction"], row["saturated_upper"]) == ("ok", 1.0, 4095.0)
 
-    def test_the_dtype_maximum_is_the_endpoint_when_nothing_else_names_one(self):
+    def test_uint8_reads_against_255_without_a_declaration(self):
         row = measure(np.full((1, 4, 4), 255, dtype=np.uint8))
-        assert (row["saturated_fraction"], row["saturated_upper"], row["saturated_upper_rule"]) == (1.0, 255.0, "dtype")
+        assert (row["saturated_fraction"], row["saturated_upper"]) == (1.0, 255.0)
 
-    def test_twelve_bit_data_in_uint16_measures_the_storage_rail_not_the_sensors_maximum(self):
-        # The values reach 4095 and `get_value_range` decodes that as 12 bits, but the endpoint is not read off them.
+    def test_twelve_bit_data_in_uint16_is_unknown_until_its_range_is_declared(self):
+        # The values reach 4095 and `get_value_range` decodes that as 12 bits, but the endpoint is not read off them,
+        # and the storage maximum of 65535 would read a clipped 12-bit image as unclipped.
         data = np.full((1, 4, 4), 4095, dtype=np.uint16)
         assert get_value_range(data).pmax == 4095.0
         row = measure(data)
-        assert (row["saturated_fraction"], row["saturated_upper"], row["saturated_upper_rule"]) == (
-            0.0,
-            65535.0,
-            "dtype",
-        )
+        assert row["saturated_status"] == "unknown_range"
+        assert np.isnan(row["saturated_fraction"])
         assert measure(data, upper=4095)["saturated_fraction"] == 1.0
 
-    @pytest.mark.parametrize(
-        ("dtype", "endpoint"),
-        [(np.uint8, 255.0), (np.uint16, 65535.0), (np.uint32, 4294967295.0), (np.bool_, 1.0)],
-    )
-    def test_an_unsigned_integer_of_32_bits_or_fewer_and_a_bool_have_a_dtype_endpoint(
-        self, dtype: Any, endpoint: float
-    ):
-        top = np.iinfo(dtype).max if dtype is not np.bool_ else True
-        row = measure(np.full((1, 3, 3), top, dtype=dtype))
-        assert (row["saturated_fraction"], row["saturated_upper"], row["saturated_upper_rule"]) == (
-            1.0,
-            endpoint,
-            "dtype",
-        )
-
-    @pytest.mark.parametrize("dtype", [np.int8, np.int16, np.int64, np.uint64, np.float16, np.float32, np.float64])
-    def test_a_signed_integer_a_uint64_and_a_float_have_no_dtype_endpoint(self, dtype: Any):
+    @pytest.mark.parametrize("dtype", [np.uint16, np.uint32, np.uint64, np.int8, np.int16, np.int64, np.bool_])
+    def test_an_integer_other_than_uint8_and_a_bool_have_no_endpoint_without_a_declaration(self, dtype: Any):
         row = measure(np.full((1, 3, 3), 1, dtype=dtype))
         assert row["saturated_status"] == "unknown_range"
         assert np.isnan(row["saturated_fraction"])
         assert np.isnan(row["saturated_upper"])
-        assert row["saturated_upper_rule"] == ""
-        assert row["saturated_valid_fraction"] == 1.0
         assert np.isnan(row["saturated_above_range_fraction"])
 
-    def test_floats_in_zero_to_one_need_a_stated_endpoint(self):
-        data = np.array([[[0.0, 0.5], [1.0, 1.0]]], dtype=np.float32)
-        assert measure(data)["saturated_status"] == "unknown_range"
-        assert measure(data, upper=1)["saturated_fraction"] == 0.5
-        assert measure(data, declared=(0, 1))["saturated_fraction"] == 0.5
+    @pytest.mark.parametrize("dtype", [np.float16, np.float32, np.float64])
+    def test_floats_within_zero_to_one_read_against_one(self, dtype: Any):
+        row = measure(np.array([[[0.0, 0.5], [1.0, 1.0]]], dtype=dtype))
+        assert (row["saturated_status"], row["saturated_fraction"], row["saturated_upper"]) == ("ok", 0.5, 1.0)
+
+    def test_floats_within_zero_to_255_read_against_255(self):
+        row = measure(np.array([[[0.0, 128.0], [255.0, 17.5]]], dtype=np.float32))
+        assert (row["saturated_status"], row["saturated_fraction"], row["saturated_upper"]) == ("ok", 0.25, 255.0)
+
+    def test_floats_outside_both_conventions_have_no_endpoint(self):
+        for values in ([[-0.5, 0.5]], [[0.0, 300.0]]):
+            row = measure(np.array([values], dtype=np.float32))
+            assert row["saturated_status"] == "unknown_range"
+            assert np.isnan(row["saturated_upper"])
+
+    def test_a_dark_0_to_255_float_image_is_read_as_the_0_to_1_convention(self):
+        # The accepted limit of the shared rule: the convention is read off the data's extremes, so a 0-255 image whose
+        # values all lie at or below 1 is read against 1, and its values at 1.0 count as saturated.
+        row = measure(np.array([[[0.0, 0.25], [1.0, 1.0]]], dtype=np.float32))
+        assert (row["saturated_upper"], row["saturated_fraction"]) == (1.0, 0.5)
+        assert measure(np.array([[[0.0, 0.25], [1.0, 1.0]]], dtype=np.float32), upper=255)["saturated_fraction"] == 0.0
 
     def test_uint8_is_exact_at_255_and_cannot_wrap(self):
         data = np.array([[[3, 5, 254, 255]]], dtype=np.uint8)
@@ -216,11 +202,10 @@ class TestCounting:
         data[0] = 255
         assert measure(data)["saturated_fraction"] == pytest.approx(1 / 3)
 
-    def test_nan_is_in_neither_count_and_the_valid_fraction_shows_it(self):
+    def test_nan_is_in_neither_count(self):
         data = np.array([[1.0, np.nan], [0.5, 1.0]], dtype=np.float32)
         row = measure(data, declared=(0, 1))
         assert row["saturated_fraction"] == pytest.approx(2 / 3)
-        assert row["saturated_valid_fraction"] == 0.75
 
     def test_a_value_above_the_range_stays_in_the_denominator_and_is_reported(self):
         data = np.array([[1.0, 1.5, 0.5], [2.0, 1.0, 0.0]], dtype=np.float64)
@@ -232,7 +217,6 @@ class TestCounting:
         data = np.array([[1.0, np.inf, np.nan, 0.0]], dtype=np.float64)
         row = measure(data, declared=(0, 1))
         assert row["saturated_fraction"] == 0.5
-        assert row["saturated_valid_fraction"] == 0.5
         assert row["saturated_above_range_fraction"] == 0.0
 
     def test_atol_widens_the_band_on_integers_and_on_floats(self):
@@ -296,47 +280,42 @@ class TestStatus:
         assert row["saturated_status"] == "insufficient_support"
         assert np.isnan(row["saturated_fraction"])
         assert np.isnan(row["saturated_above_range_fraction"])
-        assert row["saturated_valid_fraction"] == 0.0
-        assert (row["saturated_upper"], row["saturated_upper_rule"]) == (1.0, "declared")
+        assert row["saturated_upper"] == 1.0
 
     def test_a_view_of_only_infinities_is_insufficient_support_either(self):
         row = measure(np.full((1, 3, 3), np.inf), upper=1)
         assert row["saturated_status"] == "insufficient_support"
-        assert row["saturated_valid_fraction"] == 0.0
 
-    def test_a_box_wholly_outside_the_image_is_an_invalid_box_with_none_of_it_valid(self):
+    def test_a_box_wholly_outside_the_image_is_an_invalid_box_that_still_names_its_endpoint(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
         row = measure(data, box=box_at(data.shape, 50, 50, 60, 60))
         assert row["saturated_status"] == "invalid_box"
         assert np.isnan(row["saturated_fraction"])
-        assert row["saturated_valid_fraction"] == 0.0
-        assert (row["saturated_upper"], row["saturated_upper_rule"]) == (255.0, "dtype")
+        assert row["saturated_upper"] == 255.0
 
     def test_a_zero_area_box_is_an_invalid_box(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
         assert measure(data, box=box_at(data.shape, 4, 4, 4, 4))["saturated_status"] == "invalid_box"
 
-    def test_a_window_the_exclusion_covers_entirely_is_insufficient_support_with_no_valid_fraction(self):
+    def test_a_window_the_exclusion_covers_entirely_is_insufficient_support(self):
         data = np.zeros((3, 10, 12), dtype=np.uint8)
         row = measure(data, exclude=np.ones((10, 12), dtype=bool))
         assert row["saturated_status"] == "insufficient_support"
-        assert np.isnan(row["saturated_valid_fraction"])
+        assert np.isnan(row["saturated_fraction"])
 
     def test_a_band_group_the_datum_cannot_supply_is_missing_channel(self):
         data = np.zeros((3, 10, 12), dtype=np.uint16)
         row = measure(data, bands=(5,), view=ViewKind.BAND)
         assert row["saturated_status"] == "missing_channel"
-        assert row["saturated_valid_fraction"] == 0.0
 
     def test_an_invalid_box_outranks_an_unknown_endpoint(self):
-        data = np.zeros((3, 10, 12), dtype=np.float32)
+        data = np.zeros((3, 10, 12), dtype=np.int16)
         row = measure(data, box=box_at(data.shape, 50, 50, 60, 60))
         assert row["saturated_status"] == "invalid_box"
         assert np.isnan(row["saturated_upper"])
-        assert row["saturated_upper_rule"] == ""
 
     def test_a_missing_channel_outranks_an_unknown_endpoint(self):
-        row = measure(np.zeros((3, 10, 12), dtype=np.float32), bands=(5,), view=ViewKind.BAND)
+        row = measure(np.zeros((3, 10, 12), dtype=np.int16), bands=(5,), view=ViewKind.BAND)
         assert row["saturated_status"] == "missing_channel"
         assert np.isnan(row["saturated_upper"])
 
@@ -348,19 +327,16 @@ class TestStatus:
         row = measure(data, box=box_at(data.shape, 8, 8, 2, 2))
         assert (row["saturated_status"], row["saturated_fraction"]) == ("ok", 1.0)
 
-    def test_an_excluded_pixel_is_in_neither_half_and_the_valid_fraction_is_over_the_rest(self):
+    def test_an_excluded_pixel_is_in_neither_half(self):
         data = np.full((1, 4, 4), 255, dtype=np.uint8)
         data[:, 2:] = 0
         mask = np.zeros((4, 4), dtype=bool)
         mask[2:] = True
-        row = measure(data, exclude=mask)
-        assert (row["saturated_fraction"], row["saturated_valid_fraction"]) == (1.0, 1.0)
+        assert measure(data, exclude=mask)["saturated_fraction"] == 1.0
 
-    def test_the_valid_fraction_counts_nan_infinity_and_fill_against_the_positions_of_the_view(self):
+    def test_nan_and_infinity_are_left_out_of_the_denominator(self):
         data = np.array([[[1.0, np.nan, np.inf, 0.5]]], dtype=np.float64)
-        row = measure(data, upper=1)
-        assert row["saturated_valid_fraction"] == 0.5
-        assert row["saturated_fraction"] == 0.5
+        assert measure(data, upper=1)["saturated_fraction"] == 0.5
 
     @pytest.mark.parametrize(
         ("shape", "status"),
@@ -407,7 +383,7 @@ class TestThroughImageStats:
         assert stats["background_saturated_fraction"][0] == 0.0  # the clipped box is outside the background
         assert np.isnan(stats["background_saturated_fraction"][1])
         assert details["background_saturated_status"].tolist() == ["ok", "not_applicable"]
-        assert details["background_saturated_upper_rule"].tolist() == ["dtype", ""]
+        assert details["background_saturated_upper"][0] == 255.0
         assert np.isnan(details["background_saturated_upper"][1])
 
     def test_a_band_group_has_its_own_range_prefixed_columns_and_details(self):
@@ -420,7 +396,6 @@ class TestThroughImageStats:
         assert stats["nir_saturated_fraction"][0] == 1.0  # against the group's own 4095
         assert details["saturated_upper"].tolist() == [65535.0]
         assert details["nir_saturated_upper"].tolist() == [4095.0]
-        assert details["nir_saturated_upper_rule"].tolist() == ["declared"]
         assert details["nir_saturated_status"].tolist() == ["ok"]
 
     def test_a_band_group_the_image_cannot_supply_reports_missing_channel_beside_a_measured_image(self):
@@ -470,14 +445,24 @@ class TestKeywords:
         expected = float(np.mean(image == 4095))
         assert expected > 0.0
         default, details, _ = run([image])
-        assert default["saturated_fraction"][0] == 0.0
-        assert details["saturated_upper_rule"].tolist() == ["dtype"]
+        assert np.isnan(default["saturated_fraction"][0])
+        assert details["saturated_status"].tolist() == ["unknown_range"]
         fixed, details, _ = run([image], value_range=(0, 4095))
         assert fixed["saturated_fraction"][0] == pytest.approx(expected)
-        assert (details["saturated_upper"].tolist(), details["saturated_upper_rule"].tolist()) == (
-            [4095.0],
-            ["declared"],
-        )
+        assert details["saturated_upper"].tolist() == [4095.0]
+
+    def test_an_unknown_endpoint_is_announced_and_names_value_range(self, caplog: pytest.LogCaptureFixture):
+        with caplog.at_level("WARNING", logger="dataeval"):
+            run([np.zeros((3, 4, 4), dtype=np.uint16), np.zeros((3, 4, 4), dtype=np.uint16)])
+        notices = [r.getMessage() for r in caplog.records if "saturat" in r.getMessage()]
+        assert len(notices) == 1
+        assert "unknown_range" in notices[0]
+        assert "value_range" in notices[0]
+
+    def test_a_measured_endpoint_is_not_announced(self, caplog: pytest.LogCaptureFixture):
+        with caplog.at_level("WARNING", logger="dataeval"):
+            run([np.zeros((3, 4, 4), dtype=np.uint8)])
+        assert not [r for r in caplog.records if "saturat" in r.getMessage()]
 
     def test_the_endpoint_is_not_a_keyword(self):
         with pytest.raises(TypeError, match="saturated_upper"):
@@ -500,7 +485,7 @@ class TestKeywords:
         assert stats["nir_saturated_fraction"].tolist() == [1.0, 1.0]
         assert stats["background_saturated_fraction"][0] == 1.0
         for prefix in ("", "nir_", "background_"):
-            assert details[f"{prefix}saturated_upper_rule"][0] == "declared"
+            assert details[f"{prefix}saturated_upper"][0] == 4095.0
 
     @pytest.mark.parametrize(
         ("name", "value"),

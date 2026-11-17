@@ -40,23 +40,29 @@ def read(data: Any, **kw: Any) -> tuple[list[float], list[float], list[str]]:
     return (
         np.asarray(result["stats"]["saturated_fraction"]).tolist(),
         np.asarray(details["saturated_upper"]).tolist(),
-        np.asarray(details["saturated_upper_rule"]).tolist(),
+        np.asarray(details["saturated_status"]).tolist(),
     )
 
 
 class TestTheEndpointComesFromTheImage:
-    def test_a_declared_range_is_the_endpoint_and_without_one_the_dtype_is(self):
-        assert read(Sensors([TWELVE], [{"value_range": (0, 4095)}])) == ([1.0], [4095.0], ["declared"])
-        assert read(Sensors([TWELVE])) == ([0.0], [65535.0], ["dtype"])
+    def test_a_declared_range_is_the_endpoint_and_without_one_uint16_has_none(self):
+        assert read(Sensors([TWELVE], [{"value_range": (0, 4095)}])) == ([1.0], [4095.0], ["ok"])
+        fraction, upper, status = read(Sensors([TWELVE]))
+        assert np.isnan(fraction[0])
+        assert np.isnan(upper[0])
+        assert status == ["unknown_range"]
 
     def test_each_image_is_read_against_its_own_endpoint(self):
         declared = [{"value_range": (0, 4095)}, {"value_range": (0, 65535)}]
-        assert read(Sensors([TWELVE, SIXTEEN], declared)) == ([1.0, 1.0], [4095.0, 65535.0], ["declared", "declared"])
-        assert read(Sensors([TWELVE, SIXTEEN])) == ([0.0, 1.0], [65535.0, 65535.0], ["dtype", "dtype"])
+        assert read(Sensors([TWELVE, SIXTEEN], declared)) == ([1.0, 1.0], [4095.0, 65535.0], ["ok", "ok"])
 
-    def test_an_image_that_declares_none_beside_one_that_does_uses_its_dtype(self):
-        got = read(Sensors([TWELVE, SIXTEEN], [{"value_range": (0, 4095)}, {}]))
-        assert got == ([1.0, 1.0], [4095.0, 65535.0], ["declared", "dtype"])
+    def test_an_image_that_declares_none_beside_one_that_does_is_unknown(self):
+        fraction, upper, status = read(Sensors([TWELVE, SIXTEEN], [{"value_range": (0, 4095)}, {}]))
+        assert fraction[0] == 1.0
+        assert np.isnan(fraction[1])
+        assert upper[0] == 4095.0
+        assert np.isnan(upper[1])
+        assert status == ["ok", "unknown_range"]
 
     def test_the_default_request_reads_it_too(self):
         result = image_stats(Sensors([TWELVE], [{"value_range": (0, 4095)}]))
@@ -64,7 +70,7 @@ class TestTheEndpointComesFromTheImage:
 
     def test_the_call_range_beats_the_metadata(self):
         data = Sensors([TWELVE], [{"value_range": (0, 65535)}])
-        assert read(data, value_range=(0, 4095)) == ([1.0], [4095.0], ["declared"])
+        assert read(data, value_range=(0, 4095)) == ([1.0], [4095.0], ["ok"])
 
     def test_a_channel_groups_own_range_beats_both(self):
         data = Sensors([np.full((2, 4, 4), 4095, dtype=np.uint16)], [{"value_range": (0, 65535)}])
@@ -89,8 +95,8 @@ class TestInThePixelFamily:
         assert said
         assert all("PIXEL_SATURATED_FRACTION" not in m for m in said)
 
-    def test_a_float_image_without_a_range_is_nan_and_says_why(self):
-        got = image_stats([np.zeros((3, 4, 4), dtype=np.float32)], stats=ImageStats.PIXEL)
+    def test_a_float_image_outside_both_conventions_without_a_range_is_nan_and_says_why(self):
+        got = image_stats([np.full((3, 4, 4), -1.0, dtype=np.float32)], stats=ImageStats.PIXEL)
         assert np.isnan(got["stats"]["saturated_fraction"][0])
         assert got.get("details", {})["saturated_status"].tolist() == ["unknown_range"]
 
