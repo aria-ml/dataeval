@@ -581,6 +581,9 @@ Experimental ⚠️ (API may change or be removed):
 - {func}`.track_steps` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The
   status names and their order, the rule for a frame size that cannot be read, the column and detail names and the
   `max_frame_delta` keyword may change.
+- {func}`.noise_pca` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The patch
+  size, the floor of clear patches, the `n_patches` keyword and its default, and the correction may change. Nothing in
+  DataEval calls it. {func}`.noise_immerkaer`, the other noise estimate, is stable.
 - {class}`.View` with `record_reads=True` raises {class}`~dataeval.exceptions.ExperimentalWarning` when the first such
   view is constructed in a process. The keyword and what the view records may change. A view built without it raises
   nothing.
