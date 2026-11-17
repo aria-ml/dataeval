@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -48,6 +48,71 @@ def get_valid_layer(layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
     return modules_dict[layer_name]
 
 
+def _first_tensor(output: Any) -> Any:
+    """Return the first element of a tuple output, and any other output as it is."""
+    return output[0] if isinstance(output, tuple) else output
+
+
+def _detached(value: Any) -> Any:
+    return value.detach().clone() if isinstance(value, torch.Tensor) else value
+
+
+def _output_hook(captured: dict[str, Any], name: str, convert: Callable[[Any], Any]) -> Callable[..., None]:
+    def hook(_module: torch.nn.Module, _args: Any, output: Any) -> None:
+        captured[name] = _detached(convert(output))
+
+    return hook
+
+
+def _input_hook(captured: dict[str, Any], name: str, convert: Callable[[Any], Any]) -> Callable[..., None]:
+    def hook(_module: torch.nn.Module, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        received = args[0] if args else next(iter(kwargs.values()), None)
+        captured[name] = _detached(convert(received))
+
+    return hook
+
+
+def _capture(
+    model: torch.nn.Module,
+    model_input: torch.Tensor,
+    layers: Mapping[str, torch.nn.Module],
+    *,
+    use_output: bool,
+    convert: Callable[[Any], Any],
+) -> dict[str, Any]:
+    """Run `model` once and return what each of `layers` produced, or received when `use_output` is False.
+
+    The hooks live for this one forward pass and are removed even when it fails, so constructing extractors or calling
+    them leaves nothing registered on the model. An input is read by a forward pre-hook, before the layer runs, so an
+    in-place layer cannot overwrite it first, and a layer called with keyword arguments only gives its first keyword
+    value. Shared by every torch-backed extractor.
+
+    Raises
+    ------
+    RuntimeError
+        When a layer did not run during the forward pass, so there is nothing to extract from it.
+    """
+    captured: dict[str, Any] = {}
+    handles = [
+        layer.register_forward_hook(_output_hook(captured, name, convert))
+        if use_output
+        else layer.register_forward_pre_hook(_input_hook(captured, name, convert), with_kwargs=True)
+        for name, layer in layers.items()
+    ]
+    try:
+        model(model_input)
+    finally:
+        for handle in handles:
+            handle.remove()
+
+    missing = ", ".join(repr(name) for name in layers if name not in captured)
+    if missing:
+        raise RuntimeError(
+            f"Layer {missing} did not run during the forward pass, so there is nothing to extract from it."
+        )
+    return captured
+
+
 class TorchExtractor(ReprMixin):
     """
     Extracts embeddings from a PyTorch model, with optional intermediate layer hooking.
@@ -72,8 +137,10 @@ class TorchExtractor(ReprMixin):
     layer_name : str or None, default None
         Layer to extract embeddings from. When None, uses model output.
     use_output : bool, default True
-        If True, captures layer output; if False, captures layer input.
-        Only used when layer_name is specified.
+        If True, captures layer output; if False, captures layer input, as the layer
+        receives it, before an in-place layer such as ``ReLU(inplace=True)`` can overwrite
+        it. Only used when layer_name is specified. The layer is hooked only while the
+        model runs, so the extractor leaves nothing registered on the model.
     flatten : bool, default True
         If True, flattens outputs with more than 2 dimensions to (N, D) shape.
         If False, preserves the original output shape.
@@ -142,11 +209,10 @@ class TorchExtractor(ReprMixin):
         # Setup model
         self._model = model.to(self.device).eval()
 
-        # Setup hook for intermediate layer extraction
-        self._captured_output: Any = None
+        # The layer to capture, validated now and hooked only for the length of each forward pass
+        self._layers: dict[str, torch.nn.Module] = {}
         if layer_name is not None:
-            target_layer = self._get_valid_layer(layer_name, model)
-            target_layer.register_forward_hook(self._hook_fn)
+            self._layers[layer_name] = self._get_valid_layer(layer_name, model)
             _logger.debug(f"Capturing {'output' if use_output else 'input'} data from layer {layer_name}.")
 
     @property
@@ -176,13 +242,6 @@ class TorchExtractor(ReprMixin):
         """Normalize transforms to a list."""
         return normalize_transforms(transforms)
 
-    def _hook_fn(self, _module: torch.nn.Module, inputs: tuple[torch.Tensor], output: torch.Tensor) -> None:
-        """Forward hook to capture layer input or output."""
-        if self._use_output:
-            self._captured_output = output.detach().clone()
-        else:
-            self._captured_output = inputs[0].detach().clone()
-
     def _get_valid_layer(self, layer_name: str, model: torch.nn.Module) -> torch.nn.Module:
         """Validate and return the target layer for hook registration."""
         return get_valid_layer(layer_name, model)
@@ -207,9 +266,11 @@ class TorchExtractor(ReprMixin):
         for start in range(0, len(images), batch_size):
             input_tensor = torch.stack(images[start : start + batch_size]).to(self.device)
             with torch.no_grad():
-                if self._layer_name:
-                    _ = self._model(input_tensor)  # Triggers hook
-                    output = self._captured_output
+                if self._layers:
+                    captured = _capture(
+                        self._model, input_tensor, self._layers, use_output=self._use_output, convert=_first_tensor
+                    )
+                    output = next(iter(captured.values()))
                 else:
                     output = self._model(input_tensor)
             postprocess_fn = self._postprocess_fn
