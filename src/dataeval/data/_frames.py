@@ -404,9 +404,13 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
         self._metadata = inherited_metadata(dataset, "frames")
 
+        # The (sequence, kept-frame ordinal) behind each view position, filled on first index.
+        self._where: list[tuple[int, int]] | None = None
+        # The cursor is a recording walk of one sequence, resting on its kept frame `_cursor_position`.
         self._cursor_sequence: int | None = None
-        self._cursor: Generator[Any, None, None] | None = None
+        self._cursor: Generator[tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget], None, None] | None = None
         self._cursor_position: int = -1
+        self._cursor_entry: dict[str, Any] | None = None
         self._cursor_frame: Any = None
         self._cursor_target: Any = None
 
@@ -464,14 +468,28 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     def __getitem__(self, index: int) -> tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]:
         """Return one frame as an object-detection datum."""
-        entries = self._realize()
-        index = checked_index(index, len(entries), "SequenceFrames", "frame(s)")
-        entry = entries[index]
-        frame, target = self._seek(entry["sequence"], entry["position"])
-        if index + 1 == len(entries) or entries[index + 1]["sequence"] != entry["sequence"]:
+        where = self._located_kept()
+        index = checked_index(index, len(where), "SequenceFrames", "frame(s)")
+        sequence, ordinal = where[index]
+        entry, frame, target = self._seek(sequence, ordinal)
+        if index + 1 == len(where) or where[index + 1][0] != sequence:
             self._release()
         pixels = normalize_image_shape(as_numpy(frame.pixels))
         return pixels, target, cast(FrameMetadata, {**entry["metadata"], "id": index})
+
+    def _located_kept(self) -> list[tuple[int, int]]:
+        """Return the ``(sequence, kept-frame ordinal)`` behind each view position, in view order.
+
+        From the plan where there is one, so indexing a planned view walks each sequence once, in the walk that
+        presents it. Otherwise from the records, walking every sequence that has none.
+        """
+        if self._where is None:
+            if self._planned is not None:
+                counts = [len(positions) for positions in self._planned]
+            else:
+                counts = [len(record.entries) for record in self._recorded()]
+            self._where = [(sequence, ordinal) for sequence, count in enumerate(counts) for ordinal in range(count)]
+        return self._where
 
     def __iter__(self) -> Iterator[tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]]:
         """Iterate frames in order, decoding each sequence once."""
@@ -1149,7 +1167,9 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
             )
         return verdict.factors
 
-    def _walk(self, info: SequenceInfo) -> Iterator[tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget]]:  # noqa: C901
+    def _walk(  # noqa: C901
+        self, info: SequenceInfo
+    ) -> Generator[tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget], None, None]:
         """Yield each kept frame of one sequence with its record and target, one frame behind.
 
         The lag is what makes the weights answerable: a frame's ``frames_represented`` is the gap
@@ -1279,30 +1299,33 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         # Beside the metadata, not in it: whether a frame was judged is no factor of the data.
         return {"sequence": info.index, "position": position, "metadata": metadata, "unmeasured": unmeasured}
 
-    def _seek(self, sequence: int, position: int) -> tuple[Any, SingleFrameObjectTrackingTarget]:
-        """Decode up to one frame of one sequence, reusing the cursor when moving forward.
+    def _seek(self, sequence: int, ordinal: int) -> tuple[dict[str, Any], Any, SingleFrameObjectTrackingTarget]:
+        """Walk one sequence up to its kept frame ``ordinal``, reusing the cursor when moving forward.
 
-        The frame the cursor currently rests on is held, so re-reading a position costs nothing.
+        The frame the cursor currently rests on is held, so re-reading it costs nothing.
         Re-reading is not a rare case: any consumer that probes ``dataset[0]`` before walking --
         :class:`~dataeval.Metadata` does, to pick a structurer -- asks for it twice.
 
-        The frame's target is carried on the cursor beside it. The walk already pairs the two, and
-        re-reading it through ``self._dataset[sequence]`` would index the source dataset once per
-        frame -- for a video dataset that is a file opened per frame.
+        The cursor is the recording walk, :meth:`_walk`, so it hands back each kept frame with its
+        record and target, and the first walk to reach a sequence's last kept frame records the
+        sequence. Re-reading the target through ``self._dataset[sequence]`` would index the source
+        dataset once per frame -- for a video dataset that is a file opened per frame.
         """
-        if self._cursor_sequence == sequence and self._cursor_position == position:
-            return self._cursor_frame, cast(SingleFrameObjectTrackingTarget, self._cursor_target)
-        if self._cursor is None or self._cursor_sequence != sequence or self._cursor_position > position:
+        if self._cursor_sequence == sequence and self._cursor_position == ordinal and self._cursor_entry is not None:
+            return self._cursor_entry, self._cursor_frame, cast(SingleFrameObjectTrackingTarget, self._cursor_target)
+        if self._cursor is None or self._cursor_sequence != sequence or self._cursor_position > ordinal:
             self._restart(sequence)
 
         cursor = cast(Iterator[Any], self._cursor)
         exhausted = object()
-        while self._cursor_position < position:
+        while self._cursor_position < ordinal:
             step = next(cursor, exhausted)
             if step is exhausted:
-                raise IndexError(f"SequenceFrames: sequence {sequence} has no frame at position {position}.")
-            self._cursor_position, self._cursor_frame, self._cursor_target = cast(tuple, step)
-        return self._cursor_frame, cast(SingleFrameObjectTrackingTarget, self._cursor_target)
+                raise IndexError(f"SequenceFrames: sequence {sequence} has no kept frame {ordinal}.")
+            self._cursor_entry, self._cursor_frame, self._cursor_target = cast(tuple, step)
+            self._cursor_position += 1
+        entry = cast(dict[str, Any], self._cursor_entry)
+        return entry, self._cursor_frame, cast(SingleFrameObjectTrackingTarget, self._cursor_target)
 
     def _restart(self, sequence: int) -> None:
         """Point the cursor at the start of one sequence, decoding it again from the beginning."""
@@ -1313,9 +1336,10 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 sequence,
             )
         self._release()
-        self._cursor = self._frames_of(self._sequences[sequence])
+        self._cursor = self._walk(self._sequences[sequence])
         self._cursor_sequence = sequence
         self._cursor_position = -1
+        self._cursor_entry = None
         self._cursor_frame = None
         self._cursor_target = None
 
