@@ -128,3 +128,45 @@ def test_a_kwargs_only_call_is_captured(images, use_output):
 def test_a_layer_that_does_not_run_raises(images):
     with pytest.raises(RuntimeError, match="did not run"):
         TorchExtractor(_SkipsALayer(), layer_name="unused", device="cpu")(images)
+
+
+class _ReturnsNone(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> None:
+        return None
+
+
+class _CallsALayerThatReturnsNone(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.nothing = _ReturnsNone()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.nothing(x)
+        return self.flat(x)
+
+
+def test_a_layer_that_returns_none_is_named(images):
+    with pytest.raises(RuntimeError, match="'nothing' gave no tensor"):
+        TorchExtractor(_CallsALayerThatReturnsNone(), layer_name="nothing", device="cpu")(images)
+
+
+class _TakesNothing(torch.nn.Module):
+    def forward(self) -> None:
+        return None
+
+
+class _CallsALayerWithNoArguments(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.nothing = _TakesNothing()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.nothing()
+        return self.flat(x)
+
+
+def test_a_layer_that_receives_none_is_named(images):
+    with pytest.raises(RuntimeError, match="'nothing' received no tensor"):
+        TorchExtractor(_CallsALayerWithNoArguments(), layer_name="nothing", use_output=False, device="cpu")(images)

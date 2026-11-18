@@ -90,7 +90,7 @@ def _capture(
     Raises
     ------
     RuntimeError
-        When a layer did not run during the forward pass, so there is nothing to extract from it.
+        When a layer did not run during the forward pass, or gave None, so there is nothing to extract from it.
     """
     captured: dict[str, Any] = {}
     handles = [
@@ -110,6 +110,10 @@ def _capture(
         raise RuntimeError(
             f"Layer {missing} did not run during the forward pass, so there is nothing to extract from it."
         )
+    empty = ", ".join(repr(name) for name in layers if captured[name] is None)
+    if empty:
+        given = "gave" if use_output else "received"
+        raise RuntimeError(f"Layer {empty} {given} no tensor (None), so there is nothing to extract from it.")
     return captured
 
 
