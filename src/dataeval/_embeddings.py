@@ -4,7 +4,9 @@ __all__ = ["Embeddings"]
 
 import os
 import re
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Iterator, Mapping, Sequence
+from contextlib import closing
+from itertools import islice
 from pathlib import Path
 from typing import Any, Self
 
@@ -16,7 +18,7 @@ from numpy.typing import NDArray
 
 from dataeval._experimental import experimental
 from dataeval._log import get_logger
-from dataeval.config import get_load_threads, resolve_batch_size
+from dataeval.config import resolve_batch_size
 from dataeval.exceptions import NotFittedError, ShapeMismatchError
 from dataeval.extractors import FlattenExtractor, TorchLayers
 from dataeval.extractors._videotorch import _is_mirrored, _mirror
@@ -27,7 +29,7 @@ from dataeval.protocols import (
     ImageDataset,
     ProgressCallback,
 )
-from dataeval.utils._internal import read_ordered
+from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import requires_maite_dataset, unwrap_image
 
 _logger = get_logger(__name__)
@@ -257,14 +259,15 @@ def _fill_together(
     first = next(iter(children.values()))
     total = len(first)
     use_memmap: bool | None = None
-    for start in range(0, total, size):
-        indices = list(range(start, min(start + size, total)))
-        rows = _extract_each(children, indices, first._fetch_images(indices), groups)
-        if use_memmap is None:
-            use_memmap = _memmap_for_all(children, rows)
-        _ingest_each(children, indices, rows, use_memmap)
-        if progress_callback:
-            progress_callback(indices[-1] + 1, total=total)
+    with closing(first._read_images(range(total))) as images:
+        for start in range(0, total, size):
+            indices = list(range(start, min(start + size, total)))
+            rows = _extract_each(children, indices, list(islice(images, len(indices))), groups)
+            if use_memmap is None:
+                use_memmap = _memmap_for_all(children, rows)
+            _ingest_each(children, indices, rows, use_memmap)
+            if progress_callback:
+                progress_callback(indices[-1] + 1, total=total)
 
 
 class Embeddings(Array, FeatureExtractor):
@@ -858,13 +861,15 @@ class Embeddings(Array, FeatureExtractor):
 
         return self
 
-    def _fetch_images(self, indices: Sequence[int]) -> list[Any]:
-        """Fetch images from the dataset, extracting from tuples if needed."""
+    def _read_images(self, indices: Sequence[int]) -> Generator[Any, None, None]:
+        """Yield the image of each index in order, read as one pass, in threads when ``load_threads`` allows it.
+
+        One pass, not one per batch, so the choice and the first read on the calling thread are made once, and reads
+        continue into the next batch while the extractor runs on this one. Close it if the pass stops early.
+        """
         if self._dataset is None:
             raise NotFittedError("No dataset bound. Call bind() first.")
-
-        dataset = self._dataset
-        return list(read_ordered(lambda idx: unwrap_image(dataset[idx]), indices, get_load_threads()))
+        return read_dataset(self._dataset, indices, unwrap_image)
 
     def _rows(self, raw: Any, expected: int) -> NDArray[Any]:
         """Return the extractor's output as an array with one row for each of ``expected`` images.
@@ -926,19 +931,20 @@ class Embeddings(Array, FeatureExtractor):
 
             # Process in batches
             processed = 0
-            for batch_start in range(0, len(uncached), self._batch_size):
-                batch_idx = uncached[batch_start : batch_start + self._batch_size]
+            with closing(self._read_images(uncached)) as images:
+                for batch_start in range(0, len(uncached), self._batch_size):
+                    batch_idx = uncached[batch_start : batch_start + self._batch_size]
 
-                # Fetch images from dataset
-                batch_images = self._fetch_images(batch_idx)
+                    # Fetch images from dataset
+                    batch_images = list(islice(images, len(batch_idx)))
 
-                # Extract features and store them
-                self._ingest(batch_idx, self._rows(self._extractor(batch_images), len(batch_idx)))
+                    # Extract features and store them
+                    self._ingest(batch_idx, self._rows(self._extractor(batch_images), len(batch_idx)))
 
-                # Report progress
-                processed += len(batch_idx)
-                if self._progress_callback:
-                    self._progress_callback(processed, total=len(uncached))
+                    # Report progress
+                    processed += len(batch_idx)
+                    if self._progress_callback:
+                        self._progress_callback(processed, total=len(uncached))
 
         # Yield results in batches for consistency
         for batch_start in range(0, len(indices), self._batch_size):

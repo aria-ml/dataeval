@@ -2,6 +2,7 @@
 
 __all__ = []
 
+import threading
 from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property
@@ -359,6 +360,10 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
     >>> stats = image_stats(frames, stats=ImageStats.HASH)  # doctest: +SKIP
     """
 
+    # One video's frames come off one decoder in order, so a whole-dataset read takes them, through any view, crops or
+    # merge built on this, one at a time in order, whatever `load_threads` says (`utils._internal.read_dataset`).
+    _reads_in_order = True
+
     def __init__(
         self,
         dataset: VideoDataset,
@@ -419,6 +424,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
         self._cursor_entry: dict[str, Any] | None = None
         self._cursor_frame: Any = None
         self._cursor_target: Any = None
+        # One thread at a time moves the cursor, for a wrapper that reads this from several threads at once.
+        self._lock = threading.Lock()
 
         _logger.debug(
             "SequenceFrames: %d sequence(s), %d source frame(s), selector=%r, planned=%s",
@@ -474,14 +481,25 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
 
     def __getitem__(self, index: int) -> tuple[NDArray[Any], SingleFrameObjectTrackingTarget, FrameMetadata]:
         """Return one frame as an object-detection datum."""
-        where = self._located_kept()
-        index = checked_index(index, len(where), "SequenceFrames", "frame(s)")
-        sequence, ordinal = where[index]
-        entry, frame, target = self._seek(sequence, ordinal)
-        if index + 1 == len(where) or where[index + 1][0] != sequence:
-            self._release()
-        pixels = normalize_image_shape(as_numpy(frame.pixels))
+        with self._lock:
+            where = self._located_kept()
+            index = checked_index(index, len(where), "SequenceFrames", "frame(s)")
+            sequence, ordinal = where[index]
+            entry, frame, target = self._seek(sequence, ordinal)
+            if index + 1 == len(where) or where[index + 1][0] != sequence:
+                self._release()
+            pixels = normalize_image_shape(as_numpy(frame.pixels))
         return pixels, target, cast(FrameMetadata, {**entry["metadata"], "id": index})
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle all but the lock, which cannot be pickled and guards nothing in a copy."""
+        state = self.__dict__.copy()
+        del state["_lock"]
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.Lock()
 
     def _located_kept(self) -> list[tuple[int, int]]:
         """Return the ``(sequence, kept-frame ordinal)`` behind each view position, in view order.
