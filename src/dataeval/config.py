@@ -353,8 +353,8 @@ def set_load_threads(threads: int | None) -> None:
     """
     Set how many threads load dataset items at once.
 
-    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset, and so does
-    :class:`~dataeval.data.Filter` given `where`, which reads every item once.
+    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset, and so do
+    :class:`~dataeval.data.Filter` and :class:`~dataeval.data.Relabel`, which read every item once when a view is built.
 
     Parameters
     ----------

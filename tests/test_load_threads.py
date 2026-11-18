@@ -1,5 +1,5 @@
-"""`load_threads` loads several dataset items at once in the three whole-dataset passes, `Embeddings`, `Metadata` and
-`Filter(where=...)`, and leaves every result and the order of reads exactly as they were when it is not set."""
+"""`load_threads` loads several dataset items at once in the whole-dataset passes, `Embeddings`, `Metadata`, `Filter`
+and `Relabel`, and leaves every result and the order of reads exactly as they were when it is not set."""
 
 import threading
 import time
@@ -14,12 +14,12 @@ from dataeval import Embeddings, Metadata
 from dataeval import _experimental as experimental_module
 from dataeval.bias import Balance
 from dataeval.config import get_load_threads, set_load_threads, use_load_threads
-from dataeval.data import Filter, View
+from dataeval.data import Filter, Relabel, View
 from dataeval.exceptions import ExperimentalWarning
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.quality import Outliers
-from tests.data.conftest import VIDEO_FACTORS, VIDEOS, FactorVideos
+from tests.data.conftest import OD_FACTORS, OD_LABELS, VIDEO_FACTORS, VIDEOS, FactorODDataset, FactorVideos
 
 pytestmark = [
     pytest.mark.required,
@@ -280,6 +280,128 @@ class TestFilter:
         with use_load_threads(4):
             Filter(self.WHERE).apply(view)
         assert seen - {threading.get_ident()}
+
+
+class _RecordingOD(FactorODDataset):
+    """Object detection images that record which thread read each one."""
+
+    def __init__(self) -> None:
+        super().__init__(OD_LABELS, OD_FACTORS)
+        self.idents: list[int] = []
+
+    def __getitem__(self, index: int) -> Any:
+        self.idents.append(threading.get_ident())
+        return super().__getitem__(index)
+
+
+class _Broken(_SlowImages):
+    """A classification dataset whose item 9 cannot be read."""
+
+    def __getitem__(self, index: int) -> Any:
+        if index == 9:
+            raise RuntimeError("item 9 is unreadable")
+        return super().__getitem__(index)
+
+
+class TestRelabel:
+    """`Relabel` reads every datum once to decide what to drop, and loads those reads in threads too."""
+
+    MAPPING = {"a": "x", "b": "x"}  # class "c" has no target class, so its items are dropped
+
+    def test_the_default_reads_in_order_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0)
+        View(dataset, Relabel(self.MAPPING))
+        assert dataset.off_main_thread == 0
+        assert dataset.order[-N:] == list(range(N))
+
+    def test_threads_give_the_same_view_and_the_same_drops_faster(self):
+        serial_op, threaded_op = Relabel(self.MAPPING), Relabel(self.MAPPING)
+        start = time.perf_counter()
+        serial = View(_SlowImages(), serial_op)
+        serial_time = time.perf_counter() - start
+
+        dataset = _SlowImages()
+        with use_load_threads(4):
+            start = time.perf_counter()
+            threaded = View(dataset, threaded_op)
+            threaded_time = time.perf_counter() - start
+
+        assert threaded.selection == serial.selection
+        assert threaded_op.dropped_indices == serial_op.dropped_indices
+        assert serial_op.dropped_indices  # the class with no target class was dropped
+        assert dataset.off_main_thread > 0
+        assert threaded_time < 0.6 * serial_time
+
+    def test_item_zero_is_read_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            View(dataset, Relabel(self.MAPPING))
+        assert dataset.idents[0] == threading.get_ident()
+
+    def test_an_item_that_cannot_be_read_raises_the_same_error(self):
+        with pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(_Broken(delay=0), Relabel(self.MAPPING))
+        with use_load_threads(4), pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(_Broken(delay=0), Relabel(self.MAPPING))
+
+
+class TestFilterByClasses:
+    """`Filter(classes=...)` without `where` reads each target, and loads those reads in threads too."""
+
+    def test_the_default_reads_in_order_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0)
+        View(dataset, Filter(classes=[0]))
+        assert dataset.off_main_thread == 0
+        assert dataset.order[-N:] == list(range(N))
+
+    def test_threads_give_the_same_view_faster(self):
+        start = time.perf_counter()
+        serial = View(_SlowImages(), Filter(classes=[0]))
+        serial_time = time.perf_counter() - start
+
+        dataset = _SlowImages()
+        with use_load_threads(4):
+            start = time.perf_counter()
+            threaded = View(dataset, Filter(classes=[0]))
+            threaded_time = time.perf_counter() - start
+
+        assert threaded.selection == serial.selection == list(range(0, N, 3))
+        assert dataset.off_main_thread > 0
+        assert threaded_time < 0.6 * serial_time
+
+    def test_it_still_starts_no_read_record(self):
+        with use_load_threads(4):
+            view = View(_SlowImages(delay=0.002), Filter(classes=[0]))
+        assert view._reads is None
+
+    def test_item_zero_is_read_on_the_calling_thread(self):
+        dataset = _SlowImages(delay=0.002)
+        with use_load_threads(4):
+            View(dataset, Filter(classes=[0]))
+        assert dataset.idents[0] == threading.get_ident()
+
+    def test_an_item_that_cannot_be_read_raises_the_same_error(self):
+        with pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(_Broken(delay=0), Filter(classes=[0]))
+        with use_load_threads(4), pytest.raises(RuntimeError, match="item 9 is unreadable"):
+            View(_Broken(delay=0), Filter(classes=[0]))
+
+    def test_detections_are_removed_the_same_way_when_loaded_in_threads(self):
+        serial = View(FactorODDataset(OD_LABELS, OD_FACTORS), Filter(classes=[0, 1]))
+        dataset = _RecordingOD()
+        with use_load_threads(4):
+            threaded = View(dataset, Filter(classes=[0, 1]))
+        assert threaded.selection == serial.selection
+        assert_frame_equal(Metadata(threaded).dataframe, Metadata(serial).dataframe)
+        assert set(dataset.idents) - {threading.get_ident()}
+
+    def test_a_tracking_dataset_is_filtered_serially_and_gives_the_same_view(self):
+        serial = View(FactorVideos(VIDEOS, VIDEO_FACTORS), Filter(classes=[0]))
+        dataset = _RecordingVideos(VIDEOS, VIDEO_FACTORS)
+        with use_load_threads(4):
+            threaded = View(dataset, Filter(classes=[0]))
+        assert threaded.selection == serial.selection
+        assert set(dataset.idents) == {threading.get_ident()}
 
 
 class TestWithTheReadRecord:

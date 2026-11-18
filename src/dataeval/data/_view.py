@@ -322,22 +322,33 @@ class View(AnnotatedDataset[_TDatum]):
                 len(wanted),
                 len(missing),
             )
-        threads = get_load_threads()
-        if threads is not None and threads > 1 and len(missing) > 2:
-            # The first item is read here, on the calling thread: it names the task, and a tracking dataset is read
-            # serially, as the Metadata walk reads one. The pixels are dropped inside each thread, so only skeletons
-            # wait for the loop.
-            reads[missing[0]] = head = skeleton(self.read(missing[0]))
-            rest = missing[1:]
-            parallel = None if detect_task(head[1]) == "MOT" else threads
-            loaded = read_ordered(lambda index: skeleton(self.read(index)), rest, parallel, ahead=4 * threads)
-            for index, datum in zip(rest, loaded, strict=True):
-                reads[index] = datum
-        else:
-            for index in missing:
-                reads[index] = skeleton(self.read(index))
+        for index, datum in zip(missing, self._read_each(missing, skeleton), strict=True):
+            reads[index] = datum
         self._reads = reads
         return [reads[index] for index in self.selection]
+
+    def _read_each(self, indices: Iterable[int], use: Callable[[Any], Any]) -> Iterator[Any]:
+        """Yield ``use(self.read(index))`` for each index in order, in several threads when ``load_threads`` is set.
+
+        `use` runs in the loading thread, so a result that no longer holds the pixels, a skeleton or a verdict, is all
+        that waits for the caller. The first item is read here, on the calling thread: it names the task, and a tracking
+        dataset is read serially, as the Metadata walk reads one. With no threads set this is the plain loop.
+        """
+        wanted = list(indices)
+        threads = get_load_threads()
+        if threads is None or threads < 2 or len(wanted) < 3:
+            for index in wanted:
+                yield use(self.read(index))
+            return
+        head = self.read(wanted[0])
+        tracking = isinstance(head, tuple) and len(head) == 3 and detect_task(head[1]) == "MOT"
+        first = use(head)
+        del head  # a generator keeps its locals, and this one holds the first item's pixels
+        yield first
+        loaded = read_ordered(
+            lambda index: use(self.read(index)), wanted[1:], None if tracking else threads, ahead=4 * threads
+        )
+        yield from loaded
 
     def _structuring_source(self) -> Any:
         """Return what :class:`~dataeval.Metadata` structures in place of this view: its cached reads if it has any.

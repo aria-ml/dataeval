@@ -197,6 +197,9 @@ class Relabel(Operation):
       its mass, and a coarsening can carry a sum past 1.0 — so treat the result as
       per-class weights whose argmax is the label, not as a distribution.
 
+    Building the view reads every datum, image included, to decide what to drop, so it costs a pass over the dataset.
+    :func:`~dataeval.config.set_load_threads` loads those reads in several threads.
+
     .. versionchanged:: 1.2
         A detection's score is conformed rather than left in the source vocabulary, and is
         reduced to one confidence rather than folded; ``reduce_detection_scores=False``
@@ -332,8 +335,8 @@ class Relabel(Operation):
         # filtered so the drops are reportable without reading every datum a second time.
         kept: list[int] = []
         self._dropped_indices = {}
-        for index in view.selection:
-            reason = self._drop_reason(view.read(index))
+        selection = list(view.selection)
+        for index, reason in zip(selection, view._read_each(selection, self._drop_reason), strict=True):
             if reason is None:
                 kept.append(index)
             else:
