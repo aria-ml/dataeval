@@ -42,6 +42,7 @@ from collections import Counter
 
 import dataeval_plots as dep
 import numpy as np
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -207,8 +208,8 @@ metadata.add_factors(
 )
 
 rows = metadata.rows_at("instance")
-print(rows.select("item_index", "target_index", "instance_is_outlier").head(5))
-print(f"\nflagged {rows['instance_is_outlier'].sum()} of {rows.height} instance rows")
+display(rows.select("item_index", "target_index", "instance_is_outlier").head(5))
+print(f"flagged {rows['instance_is_outlier'].sum()} of {rows.height} instance rows")
 
 # %% [markdown]
 # The addresses spanned two levels, so the one array became two columns, `unit_is_outlier` on the image rows and

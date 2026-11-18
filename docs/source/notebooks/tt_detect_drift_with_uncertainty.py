@@ -88,6 +88,7 @@ import plotly.express as px
 import plotly.io as pio
 import polars as pl
 import torch
+from IPython.display import display
 from maite_datasets.image_classification import MilitaryVehicles
 from scipy.ndimage import gaussian_filter
 from scipy.sparse import coo_matrix
@@ -380,7 +381,7 @@ summary = batch_results.group_by("condition", maintain_order=True).agg(
     pl.col("entropy alarm").mean().mul(100).round(0).alias("entropy alarms (%)"),
     pl.col("length alarm").mean().mul(100).round(0).alias("length alarms (%)"),
 )
-print(summary)
+display(summary)
 
 # %% [markdown]
 # The table holds four findings:

@@ -37,6 +37,7 @@ except Exception:
 
 # %%
 import polars as pl
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -134,7 +135,7 @@ print("new factors :", sorted(set(metadata.factor_names) - supplied))
 # %%
 print("dropped:", metadata.dropped_factors)
 
-print(
+display(
     metadata
     .rows_at("unit")
     .select("item_index", "unit_sharpness", "unit_background_sharpness", "unit_background_fraction")

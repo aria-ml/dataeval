@@ -97,6 +97,7 @@ from typing import Literal
 
 import numpy as np
 import polars as pl
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -120,7 +121,7 @@ raw = Metadata(dataset)
 rows = raw.dataframe
 frames = rows.filter(pl.col("level") == "unit")
 
-print(
+display(
     frames
     .group_by("drone")
     .agg(
@@ -148,7 +149,7 @@ detections = rows.filter(pl.col("level") == "instance").with_columns(
 )
 mix = detections.group_by("drone", "class").len().pivot(on="class", index="drone", values="len").fill_null(0)
 totals = mix.select(pl.exclude("drone")).sum_horizontal()
-print(mix.with_columns((pl.exclude("drone") * 100 / totals).round(0)))
+display(mix.with_columns((pl.exclude("drone") * 100 / totals).round(0)))
 
 # %% [markdown]
 # Swimmers make up 93% of the detections of the `m210` and 46% of the detections of the `trinity`, and the `trinity`
@@ -294,7 +295,7 @@ binnings = {
     }),
 }
 with pl.Config(tbl_rows=10, tbl_width_chars=140, fmt_str_lengths=50):
-    print(
+    display(
         pl.DataFrame([{"binning": name, **scores} for name, scores in binnings.items()]).with_columns(
             pl.col(pl.Float64).round(2)
         )
@@ -373,7 +374,7 @@ print(f"after:  {list(by_drone.factor_names)}")
 
 # %%
 default = Balance().evaluate(metadata)
-print(default.balance)
+display(default.balance)
 
 # %% [markdown]
 # Seen from the class, only `object_size` stands out, at about 0.30. The `altitude` and the `gimbal_pitch` show almost
@@ -382,7 +383,7 @@ print(default.balance)
 
 # %%
 result = Balance().evaluate(by_drone)
-print(result.balance)
+display(result.balance)
 
 # %% [markdown]
 # Seen from the drone, the picture reverses. The `altitude` and the `gimbal_pitch` show strong mutual information with
@@ -403,14 +404,14 @@ print(result.balance)
 # Inspect the `altitude` rows from the default class-conditional evaluation:
 
 # %%
-print(default.classwise.filter(pl.col("factor_name") == "altitude"))
+display(default.classwise.filter(pl.col("factor_name") == "altitude"))
 
 # %% [markdown]
 # In the default class-conditional view, no class is flagged as imbalanced against altitude: each class is spread over
 # the altitudes that the three drones flew. Now inspect the same factor under the `drone` class axis:
 
 # %%
-print(result.classwise.filter(pl.col("factor_name") == "altitude"))
+display(result.classwise.filter(pl.col("factor_name") == "altitude"))
 
 # %% [markdown]
 # Under the `drone` axis, every drone is flagged, and the `mavic` scores highest at about 0.81: within this dataset,
@@ -422,7 +423,7 @@ print(result.classwise.filter(pl.col("factor_name") == "altitude"))
 # The `object_size` rows show the opposite case, an association that does belong to the class:
 
 # %%
-print(default.classwise.filter(pl.col("factor_name") == "object_size"))
+display(default.classwise.filter(pl.col("factor_name") == "object_size"))
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
@@ -472,7 +473,7 @@ except ValueError as error:
 
 # %%
 by_drone_per_image = metadata.at("unit").classed_by("drone")
-print(Balance().evaluate(by_drone_per_image).balance)
+display(Balance().evaluate(by_drone_per_image).balance)
 
 # %% [markdown]
 # You can inspect {attr}`.ClassAxis.rows_per_group_entity` to verify the fan-out ratio between rows and entities:
@@ -571,12 +572,12 @@ assert min(counts) >= 11
 recorded = metadata.at("unit").where(pl.col("altitude").is_not_null() & pl.col("gimbal_pitch").is_not_null())
 recorded_cells = recorded.classed_by("drone", "altitude")
 parity = Parity().evaluate(recorded_cells)
-print(parity.factors.select("factor_name", "status", "score", "p_value_adjusted", "has_insufficient_data"))
-print(f"\ngrouping: {parity.group_source} ({parity.n_rows} rows, {parity.n_groups} groups, {parity.test} test)")
-print(parity.cells["status"].value_counts().sort("status"))
+display(parity.factors.select("factor_name", "status", "score", "p_value_adjusted", "has_insufficient_data"))
+print(f"grouping: {parity.group_source} ({parity.n_rows} rows, {parity.n_groups} groups, {parity.test} test)")
+display(parity.cells["status"].value_counts().sort("status"))
 
 findings = parity.cells.filter(pl.col("is_actionable")).sort("p_value_adjusted").head(8)
-print(findings.select("level", "class_name", "status", "observed", "expected", "p_value_adjusted"))
+display(findings.select("level", "class_name", "status", "observed", "expected", "p_value_adjusted"))
 
 # %% [markdown]
 # Each row of {attr}`.ParityOutput.cells` is one pitch level in one drone and altitude cell, with its `status`:
@@ -613,7 +614,7 @@ assert cell_rows[("mavic × [20, 60)", "[80, 91)")]["status"] == "underrepresent
 
 # %%
 diversity = Diversity().evaluate(by_drone)
-print(diversity.classwise)
+display(diversity.classwise)
 
 # %% [markdown]
 # Diversity is low where a drone concentrates on one value. Each drone flies a narrow band of altitudes and camera

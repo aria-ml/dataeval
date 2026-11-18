@@ -37,6 +37,7 @@ except Exception:
 # %%
 import numpy as np
 import pandas as pd
+from IPython.display import display
 
 from dataeval.bias import Balance
 from dataeval.protocols import MetadataLike
@@ -195,7 +196,7 @@ print(f"class_labels shape: {ic_meta.class_labels.shape}")
 
 # %%
 ic_balance = Balance().evaluate(ic_meta)
-print(ic_balance.balance)
+display(ic_balance.balance)
 
 # %% [markdown]
 # ## Apply the adapter to an object detection DataFrame
@@ -249,7 +250,7 @@ print(f"factor_data shape:    {od_meta.factor_data.shape}")
 
 # %%
 od_balance = Balance().evaluate(od_meta)
-print(od_balance.balance)
+display(od_balance.balance)
 
 # %% tags=["remove_cell"]
 # TEST ASSERTION CELL ###
