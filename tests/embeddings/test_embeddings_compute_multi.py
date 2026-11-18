@@ -309,8 +309,10 @@ def test_keys_that_name_no_directory_raise(tmp_path, key):
 def test_a_path_that_is_a_file_raises(tmp_path):
     taken = tmp_path / "taken.npy"
     taken.write_bytes(b"")
+    dataset = _Dataset()
     with pytest.raises(ValueError, match="not a directory"):
-        Embeddings.compute_multi(_Dataset(), _ways(), batch_size=4, path=taken)
+        Embeddings.compute_multi(dataset, _ways(), batch_size=4, path=taken)
+    assert dataset.total == 0
 
 
 def test_memmap_is_chosen_on_the_sum(tmp_path, monkeypatch):
@@ -451,3 +453,81 @@ def test_an_error_in_a_torch_layers_names_its_key():
     with pytest.raises(RuntimeError, match="did not run") as raised:
         Embeddings.compute_multi(_Dataset(), {"m": TorchLayers(_Skips(), ["unused"], device="cpu")}, batch_size=4)
     assert "'m'" in _notes(raised.value)
+
+
+def test_a_row_width_that_changes_names_its_extractor():
+    calls = Counter()
+
+    def widening(batch: list[np.ndarray]) -> np.ndarray:
+        calls["n"] += 1
+        return np.zeros((len(batch), 2 if calls["n"] == 1 else 3), dtype=np.float32)
+
+    with pytest.raises(ValueError, match="could not broadcast") as raised:
+        Embeddings.compute_multi(_Dataset(), {"flat": FlattenExtractor(), "wide": widening}, batch_size=4)
+    assert "'wide'" in _notes(raised.value)
+
+
+def test_a_key_that_is_not_a_string_is_refused():
+    dataset = _Dataset()
+    with pytest.raises(TypeError, match="must be a str"):
+        Embeddings.compute_multi(dataset, {0: FlattenExtractor()}, batch_size=4)  # type: ignore[dict-item]
+    assert dataset.total == 0
+
+
+def test_a_dataset_that_fails_the_probe_leaves_no_directory(tmp_path):
+    from dataeval.exceptions import MaiteShapeError
+
+    class _Pairs:
+        def __len__(self) -> int:
+            return 4
+
+        def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
+            return np.zeros((1, 4, 4), dtype=np.float32), 0
+
+    with pytest.raises(MaiteShapeError):
+        Embeddings.compute_multi(_Pairs(), {"flat": FlattenExtractor()}, batch_size=4, path=tmp_path / "out")  # type: ignore[arg-type]
+    assert not (tmp_path / "out").exists()
+
+
+def test_keys_that_differ_only_in_case_are_refused_with_a_path(tmp_path):
+    dataset = _Dataset()
+    with pytest.raises(ValueError, match="differ only in case"):
+        Embeddings.compute_multi(
+            dataset, {"A": FlattenExtractor(), "a": FlattenExtractor()}, batch_size=4, path=tmp_path
+        )
+    assert dataset.total == 0
+    in_memory = Embeddings.compute_multi(_Dataset(), {"A": FlattenExtractor(), "a": FlattenExtractor()}, batch_size=4)
+    assert list(in_memory) == ["A", "a"]
+
+
+class _PairOut(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return x, 2 * x
+
+
+class _RichModel(torch.nn.Module):
+    """A convolution with a 4-D output, a block and its child, and a layer that returns a tuple, with fixed weights."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        torch.manual_seed(3)
+        self.conv = torch.nn.Conv2d(1, 2, 3, padding=1)
+        self.block = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(32, 4))
+        self.pair = _PairOut()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        first, _ = self.pair(self.block(self.conv(x)))
+        return first
+
+
+@pytest.mark.parametrize(("transforms", "flatten"), [(None, True), ([lambda t: t * 2], True), (None, False)])
+def test_each_layer_of_a_torch_layers_equals_its_solo_extractor(transforms, flatten):
+    from dataeval.extractors import TorchLayers
+
+    model = _RichModel()
+    names = ["conv", "block", "block.1", "pair"]
+    layers = TorchLayers(model, names, transforms=transforms, flatten=flatten, device="cpu")
+    children = Embeddings.compute_multi(_Dataset(), {"m": layers}, batch_size=4)
+    for name in names:
+        solo = TorchExtractor(model, layer_name=name, transforms=transforms, flatten=flatten, device="cpu")
+        assert np.array_equal(children[f"m/{name}"][:], _solo(solo)), name

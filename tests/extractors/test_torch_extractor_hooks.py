@@ -128,3 +128,83 @@ def test_a_kwargs_only_call_is_captured(images, use_output):
 def test_a_layer_that_does_not_run_raises(images):
     with pytest.raises(RuntimeError, match="did not run"):
         TorchExtractor(_SkipsALayer(), layer_name="unused", device="cpu")(images)
+
+
+class _ReturnsNone(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> None:
+        return None
+
+
+class _CallsALayerThatReturnsNone(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.nothing = _ReturnsNone()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.nothing(x)
+        return self.flat(x)
+
+
+def test_a_layer_that_returns_none_is_named(images):
+    with pytest.raises(RuntimeError, match="'nothing' gave no tensor"):
+        TorchExtractor(_CallsALayerThatReturnsNone(), layer_name="nothing", device="cpu")(images)
+
+
+class _TakesNothing(torch.nn.Module):
+    def forward(self) -> None:
+        return None
+
+
+class _CallsALayerWithNoArguments(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.nothing = _TakesNothing()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.nothing()
+        return self.flat(x)
+
+
+def test_a_layer_that_receives_none_is_named(images):
+    with pytest.raises(RuntimeError, match="'nothing' received no tensor"):
+        TorchExtractor(_CallsALayerWithNoArguments(), layer_name="nothing", use_output=False, device="cpu")(images)
+
+
+class _RaisesAfterTheLayer(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.lin = torch.nn.Linear(4, 4)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.lin(self.flat(x))
+        raise ValueError("the forward pass failed")
+
+
+@pytest.mark.parametrize("use_output", [True, False])
+def test_a_forward_that_raises_leaves_no_hook(images, use_output):
+    model = _RaisesAfterTheLayer()
+    with pytest.raises(ValueError, match="the forward pass failed"):
+        TorchExtractor(model, layer_name="lin", use_output=use_output, device="cpu")(images)
+    assert _hooks(model.lin) == 0
+
+
+class _SkipsTwoLayers(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.first = torch.nn.Linear(4, 4)
+        self.second = torch.nn.Linear(4, 4)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.flat(x)
+
+
+@pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
+def test_several_layers_that_do_not_run_are_named(images):
+    from dataeval.extractors import TorchLayers
+
+    with pytest.raises(RuntimeError, match="Layers 'first' and 'second' did not run"):
+        TorchLayers(_SkipsTwoLayers(), ["first", "second"], device="cpu").extract(images)
