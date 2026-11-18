@@ -42,6 +42,7 @@ from typing import Any
 
 import numpy as np
 import polars as pl
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -143,7 +144,7 @@ print(f"drifted: {result.drifted}   {feature_drift.sum()} of {len(feature_drift)
 factor_names = list(result.feature_names)
 
 drift_table = pl.DataFrame({"factor": factor_names, "p_value": p_values, "drifted": feature_drift}).sort("p_value")
-print(drift_table)
+display(drift_table)
 
 # %% [markdown]
 # Fourteen named factors are reported. `drone` does not register as drifted, but `gimbal_pitch` drifts at `p ≈ 1e-15`.
@@ -155,7 +156,7 @@ print(drift_table)
 
 # %%
 rows = extractor.dataframe.filter(pl.col("level") == "unit")
-print(rows.select("item_index", "altitude", "altitude↕", "gimbal_pitch", "gimbal_pitch↕").head(5))
+display(rows.select("item_index", "altitude", "altitude↕", "gimbal_pitch", "gimbal_pitch↕").head(5))
 
 
 # %% [markdown]
@@ -209,7 +210,7 @@ after_df = pl.DataFrame({
 comparison = before_df.join(after_df, on="factor", how="inner").with_columns(
     changed=pl.col("before") != pl.col("after")
 )
-print(comparison.sort("changed", descending=True))
+display(comparison.sort("changed", descending=True))
 
 # %% [markdown]
 # Four verdicts flip. `gimbal_pitch` no longer registers as drifted, so the earlier result was a false alarm caused by

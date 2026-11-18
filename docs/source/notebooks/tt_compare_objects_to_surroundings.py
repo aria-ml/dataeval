@@ -83,6 +83,7 @@ except Exception:
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -217,7 +218,7 @@ by_class = (
     )
     .sort("mean_separation")
 )
-print(by_class)
+display(by_class)
 
 # %% [markdown]
 # Three things fall out of this table.
@@ -306,14 +307,14 @@ print(
     f"{len(camouflaged)} of {len(detections)} detections ({len(camouflaged) / len(detections):.1%}) "
     f"are within ±5 brightness of their background"
 )
-print(camouflaged.group_by("class_name").agg(pl.len().alias("n")).sort("n", descending=True))
+display(camouflaged.group_by("class_name").agg(pl.len().alias("n")).sort("n", descending=True))
 
 # %% [markdown]
 # These are the first cases to check when a detector misses. You can look up their exact
 # image and target indices directly from the metadata:
 
 # %%
-print(camouflaged.select("item_index", "target_index", "class_name", "separation").head(8))
+display(camouflaged.select("item_index", "target_index", "class_name", "separation").head(8))
 
 # %% [markdown]
 # ## Compare targets with each other
@@ -341,7 +342,7 @@ comparison = (
     )
     .sort("brightness_vs_image")
 )
-print(comparison)
+display(comparison)
 
 # %% [markdown]
 # Read as ratios, `1.0` means "indistinguishable from the frame average". Buoys sit below it and every other class above
@@ -421,7 +422,7 @@ classwise = (
     .filter(pl.col("factor_name").str.starts_with("unit_background"))
     .sort("factor_name", "class_name")
 )
-print(classwise)
+display(classwise)
 
 # %% [markdown]
 # The result is classwise, so every row answers one narrow question: how much does knowing this background number tell

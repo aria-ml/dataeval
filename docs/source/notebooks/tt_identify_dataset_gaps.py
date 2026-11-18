@@ -95,6 +95,7 @@ import numpy as np
 import plotly.io as pio
 import polars as pl
 import torch
+from IPython.display import display
 from maite_datasets.image_classification import MilitaryVehicles
 from PIL import Image
 from sklearn.decomposition import PCA
@@ -134,7 +135,7 @@ counts = {metadata.index2label[i]: c for i, c in stats["label_counts_per_class"]
 counts_table = pl.DataFrame({"class": list(counts), "count": list(counts.values())}).sort("count")
 
 print("images:", len(dataset), "| classes present:", stats["class_count"])
-print(counts_table.head(6))
+display(counts_table.head(6))
 
 # %% [markdown]
 # The counts look healthy. Every class except `30N6E` holds at least 240 images, and `30N6E` is the only thin class.
@@ -165,7 +166,7 @@ print("sanctioned leaf classes:", len(ontology.leaves))
 representation = Representation(ontology).evaluate(metadata)
 
 print(f"leaf coverage: {representation.leaf_coverage:.0%} of sanctioned classes have any examples")
-print(representation.data().select(["concept", "parent", "action", "count", "target", "deficit"]))
+display(representation.data().select(["concept", "parent", "action", "count", "target", "deficit"]))
 
 # %% [markdown]
 # The ontology shows what the counts did not. `aircraft` and `watercraft` are sanctioned but have no images, so the
@@ -268,7 +269,7 @@ topped_up_metadata = Metadata(topped_up)
 
 topped_up_stats = label_stats(topped_up_metadata.class_labels, index2label=topped_up_metadata.index2label)
 topped_up_counts = {topped_up_metadata.index2label[i]: c for i, c in topped_up_stats["label_counts_per_class"].items()}
-print(
+display(
     pl.DataFrame({
         "class": list(quick_fixes),
         "before": [counts[name] for name in quick_fixes],
@@ -335,7 +336,7 @@ print("embedding shape:", embeddings.shape)
 # {class}`.Coverage` also turns each signal into a flag per class: `is_clustered`, `is_one_dimensional`, and
 # `has_near_duplicates`. By default a flag is raised only when a class has collapsed to half of a typical class, which
 # keeps the flags quiet on healthy data. The classes of this dataset are tight, so set `dispersion_factor` and
-# `isotropy_factor` to 0.8 to flag a class that is a fifth below its peers. Print the flagged classes, and summarize
+# `isotropy_factor` to 0.8 to flag a class that is a fifth below its peers. Show the flagged classes, and summarize
 # the classes that no flag marks.
 
 # %%
@@ -346,8 +347,8 @@ coverage = Coverage(num_observations=20, min_class_samples=20, dispersion_factor
 signals = ["dispersion", "isotropy", "near_duplicate_fraction"]
 flags = ["is_clustered", "is_one_dimensional", "has_near_duplicates"]
 cov = coverage.data()
-print(cov.filter(pl.any_horizontal(flags)).select(["class", *signals, *flags]))
-print(cov.filter(~pl.any_horizontal(flags)).select(signals).describe())
+display(cov.filter(pl.any_horizontal(flags)).select(["class", *signals, *flags]))
+display(cov.filter(~pl.any_horizontal(flags)).select(signals).describe())
 
 # %% [markdown]
 # The flags mark the three classes that received a quick fix. The other 21 classes behave alike. Their

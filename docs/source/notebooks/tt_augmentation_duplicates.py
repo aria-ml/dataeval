@@ -99,6 +99,7 @@ import numpy as np
 import polars as pl
 import torch
 import torchvision.transforms.v2 as T
+from IPython.display import display
 from maite_datasets.image_classification import MilitaryVehicles
 from PIL import Image
 
@@ -342,7 +343,7 @@ rates = pl.DataFrame({
     },
 })
 with pl.Config(tbl_rows=len(names), fmt_str_lengths=40):
-    print(rates)
+    display(rates)
 
 # %% [markdown]
 # ## Visualizing detected vs missed transformations

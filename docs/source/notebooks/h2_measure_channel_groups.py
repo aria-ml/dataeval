@@ -40,6 +40,7 @@ import logging
 
 import numpy as np
 import polars as pl
+from IPython.display import display
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
@@ -143,7 +144,7 @@ print("factors:", sorted(metadata.factor_names))
 
 # %%
 rows = metadata.rows_at("instance")
-print(
+display(
     rows
     .group_by("class_label")
     .agg(
@@ -174,7 +175,7 @@ patchy = image_stats(
     channels={"nir": 3},
 )["stats"]
 
-print(pl.DataFrame({name: np.asarray(values, dtype=float) for name, values in sorted(patchy.items())}))
+display(pl.DataFrame({name: np.asarray(values, dtype=float) for name, values in sorted(patchy.items())}))
 
 # %% [markdown]
 # The scene without the band gets `nan` for `nir_mean` and 1.0 for `nir_missing`. Columns are never dropped, so they

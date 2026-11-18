@@ -93,6 +93,7 @@ except Exception:
 
 # %%
 import polars as pl
+from IPython.display import display
 from maite_datasets.object_detection import SeaDrone
 
 from dataeval import Metadata
@@ -163,10 +164,10 @@ if dict(metadata.level_counts) != EXPECTED_COUNTS:
 
 # %%
 print("one row per image:")
-print(metadata.rows_at("unit").select("item_index", "altitude", "speed").head(3))
+display(metadata.rows_at("unit").select("item_index", "altitude", "speed").head(3))
 
-print("\none row per detection:")
-print(metadata.rows_at("instance").select("item_index", "class_label", "object_size").head(3))
+print("one row per detection:")
+display(metadata.rows_at("instance").select("item_index", "class_label", "object_size").head(3))
 
 # %% [markdown]
 # Notice the difference between the two `item_index` columns. The first three detections all come from image 0,
@@ -417,15 +418,15 @@ print("dropped    :", metadata.dropped_factors)
 # no single "object sharpness" for an image containing several detections.
 
 # %%
-print(
+display(
     metadata
     .rows_at("unit")
     .select("item_index", "unit_sharpness", "unit_background_sharpness", "instance_sharpness")
     .head(3)
 )
 
-print("\nand from the detection rows, where the image value propagates down:")
-print(metadata.rows_at("instance").select("item_index", "unit_sharpness", "instance_sharpness").head(3))
+print("and from the detection rows, where the image value propagates down:")
+display(metadata.rows_at("instance").select("item_index", "unit_sharpness", "instance_sharpness").head(3))
 
 # %% [markdown]
 # The three sharpness factors are measured over different regions of the same frame. `unit_background_fraction` says how
@@ -453,7 +454,7 @@ enriched = metadata.agg(
 
 new_factors = sorted(set(enriched.at("unit").factor_names) - set(metadata.at("unit").factor_names))
 print("new factors at the image level:", new_factors)
-print(enriched.rows_at("unit").select("item_index", "altitude", "n_objects", "mean_object_size").head(5))
+display(enriched.rows_at("unit").select("item_index", "altitude", "n_objects", "mean_object_size").head(5))
 
 # %% [markdown]
 # The factor `n_objects` is now an explicit, per-image factor capturing object density. All level-based rules apply to
@@ -476,7 +477,7 @@ print(round(float(crowding.select(pl.corr("altitude", "n_objects")).item()), 3))
 # separate from the three regional measurements in the "Measure your own factors" section.
 
 # %%
-print(
+display(
     enriched
     .rows_at("unit")
     .select("item_index", "n_objects", "unit_sharpness", "unit_background_sharpness", "mean_object_sharpness")
@@ -514,10 +515,10 @@ print(
 # %%
 per_object = Balance().evaluate(metadata)
 ranked = per_object.balance.sort("mi_value", descending=True)
-print(ranked.head(5))
+display(ranked.head(5))
 
-print("\nobject_size, for comparison:")
-print(ranked.filter(pl.col("factor_name") == "object_size"))
+print("object_size, for comparison:")
+display(ranked.filter(pl.col("factor_name") == "object_size"))
 
 # %% [markdown]
 # As demonstrated in the "Choose your level with `at()`" section, evaluating at the image (`unit`) level yields an error
@@ -527,7 +528,7 @@ print(ranked.filter(pl.col("factor_name") == "object_size"))
 
 # %%
 per_image_balance = Balance(label="n_objects").evaluate(enriched.at("unit"))
-print(per_image_balance.balance.sort("mi_value", descending=True).head(5))
+display(per_image_balance.balance.sort("mi_value", descending=True).head(5))
 
 # %% [markdown]
 # The two evaluations produce different profiles, and both are correct.

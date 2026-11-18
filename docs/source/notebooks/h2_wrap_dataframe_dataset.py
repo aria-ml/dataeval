@@ -44,6 +44,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from IPython.display import display
 from numpy.typing import NDArray
 from PIL import Image
 
@@ -227,7 +228,7 @@ od_dataset = DataFrameODDataset(
 od_metadata = Metadata(od_dataset)
 
 print(f"{len(od_catalog)} boxes in {len(od_dataset)} images")
-print(
+display(
     od_metadata
     .rows_at(od_metadata.label_level)
     .select(["item_index", "target_index", "class_label", "weather", "occlusion"])

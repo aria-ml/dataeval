@@ -45,6 +45,7 @@ from typing import NamedTuple, cast
 
 import av
 import numpy as np
+from IPython.display import display
 
 from dataeval import Metadata
 from dataeval.config import set_max_processes
@@ -195,7 +196,7 @@ class VideoFileDataset:
 
 dataset = VideoFileDataset(paths, boxes)
 metadata = Metadata(dataset)
-print(metadata.rows_at("sequence").select("item_index", "frame_rate", "video_duration", "codec_name"))
+display(metadata.rows_at("sequence").select("item_index", "frame_rate", "video_duration", "codec_name"))
 
 # %% [markdown]
 # A value that breaks a known factor's definition sets the factor aside. {attr}`.Metadata.dropped_factors` names the
@@ -204,7 +205,7 @@ print(metadata.rows_at("sequence").select("item_index", "frame_rate", "video_dur
 # %%
 broken = Metadata(VideoFileDataset(paths, boxes, frame_rates=[-1.0, 15.0, 15.0]))
 print(broken.dropped_factors)
-print(broken.unusable_rows("frame_rate").sort("value").head(1))
+display(broken.unusable_rows("frame_rate").sort("value").head(1))
 
 # %% [markdown]
 # ## Run an evaluator and follow a finding
