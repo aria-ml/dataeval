@@ -121,6 +121,8 @@ os.environ.setdefault("UV_VENV_CLEAR", "1")
 nox.options.default_venv_backend = "uv" if nox_uv is not None else "virtualenv"
 nox.options.sessions = ["test", "type", "deps", "lint", "doctest", "check"]
 
+# Kernel environment of the docs job. An edit here, to the docs session or to module-level code
+# re-executes every notebook; see docs/notebook_cache_inputs.py.
 DOCS_ENVS = {
     "LANG": "C",
     "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",

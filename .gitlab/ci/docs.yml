@@ -15,12 +15,13 @@ docs:
     - curl -LsSf https://astral.sh/uv/install.sh | sh
     - uv tool install nox --with nox-uv
   script:
-    # Notebook hashes cover code cells, but not imported library code or the
-    # execution environment. Validate those against the actual restored cache,
-    # so a skipped/canceled pipeline cannot leave apparently valid stale outputs.
+    # Jupyter's hashes cover each notebook's code cells. docs/notebook_cache_inputs.py covers the
+    # rest: it validates the shared inputs and the source files each notebook imports against the
+    # actual restored cache and removes the cached outputs of only the stale notebooks. Checking the
+    # cache, not the previous commit, means a skipped or canceled pipeline cannot leave stale outputs.
     # Merge request pipelines are best effort instead: they start from the restored cache and
-    # re-execute only the notebooks whose code cells changed. The merge train pipeline still runs
-    # the check, as the gate.
+    # re-execute only the notebooks whose code cells changed, so main's builds are the only ones that
+    # pay for a widely imported file. The merge train pipeline still runs the check, as the gate.
     - |
       BEST_EFFORT=
       if [ "$CI_PIPELINE_SOURCE" = merge_request_event ] && [ "$CI_MERGE_REQUEST_EVENT_TYPE" != merge_train ]; then
@@ -37,8 +38,9 @@ docs:
       export DOCS_CACHE_RESTORED=1
     # Harbor cache of the notebook datasets, kept outside the docs build: the build
     # downloads whatever is missing, so a miss or a Harbor failure only costs time.
-    # Restore before the build, and only when a notebook is about to execute (the
-    # check exits non-zero if so); store after it, if the restore missed.
+    # Restore before the build, and only when a notebook is about to execute (the check
+    # above has removed its cached output, so check_notebook_cache.py exits non-zero);
+    # store after it, if the restore missed.
     - |
       if [ -n "$DOCS_CLEAN" ] || ! uv run --no-project --with jupytext --with nbformat python docs/check_notebook_cache.py >/dev/null 2>&1; then
         bash docs/harbor-datasets-cache.sh pull
