@@ -29,7 +29,7 @@ docs-artifacts/main (orphan branch, cache only)
 Orphan branches have no parent commits and are disconnected from main branch history:
 
 - `docs-artifacts/main` - Cache for main branch
-- `docs-artifacts/release/1.0` - Cache for release/1.0 branch
+- `docs-artifacts/release/v1.0` - Cache for release/v1.0 branch
 - `docs-artifacts/feature/xyz` - Cache for feature branches (optional)
 
 **Important**: These branches should NEVER be merged into working branches.
@@ -116,10 +116,12 @@ variables:
 Successful GitLab docs builds push cache to:
 
 - `docs-artifacts/main` for main
-- `docs-artifacts/<branch>` for merge request branches
+- `docs-artifacts/<branch>` for merge request branches and release branches
 - `docs-artifacts/<tag>` for tags, including version tags used by Colab links
 
-Release branches only publish to a version tag on HEAD. Orphaned feature artifact branches are removed after merge.
+A release branch keeps its own cache, so its next build starts from it, not from the last version tag's older cache.
+A merge request into a release branch starts from that branch's cache. Orphaned feature artifact branches are removed
+after merge.
 
 ### Cache invalidation
 
@@ -140,13 +142,13 @@ notebook, and a comment edit counts as a change. The exact inputs, and why the o
 invalidate the cache. An older cache without a manifest requires one clean build to initialize it.
 
 Merge request pipelines are best effort. They start from the cache of the merge request's branch, or from
-`docs-artifacts/main` on the first run (from the latest version artifact of the release line for a merge request into
-a `release/v*` branch), and re-execute only the notebooks whose code cells changed. They skip the check above and leave
-`execution-inputs.json` as they found it, so it still describes the tree the cached outputs were last validated
-against. A merge request that changes the library can therefore show notebook outputs that are older than its code,
-and the assertion cells in the notebooks that are not re-executed do not run. The merge train pipeline, main, release
-branches and tags run the check, so a notebook that a change breaks or whose numbers move fails there. Merge request
-caches are never used to seed main, a release branch or a tag.
+`docs-artifacts/main` on the first run (from the target branch's own cache, else the latest version artifact of the
+release line, for a merge request into a `release/v*` branch), and re-execute only the notebooks whose code cells
+changed. They skip the check above and leave `execution-inputs.json` as they found it, so it still describes the tree
+the cached outputs were last validated against. A merge request that changes the library can therefore show notebook
+outputs that are older than its code, and the assertion cells in the notebooks that are not re-executed do not run. The
+merge train pipeline, main, release branches and tags run the check, so a notebook that a change breaks or whose numbers
+move fails there. Merge request caches are never used to seed main, a release branch or a tag.
 
 Scheduled main builds (`DOCS_NIGHTLY`) and version tags always run a clean build, to refresh external datasets and model
 downloads and to rebuild what a release publishes. To request a clean build on main or a release branch, run a pipeline

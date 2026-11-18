@@ -152,8 +152,12 @@ if ! fetch_cache "$ARTIFACT_BRANCH"; then
     elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
         VERSION_FALLBACK=$(find_release_branch_fallback "$BRANCH_NAME") || true
     elif [[ "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME" =~ ^release/v ]]; then
-        # A merge request into a release branch builds that release line, not main's newer tree.
-        VERSION_FALLBACK=$(find_release_branch_fallback "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME") || true
+        # A merge request into a release branch builds that release line, not main's newer tree:
+        # seed from the release branch's own cache, else from its latest version artifact.
+        VERSION_FALLBACK="docs-artifacts/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+        if ! git ls-remote --exit-code --heads origin "$VERSION_FALLBACK" >/dev/null 2>&1; then
+            VERSION_FALLBACK=$(find_release_branch_fallback "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME") || true
+        fi
     fi
 
     if [ -n "$VERSION_FALLBACK" ]; then
