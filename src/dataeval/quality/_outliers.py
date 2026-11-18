@@ -22,10 +22,12 @@ from dataeval.core import (
 )
 from dataeval.core._combination_scores import _named_groups
 from dataeval.data import SequenceFrames
+from dataeval.data._merge import _MergedDataset
 from dataeval.exceptions import MaiteShapeError
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     AnnotatedDataset,
+    DatasetMetadata,
     FeatureExtractor,
     ImageDataset,
     MetadataLike,
@@ -94,7 +96,6 @@ from dataeval.types import (
     set_metadata,
 )
 from dataeval.utils._array import flatten_samples, to_numpy
-from dataeval.utils.data import iter_images
 from dataeval.utils.thresholds import ZScoreThreshold, resolve_threshold
 
 DEFAULT_OUTLIERS_FLAGS = ImageStats.DIMENSION | ImageStats.PIXEL | ImageStats.VISUAL
@@ -3783,8 +3784,8 @@ class Outliers(Evaluator):
         # Cluster-based: early fusion — combine all images, cluster globally
         stored_cluster_stats: ClusterStats | None = None
         if self.extractor is not None:
-            all_images = [img for ds in datasets for img in iter_images(ds)]
-            embeddings = Embeddings(all_images, self.extractor, batch_size=self.batch_size)
+            together = _MergedDataset(cast("list[Any]", list(datasets)), DatasetMetadata(id="outliers-datasets"))
+            embeddings = Embeddings(together, self.extractor, batch_size=self.batch_size)
 
             cluster_result = cluster(
                 embeddings,
