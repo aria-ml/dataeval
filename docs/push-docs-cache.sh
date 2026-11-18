@@ -141,19 +141,14 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 Files: $FILE_COUNT
 Size: $CACHE_SIZE"
 
-# Release branches (release/v*) only push to docs-artifacts/<tag>, never to
-# docs-artifacts/release/v* which would be an orphan nobody fetches from.
-if [[ "$BRANCH_NAME" =~ ^release/v ]]; then
-    echo "Release branch detected — skipping push to $ARTIFACT_BRANCH"
-    echo "Will only push to versioned artifact branch if a tag exists on HEAD"
-else
-    # Push to artifact branch (force push since it's orphan)
-    echo "Pushing to $ARTIFACT_BRANCH..."
-    git push --force "$REPO_URL" HEAD:"refs/heads/$ARTIFACT_BRANCH"
-    echo "================================================"
-    echo "✓ Cache pushed successfully to $ARTIFACT_BRANCH"
-    echo "================================================"
-fi
+# Push to artifact branch (force push since it's orphan). A release branch (release/v*) keeps its own
+# cache here too: fetch-docs-cache.sh restores it for the next build of the branch and for merge
+# requests into it, instead of the last version tag's older cache.
+echo "Pushing to $ARTIFACT_BRANCH..."
+git push --force "$REPO_URL" HEAD:"refs/heads/$ARTIFACT_BRANCH"
+echo "================================================"
+echo "✓ Cache pushed successfully to $ARTIFACT_BRANCH"
+echo "================================================"
 
 cd "$OLDPWD"
 
@@ -171,8 +166,4 @@ if [ -n "$VERSION_TAG" ]; then
     git push --force "$REPO_URL" HEAD:"refs/heads/$VERSION_ARTIFACT_BRANCH"
     cd "$OLDPWD"
     echo "✓ Pushed to $VERSION_ARTIFACT_BRANCH"
-elif [[ "$BRANCH_NAME" =~ ^release/v ]]; then
-    echo ""
-    echo "⚠ Release branch has no version tag on HEAD — no artifact branch pushed"
-    echo "  Artifacts are pushed by the tag pipeline once scripts/release.py tags this commit"
 fi
