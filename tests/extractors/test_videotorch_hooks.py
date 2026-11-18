@@ -59,3 +59,26 @@ def test_input_capture_on_an_in_place_layer_keeps_its_negatives():
         _InPlaceVideoModel(), processor=MockProcessor(), layer_name="encoder.2", use_output=False, device="cpu"
     )
     assert (np.asarray(extractor([make_video(8)])) < 0).any()
+
+
+class _ReturnsNone(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> None:
+        return None
+
+
+class _VideoModelWithALayerThatReturnsNone(MockVideoModel):
+    def __init__(self) -> None:
+        super().__init__()
+        self.nothing = _ReturnsNone()
+
+    def forward(self, pixel_values):
+        self.nothing(pixel_values)
+        return super().forward(pixel_values)
+
+
+def test_a_layer_that_returns_none_is_named():
+    extractor = VideoTorchExtractor(
+        _VideoModelWithALayerThatReturnsNone(), processor=MockProcessor(), layer_name="nothing", device="cpu"
+    )
+    with pytest.raises(RuntimeError, match="'nothing' gave no tensor"):
+        extractor([make_video(8)])
