@@ -9,13 +9,11 @@ from numpy.typing import NDArray
 
 from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
-from dataeval.config import get_load_threads
 from dataeval.data._reads import Reads, recordable, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
-from dataeval.types._task import detect_task
-from dataeval.utils._internal import read_ordered
+from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import DatasetKind, validate_dataset
 
 _logger = get_logger(__name__)
@@ -331,24 +329,10 @@ class View(AnnotatedDataset[_TDatum]):
         """Yield ``use(self.read(index))`` for each index in order, in several threads when ``load_threads`` is set.
 
         `use` runs in the loading thread, so a result that no longer holds the pixels, a skeleton or a verdict, is all
-        that waits for the caller. The first item is read here, on the calling thread: it names the task, and a tracking
-        dataset is read serially, as the Metadata walk reads one. With no threads set this is the plain loop.
+        that waits for the caller. ``read_dataset`` in ``utils._internal`` says when the reads stay serial, such as for
+        a tracking dataset. With no threads set this is the plain loop.
         """
-        wanted = list(indices)
-        threads = get_load_threads()
-        if threads is None or threads < 2 or len(wanted) < 3:
-            for index in wanted:
-                yield use(self.read(index))
-            return
-        head = self.read(wanted[0])
-        tracking = isinstance(head, tuple) and len(head) == 3 and detect_task(head[1]) == "MOT"
-        first = use(head)
-        del head  # a generator keeps its locals, and this one holds the first item's pixels
-        yield first
-        loaded = read_ordered(
-            lambda index: use(self.read(index)), wanted[1:], None if tracking else threads, ahead=4 * threads
-        )
-        yield from loaded
+        return read_dataset(self, indices, use, read=self.read)
 
     def _structuring_source(self) -> Any:
         """Return what :class:`~dataeval.Metadata` structures in place of this view: its cached reads if it has any.

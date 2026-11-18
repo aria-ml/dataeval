@@ -373,14 +373,21 @@ def set_load_threads(threads: int | None) -> None:
     Notes
     -----
     **Parallelism.** With more than one thread, ``dataset[i]`` is called from several threads at once and in no fixed
-    order. A dataset that is not safe for that, such as one that holds an open file handle, returns wrong data without
-    raising. Results and their order are unchanged. Threads help when each read takes more than a few milliseconds and
-    releases the GIL, such as decoding a large image, and can be slower than the serial loop when reads are short. A
-    random transform inside the dataset draws from shared random state, so seeded results can differ between runs. A
-    multi-object tracking dataset is always read serially, and so is a :class:`~dataeval.data.View` record. A transform
-    that a :class:`~dataeval.data.View` applies runs in those threads too, so one you wrote must be safe for that.
-    Evaluators that build their own :class:`~dataeval.Embeddings` or :class:`~dataeval.Metadata` use the setting too. It
-    is not tested with datasets that land their data on a GPU, or on Windows or macOS.
+    order. A dataset that is not safe for that, such as one that holds an open file handle, can return wrong data, or
+    raise. For a dataset that is safe to read from several threads, results and their order are unchanged. Threads help
+    when each read takes more than a few milliseconds and releases the GIL, such as decoding a large image, and can be
+    slower than the serial loop when reads are short. A read holds up to about four times the thread count of items
+    ahead of the one in use. A random transform inside the dataset draws from shared random state, so seeded results
+    can differ between runs. A transform that a :class:`~dataeval.data.View` applies runs in those threads too, so one
+    you wrote must be safe for that. Evaluators that build their own :class:`~dataeval.Embeddings` or
+    :class:`~dataeval.Metadata` use the setting too. It is not tested with datasets that land their data on a GPU, or
+    on Windows or macOS.
+
+    **Serial reads.** A dataset already in memory, such as a list or an array, and a multi-object tracking dataset are
+    read one item at a time on the calling thread. So is a :class:`~dataeval.data.SequenceFrames`, whose frames come
+    off each video's decoder in order, and any view, crops or merge DataEval builds on one. Behind a wrapper that is not
+    DataEval's, a :class:`~dataeval.data.SequenceFrames` still reads the right frames but can decode a video again for
+    each read out of order, so leave threads off for that.
 
     Setting more than one thread raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
 
