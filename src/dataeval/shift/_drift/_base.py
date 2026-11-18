@@ -724,7 +724,7 @@ class ChunkedDrift(Generic[TDetails]):
 class DriftAdaptiveMixin:
     """Mixin for detectors that support feature extraction and reference updating.
 
-    Provides lazy encoding of raw data via an optional
+    Provides encoding of raw data, once, via an optional
     :class:`~dataeval.protocols.FeatureExtractor` and post-predict
     reference updating via an :class:`~dataeval.protocols.UpdateStrategy`.
 
@@ -753,7 +753,7 @@ class DriftAdaptiveMixin:
         self.n = 0
 
     def _set_adaptive_data(self, data: Any) -> None:
-        """Store raw data for lazy encoding.  Call from ``fit()``."""
+        """Store the reference data, encoding it now when an extractor is set.  Call from ``fit()``."""
         if self.extractor is None and not isinstance(data, Array):
             raise ValueError("`data` must be Array-like or provide an `extractor` to convert your data to an array.")
 
@@ -761,7 +761,10 @@ class DriftAdaptiveMixin:
         self._reference_data: NDArray[np.float32] | None = None  # reset lazy cache
 
         if self.extractor is not None:
-            self.n = len(self.extractor(data))
+            # Kept, not run again on first use: on a dataset whose items are expensive to load, each run of the
+            # extractor is a full read of it.
+            self._reference_data = self._encode(data)
+            self.n = len(self._reference_data)
         else:
             self.n = len(data)
 
@@ -777,7 +780,7 @@ class DriftAdaptiveMixin:
 
     @property
     def reference_data(self) -> NDArray[np.float32]:
-        """Reference data, lazily encoded on first access.
+        """Reference data, encoded in ``fit`` when an extractor is set, otherwise on first access.
 
         Overrides :attr:`BaseDrift.reference_data` via MRO when this mixin
         appears before :class:`BaseDrift` in the inheritance list.
