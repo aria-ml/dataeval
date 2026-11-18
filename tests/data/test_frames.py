@@ -1256,6 +1256,38 @@ class TestDecodeCost:
         assert frames.sequence_offsets.tolist() == [0, 3, 5]
         assert [counter["iterations"] for counter in counters] == [0, 0]
 
+    @pytest.mark.parametrize("selector", [None, Stride(2)], ids=["all", "stride"])
+    def test_reading_every_frame_by_index_walks_each_sequence_once_when_the_selector_plans(self, selector):
+        """The walk that presents a sequence's frames also records them, so nothing walks it first."""
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset) if selector is None else SequenceFrames(dataset, selector)
+        by_index = [frames[index] for index in range(len(frames))]
+        assert [counter["iterations"] for counter in counters] == [1, 1]
+        again = make_dataset((6, 4))[0]
+        fresh = SequenceFrames(again) if selector is None else SequenceFrames(again, selector)
+        for (pixels, target, meta), (want_pixels, want_target, want_meta) in zip(by_index, emit(fresh), strict=True):
+            np.testing.assert_array_equal(pixels, want_pixels)
+            np.testing.assert_array_equal(np.asarray(target.boxes), np.asarray(want_target.boxes))
+            assert meta == want_meta
+
+    def test_image_stats_walks_each_sequence_once_when_the_selector_plans(self):
+        from dataeval.core import image_stats
+        from dataeval.flags import ImageStats
+
+        dataset, counters = make_dataset((6, 4))
+        image_stats(SequenceFrames(dataset), stats=ImageStats.HASH)
+        assert [counter["iterations"] for counter in counters] == [1, 1]
+
+    def test_index_walk_records_every_sequence(self):
+        """After reading every frame by index, the view's selection is known without another walk."""
+        dataset, counters = make_dataset((6, 4))
+        frames = SequenceFrames(dataset, Stride(2))
+        for index in range(len(frames)):
+            frames[index]
+        report = frames.selection_report()
+        assert [counter["iterations"] for counter in counters] == [1, 1]
+        assert report is not None
+
     def test_getitem_reads_the_target_off_the_cursor(self):
         """The walk already pairs frame with target; re-reading it indexes the source per frame."""
         dataset, _ = make_dataset((5,))
