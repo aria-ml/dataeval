@@ -492,6 +492,8 @@ a multi-line `repr`, and a lambda inside one records nothing recoverable.
 
 - [Measure named groups of channels](../notebooks/h2_measure_channel_groups.py): naming groups of bands so
   that each group is measured separately
+- [Compare surround contrast, clipping and noise between two collections](../notebooks/h2_compare_contrast_clipping_noise.py):
+  the context, saturation and noise statistics of two collections measured with the same settings
 - [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates
   and the three ways to respond
 - [Specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py):

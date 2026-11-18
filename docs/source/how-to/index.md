@@ -74,6 +74,7 @@ datasets for machine learning.
 ../notebooks/h2_add_intrinsic_factors.py
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_measure_channel_groups.py
+../notebooks/h2_compare_contrast_clipping_noise.py
 ../notebooks/h2_control_factor_binning.py
 ../notebooks/h2_sync_and_cache_metadata.py
 ../notebooks/h2_reconcile_labels_ontology.py
@@ -182,6 +183,10 @@ datasets for machine learning.
 - - [](../notebooks/h2_measure_channel_groups.py)
   - Measure named groups of bands separately on multispectral imagery
   - [![Open In Colab][colab-badge]][band-colab]
+- - [](../notebooks/h2_compare_contrast_clipping_noise.py)
+  - Compare surround contrast, clipping and noise between a reference and an
+    operational collection measured with the same settings
+  - [![Open In Colab][colab-badge]][ccn-colab]
 - - [](../notebooks/h2_control_factor_binning.py)
   - Declare, review and reuse a factor's bin edges so results
     are comparable across collections
@@ -225,6 +230,7 @@ datasets for machine learning.
 [trace-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_trace_findings_to_source.ipynb
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_custom_image_stats_object_detection.ipynb
 [band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_measure_channel_groups.ipynb
+[ccn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_compare_contrast_clipping_noise.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_add_intrinsic_factors.ipynb
 [ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_control_factor_binning.ipynb
 [sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_sync_and_cache_metadata.ipynb

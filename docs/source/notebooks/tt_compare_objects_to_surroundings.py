@@ -544,6 +544,8 @@ assert max(row["mi_value"] for (_, factor), row in cells.items() if factor == "u
 #   it reaches instance rows.
 # - [Specify custom statistics on object detection datasets](./h2_custom_image_stats_object_detection.py) — Learn
 #   how to choose flags and read source_index for object detection statistics.
+# - [Compare surround contrast, clipping and noise between two collections](./h2_compare_contrast_clipping_noise.py) —
+#   Compare vehicles against their surroundings in two collections measured with the same settings.
 #
 # %% [markdown]
 # ## On your own
