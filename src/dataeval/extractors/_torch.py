@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
 import numpy as np
@@ -84,13 +84,13 @@ def _capture(
 
     The hooks live for this one forward pass and are removed even when it fails, so constructing extractors or calling
     them leaves nothing registered on the model. An input is read by a forward pre-hook, before the layer runs, so an
-    in-place layer cannot overwrite it first, and a layer called with keyword arguments only gives its first keyword
-    value. Shared by every torch-backed extractor.
+    in-place layer cannot overwrite it first, and a layer called with keyword arguments only gives the first keyword
+    argument passed. Shared by every torch-backed extractor.
 
     Raises
     ------
     RuntimeError
-        When a layer did not run during the forward pass, so there is nothing to extract from it.
+        When a layer did not run during the forward pass, or gave None, so there is nothing to extract from it.
     """
     captured: dict[str, Any] = {}
     handles = [
@@ -105,12 +105,24 @@ def _capture(
         for handle in handles:
             handle.remove()
 
-    missing = ", ".join(repr(name) for name in layers if name not in captured)
+    missing = [name for name in layers if name not in captured]
     if missing:
         raise RuntimeError(
-            f"Layer {missing} did not run during the forward pass, so there is nothing to extract from it."
+            f"{_layers_named(missing)} did not run during the forward pass, so there is nothing to extract from it."
         )
+    empty = [name for name in layers if captured[name] is None]
+    if empty:
+        given = "gave" if use_output else "received"
+        raise RuntimeError(f"{_layers_named(empty)} {given} no tensor (None), so there is nothing to extract from it.")
     return captured
+
+
+def _layers_named(names: Sequence[str]) -> str:
+    """Return ``Layer 'a'``, ``Layers 'a' and 'b'`` or ``Layers 'a', 'b' and 'c'``."""
+    quoted = [repr(name) for name in names]
+    if len(quoted) == 1:
+        return f"Layer {quoted[0]}"
+    return f"Layers {', '.join(quoted[:-1])} and {quoted[-1]}"
 
 
 def warn_if_pulled_to_cpu(name: str, batch: torch.Tensor, device: torch.device) -> bool:

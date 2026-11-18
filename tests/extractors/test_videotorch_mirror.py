@@ -214,3 +214,37 @@ def test_a_sliced_array_of_another_type_reaches_each_way_as_it_is():
         way._split_video_into_clips = recording  # type: ignore[method-assign]
     _mirror(ways, [video], [0])
     assert seen == [_OtherArray, _OtherArray]
+
+
+class _FailsWhileDecoding(ReplayableStream):
+    """A stream that hands out five frames and then fails, as a corrupt file does."""
+
+    def __iter__(self) -> Iterator[StreamFrame]:
+        for i, frame in enumerate(self.video[:5]):
+            yield StreamFrame(np.ascontiguousarray(np.moveaxis(frame, -1, 0)), i / 30, i, i)
+        raise OSError("the stream could not be decoded")
+
+
+def test_a_stream_that_fails_while_decoding_is_named():
+    with pytest.raises(OSError, match="could not be decoded") as raised:
+        _mirror({"a": _way(4), "b": _way(3)}, [_FailsWhileDecoding(make_video(9))], [3])
+    notes = " ".join(getattr(raised.value, "__notes__", []))
+    assert "dataset index 3" in notes
+    assert "'a'" in notes
+    assert "'b'" in notes
+
+
+def test_mirrored_ways_leave_the_dataset_arrays_unchanged():
+    videos = [np.random.default_rng(i).random((8, 8, 8, 3), dtype=np.float32) for i in range(3)]
+    stored = [v.copy() for v in videos]
+    torch.manual_seed(0)
+    writing = VideoTorchExtractor(MockVideoModel(num_frames=4), processor=_WritingProcessor(), device="cpu")
+    ways = {
+        "writing": writing,
+        "plain": _way(4),
+        "flat": lambda batch: np.stack([np.asarray(v).ravel() for v in batch]),
+    }
+    children = Embeddings.compute_multi(_items(lambda i: videos[i]), ways, batch_size=3)
+    for kept, original in zip(videos, stored, strict=True):
+        assert np.array_equal(kept, original)
+    assert np.array_equal(children["flat"][:], np.stack([v.ravel() for v in stored]))

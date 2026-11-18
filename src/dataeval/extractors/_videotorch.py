@@ -632,12 +632,28 @@ def _feed(
             windows[key] = []
 
 
+def _frames_noted(video: Any, extractors: Mapping[str, Any], dataset_index: int) -> Iterator[Any]:
+    """Yield the frames of `video`, adding to an error the stream raises the video and the extractors it fails for.
+
+    Only errors from the stream itself are noted here; an error from an extractor is noted with its own key, and one
+    from converting a frame (`_frame_of`) is not noted.
+    """
+    keys = ", ".join(repr(key) for key in extractors)
+    try:
+        yield from video
+    except Exception as error:
+        error.add_note(
+            f"Raised while walking the video at dataset index {dataset_index}, shared by the extractors {keys}."
+        )
+        raise
+
+
 def _walk_once(
     extractors: Mapping[str, VideoTorchExtractor], video: Any, running: Mapping[str, _Running], dataset_index: int
 ) -> None:
     """Walk `video` once, converting each frame once and feeding it to every extractor's own clip window."""
     windows: dict[str, list[Any]] = {key: [] for key in extractors}
-    for frame in video:
+    for frame in _frames_noted(video, extractors, dataset_index):
         _feed(extractors, windows, running, _frame_of(frame), dataset_index)
     for key, window in windows.items():
         if window:
@@ -694,4 +710,5 @@ def _mirror(
     for position, video in enumerate(videos):
         for key, row in _embed_video(extractors, video, position, indices[position]).items():
             rows[key].append(row)
+    _logger.info(f"Processed {len(videos)} videos for {len(extractors)} extractors")
     return {key: torch.stack(r).numpy() if r else np.empty((0,), dtype=np.float32) for key, r in rows.items()}

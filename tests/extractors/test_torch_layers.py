@@ -150,3 +150,24 @@ def test_a_nested_tuple_output_gives_its_first_tensor(images):
 def test_a_single_string_of_layer_names_is_refused():
     with pytest.raises(TypeError, match="sequence of layer names"):
         TorchLayers(_Counted(), "net.1", device="cpu")
+
+
+class _GivesNone(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flat = torch.nn.Flatten()
+        self.nothing = _Nothing()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.nothing(x)
+        return self.flat(x)
+
+
+class _Nothing(torch.nn.Module):
+    def forward(self, x: torch.Tensor) -> None:
+        return None
+
+
+def test_a_layer_that_gives_none_is_named(images):
+    with pytest.raises(RuntimeError, match="'nothing' gave no tensor"):
+        TorchLayers(_GivesNone(), ["nothing"], device="cpu").extract(images)

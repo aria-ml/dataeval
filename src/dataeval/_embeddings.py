@@ -79,12 +79,21 @@ def _check_extractors(dataset: Any, extractors: Mapping[str, Any]) -> None:
     if dataset is None or not extractors:
         raise ValueError("Embeddings.compute_multi needs a dataset to read and at least one extractor.")
     for key, extractor in extractors.items():
-        if isinstance(extractor, Embeddings):
-            raise TypeError(
-                f"The extractor {key!r} is an Embeddings. Pass its extractor instead, so it is computed in this pass."
-            )
-        if not callable(extractor) and not isinstance(extractor, TorchLayers):
-            raise TypeError(f"The extractor {key!r} is not callable: it is a {type(extractor).__name__}.")
+        _check_extractor(key, extractor)
+
+
+def _check_extractor(key: Any, extractor: Any) -> None:
+    if not isinstance(key, str):
+        raise TypeError(
+            f"Each key must be a str, and {key!r} is of type {type(key).__name__}. The keys name the returned "
+            "Embeddings, and with path the directories they are stored in."
+        )
+    if isinstance(extractor, Embeddings):
+        raise TypeError(
+            f"The extractor {key!r} is an Embeddings. Pass its extractor instead, so it is computed in this pass."
+        )
+    if not callable(extractor) and not isinstance(extractor, TorchLayers):
+        raise TypeError(f"The extractor {key!r} is not callable: it is a {type(extractor).__name__}.")
 
 
 _Groups = dict[str, tuple[TorchLayers, dict[str, str]]]
@@ -144,25 +153,32 @@ def _root_directory(path: Path | str) -> Path:
 
 
 def _child_directories(path: Path | str | None, keys: Iterable[str]) -> dict[str, Path | None]:
-    """Make one directory under `path` for each key, refusing keys that name none or the same one.
+    """Plan one directory under `path` for each key, without making it: `_place_in_directories` does that.
 
-    Each child is given its directory as its `path`, so it names its file inside from its own hash, which covers the
-    dataset. The key keeps extractors apart, and the hash keeps datasets apart.
+    Keys that name no directory, the same one, or ones that differ only in case, which are one directory on macOS
+    and Windows, are refused. Each child is given its directory as its `path`, so it names its file inside from its
+    own hash, which covers the dataset. The key keeps extractors apart, and the hash keeps datasets apart.
     """
     if path is None:
         return dict.fromkeys(keys)
     root = _root_directory(path)
-    named: dict[Path, str] = {}
+    named: dict[str, str] = {}
     for key in keys:
-        directory = root / _directory_name(key)
-        if directory in named:
-            raise ValueError(
-                f"The keys {named[directory]!r} and {key!r} name the same directory, {directory.name!r}, under path."
-            )
-        named[directory] = key
-    for directory in named:
-        directory.mkdir(parents=True, exist_ok=True)
-    return {key: directory for directory, key in named.items()}
+        name = _directory_name(key)
+        other = named.get(name.casefold())
+        if other is not None:
+            same = "the same directory" if _directory_name(other) == name else "directories that differ only in case"
+            raise ValueError(f"The keys {other!r} and {key!r} name {same} under path. Rename one of them.")
+        named[name.casefold()] = key
+    return {key: root / _directory_name(key) for key in named.values()}
+
+
+def _place_in_directories(children: Mapping[str, "Embeddings"], directories: Mapping[str, Path | None]) -> None:
+    """Make each child's directory and name its file there, once every child has read its dataset's first item."""
+    for key, directory in directories.items():
+        if directory is not None:
+            directory.mkdir(parents=True, exist_ok=True)
+            children[key]._path = children[key]._resolve_path(directory)
 
 
 def _memmap_for_all(children: Mapping[str, "Embeddings"], rows: Mapping[str, NDArray[Any]]) -> bool:
@@ -184,7 +200,10 @@ def _shared_outputs(
     mirrored: Mapping[str, Any], groups: _Groups, indices: Sequence[int], images: Sequence[Any]
 ) -> dict[str, Any]:
     """Run, once each, what several children share: the walk of the mirrored videos, and each `TorchLayers`."""
-    outputs: dict[str, Any] = _mirror(mirrored, _private_copies(images), indices) if mirrored else {}
+    # No batch-wide copy for the mirror: it copies a sliced NumPy or tensor video for each extractor and a window's
+    # frames for one with a processor, and any other clip is stacked into a new array. A sliced array of another type
+    # is passed as it is, as it is to every extractor.
+    outputs: dict[str, Any] = _mirror(mirrored, images, indices) if mirrored else {}
     for entry, (layers, child_keys) in groups.items():
         try:
             read = layers.extract(_private_copies(images))
@@ -219,6 +238,18 @@ def _extract_each(
     return rows
 
 
+def _ingest_each(
+    children: Mapping[str, "Embeddings"], indices: Sequence[int], rows: Mapping[str, NDArray[Any]], use_memmap: bool
+) -> None:
+    """Store every child's rows for one batch, naming the extractor in any error, such as rows of a changed width."""
+    for key, child in children.items():
+        try:
+            child._ingest(indices, rows[key], use_memmap=use_memmap)
+        except Exception as error:
+            error.add_note(f"Raised while storing the rows of the extractor {key!r} given to Embeddings.compute_multi.")
+            raise
+
+
 def _fill_together(
     children: Mapping[str, "Embeddings"], size: int, progress_callback: ProgressCallback | None, groups: _Groups
 ) -> None:
@@ -231,8 +262,7 @@ def _fill_together(
         rows = _extract_each(children, indices, first._fetch_images(indices), groups)
         if use_memmap is None:
             use_memmap = _memmap_for_all(children, rows)
-        for key, child in children.items():
-            child._ingest(indices, rows[key], use_memmap=use_memmap)
+        _ingest_each(children, indices, rows, use_memmap)
         if progress_callback:
             progress_callback(indices[-1] + 1, total=total)
 
@@ -678,7 +708,8 @@ class Embeddings(Array, FeatureExtractor):
         path : Path, str or None, default None
             Directory with one directory under it for each key. The embeddings are stored there as memory-mapped files
             when all of them together exceed `memory_threshold` of the available memory, and are otherwise kept in
-            memory until an :class:`Embeddings` is saved. None keeps them in memory.
+            memory until an :class:`Embeddings` is saved. None keeps them in memory. Keys whose directory names
+            differ only in case are refused with a path, since macOS and Windows would give them one directory.
         memory_threshold : float, default 0.8
             Share of the available memory that the embeddings of all the extractors may take together before they are
             stored as memory-mapped files under `path`.
@@ -695,10 +726,11 @@ class Embeddings(Array, FeatureExtractor):
         ------
         ValueError
             When there is no dataset or no extractor, when the extractors' batch sizes differ and `batch_size` is not
-            given, when a key is given twice, when a key names no directory or two keys name the same one, when `path`
-            is a file, or when an item is a one-shot stream that more than one extractor would walk.
+            given, when a key is given twice, when a key names no directory, when two keys name the same directory or
+            directories that differ only in case, when `path` is a file, or when an item is a one-shot stream that more
+            than one extractor would walk.
         TypeError
-            When an extractor is an :class:`Embeddings`, or is neither callable nor a
+            When a key is not a str, or an extractor is an :class:`Embeddings` or is neither callable nor a
             :class:`~dataeval.extractors.TorchLayers`.
 
         Notes
@@ -746,12 +778,12 @@ class Embeddings(Array, FeatureExtractor):
                 dataset,
                 extractor=extractor,
                 batch_size=size,
-                path=directories[key],
                 memory_threshold=memory_threshold,
                 progress_callback=progress_callback,
             )
             for key, extractor in ways.items()
         }
+        _place_in_directories(children, directories)
         _fill_together(children, size, progress_callback, groups)
         return children
 
