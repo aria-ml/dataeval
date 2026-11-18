@@ -37,9 +37,11 @@ from dataeval.core import (
 from dataeval.core._temporal import DEFAULT_REDUNDANCY_RADIUS
 from dataeval.data import SequenceFrames
 from dataeval.data._frames import frame_numbers_at
+from dataeval.data._merge import _MergedDataset
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     Dataset,
+    DatasetMetadata,
     FeatureExtractor,
     ImageDataset,
     MetadataLike,
@@ -74,8 +76,7 @@ from dataeval.types import (
     set_metadata,
 )
 from dataeval.types._removal import canonical_address
-from dataeval.utils._array import flatten_samples, to_numpy
-from dataeval.utils.data import iter_images
+from dataeval.utils._array import to_numpy
 
 _logger = get_logger(__name__)
 
@@ -5155,16 +5156,15 @@ class Duplicates(Evaluator):
             _prepare_hash_inputs(calc_results) if calc_results else ({}, [], set(), None)
         )
 
-        # Cluster-based: combine all images, extract, cluster together
+        # Cluster-based: extract every dataset's images in batches, as one dataset, and cluster them together
         stored_cluster_result: ClusterResult | None = None
         cluster_near: MethodGroups = []
         if has_cluster_detection:
-            all_images = [img for ds in measured for img in iter_images(ds)]
-            embeddings = self.extractor(all_images)  # type: ignore[union-attr]
-            embeddings_array = flatten_samples(to_numpy(embeddings))
+            together = _MergedDataset(cast("list[Any]", list(measured)), DatasetMetadata(id="duplicates-datasets"))
+            embeddings = Embeddings(together, self.extractor, batch_size=self.batch_size)
 
             stored_cluster_result = cluster(
-                embeddings_array,
+                embeddings,
                 algorithm=self.cluster_algorithm,
                 n_clusters=self.n_clusters,
             )
