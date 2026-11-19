@@ -3,6 +3,7 @@
 __all__ = ["Embeddings"]
 
 import os
+import shutil
 import threading
 import weakref
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -376,10 +377,21 @@ class Embeddings(Array, FeatureExtractor):
         else:
             new_path = self._resolve_path(value)
             if new_path != self._path:
-                self._path = new_path
-                # Save current embeddings to new path
-                if self._embeddings.size > 0:
-                    self.save(new_path)
+                self._move_to(new_path)
+
+    def _move_to(self, new_path: Path) -> None:
+        """Save the rows to `new_path`, then make it this instance's path, and a memmap store's file.
+
+        The rows are saved before the path changes, so a refused save changes nothing.
+        """
+        if self._embeddings.size > 0:
+            self.save(new_path)
+        self._path = new_path
+        if isinstance(self._embeddings, np.memmap):
+            # Move the store onto the copy, so it reads and writes the file `path` names
+            self._embeddings = np.lib.format.open_memmap(new_path, mode="r+")
+            with _held_files_lock:
+                _mapped_files[os.path.realpath(new_path)] = self._embeddings
 
     def _resolve_path(self, path: Path | str) -> Path:
         if isinstance(path, str):
@@ -451,7 +463,8 @@ class Embeddings(Array, FeatureExtractor):
             if self._use_memmap:
                 # Create memory-mapped file
                 self._path.parent.mkdir(parents=True, exist_ok=True)
-                self._embeddings = np.memmap(self._path, dtype=dtype, mode="w+", shape=full_shape)
+                # A memmap with a .npy header, so `np.load(path, mmap_mode="r")` reads the file.
+                self._embeddings = np.lib.format.open_memmap(self._path, mode="w+", dtype=dtype, shape=full_shape)
                 with _held_files_lock:
                     _mapped_files[os.path.realpath(self._path)] = self._embeddings
             else:
@@ -512,7 +525,8 @@ class Embeddings(Array, FeatureExtractor):
         Raises
         ------
         ValueError
-            When no path is specified and instance has no configured path.
+            When no path is specified and instance has no configured path, or when the path is the file of another
+            Embeddings in this process.
         """
         # Determine target path
         if path is not None:
@@ -522,19 +536,38 @@ class Embeddings(Array, FeatureExtractor):
         else:
             raise ValueError("No path specified. Provide a path or initialize Embeddings with a path.")
 
+        self._refuse_another_file(target_path)
+
         # Ensure all embeddings are computed
         self.compute()
+        self._write(target_path)
 
-        # Save to disk
+    def _refuse_another_file(self, target_path: Path) -> None:
+        """Raise when `target_path` is the file of another live instance, which a save there would overwrite."""
+        with _held_files_lock:
+            held = _held_by_another(os.path.realpath(target_path), self)
+        if held:
+            raise ValueError(
+                f"{target_path} is the file of another Embeddings in this process, and saving there would change its "
+                "rows. Save to another file, or to a directory, where each Embeddings gets a file of its own."
+            )
+
+    def _write(self, target_path: Path) -> None:
+        """Write the computed rows to `target_path` as a .npy file, under the name as given."""
         target_path.parent.mkdir(parents=True, exist_ok=True)
-
         if isinstance(self._embeddings, np.memmap):
-            # Memmap is already on disk, just flush
+            # The store is a .npy file already: flush it, and copy it, in chunks, when the target is another file.
             self._embeddings.flush()
-            _logger.debug(f"Flushed memmap embeddings to {target_path}")
+            own = str(self._embeddings.filename)
+            if os.path.exists(target_path) and os.path.samefile(target_path, own):
+                _logger.debug(f"Flushed memmap embeddings to {target_path}")
+            else:
+                shutil.copyfile(own, target_path)
+                _logger.debug(f"Copied memmap embeddings from {own} to {target_path}")
         else:
-            # Save in-memory array to disk
-            np.save(target_path, self._embeddings)
+            # Save in-memory array to disk, through a file object so the name is kept as given, as for a memmap
+            with open(target_path, "wb") as file:
+                np.save(file, self._embeddings)
             _logger.debug(f"Saved embeddings to {target_path}")
 
     def compute(self, force: bool = False) -> Self:
