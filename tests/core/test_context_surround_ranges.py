@@ -9,6 +9,7 @@ import pytest
 
 from dataeval.core import image_stats
 from dataeval.core._compute_stats import column_name
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.flags import ImageStats
 from dataeval.utils.preprocessing import ChannelGroup
 
@@ -201,9 +202,14 @@ class TestShapes:
         flat = np.random.default_rng(1605).random((60, 80))
         assert run(flat)["stats"] == run(flat[None])["stats"]
 
-    def test_a_four_dimensional_datum_is_read_over_its_last_three_dimensions(self):
-        stack = np.random.default_rng(1605).random((2, *SHAPE))
-        assert run(stack)["stats"] == run(stack[0])["stats"]
+    def test_a_four_dimensional_datum_of_one_image_is_read_as_that_image(self):
+        image = np.random.default_rng(1605).random(SHAPE)
+        assert run(image[None])["stats"] == run(image)["stats"]
+
+    def test_a_datum_that_holds_two_images_is_refused(self):
+        # It used to be read as its first image, so the second was never measured.
+        with pytest.raises(ShapeMismatchError, match="one image per"):
+            run(np.random.default_rng(1605).random((2, *SHAPE)))
 
     def test_a_datum_with_no_picture_has_only_an_image_row_and_it_is_not_applicable(self):
         # Boxes on data with fewer than two dimensions are refused upstream, so such a datum has none.
