@@ -31,8 +31,9 @@ v1.1
     `value_range` in its metadata. `Duplicates` searches videos with long static stretches for shared segments with
     experimental `hash_neighbors` arguments `partition` and `k`, and a `segment_neighbors` option. An experimental
     `frame_stats` measures the time between frames and exact repeats, `track_stats` returns two more columns, the
-    longest gap and the net heading of a track, and an experimental `track_steps` measures the step each detection takes
-    from where its track was last seen. An experimental `View(record_reads=True)` lets `Metadata` reuse what an earlier
+    longest gap and the net heading of a track, an experimental `track_steps` measures the step each detection takes
+    from where its track was last seen, and an experimental `track_path_stats` measures how far, and in which direction,
+    the embeddings of each track travel. An experimental `View(record_reads=True)` lets `Metadata` reuse what an earlier
     pass read. An experimental `set_load_threads` loads dataset items in several threads wherever DataEval
     reads a whole dataset. An experimental `Embeddings.compute_multi` computes several
     extractors' embeddings from one read of a dataset, and an experimental `TorchLayers` reads several layers of one
