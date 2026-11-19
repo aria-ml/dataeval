@@ -112,6 +112,10 @@ stages:
     - micromamba list
   variables:
     SETUPTOOLS_SCM_PRETEND_VERSION: '0.0.0'
+    # environment.yml installs torch through pip. From PyPI that is the CUDA build, about 2.9 GB of
+    # torch, nvidia-* and triton wheels on a CPU runner; the CPU index gives a 210 MB wheel.
+    PIP_INDEX_URL: https://download.pytorch.org/whl/cpu
+    PIP_EXTRA_INDEX_URL: https://pypi.org/simple
 
 .conda_all:
   extends: .conda
