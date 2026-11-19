@@ -273,6 +273,12 @@ stages:
 trigger_compliance:
   extends: .trigger_compliance
   rules:
+    # Paused until the DevSecOps components support this package. Their `validate-package-versions` check caps
+    # requires-python at a minimum of 3.10, and DataEval requires 3.11 or later. Their unit-test and tr-compliance
+    # jobs default to Python 3.10 and 3.11, and their uv support is only on the components' `uv-support` branch. The
+    # child pipeline also held main's pipeline open for hours while its jobs waited for runners (`strategy: depend`).
+    # Secret detection and SAST still run from security.yml. Delete this rule to run the child pipeline again.
+    - when: never
     - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
