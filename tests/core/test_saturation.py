@@ -344,7 +344,7 @@ class TestStatus:
             ((), "ok"),
             ((7,), "ok"),
             ((10, 12), "ok"),
-            ((2, 3, 10, 12), "ok"),
+            ((1, 3, 10, 12), "ok"),
             ((3, 0, 0), "insufficient_support"),  # no position to count
             ((0,), "insufficient_support"),
         ],

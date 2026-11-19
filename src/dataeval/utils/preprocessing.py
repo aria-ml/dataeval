@@ -945,6 +945,10 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
     """
     Normalize the image shape into (C,H,W) format.
 
+    An image of more than 3 dimensions has its leading axes dropped when each is of size 1, as a single image with a
+    batch axis is. An array whose leading axes hold more than one image is refused: measuring only its first image
+    would leave the rest unmeasured without a word.
+
     Parameters
     ----------
     image : NDArray
@@ -957,8 +961,8 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
 
     Raises
     ------
-    ValueError
-        If image has less than 2 dimensions
+    ShapeMismatchError
+        If image has fewer than 2 dimensions, or holds more than one image along axes before the last 3.
     """
     ndim = image.ndim
     if ndim == 2:
@@ -966,7 +970,13 @@ def normalize_image_shape(image: NDArray[Any]) -> NDArray[Any]:
     if ndim == 3:
         return image
     if ndim > 3:
-        # Slice all but the last 3 dimensions
+        held = math.prod(image.shape[:-3])
+        if held != 1:
+            raise ShapeMismatchError(
+                f"An image of shape {image.shape} holds {held} images along its leading axes, and only one can be "
+                "measured. Give one image per dataset item, of shape (C, H, W): split a batch, such as one from a "
+                "data loader, into its images."
+            )
         return image[(0,) * (ndim - 3)]
     raise ShapeMismatchError("Images must have 2 or more dimensions.")
 

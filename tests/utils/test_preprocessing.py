@@ -464,10 +464,17 @@ class TestImageUtils:
         normalized = normalize_image_shape(image)
         assert normalized.shape == (1, 28, 28)
 
-    def test_normalize_image_shape_slice(self):
-        image = np.zeros((10, 3, 28, 28))
+    def test_normalize_image_shape_drops_leading_axes_of_size_one(self):
+        image = np.arange(3 * 28 * 28, dtype=np.float32).reshape(1, 1, 3, 28, 28)
         normalized = normalize_image_shape(image)
         assert normalized.shape == (3, 28, 28)
+        assert np.array_equal(normalized, image[0, 0])
+
+    @pytest.mark.parametrize("shape", [(10, 3, 28, 28), (2, 1, 3, 28, 28), (0, 3, 28, 28)])
+    def test_normalize_image_shape_refuses_more_than_one_image(self, shape):
+        # A batch used to become its first image without a word, so the rest of it was never measured.
+        with pytest.raises(ShapeMismatchError, match="one image per"):
+            normalize_image_shape(np.zeros(shape))
 
     def test_normalize_image_valueerror(self):
         image = np.zeros(10)
