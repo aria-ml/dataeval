@@ -353,8 +353,13 @@ def set_load_threads(threads: int | None) -> None:
     """
     Set how many threads load dataset items at once.
 
-    :class:`~dataeval.Embeddings` and :class:`~dataeval.Metadata` use them while they read a whole dataset, and so do
-    :class:`~dataeval.data.Filter` and :class:`~dataeval.data.Relabel`, which read every item once when a view is built.
+    DataEval uses them wherever it reads a whole dataset item by item: :class:`~dataeval.Embeddings`,
+    :class:`~dataeval.Metadata`, :func:`~dataeval.core.image_stats` and so :class:`~dataeval.quality.Outliers` and
+    :class:`~dataeval.quality.Duplicates`, the extractors in :mod:`dataeval.extractors` called on a dataset and so the
+    drift and OOD detectors given one, :class:`~dataeval.performance.Feasibility` given a model, and
+    :func:`~dataeval.data.unzip_dataset`, which reads ahead while it is iterated. So do
+    :class:`~dataeval.data.Filter`, :class:`~dataeval.data.Relabel`, :class:`~dataeval.data.ClassBalance` and
+    :class:`~dataeval.data.DetectionCrops`, which read every item once when a view is built.
 
     Parameters
     ----------
@@ -368,7 +373,8 @@ def set_load_threads(threads: int | None) -> None:
 
     See Also
     --------
-    set_max_processes : The separate setting for worker processes and scikit-learn's ``n_jobs``.
+    set_max_processes : The separate setting for computing, not reading: worker processes, such as the ones
+        :func:`~dataeval.core.image_stats` computes in while it reads in these threads, and scikit-learn's ``n_jobs``.
 
     Notes
     -----
@@ -379,15 +385,16 @@ def set_load_threads(threads: int | None) -> None:
     slower than the serial loop when reads are short. A read holds up to about four times the thread count of items
     ahead of the one in use. A random transform inside the dataset draws from shared random state, so seeded results
     can differ between runs. A transform that a :class:`~dataeval.data.View` applies runs in those threads too, so one
-    you wrote must be safe for that. Evaluators that build their own :class:`~dataeval.Embeddings` or
-    :class:`~dataeval.Metadata` use the setting too. It is not tested with datasets that land their data on a GPU, or
-    on Windows or macOS.
+    you wrote must be safe for that. It is not tested with datasets that land their data on a GPU, on free-threaded
+    builds of Python, or on Windows or macOS.
 
     **Serial reads.** A dataset already in memory, such as a list or an array, and a multi-object tracking dataset are
     read one item at a time on the calling thread. So is a :class:`~dataeval.data.SequenceFrames`, whose frames come
     off each video's decoder in order, and any view, crops or merge DataEval builds on one. Behind a wrapper that is not
     DataEval's, a :class:`~dataeval.data.SequenceFrames` still reads the right frames but can decode a video again for
-    each read out of order, so leave threads off for that.
+    each read out of order, so leave threads off for that. :func:`~dataeval.core.video_stats`,
+    :func:`~dataeval.core.frame_stats` and :func:`~dataeval.core.ego_stats` measure several videos at once instead, in
+    threads that :func:`set_max_processes` sizes.
 
     Setting more than one thread raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
 

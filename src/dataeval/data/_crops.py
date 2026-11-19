@@ -21,6 +21,7 @@ from dataeval.protocols import (
 )
 from dataeval.types._index import SourceIndex
 from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import requires_maite_dataset
 from dataeval.utils.preprocessing import clip_box, crop_with_fill, normalize_image_shape
 
@@ -262,6 +263,11 @@ class CropPolicy:
         return resolve_fill(pixels, channels, self._fill)
 
 
+def _target_and_metadata(datum: Any) -> tuple[Any, Any]:
+    """Keep a datum's target and metadata, so only those wait while the walk reads ahead."""
+    return datum[1], datum[2]
+
+
 class _CropDatumMetadata(DatumMetadata):
     """Internal typing aid for a crop's metadata dict; see :class:`DetectionCrops`.
 
@@ -411,8 +417,8 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         source_ids: list[int | str] = []
         observed: set[int] = set()
         n_dropped = 0
-        for item_index in range(len(dataset)):
-            _, target, datum_metadata = dataset[item_index]
+        reads = read_dataset(dataset, range(len(dataset)), _target_and_metadata)
+        for item_index, (target, datum_metadata) in enumerate(reads):
             # Stable provenance: the source datum's own id survives filtering/sorting/relabeling
             # views (which renumber positions but pass each datum's id through); fall back to the
             # positional index only for source data missing the protocol-required id.

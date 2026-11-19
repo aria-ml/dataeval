@@ -29,6 +29,7 @@ from dataeval.protocols import (
 )
 from dataeval.types._target import detection_count
 from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import read_dataset
 
 DatasetKind = Literal[
     "image_only",
@@ -436,10 +437,14 @@ def iter_images(data: Iterable[AnyDatum] | Dataset[AnyDatum]) -> Iterator[ArrayL
 
     MAITE datasets return ``(image, target, metadata)`` tuples per index; iterables of
     bare images pass through. Use in feature extractors so they accept both shapes
-    uniformly.
+    uniformly. A dataset is read in ``load_threads`` threads when that is set and it allows
+    it (``read_dataset`` in ``utils._internal``); otherwise this is ``for item in data``.
     """
-    for item in data:
-        yield unwrap_image(item)
+    if not _is_protocol_instance(data, Dataset):
+        return (unwrap_image(item) for item in data)
+    # ponytail: a consumer that raises part way leaves the read threads waiting until this iterator is collected;
+    # close it, as `Embeddings` and `image_stats` do, if a caller ever holds the traceback for long.
+    return read_dataset(data, range(len(data)), unwrap_image, serial=cast(Iterable[AnyDatum], data))
 
 
 def as_image(image: ArrayLike) -> NDArray[Any]:

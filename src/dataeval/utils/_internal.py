@@ -170,18 +170,26 @@ def read_ordered(
 
 
 def read_dataset(
-    dataset: Any, indices: Iterable[int], keep: Callable[[Any], R], read: Callable[[int], Any] | None = None
+    dataset: Any,
+    indices: Iterable[int],
+    keep: Callable[[Any], R],
+    read: Callable[[int], Any] | None = None,
+    serial: Iterable[Any] | None = None,
 ) -> Generator[R, None, None]:
     """Yield ``keep(read(index))`` for each index, in order, in ``load_threads`` threads when the dataset allows it.
 
     `read` defaults to ``dataset[index]``. The choice is made once, for the whole read. It reads one item at a time on
     the calling thread when no threads are set, when there are fewer than three items, when the dataset is already in
-    memory (a list, tuple or array, or a class marked ``_in_memory``), when it or a dataset it is built on must be read
-    in order (see ``_must_read_in_order``), or when its first item is a tracking datum. Otherwise the first item is
-    read on the calling thread, since it may be one the caller already holds, and the rest in threads, at most four
+    memory (a list, tuple or any array, or a class marked ``_in_memory``), when it or a dataset it is built on must be
+    read in order (see ``_must_read_in_order``), or when its first item is a tracking datum. Otherwise the first item
+    is read on the calling thread, since it may be one the caller already holds, and the rest in threads, at most four
     times the thread count ahead of the one in use. `keep` runs in the reading thread, so only what it keeps waits.
+
+    `serial`, when given, is what the serial read takes its items from in place of `read`, for a caller that iterated
+    the dataset, so a dataset with its own ``__iter__`` reads as it did before.
     """
     from dataeval.config import get_load_threads
+    from dataeval.protocols import Array, _is_protocol_instance
     from dataeval.types._task import detect_task
 
     get = dataset.__getitem__ if read is None else read
@@ -191,12 +199,13 @@ def read_dataset(
         threads is None
         or threads < 2
         or len(wanted) < 3
-        or isinstance(dataset, list | tuple | np.ndarray)
+        or isinstance(dataset, list | tuple)
+        or _is_protocol_instance(dataset, Array)
         or getattr(type(dataset), "_in_memory", False)
         or _must_read_in_order(dataset)
     ):
-        for index in wanted:
-            yield keep(get(index))
+        for item in (get(index) for index in wanted) if serial is None else serial:
+            yield keep(item)
         return
     head = get(wanted[0])
     tracking = isinstance(head, tuple) and len(head) == 3 and detect_task(head[1]) == "MOT"

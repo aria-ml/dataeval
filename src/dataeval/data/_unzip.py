@@ -2,7 +2,7 @@
 
 __all__ = []
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from typing import Any
 
 import numpy as np
@@ -12,15 +12,22 @@ from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, Dataset, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
 from dataeval.utils._annotations import Annotations, build_annotations
 from dataeval.utils._array import as_numpy
+from dataeval.utils._internal import read_dataset
 from dataeval.utils._mask import VALUE_RANGE_KEY
 from dataeval.utils.data import unwrap_image, validate_dataset
 from dataeval.utils.preprocessing import BoundingBox
 
 
 class _SizedIterator:
-    def __init__(self, iterator: Iterator[Any], length: int) -> None:
+    def __init__(self, iterator: Iterator[Any], length: int, close: Callable[[], None] | None = None) -> None:
         self._iterator = iterator
         self._length = length
+        self._close = close
+
+    def close(self) -> None:
+        """Stop the read behind this iterator, so no read thread outlives a caller that stopped early."""
+        if self._close is not None:
+            self._close()
 
     def __iter__(self) -> Iterator[Any]:
         return self._iterator
@@ -113,27 +120,27 @@ def _unzip_annotations(
 
     _reject_tracking(dataset, per_target)
 
-    def _generate_pairs() -> Iterator[tuple[NDArray[Any], Annotations | None, Any]]:
-        for i in range(len(dataset)):
-            d = dataset[i]
-            # From the item already read, so no item is loaded twice. Unchecked here: only a statistic that reads a
-            # range needs it to be a pair, and a dataset that holds another value under the key is fine for the rest.
-            meta = d[2] if isinstance(d, tuple) and len(d) == 3 else None
-            declared = meta.get(VALUE_RANGE_KEY) if isinstance(meta, Mapping) else None
-            image = as_numpy(unwrap_image(d))
-            if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
-                boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
-                labels = _dataset_labels(d[1].labels, i) if with_labels else None
-                annotations = build_annotations(boxes, image.shape, i, labels)
-            else:
-                annotations = None
-            yield image, annotations, declared
+    def _unpack(read: tuple[int, Any]) -> tuple[NDArray[Any], Annotations | None, Any]:
+        i, d = read
+        # From the item already read, so no item is loaded twice. Unchecked here: only a statistic that reads a
+        # range needs it to be a pair, and a dataset that holds another value under the key is fine for the rest.
+        meta = d[2] if isinstance(d, tuple) and len(d) == 3 else None
+        declared = meta.get(VALUE_RANGE_KEY) if isinstance(meta, Mapping) else None
+        image = as_numpy(unwrap_image(d))
+        if per_target and isinstance(d, tuple) and isinstance(d[1], ObjectDetectionTarget):
+            boxes = d[1].boxes if isinstance(d[1].boxes, Array) else as_numpy(d[1].boxes)
+            labels = _dataset_labels(d[1].labels, i) if with_labels else None
+            annotations = build_annotations(boxes, image.shape, i, labels)
+        else:
+            annotations = None
+        return image, annotations, declared
 
-    # Create three independent iterators from the generator
-    iter1, iter2, iter3 = tee(_generate_pairs(), 3)
+    # One read of the dataset, in `load_threads` threads when it is set, and three iterators over it
+    pairs = read_dataset(dataset, range(len(dataset)), _unpack, read=lambda i: (i, dataset[i]))
+    iter1, iter2, iter3 = tee(pairs, 3)
 
     # Extract images, annotations and declared ranges separately
-    images_iter = _SizedIterator((item[0] for item in iter1), len(dataset))
+    images_iter = _SizedIterator((item[0] for item in iter1), len(dataset), close=pairs.close)
     annotations_iter = (item[1] for item in iter2) if per_target else None
     ranges_iter = (item[2] for item in iter3)
 
