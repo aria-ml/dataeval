@@ -6,8 +6,10 @@ from functools import partial
 import numpy as np
 import pytest
 
+import dataeval.core._ego_stats as ego_stats_module
 from dataeval.core._ego_stats import (
     _MASK_MARGIN,
+    _TWO_MOTION_FLOOR,
     FlowMethod,
     _as_mask,
     _biweight_weights,
@@ -20,8 +22,10 @@ from dataeval.core._ego_stats import (
     _OverlayMask,
     _pair_ego,
     _photometric_agreement,
+    _quadratic_residual,
     _robust_cutoff,
     _two_motion,
+    _two_motion_residual,
     ego_stats,
 )
 from dataeval.core._video_stats import video_stats
@@ -86,6 +90,8 @@ def hud_pan(shift, n, *, dense=True, seed=0, dy=0, draw=None, channels=1):
 DENSE = drawn_mask(hud, (HEIGHT, WIDTH))
 CORNER = np.ones((HEIGHT, WIDTH), bool)
 CORNER[-96:, -128:] = False  # a 128x96 corner, trimmed to 96x64 by the margin
+BOTTOM_STRIP = np.zeros((HEIGHT, WIDTH), bool)
+BOTTOM_STRIP[int(0.88 * HEIGHT) :] = True
 
 
 class TestMaskFit:
@@ -260,6 +266,31 @@ def _still_mover(rect, v, *, seed=0, draw=None):
     return frames
 
 
+def _pan_with_mover(pan, rect, v, *, seed=0):
+    """A camera panning ``pan`` px over texture, with a textured object at ``rect`` (x, y, w, h) moving ``v`` px."""
+    x0, y0, w, h = rect
+    background, obj = texture(seed, blur=4), texture(seed + 1000, size=(h, w), blur=4)
+    frames = []
+    for k in range(2):
+        img = np.roll(background, k * pan, axis=1)
+        _paste(img, obj, x0 + k * v, y0)
+        frames.append(FakeFrame(img, k))
+    return frames
+
+
+def _spy_two_motion(monkeypatch):
+    """The arguments of every `_two_motion` call, which the ego walk makes only for a pair nothing else refused."""
+    calls = []
+    real = ego_stats_module._two_motion
+
+    def spy(*args):
+        calls.append(args)
+        return real(*args)
+
+    monkeypatch.setattr(ego_stats_module, "_two_motion", spy)
+    return calls
+
+
 def _split(pts, flow):
     """The camera fit's residuals and outliers, as `_pair_ego` passes them, for a hand-built flow field."""
     fit = _fit_irls(pts, flow)
@@ -277,6 +308,36 @@ def _lattice_points():
 def _with_flow_noise(flow, sigma=0.2, seed=0):
     """``flow`` plus the per-sample noise real optical flow carries, so the two-motion split actually runs."""
     return flow + np.random.default_rng(seed).normal(0, sigma, flow.shape)
+
+
+def _strength(pts, flow, resid, outlier):
+    """`q / two` of a split: the quadratic flow's median residual over the camera-plus-one-mover split's."""
+    two = _two_motion_residual(pts, flow, resid)
+    assert two is not None
+    return _quadratic_residual(pts, flow, ~outlier) / two
+
+
+def _half_step(step, seed=0):
+    """Lattice flow with a ``step`` px jump across the middle of the frame, plus flow noise."""
+    pts = _lattice_points()
+    return pts, _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [step, 0.0], [0.0, 0.0]), seed=seed)
+
+
+def _gain(pts, flow, resid, outlier):
+    """`single / two` of a split: the camera fit's median inlier residual over the camera-plus-one-mover split's."""
+    two = _two_motion_residual(pts, flow, resid)
+    assert two is not None
+    return float(np.median(np.hypot(*resid[~outlier].T))) / two
+
+
+def _bowed(bow, step=0.0, seed=0):
+    """Lattice flow whose x part grows with the square of the distance from the center column, plus flow noise.
+
+    It is ``bow`` px at the left and right edges. The right 30% of the frame moves ``step`` px further, if there is one.
+    """
+    pts = _lattice_points()
+    across = (pts[:, 0] - WIDTH / 2) / (WIDTH / 2)
+    return pts, _with_flow_noise(np.c_[bow * across**2 + step * (across > 0.4), np.zeros(len(pts))], seed=seed)
 
 
 def _noisy(frames, sigma, seed=0):
@@ -301,6 +362,63 @@ def _yaw(degrees, fov_degrees=60, seed=0):
         turn = np.array([[np.cos(angle), 0, np.sin(angle)], [0, 1, 0], [-np.sin(angle), 0, np.cos(angle)]])
         frames.append(FakeFrame(cv2.warpPerspective(big, k @ turn @ np.linalg.inv(k) @ shift, (WIDTH, HEIGHT)), i))
     return frames
+
+
+class TestQuadraticResidual:
+    """The robust quadratic flow behind the two-motion test's second refusal: what it explains and what it must not."""
+
+    def test_an_exact_quadratic_flow_has_no_residual(self):
+        pts = _lattice_points()
+        x, y = pts[:, 0] - WIDTH / 2, pts[:, 1] - HEIGHT / 2
+        flow = np.c_[0.001 * (x * x + x * y) + 0.5, 0.001 * (y * y - x * y) - 0.3]
+        assert _quadratic_residual(pts, flow, np.ones(len(pts), bool)) < 1e-9
+
+    def test_a_step_in_the_flow_is_not_absorbed(self):
+        pts = _lattice_points()
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [4.0, 0.0], [0.0, 0.0]))
+        assert _quadratic_residual(pts, flow, np.ones(len(pts), bool)) > 0.5
+
+    @pytest.mark.parametrize("rows", [1, 2, 3])
+    def test_samples_in_one_to_three_rows_do_not_raise(self, rows):
+        pts = _lattice_points()
+        pts = pts[pts[:, 1] < 8 + 16 * rows]
+        flow = _with_flow_noise(np.random.default_rng(rows).normal(0, 1, pts.shape), 0.1)
+        assert np.isfinite(_quadratic_residual(pts, flow, np.ones(len(pts), bool)))
+
+    def test_fewer_than_six_samples_cannot_refuse(self):
+        rng = np.random.default_rng(0)
+        pts, flow = rng.uniform(0, [WIDTH, HEIGHT], (5, 2)), rng.normal(0, 1, (5, 2))
+        assert _quadratic_residual(pts, flow, np.ones(5, bool)) == pytest.approx(0.0, abs=1e-9)
+
+    def test_gross_outliers_are_reweighted_away(self):
+        """An exact quadratic flow with 20% gross outliers: the Tukey rounds leave none, least squares leaves 1.8."""
+        pts = _lattice_points()
+        x, y = pts[:, 0] - WIDTH / 2, pts[:, 1] - HEIGHT / 2
+        flow = np.c_[0.001 * (x * x + x * y) + 0.5, 0.001 * (y * y - x * y) - 0.3]
+        flow[::5] += [6, -6]
+        assert _quadratic_residual(pts, flow, np.ones(len(pts), bool)) < 1e-6
+
+    def test_only_the_kept_samples_are_fitted(self):
+        """Half the samples step away from an exact quadratic, too many for the reweighting to drop: only `keep` can."""
+        pts = _lattice_points()
+        x, y = pts[:, 0] - WIDTH / 2, pts[:, 1] - HEIGHT / 2
+        flow = np.c_[0.001 * (x * x + x * y) + 0.5, 0.001 * (y * y - x * y) - 0.3]
+        right = pts[:, 0] >= WIDTH / 2
+        flow[right] += [6, -6]
+        assert _quadratic_residual(pts, flow, ~right) < 1e-9
+        assert _quadratic_residual(pts, flow, np.ones(len(pts), bool)) > 0.5
+
+    def test_the_order_of_the_samples_does_not_matter(self):
+        pts = _lattice_points()
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [2.0, 0.0], [0.0, 0.0]))
+        keep = np.ones(len(pts), bool)
+        order = np.random.default_rng(0).permutation(len(pts))
+        once = _quadratic_residual(pts, flow, keep)
+        assert abs(_quadratic_residual(pts[order], flow[order], keep) - once) < 1e-9 * once
+        assert _quadratic_residual(pts, flow, keep) == once
+        # and no decision: this split is stable, a refusal over the bar of 1.5 whatever the order
+        assert _two_motion(pts, flow, *_split(pts, flow), 1)
+        assert _two_motion(pts[order], flow[order], *_split(pts[order], flow[order]), 1)
 
 
 class TestTwoMotions:
@@ -335,14 +453,42 @@ class TestTwoMotions:
         assert not _two_motion(pts, flow, *_split(pts, flow), 1)
 
     def test_a_split_is_judged_per_frame_of_gap(self):
-        """A split about 4.8 times better than the fit is two motions over one frame, but not over three.
+        """A split the quadratic flow leaves 2.0 times over is two motions over one frame, but not over three.
 
-        What the affine leaves out of a real camera's motion, such as parallax, grows with the frames between a pair;
-        flow noise does not. So a split this strong over three frames is a third as strong per frame.
+        The quadratic bar scales with the square root of the gap, an empirical choice: 1.5 over one frame, 2.6 over
+        three, and this split falls between them.
         """
         pts = _lattice_points()
-        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [6.0, 0.0], [0.0, 0.0]))
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [2.1, 0.0], [0.0, 0.0]))
         split = _split(pts, flow)
+        assert 1.9 < _strength(pts, flow, *split) < 2.1
+        assert _two_motion(pts, flow, *split, 1)
+        assert not _two_motion(pts, flow, *split, 3)
+
+    def test_a_bowed_flow_is_one_motion_because_the_quadratic_flow_explains_it(self):
+        """The split explains a flow bowed 4 px by a quadratic 2.1 times better than the affine: over the bar of 1.5.
+
+        It is under the old bar of 3, so only the quadratic test can refuse it. The quadratic flow explains it to the
+        noise, 0.5 times the split's residual, so it does not.
+        """
+        pts, flow = _bowed(4.0)
+        split = _split(pts, flow)
+        assert 1.5 < _gain(pts, flow, *split) < 3.0
+        assert _strength(pts, flow, *split) < 1.5
+        assert not _two_motion(pts, flow, *split, 1)
+
+    def test_the_old_bar_is_still_judged_per_frame_of_gap(self):
+        """A split the quadratic flow explains is refused over one frame by the old bar of 3, and not over three, by 9.
+
+        A bowed flow with the right 30% of the frame moving 12 px further: the split explains it 6 times better than the
+        affine, over the old bar of 3 and under 9. It is over 5.2 as well, which the old bar over three frames would be
+        if it scaled with the square root of the gap. The quadratic flow sets the moving side aside and leaves 1.2 times
+        the split's residual, under the quadratic bar of 1.5, 2.6 over three frames, so only the old bar can refuse it.
+        """
+        pts, flow = _bowed(10.0, step=12.0)
+        split = _split(pts, flow)
+        assert 5.4 < _gain(pts, flow, *split) < 9.0
+        assert _strength(pts, flow, *split) < 1.5
         assert _two_motion(pts, flow, *split, 1)
         assert not _two_motion(pts, flow, *split, 3)
 
@@ -366,6 +512,202 @@ class TestTwoMotions:
         reading = _pair(_still_mover((320, 0, 320, 360), (12, 0)), gap=3)
         assert reading is not None
         assert reading.ambiguous
+
+    @pytest.mark.parametrize("seed", range(5))
+    @pytest.mark.parametrize(("sigma", "v"), [(1, 1), (1, 2), (1, 3), (3, 2), (3, 3)])
+    def test_a_slow_half_frame_mover_in_noise_is_refused(self, sigma, v, seed):
+        """#1592: a half-frame mover of 1 to 3 px in noisy frames drags the fit to a trusted zoom of a pixel or two.
+
+        The quadratic flow leaves at least 2.0 times the split's residual in every cell, over a bar of 1.5.
+        """
+        reading = _pair(_noisy(_still_mover((320, 0, 320, 360), (v, 0), seed=seed), sigma, seed=seed))
+        assert reading is not None
+        assert reading.ambiguous
+
+    @pytest.mark.parametrize("seed", range(5))
+    def test_a_slow_half_frame_mover_over_two_frames_is_refused(self, seed):
+        """A half-frame mover of 1 px a frame over two frames, in noisy footage: the quadratic bar is 2.1 here.
+
+        The quadratic flow leaves 3.9 to 4.5 times the split's residual, under the old bar of 6, so only the quadratic
+        test refuses it.
+        """
+        reading = _pair(_noisy(_still_mover((320, 0, 320, 360), (2, 0), seed=seed), 1, seed=seed), gap=2)
+        assert reading is not None
+        assert reading.ambiguous
+
+    @pytest.mark.parametrize("seed", [0, 3, 4])
+    @pytest.mark.parametrize(("step", "refused"), [(1.15, False), (1.55, True)])
+    def test_the_quadratic_bar_is_pinned_from_both_sides(self, step, refused, seed):
+        """A step the quadratic flow leaves 1.4 times the split's residual is not refused, and one at 1.65 times is.
+
+        The seeds are three whose noise draws keep that ratio within 0.04 of one another, so moving the 1.5 bar by more
+        than about 10% fails one side.
+        """
+        pts, flow = _half_step(step, seed)
+        split = _split(pts, flow)
+        assert _strength(pts, flow, *split) == pytest.approx(1.65 if refused else 1.4, abs=0.05)
+        assert _two_motion(pts, flow, *split, 1) == refused
+
+    @pytest.mark.parametrize("seed", range(3))
+    def test_the_quadratic_bar_scales_with_the_square_root_of_the_gap(self, seed):
+        """The quadratic flow leaves 2.3 times the split's residual: refused over 1 and 2 frames, not over 4.
+
+        The bars are 1.5, 2.1 and 3.0. A bar of `1.5 * gap` would not refuse it over 2 frames, and a bar that
+        ignored the gap would refuse it over 4.
+        """
+        pts, flow = _half_step(2.6, seed)
+        split = _split(pts, flow)
+        assert 2.25 < _strength(pts, flow, *split) < 2.45
+        assert _two_motion(pts, flow, *split, 1)
+        assert _two_motion(pts, flow, *split, 2)
+        assert not _two_motion(pts, flow, *split, 4)
+
+    @pytest.mark.parametrize("seed", range(5))
+    def test_a_masked_slow_mover_is_refused(self, seed):
+        reading = _pair(_noisy(_still_mover((320, 0, 320, 360), (2, 0), seed=seed), 3, seed=seed), BOTTOM_STRIP)
+        assert reading is not None
+        assert reading.ambiguous
+
+    @pytest.mark.skipif(
+        tuple(int(part) for part in cv2.__version__.split(".")[:2]) < (4, 8), reason="measured on OpenCV 4.8 and later"
+    )
+    @pytest.mark.parametrize("seed", range(5))
+    @pytest.mark.parametrize("v", [1, 2])
+    def test_a_slow_mover_under_lucas_kanade_is_refused(self, v, seed):
+        reading = _pair(_noisy(_still_mover((320, 0, 320, 360), (v, 0), seed=seed), 1, seed=seed), flow="lk")
+        assert reading is not None
+        assert reading.ambiguous
+
+    def test_a_pan_with_a_small_real_mover_stays_trusted(self):
+        """A 5 px pan under a mover a tenth of the frame at the corner, 3 px a frame: the affine fit is inside the bar.
+
+        The fit's residual is 1.1 times the split's, so the quadratic flow is not fitted.
+        """
+        reading = _pair(_noisy(_pan_with_mover(5, (0, 0, 203, 114), 3), 3))
+        assert reading is not None
+        assert reading.trusted
+
+    def test_a_tiny_lattice_does_not_raise(self, monkeypatch):
+        """Ten samples across the frame leave a lattice of 60: the quadratic flow still gives a reading or None."""
+        kept = []
+        fit = ego_stats_module._quadratic_residual
+
+        def record(pts, flow, keep):
+            kept.append(int(keep.sum()))
+            return fit(pts, flow, keep)
+
+        monkeypatch.setattr(ego_stats_module, "_quadratic_residual", record)
+        frames = _noisy(_still_mover((320, 0, 320, 360), (1, 0)), 3)
+        previous, current = (_FlowFrame(f.pixels[0], (WIDTH, HEIGHT)) for f in frames)
+        _measure_pair(_flow_estimator("dis"), previous, current, 10, 1)
+        assert kept == [60]
+
+    def test_the_early_exit_and_the_skip_never_fit_the_quadratic(self, monkeypatch):
+        """A fit at the floor and a fit within the bar are settled without the quadratic flow, which a mover reaches."""
+        calls = _spy_two_motion(monkeypatch)
+
+        def boom(*_):
+            raise AssertionError("the quadratic flow was fitted")
+
+        monkeypatch.setattr(ego_stats_module, "_quadratic_residual", boom)
+
+        def settled(frames):
+            """Read the pair, which must come out trusted, and return the affine inlier residual and the split's."""
+            reading = _pair(frames)
+            assert reading is not None
+            assert reading.trusted
+            pts, flow, resid, outlier, _ = calls[-1]
+            two = _two_motion_residual(pts, flow, resid)
+            assert two is not None
+            return float(np.median(np.hypot(*resid[~outlier].T))), two
+
+        single, _ = settled(hud_pan(5, 2, draw=lambda img: img))  # an exact pan: the fit is at the floor
+        assert single <= _TWO_MOTION_FLOOR
+        # Two motions in a nearly exact flow: either test would refuse it if the fit were not at the floor.
+        pts = _lattice_points()
+        flow = _with_flow_noise(np.where((pts[:, 0] >= WIDTH / 2)[:, None], [0.4, 0.0], [0.0, 0.0]), sigma=0.01)
+        resid, outlier = _split(pts, flow)
+        assert float(np.median(np.hypot(*resid[~outlier].T))) <= _TWO_MOTION_FLOOR
+        assert not _two_motion(pts, flow, resid, outlier, 1)
+        # A still camera and no mover, in noise: the fit is above the floor and within 1.5 times the split.
+        single, two = settled(_noisy(_still_mover((320, 0, 320, 360), (0, 0)), 3))
+        assert _TWO_MOTION_FLOOR < single <= 1.5 * two
+        with pytest.raises(AssertionError, match="quadratic flow was fitted"):  # a mover does reach it
+            _pair(_noisy(_still_mover((320, 0, 320, 360), (2, 0)), 3))
+
+    def test_the_quadratic_flow_is_fitted_to_the_samples_the_fit_kept(self, monkeypatch):
+        """A bowed flow with a corner mover reaches the quadratic flow, fitted to the 95% the fit kept, not all."""
+        pts, flow = _bowed(4.0)
+        flow[(pts[:, 0] < 0.15 * WIDTH) & (pts[:, 1] < 0.3 * HEIGHT)] += [0.0, 12.0]
+        resid, outlier = _split(pts, flow)
+        assert 0 < outlier.sum() < 0.1 * len(pts)
+        kept = []
+        fit = ego_stats_module._quadratic_residual
+
+        def record(pts, flow, keep):
+            kept.append(keep)
+            return fit(pts, flow, keep)
+
+        monkeypatch.setattr(ego_stats_module, "_quadratic_residual", record)
+        assert not _two_motion(pts, flow, resid, outlier, 1)
+        assert len(kept) == 1
+        np.testing.assert_array_equal(kept[0], ~outlier)
+
+    @pytest.mark.parametrize(
+        ("build", "mask", "gap"),
+        [
+            pytest.param(lambda: hud_pan(5, 2, draw=lambda img: img), None, 1, id="pan"),
+            pytest.param(lambda: _about_center((0, 1.0), (0, 1.02)), None, 1, id="zoom"),
+            pytest.param(lambda: _about_center((0, 1.0), (1.0, 1.0)), None, 1, id="roll"),
+            pytest.param(lambda: _noisy(_yaw(0.5), 0), None, 1, id="yaw-half-degree"),
+            pytest.param(lambda: _noisy(_yaw(0.5), 3), None, 1, id="yaw-half-degree-noisy"),
+            pytest.param(lambda: _noisy(_yaw(1), 0), None, 1, id="yaw-one-degree"),
+            pytest.param(lambda: _noisy(_yaw(1), 3), None, 1, id="yaw-one-degree-noisy"),
+            pytest.param(lambda: _noisy(_still_mover((320, 0, 320, 360), (0, 0)), 0), None, 1, id="still"),
+            pytest.param(lambda: _noisy(_still_mover((320, 0, 320, 360), (0, 0)), 3), None, 1, id="still-noisy"),
+            pytest.param(lambda: _noisy(_still_mover((0, 0, 203, 114), (3, 0)), 3), None, 1, id="small-mover"),
+            pytest.param(
+                lambda: _noisy(_still_mover((0, 0, 203, 114), (3, 0)), 3), BOTTOM_STRIP, 1, id="small-mover-masked"
+            ),
+            pytest.param(lambda: _noisy(_yaw(0.5), 0), None, 2, id="yaw-half-degree-gap-2"),
+            pytest.param(lambda: _noisy(_still_mover((0, 0, 203, 114), (6, 0)), 3), None, 2, id="small-mover-gap-2"),
+        ],
+    )
+    def test_a_pair_the_new_test_passes_is_unchanged_and_nothing_is_newly_trusted(self, monkeypatch, build, mask, gap):
+        """With the quadratic test off, an infinite ratio, each of these pairs reads exactly as it does with it on.
+
+        They are pairs the quadratic test passes: where the test only adds refusals to the old one, nothing is newly
+        trusted, and a pair it does not refuse leaves every field of the reading alone, NaN for NaN.
+        """
+        frames = build()
+        with monkeypatch.context() as off:
+            off.setattr(ego_stats_module, "_QUADRATIC_RATIO", float("inf"))
+            before = _pair(frames, mask, gap=gap)
+        after = _pair(frames, mask, gap=gap)
+        assert before is not None
+        assert after is not None
+        assert not (after.trusted and not before.trusted)
+        np.testing.assert_equal(after, before)
+
+    @pytest.mark.parametrize("seed", range(3))
+    @pytest.mark.parametrize(("sigma", "v"), [(1, 1), (3, 2)])
+    def test_a_pair_the_new_test_refuses_differs_only_in_being_ambiguous(self, monkeypatch, sigma, v, seed):
+        """With the quadratic test off, a slow mover reads trusted; with it on, the same reading is ambiguous.
+
+        Nothing else about the reading changes, so the mover's fraction and speed, which users see on a refused pair,
+        stay as they were.
+        """
+        frames = _noisy(_still_mover((320, 0, 320, 360), (v, 0), seed=seed), sigma, seed=seed)
+        with monkeypatch.context() as off:
+            off.setattr(ego_stats_module, "_QUADRATIC_RATIO", float("inf"))
+            before = _pair(frames)
+        after = _pair(frames)
+        assert before is not None
+        assert after is not None
+        assert before.trusted
+        assert after.ambiguous
+        assert not after.trusted
+        np.testing.assert_equal(after._replace(ambiguous=False), before)
 
 
 def _pans(frames, **kwargs):

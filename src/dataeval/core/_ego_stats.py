@@ -91,17 +91,30 @@ _MIN_FLOW_SIDE = 32
 # frame dropped. A pan read 4 px off has a median score of 0.86, so a mid-size misread can pass.
 _MIN_AGREEMENT = 0.80
 
-# The two-motion test (`_two_motion`, #1577): how much better, per frame of `gap`, "camera + one translating mover"
+# The split test of `_two_motion` (#1577): how much better, per frame of `gap`, "camera + one translating mover"
 # must explain the samples than the single fit explains its own inliers. Measured on synthetic still-camera movers,
 # real pans under dense overlays and 4,578 pairs of real drone footage at gap 1: a ratio of 2 refused a correct
 # 0.5-degree yaw at a 60-degree field of view (ratio 2.4), 3 refused none of those guards, and higher let compromises
-# through. It catches a mover's pull only once that pull stands about 15 times above the flow noise, so a slow mover
-# in noisy footage can still drag a still camera into a trusted zoom of a pixel or two.
+# through. On its own this test catches a mover only once its pull stands about 15 times above the flow noise (a slow
+# mover in noisy footage can still drag a still camera into a trusted zoom of a pixel or two); the quadratic test below
+# catches slower ones.
 _TWO_MOTION_RATIO = 3.0
 # The inlier residual (processed px) at or below which a fit is taken as exact and the test does not run.
 _TWO_MOTION_FLOOR = 0.1
 # Assignment-and-refit rounds the two-motion split takes before using its last assignment.
 _TWO_MOTION_ITERATIONS = 4
+# Tukey reweighting rounds in the robust quadratic flow `_quadratic_residual` fits.
+_QUADRATIC_ITERATIONS = 6
+# How much worse than the camera-plus-one-mover split a smooth quadratic flow must explain the samples before the pair
+# is two motions: the pair is refused where the quadratic fit's median residual exceeds this ratio times `sqrt(gap)`
+# times the split's. Provisional, chosen on constructed frames, a simulation built from real images and 19 public
+# drone clips; the sweep was run on DIS flow. The square-root scaling is empirical, where the split test's ratio
+# scales with `gap`. The ratio is at most 1.004 over the 74 of 81 constructed yaw, zoom and roll guards that reach the
+# test, and at most 1.36 over 40 constructed no-mover seeds at pixel noise sigma 3 (the simulation's no-mover controls
+# reached 1.41). A ratio of 1.3 falsely refuses 8.8% of simulated no-mover controls at pixel noise sigma 10; a ratio
+# of 2.0 refuses none of five constructed half-frame movers at sigma 3 and 1 px per frame, where 1.5 refuses one. A
+# retune records its sweep.
+_QUADRATIC_RATIO = 1.5
 
 # How close, in processed px, a rejected sample must sit to its group's median flow to count toward the group's
 # coherence in `_is_ambiguous`, when the group's own robust spread is tighter than this.
@@ -450,15 +463,31 @@ def _two_motion(
     `gap` better than the fit, whose residuals are `resid`, explains its own inliers, and the fit is
     not exact (its inlier residual is above `_TWO_MOTION_FLOOR`).
 
-    The ratio scales with `gap` because what the affine leaves out of a real camera's motion, such
-    as parallax, grows with the frames between a pair while flow noise does not; a mover's pull on
-    the fit grows the same way, so it is judged per frame either way.
+    The pair also has two motions where a camera and one mover explain the samples much better than a
+    smooth quadratic flow does: the quadratic fit's median residual over the affine inliers exceeds
+    `_QUADRATIC_RATIO` times `sqrt(gap)` times the split's. That catches a slower mover than the split
+    test does, and a flow of two groups, such as a near cliff and a distant sea. The quadratic is not
+    fitted where the affine fit's own residual is already inside that bar: the quadratic contains the
+    affine, so a refusal there could only come from its fit coming out worse than the affine's.
+
+    The split test's ratio scales with `gap` because what the affine leaves out of a real camera's
+    motion, such as parallax, grows with the frames between a pair while flow noise does not; a
+    mover's pull on the fit grows the same way, so it is judged per frame either way. The quadratic
+    bar scales with `sqrt(gap)`, an empirical choice: scaled with `gap` it loses much of its power
+    at gaps 2 and 3 in simulated noisy footage, and held constant it refuses more real pairs of the
+    clips measured as `gap` grows.
     """
     single = float(np.median(np.hypot(*resid[~outlier].T))) if (~outlier).any() else 0.0
     if single <= _TWO_MOTION_FLOOR:
         return False
     two = _two_motion_residual(pts, flow, resid)
-    return two is not None and single > _TWO_MOTION_RATIO * gap * two
+    if two is None:
+        return False
+    if single > _TWO_MOTION_RATIO * gap * two:
+        return True
+    bar = _QUADRATIC_RATIO * gap**0.5 * two
+    # ponytail: a pair cannot tell two depth layers from a still camera with a mover; a sequence-level check could.
+    return single > bar and _quadratic_residual(pts, flow, ~outlier) > bar
 
 
 def _two_motion_residual(
@@ -505,6 +534,34 @@ def _reassign(
     affine_resid = np.hypot(*affine.residuals(pts, flow).T)
     mover_resid = np.hypot(*(flow - np.median(flow[~camera], axis=0)).T)
     return affine_resid <= mover_resid, np.minimum(affine_resid, mover_resid)
+
+
+def _quadratic_residual(
+    pts: NDArray[np.float64],
+    flow: NDArray[np.float64],
+    keep: NDArray[np.bool_],
+) -> float:
+    """Median residual magnitude (flow px) of a robust quadratic flow fitted to the `keep` samples.
+
+    The flow is `[x, y, x², xy, y², 1]` on coordinates centered at the samples' mean, with each
+    design column normalized, fitted by `_QUADRATIC_ITERATIONS` Tukey biweight rounds. Each round is
+    solved on the design itself, not the normal equations, which raise or return a badly conditioned
+    solution when the samples lie in one or two rows; samples that do not span the six terms take
+    the minimum-norm fit instead, and six or fewer in general position fit exactly, so a residual of
+    zero cannot refuse. `keep` must select at least one sample.
+    """
+    centered = pts[keep] - pts[keep].mean(axis=0)
+    x, y = centered.T
+    design = np.column_stack([x, y, x * x, x * y, y * y, np.ones(len(x))])
+    design /= np.maximum(np.linalg.norm(design, axis=0), 1e-12)
+    weights, magnitude = np.ones(len(x)), np.zeros(len(x))
+    for _ in range(_QUADRATIC_ITERATIONS):
+        scale = np.sqrt(weights)[:, None]
+        coefficients = np.linalg.lstsq(design * scale, flow[keep] * scale, rcond=None)[0]
+        residual = flow[keep] - design @ coefficients
+        magnitude = np.hypot(*residual.T)
+        weights = _biweight_weights(magnitude, _robust_cutoff(magnitude))
+    return float(np.median(magnitude))
 
 
 def _photometric_agreement(
@@ -863,9 +920,11 @@ class EgoFactors(TypedDict):
     ego_trusted : Sequence[bool]
         Whether this frame's camera estimate can be trusted. False where any of these holds:
 
-        - the camera could not be told apart from an independent mover, a mover filling the
-          middle of the frame captured the fit, or the fit settled between the camera's motion
-          and a large mover's, which the samples read better as two motions;
+        - the camera could not be told apart from an independent mover: a mover filling the
+          middle of the frame captured the fit, the fit settled between the camera's motion
+          and a large mover's (which the samples read better as two motions), or the samples
+          read better as one camera and one mover than as one smooth camera motion, as with a
+          slow mover over a still camera;
         - the fitted camera motion does not explain the new frame, as across a hard cut, a large
           field-of-view switch or a misread fast pan, or nothing in the frame confirms the fit,
           as on a nearly textureless noisy frame;
@@ -1267,8 +1326,8 @@ def ego_stats(
         pixels of the pair it was measured on regardless.
     flow : {"dis", "lk"}, default "dis"
         Optical flow estimator: dense DIS at its ultrafast preset, or sparse Lucas-Kanade
-        on the sampling lattice. DIS is more robust on weak texture. LK is cheaper and
-        reports which points it failed to track.
+        on the sampling lattice. DIS is more robust on weak texture. LK is cheaper
+        and reports which points it failed to track, but refuses a slow mover less often than DIS.
     grid_target : int, default 40
         Roughly how many flow samples to take along the longer frame axis. Raising it
         gives a finer picture of what moved independently, at quadratic cost.
@@ -1333,17 +1392,20 @@ def ego_stats(
     different resolutions.
 
     **Overlays.** A burned-in overlay does not move with the scene. Without `mask`, a light one
-    refuses pans, and a dense one drags a pan's reading toward a still camera: a mild drag stays
-    trusted, and one that splits the samples into two motions is refused. With `mask`, samples
-    within 32 px of the overlay, at `proc_short_side`, are left out too, so a mask leaves less of
-    the frame than its area suggests, and `mover_frac` is over the samples kept. A masked pair is
-    refused where its samples, or the fit's inliers, do not spread across the frame.
+    refuses pans, and a dense one drags a pan's reading toward a still camera: a mild drag can stay
+    trusted, and a drag that leaves the samples reading better as two motions is refused. With
+    `mask`, samples within 32 px of the overlay, at `proc_short_side`, are left out too, so a mask
+    leaves less of the frame than its area suggests, and `mover_frac` is over the samples kept. A
+    masked pair is refused where its samples, or the fit's inliers, do not spread across the frame.
 
     **Movers.** A mover that pulls the fit toward its own motion is refused, as two motions, once
-    its pull stands well above the flow noise; a slow mover in noisy footage can still drag a still
-    camera into a trusted zoom of a pixel or two. One that holds most of the samples the fit sees,
-    with a mask most of what the mask leaves, can be read as the camera: a single pair cannot tell
-    the two apart, and the temporal gate catches such a mover only when it is brief.
+    its pull stands well above the flow noise. A slower mover is also refused, less reliably the
+    slower it is and the noisier the footage. A pair whose flow falls in two groups, such as a
+    camera moving past a near cliff and a distant sea, can be refused too; a mover slow enough in
+    noisy footage can still drag a still camera into a trusted zoom of a pixel or two.
+    One that holds most of the samples the fit sees, with a mask most of what the mask leaves, can
+    be read as the camera: a single pair cannot tell the two apart, and the temporal gate catches
+    such a mover only when it is brief.
 
     **Cost.** Linear in frames measured. Per pair, optical flow takes a third to a half of the
     time, and the robust fit, the two-motion test and the check that the fit explains the new
