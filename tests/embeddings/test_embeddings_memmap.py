@@ -389,9 +389,9 @@ class TestProgressCallback:
 
 @pytest.mark.required
 class TestSaveOnMemmapBackedEmbeddings:
-    """A memmap is already on disk, so `save` flushes rather than rewriting the array."""
+    """A memmap is already a .npy file on disk, so `save` flushes it and copies the file, rather than rewriting it."""
 
-    def test_save_flushes_instead_of_rewriting(self, tmp_path, memmap_embeddings, monkeypatch):
+    def test_save_flushes_and_copies_instead_of_rewriting(self, tmp_path, memmap_embeddings, monkeypatch):
         emb, data = memmap_embeddings
         flushed: list[bool] = []
         monkeypatch.setattr(type(emb._embeddings), "flush", lambda _self: flushed.append(True), raising=False)
@@ -400,6 +400,7 @@ class TestSaveOnMemmapBackedEmbeddings:
         emb.save(tmp_path / "out" / "embeddings.npy")
 
         assert flushed == [True]
+        assert np.array_equal(np.load(tmp_path / "out" / "embeddings.npy"), emb[:])
 
     def test_save_without_a_path_anywhere_is_an_error(self, memmap_embeddings):
         emb, _ = memmap_embeddings
