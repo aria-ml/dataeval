@@ -17,7 +17,13 @@ from dataeval.protocols import (
     SegmentationTarget,
 )
 from dataeval.utils._array import argmax_label, as_numpy
+from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import DatasetKind
+
+
+def _target_of(datum: Any) -> Any:
+    """Keep a datum's target, or None for an item that carries none."""
+    return datum[1] if isinstance(datum, tuple) else None
 
 
 class ClassBalance(Operation):
@@ -99,8 +105,9 @@ class ClassBalance(Operation):
         tuple[int, int]
             Pairs of (class_label, image_index) for each label in the dataset.
         """
-        for img_idx, datum in enumerate(dataset):
-            target = datum[1] if isinstance(datum, tuple) else None
+        # Read by `View.__getitem__`, so a view that records its reads records these too
+        targets = read_dataset(dataset, range(len(dataset)), _target_of, serial=dataset)
+        for img_idx, target in enumerate(targets):
             if isinstance(target, Array):
                 if len(target) > 0:
                     yield (argmax_label(target), img_idx)

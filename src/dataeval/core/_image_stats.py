@@ -31,7 +31,7 @@ from dataeval.core._compute_stats import (
     _reconcile_stats,
     column_name,
 )
-from dataeval.data._unzip import _unzip_annotations
+from dataeval.data._unzip import _SizedIterator, _unzip_annotations
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
     ArrayLike,
@@ -2332,22 +2332,28 @@ def image_stats(  # noqa: C901
         settings=settings,
     )
 
-    with PoolWrapper(processes=get_max_processes()) as p:
-        for result in p.imap_unordered(partial(_compute_batch, plan=plan), datum):
-            _aggregate_batch(
-                result,
-                source_indices,
-                aggregated_stats,
-                aggregated_details,
-                object_count,
-                invalid_box_count,
-                warning_list,
-                empty_values,
-            )
-            image_count += 1
+    try:
+        with PoolWrapper(processes=get_max_processes()) as p:
+            for result in p.imap_unordered(partial(_compute_batch, plan=plan), datum):
+                _aggregate_batch(
+                    result,
+                    source_indices,
+                    aggregated_stats,
+                    aggregated_details,
+                    object_count,
+                    invalid_box_count,
+                    warning_list,
+                    empty_values,
+                )
+                image_count += 1
 
-            if progress_callback:
-                progress_callback(image_count, total=total_images)
+                if progress_callback:
+                    progress_callback(image_count, total=total_images)
+    finally:
+        # The pool has stopped taking items by now. Closing the read stops its threads, which would otherwise wait for
+        # as long as an error's traceback holds this frame.
+        if isinstance(images, _SizedIterator):
+            images.close()
 
     if len(sizes) > 1:
         warnings.warn(

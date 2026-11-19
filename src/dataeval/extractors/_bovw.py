@@ -14,7 +14,7 @@ from dataeval.config import get_max_processes, get_seed
 from dataeval.exceptions import NotFittedError
 from dataeval.protocols import Array
 from dataeval.utils._internal import PoolWrapper
-from dataeval.utils.data import as_image, unwrap_image
+from dataeval.utils.data import as_image, iter_images, unwrap_image
 from dataeval.utils.preprocessing import ValueRange, rescale, to_canonical_grayscale
 
 # scikit-learn is a third of `import dataeval`'s cost and only this extractor needs it,
@@ -218,9 +218,8 @@ class BoVWExtractor:
         # Threads, not processes: OpenCV and k-means release the GIL, so threads scale SIFT
         # without paying process startup and model pickling on every Embeddings batch.
         with PoolWrapper(get_max_processes(), context="threads") as pool:
-            all_descriptors = [
-                des for _, des in sorted(pool.imap_unordered(_extract_single, enumerate(data))) if len(des) > 0
-            ]
+            extracted = pool.imap_unordered(_extract_single, enumerate(iter_images(data)))
+            all_descriptors = [des for _, des in sorted(extracted) if len(des) > 0]
 
         if not all_descriptors:
             raise ValueError("No SIFT features found in any image. Cannot build vocabulary.")
@@ -281,7 +280,7 @@ class BoVWExtractor:
         with PoolWrapper(get_max_processes(), context="threads") as pool:
             for idx, histogram in pool.imap_unordered(
                 partial(_transform_single, kmeans=self._kmeans, n_clusters=n_clusters),
-                enumerate(images),
+                enumerate(iter_images(images)),
             ):
                 result[idx] = histogram
 

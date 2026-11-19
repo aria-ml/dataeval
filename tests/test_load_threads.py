@@ -14,10 +14,11 @@ from polars.testing import assert_frame_equal
 from dataeval import Embeddings, Metadata
 from dataeval import _experimental as experimental_module
 from dataeval.bias import Balance
-from dataeval.config import get_load_threads, set_load_threads, use_load_threads
-from dataeval.data import DetectionCrops, Filter, Relabel, SequenceFrames, View, merge_datasets
+from dataeval.config import get_load_threads, set_load_threads, use_load_threads, use_max_processes
+from dataeval.data import ClassBalance, DetectionCrops, Filter, Relabel, SequenceFrames, View, merge_datasets
 from dataeval.exceptions import ExperimentalWarning
 from dataeval.extractors import FlattenExtractor
+from dataeval.flags import ImageStats
 from dataeval.protocols import DatasetMetadata, DatumMetadata
 from dataeval.quality import Outliers
 from tests.data import test_frames as frame_fixtures
@@ -552,6 +553,36 @@ class TestSequenceFrames:
         for dataset in (frames, View(frames)):
             np.testing.assert_array_equal(pickle.loads(pickle.dumps(dataset))[1][0], expected)
 
+    @pytest.mark.parametrize("wrap", [lambda frames: frames, View, DetectionCrops], ids=["frames", "view", "crops"])
+    def test_statistics_and_extractors_give_the_serial_result_and_decode_as_many_frames(self, wrap):
+        from dataeval.core import image_stats
+
+        results = []
+        for threads in (1, 8):
+            frames, counters = self._frames()
+            with use_load_threads(threads):
+                stats = image_stats(wrap(frames), stats=ImageStats.PIXEL)
+                outliers = Outliers(flags=ImageStats.PIXEL).evaluate(wrap(frames)).data()
+                features = np.asarray(FlattenExtractor()(wrap(frames)))
+            results.append((stats, outliers, features, sum(counter["frames"] for counter in counters)))
+        (*serial, serial_decoded), (*threaded, threaded_decoded) = results
+        _equal(threaded[0], serial[0])
+        assert_frame_equal(threaded[1], serial[1])
+        np.testing.assert_array_equal(threaded[2], serial[2])
+        assert threaded_decoded == serial_decoded
+
+    def test_duplicates_over_several_with_an_extractor_gives_the_serial_result(self):
+        from dataeval.quality import Duplicates
+
+        def run() -> Any:
+            detector = Duplicates(flags=ImageStats.NONE, extractor=FlattenExtractor(), cluster_sensitivity=1.0)
+            return detector.evaluate(self._frames()[0], self._frames()[0]).data()
+
+        serial = run()
+        with use_load_threads(8):
+            threaded = run()
+        assert_frame_equal(threaded, serial)
+
 
 class TestEvaluatorsThatBuildTheirOwn:
     def test_outliers_loads_its_embeddings_in_threads(self):
@@ -569,3 +600,244 @@ class TestEvaluatorsThatBuildTheirOwn:
         assert dataset.off_main_thread > 0
         serial = Balance().evaluate(_SlowImages(delay=0))
         _same(threaded.data(), serial.data())
+
+
+class _Reversed(_SlowImages):
+    """A classification dataset whose reads finish in reverse order: the earlier the item, the longer it takes."""
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, DatumMetadata]:
+        if index >= self.size:
+            raise IndexError(index)  # which ends a `for` loop over a dataset with no `__iter__`
+        self.order.append(index)
+        self.idents[index] = threading.get_ident()
+        time.sleep(self.delay * (self.size - index) / self.size)
+        rng = np.random.default_rng(index)
+        image = rng.integers(0, 256, (3, 24, 24)).astype(np.uint8) if index % 5 else np.full((3, 24, 24), 7, np.uint8)
+        metadata = cast(DatumMetadata, {"id": index, "group": ("x", "y")[index % 2]})
+        return image, np.eye(3, dtype=np.float32)[index % 3], metadata
+
+
+class _Target:
+    def __init__(self, index: int) -> None:
+        count = 1 + index % 3
+        corner = np.arange(count, dtype=np.float32)[:, None] * 3 + index % 4
+        self.boxes = np.hstack([corner, corner, corner + 8, corner + 6])
+        self.labels = np.arange(index, index + count) % 3
+        self.scores = np.ones(count, dtype=np.float32)
+
+
+class _Detections(_Reversed):
+    """An object detection dataset whose reads finish in reverse order."""
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, DatumMetadata]:
+        image, _, metadata = super().__getitem__(index)
+        return image, _Target(index), metadata
+
+
+class _Iterating(_SlowImages):
+    """A dataset with its own `__iter__`, which records whether it was iterated or indexed."""
+
+    def __init__(self) -> None:
+        super().__init__(delay=0)
+        self.iterated = 0
+
+    def __iter__(self) -> Any:
+        self.iterated += 1
+        for index in range(self.size):
+            yield _SlowImages.__getitem__(self, index)
+
+    def __getitem__(self, index: int) -> tuple[Any, Any, DatumMetadata]:
+        self.indexed = True
+        return super().__getitem__(index)
+
+
+def _equal(left: Any, right: Any) -> None:
+    np.testing.assert_equal(left, right)
+
+
+def _threaded(make: Any, run: Any, threads: int = 4) -> tuple[Any, Any, Any]:
+    """Run `run` over a fresh dataset serially and with `threads`; return both results and the threaded dataset."""
+    serial = run(make())
+    dataset = make()
+    with use_load_threads(threads):
+        threaded = run(dataset)
+    return serial, threaded, dataset
+
+
+class TestReadDataset:
+    def test_a_tensor_is_read_on_the_calling_thread(self, monkeypatch):
+        import torch
+
+        from dataeval.utils import _internal
+
+        monkeypatch.setattr(_internal, "read_ordered", lambda *args, **kwargs: pytest.fail("a tensor was threaded"))
+        tensor = torch.arange(24, dtype=torch.float32).reshape(6, 4)
+        with use_load_threads(4):
+            rows = list(_internal.read_dataset(tensor, range(6), lambda row: row))
+        assert [row.tolist() for row in rows] == tensor.tolist()
+
+
+class TestImageStatistics:
+    """Every image statistic reads its dataset through one walk, and that walk loads in threads."""
+
+    @staticmethod
+    def _stats(dataset: Any) -> Any:
+        from dataeval.core import image_stats
+
+        return image_stats(dataset, stats=ImageStats.PIXEL | ImageStats.VISUAL | ImageStats.HASH)
+
+    @pytest.mark.parametrize("make", [_Reversed, _Detections], ids=["images", "detections"])
+    def test_image_stats_give_the_serial_result_from_several_threads(self, make):
+        serial, threaded, dataset = _threaded(lambda: make(delay=0.004), self._stats)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_the_default_reads_every_item_once_in_order_on_the_calling_thread(self):
+        dataset = _Reversed(delay=0)
+        self._stats(dataset)
+        assert dataset.off_main_thread == 0
+        assert dataset.order[-N:] == list(range(N))
+
+    def test_with_worker_processes_too_the_result_is_the_serial_one(self):
+        serial = self._stats(_Detections(delay=0.002))
+        dataset = _Detections(delay=0.002)
+        with use_load_threads(4), use_max_processes(2):
+            threaded = self._stats(dataset)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_a_consumer_that_raises_leaves_no_read_thread_running(self):
+        from dataeval.core import image_stats
+
+        def progress(step: int, *, total: Any = None, desc: Any = None, extra_info: Any = None) -> None:
+            if step == 3:
+                raise RuntimeError("progress failed")
+
+        before = set(threading.enumerate())
+        with use_load_threads(4), pytest.raises(RuntimeError, match="progress failed") as raised:
+            image_stats(_Reversed(delay=0.002), stats=ImageStats.PIXEL, progress_callback=progress)
+        assert raised.traceback
+        assert set(threading.enumerate()) <= before
+
+    def test_unzip_dataset_gives_the_serial_images_and_boxes(self):
+        from dataeval.data import unzip_dataset
+
+        def unzip(dataset: Any) -> Any:
+            images, boxes = unzip_dataset(dataset, per_target=True)
+            return [np.asarray(image) for image in images], [[box.xyxy for box in item or []] for item in boxes or []]
+
+        serial, threaded, dataset = _threaded(lambda: _Detections(delay=0.004), unzip)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    @pytest.mark.parametrize("make", [_Reversed, _Detections], ids=["images", "detections"])
+    def test_outliers_and_duplicates_give_the_serial_result(self, make):
+        from dataeval.quality import Duplicates
+
+        for evaluator in (Outliers(), Duplicates()):
+            serial, threaded, dataset = _threaded(lambda: make(delay=0.002), evaluator.evaluate)
+            assert_frame_equal(threaded.data(), serial.data())
+            assert dataset.off_main_thread > 0
+
+
+class TestExtractors:
+    """An extractor called on a dataset reads it in threads; one called on a list reads the list where it is."""
+
+    def test_an_extractor_called_on_a_dataset_gives_the_serial_features_from_several_threads(self):
+        serial, threaded, dataset = _threaded(lambda: _Reversed(delay=0.004), FlattenExtractor())
+        np.testing.assert_array_equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_a_drift_detector_given_an_extractor_reads_in_threads(self):
+        from dataeval.shift import DriftUnivariate
+
+        def drift(dataset: Any) -> Any:
+            detector = DriftUnivariate(extractor=FlattenExtractor()).fit(dataset)
+            return detector.predict(dataset).distance
+
+        serial, threaded, dataset = _threaded(lambda: _Reversed(delay=0.004), drift)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_bovw_fits_the_same_vocabulary_from_several_threads(self):
+        pytest.importorskip("cv2")
+        from dataeval.extractors import BoVWExtractor
+
+        def fit(dataset: Any) -> Any:
+            extractor = BoVWExtractor(vocab_size=8).fit(dataset)
+            return extractor.transform(_Reversed(delay=0))
+
+        serial, threaded, dataset = _threaded(lambda: _Reversed(delay=0.004), fit)
+        np.testing.assert_array_equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_without_threads_a_dataset_with_its_own_iterator_is_iterated(self):
+        dataset = _Iterating()
+        FlattenExtractor()(dataset)
+        assert dataset.iterated == 1
+        assert not hasattr(dataset, "indexed")
+
+    def test_a_list_is_read_on_the_calling_thread(self):
+        images = _RecordingList(np.full((3, 4, 4), index, dtype=np.float32) for index in range(12))
+        with use_load_threads(4):
+            features = FlattenExtractor()(images)
+        np.testing.assert_array_equal(np.asarray(features)[:, 0], np.arange(12))
+        assert set(images.idents) <= {threading.get_ident()}
+
+
+class _Model:
+    """A MAITE-shaped classifier that scores an image by its mean, one row per image."""
+
+    metadata = {"id": "mean-model"}
+
+    def __call__(self, batch: Any) -> Any:
+        return [np.array([float(np.mean(image)), 1.0], dtype=np.float32) for image in batch]
+
+
+class TestTargetReads:
+    """The walks that read targets, which on a typical dataset decode the image too, load in threads."""
+
+    def test_feasibility_scores_every_item_once_in_order_from_several_threads(self):
+        from dataeval.performance._feasibility_model import model_scores
+
+        serial, threaded, dataset = _threaded(
+            lambda: _Reversed(delay=0.004), lambda dataset: model_scores(cast(Any, _Model()), dataset, batch_size=8)
+        )
+        np.testing.assert_array_equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+        assert sorted(dataset.order) == list(range(N))
+
+    def test_the_duplicates_annotation_walk_gives_the_serial_targets(self):
+        from dataeval.quality._duplicates import _targets_of
+
+        def walk(dataset: Any) -> Any:
+            return [(index, np.asarray(image), target.boxes) for index, image, target in _targets_of(dataset)]
+
+        serial, threaded, dataset = _threaded(lambda: _Detections(delay=0.004), walk)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_detection_crops_are_built_the_same_from_several_threads(self):
+        def crops(dataset: Any) -> Any:
+            view = DetectionCrops(dataset)
+            return view._index_map, view._source_ids, view.metadata
+
+        serial, threaded, dataset = _threaded(lambda: _Detections(delay=0.004), crops)
+        _equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+
+    def test_class_balance_selects_the_same_items_from_several_threads(self):
+        def balance(dataset: Any) -> Any:
+            return View(dataset, ClassBalance("interclass", num_samples=6)).selection
+
+        serial, threaded, dataset = _threaded(lambda: _Reversed(delay=0.004), balance)
+        assert threaded == serial
+        assert dataset.off_main_thread > 0
+
+    def test_class_balance_over_a_recording_view_records_every_item(self):
+        dataset = _Reversed(delay=0.002)
+        view = View(dataset, record_reads=True)
+        with use_load_threads(4):
+            View(view, ClassBalance("interclass", num_samples=6))
+        assert view._reads is not None
+        assert set(view._reads) == set(range(N))

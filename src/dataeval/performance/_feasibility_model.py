@@ -2,6 +2,9 @@
 
 __all__ = []
 
+from contextlib import closing
+from itertools import islice
+from operator import itemgetter
 from typing import Any
 
 import numpy as np
@@ -10,6 +13,7 @@ from numpy.typing import NDArray
 
 from dataeval.protocols import AnnotatedDataset, Model
 from dataeval.utils._array import to_numpy
+from dataeval.utils._internal import read_dataset
 
 
 def model_scores(model: Model, dataset: AnnotatedDataset[Any], batch_size: int) -> NDArray[np.float64]:
@@ -22,9 +26,11 @@ def model_scores(model: Model, dataset: AnnotatedDataset[Any], batch_size: int) 
     device.
     """
     rows: list[NDArray[Any]] = []
-    with torch.no_grad():  # a torch model's outputs would otherwise carry an autograd graph and refuse numpy()
-        for start in range(0, len(dataset), batch_size):
-            batch = [dataset[i][0] for i in range(start, min(start + batch_size, len(dataset)))]
+    # One read of the whole dataset, in `load_threads` threads when that is set, so reads run on into the next batch
+    # while the model scores this one. Closed if the model raises, so no read thread outlives the error.
+    images = read_dataset(dataset, range(len(dataset)), itemgetter(0))
+    with torch.no_grad(), closing(images):  # without no_grad a torch model's outputs carry a graph and refuse numpy()
+        while batch := list(islice(images, batch_size)):
             rows.extend(to_numpy(scores, copy=False) for scores in model(batch))
     return np.stack(rows).astype(np.float64)
 

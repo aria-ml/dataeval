@@ -77,6 +77,7 @@ from dataeval.types import (
 )
 from dataeval.types._removal import canonical_address
 from dataeval.utils._array import to_numpy
+from dataeval.utils._internal import read_dataset
 
 _logger = get_logger(__name__)
 
@@ -2612,10 +2613,20 @@ def _targets_of(measured: Any, first: Any = None) -> Iterator[tuple[int, Any, An
     """
     if not _is_protocol_instance(measured, Dataset):
         return
-    for index in range(len(measured)):
-        datum = first if index == 0 and first is not None else measured[index]
-        if isinstance(datum, tuple) and len(datum) == 3:
-            yield index, datum[0], datum[1]
+    reads = read_dataset(
+        measured,
+        range(len(measured)),
+        _image_and_target,
+        read=lambda index: first if index == 0 and first is not None else measured[index],
+    )
+    for index, read in enumerate(reads):
+        if read is not None:
+            yield index, *read
+
+
+def _image_and_target(datum: Any) -> tuple[Any, Any] | None:
+    """Keep a ``(data, target, metadata)`` triple's image and target, and nothing of any other item."""
+    return (datum[0], datum[1]) if isinstance(datum, tuple) and len(datum) == 3 else None
 
 
 def _first_detection_datum(measured: Any) -> Any:
