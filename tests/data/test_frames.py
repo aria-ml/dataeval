@@ -1338,13 +1338,19 @@ class TestTrackMap:
 
     def test_a_frame_with_no_detections_takes_no_rows(self):
         dataset, _ = make_dataset((3,))
-        dataset[0][1].frame_tracks[1].track_ids = np.empty(0, dtype=np.int64)
+        dataset[0][1].frame_tracks[1] = make_frame_target([], [])
         assert SequenceFrames(dataset).track_map[:, 0].tolist() == [0, 0, 2, 2]
 
     def test_an_empty_view_has_an_empty_map(self):
         frames = SequenceFrames(make_dataset((4,))[0], FrameIndices({0: []}))
         assert frames.frame_map.shape == (0, 2)
         assert frames.track_map.shape == (0, 2)
+
+    def test_ids_shorter_than_the_boxes_are_padded_so_every_detection_has_a_row(self):
+        """A per-target statistic row exists for each box, so a short `track_ids` must not shorten the map."""
+        target = make_frame_target([[0.0, 0.0, 4.0, 4.0], [5.0, 5.0, 9.0, 9.0], [1.0, 1.0, 3.0, 3.0]], [7, 9])
+        frames = SequenceFrames(make_dataset_of([[target]]))
+        assert frames.track_map.tolist() == [[0, 7], [0, 9], [0, -1]]
 
 
 @pytest.mark.required
