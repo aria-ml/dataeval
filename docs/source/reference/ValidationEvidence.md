@@ -645,6 +645,15 @@ statistical and computational.
     pan reads as a large step, and the function does not judge identity, so an id switch reads as one too. Frame sizes
     are compared as the stream reports them, so a lazy stream hides a resolution change inside one file. Tested on
     constructed inputs only, not on real footage.
+- - {func}`.track_path_stats` ⚠️
+  - Per-track distance between the mean embeddings of the first and last thirds of its rows, the value that distance
+    would have on average for a random order of the rows, and the unit direction from the first mean to the last.
+  - Anchored (embeddings constructed with a known path, and a null checked against every order of small tracks)
+  - Experimental: the names, `min_points`, the thirds and the geometry may change. It is not an ID-switch detector. A
+    direction describes the path and does not state a cause, since the object, its surroundings, its scale and the
+    camera can each move an embedding. The ratio of the distance to its null rises with the number of rows in a track,
+    so it is not a score to rank tracks by. A track shorter than `min_points` is NaN. The thirds are counted in rows, so
+    a gap in a track is not corrected for. Tested on constructed inputs only, not on real footage.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same
