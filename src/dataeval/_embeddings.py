@@ -3,6 +3,8 @@
 __all__ = ["Embeddings"]
 
 import os
+import threading
+import weakref
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Self
@@ -26,6 +28,26 @@ from dataeval.protocols import (
 from dataeval.utils.data import requires_maite_dataset, unwrap_image
 
 _logger = get_logger(__name__)
+
+# Each file name `_resolve_path` gives, held by the live instance it was given to, and each memmap opened on one. The
+# name comes from the dataset's id and the extractor, which two datasets, two views of one source or two crop views
+# can share, and a second instance opening the first one's file with mode "w+" changes its rows or, when smaller,
+# crashes the next read. A memmap holds its name after its instance is gone, since a view of it, such as the array
+# `Embeddings.__call__` returns, still reads the file.
+# ponytail: one process only; two processes writing to one directory can still take one name. A lock file per name
+# is the upgrade if that case appears.
+_held_files: "weakref.WeakValueDictionary[str, Embeddings]" = weakref.WeakValueDictionary()
+_mapped_files: "weakref.WeakValueDictionary[str, np.memmap]" = weakref.WeakValueDictionary()
+_held_files_lock = threading.Lock()
+
+
+def _held_by_another(key: str, embeddings: "Embeddings") -> bool:
+    """Whether another live instance holds the file `key`, or a memmap other than this instance's store maps it."""
+    holder = _held_files.get(key)
+    mapped = _mapped_files.get(key)
+    return (holder is not None and holder is not embeddings) or (
+        mapped is not None and mapped is not embeddings._embeddings
+    )
 
 
 class Embeddings(Array, FeatureExtractor):
@@ -80,7 +102,9 @@ class Embeddings(Array, FeatureExtractor):
     path : Path, str, or None, default None
         File path for memory-mapped storage. When None, caches embeddings in memory only.
         When Path or string is provided, uses memory-mapped storage for large embeddings
-        (automatic based on memory_threshold).
+        (automatic based on memory_threshold). In a directory, the file is named for the
+        dataset and the extractor, and is never one that another live instance in this
+        process uses.
     memory_threshold : float, default 0.8
         Fraction of available memory (0-1) that triggers memory-mapped storage. When estimated
         embedding size exceeds this threshold, uses disk-backed memmap instead of in-memory arrays.
@@ -138,6 +162,7 @@ class Embeddings(Array, FeatureExtractor):
         self._embeddings: np.ndarray | np.memmap = np.empty((0,))
         self._use_memmap: bool = False
 
+        self._own_names: dict[str, Path] = {}
         self._path = self._resolve_path(path) if path is not None else None
         self._shape: tuple[int, ...] | None = None
 
@@ -360,8 +385,29 @@ class Embeddings(Array, FeatureExtractor):
         if isinstance(path, str):
             path = Path(os.path.abspath(path))
         if isinstance(path, Path) and (path.is_dir() or not path.suffix):
-            path = path / f"emb-{hash(self)}.npy"
+            path = self._own_file(path)
         return path
+
+    def _own_file(self, directory: Path) -> Path:
+        """Name this instance's file in `directory`, one that no other live instance in this process holds.
+
+        The name is ``emb-<hash>.npy``, or ``emb-<hash>-<n>.npy`` with the smallest free `n` when another live instance,
+        or a memmap still read through a view, holds that name. A name is free again once both are gone, so a rerun
+        reuses its file. This instance keeps the name it was given for the same directory and hash.
+        """
+        stem = f"emb-{hash(self)}"
+        candidate = directory / f"{stem}.npy"
+        given = os.path.realpath(candidate)
+        with _held_files_lock:
+            if given in self._own_names:
+                return self._own_names[given]
+            n = 0
+            while _held_by_another(os.path.realpath(candidate), self):
+                n += 1
+                candidate = directory / f"{stem}-{n}.npy"
+            _held_files[os.path.realpath(candidate)] = self
+            self._own_names[given] = candidate
+        return candidate
 
     def _should_use_memmap(self, embedding_shape: tuple[int, ...]) -> bool:
         """Determine if memmap should be used based on estimated size."""
@@ -406,6 +452,8 @@ class Embeddings(Array, FeatureExtractor):
                 # Create memory-mapped file
                 self._path.parent.mkdir(parents=True, exist_ok=True)
                 self._embeddings = np.memmap(self._path, dtype=dtype, mode="w+", shape=full_shape)
+                with _held_files_lock:
+                    _mapped_files[os.path.realpath(self._path)] = self._embeddings
             else:
                 # Use in-memory array
                 self._embeddings = np.empty(full_shape, dtype=dtype)
@@ -432,16 +480,19 @@ class Embeddings(Array, FeatureExtractor):
         Embeddings
             New Embeddings object configured identically to the current instance.
         """
-        return self.__class__(
+        other = self.__class__(
             dataset,
             extractor=self._extractor,
             batch_size=self._batch_size,
-            # The directory, not this instance's file: the new instance names its own file from its own hash, which
-            # covers the dataset, so a memmap here is not overwritten and a saved file is not replaced.
-            path=None if self._path is None else self._path.parent,
             memory_threshold=self.memory_threshold,
             progress_callback=self._progress_callback,
         )
+        if self._path is not None:
+            # The directory, not this instance's file: the new instance names a file of its own there, so a memmap
+            # here is not overwritten and a saved file is not replaced. Named as a directory even before it exists,
+            # since a directory such as "v1.2" would otherwise read as a file name.
+            other._path = other._own_file(self._path.parent)
+        return other
 
     def save(self, path: Path | str | None = None) -> None:
         """
