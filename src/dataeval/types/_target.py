@@ -39,7 +39,7 @@ def detection_count(target: Any) -> int:
 
 def instance_arrays(
     target: "ObjectDetectionTarget | SingleFrameObjectTrackingTarget",
-) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.float32]]:
     """Read one target's per-detection labels, boxes and scores.
 
     Parameters
@@ -59,7 +59,7 @@ def instance_arrays(
     """
     labels = whole_ids(target.labels, "labels")
     count = len(labels)
-    boxes = as_numpy(target.boxes).astype(np.float32).reshape(count, 4) if count else np.empty((0, 4), dtype=np.float32)
+    boxes = as_numpy(target.boxes).astype(np.float64).reshape(count, 4) if count else np.empty((0, 4), dtype=np.float64)
     return labels, boxes, own_class_scores(getattr(target, "scores", None), labels)
 
 

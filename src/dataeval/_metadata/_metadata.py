@@ -3374,6 +3374,11 @@ class Metadata(Array, FeatureExtractor):
                 summed mass rather than the detection's own confidence, and ``0.0``
                 rather than null where the score cannot be read.
 
+            .. versionchanged:: 1.3
+                ``box`` is ``Array(Float64, 4)``, the coordinates as the dataset's
+                targets give them. v1.2 stored them as ``Float32``, which rounded a
+                coordinate such as ``473.07`` to ``473.070007``.
+
         See Also
         --------
         :meth:`~dataeval.Metadata.rows_at` : Filter to any level

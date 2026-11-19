@@ -168,7 +168,7 @@ class TestKeyedRejections:
         whole message with a stack trace.
         """
         md = _tracking([[[5, 9], [], [9, -1]]])
-        assert md._store.frame("instance")["box"].dtype == pl.Array(pl.Float32, 4)
+        assert md._store.frame("instance")["box"].dtype == pl.Array(pl.Float64, 4)
 
         with pytest.raises(ValueError, match="does not name one row") as raised:
             md.add_factors(

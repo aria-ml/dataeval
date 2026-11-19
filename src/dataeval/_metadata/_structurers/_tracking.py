@@ -288,7 +288,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         boxes: Sequence[NDArray[Any]],
         scores: Sequence[NDArray[Any]],
         track_ids: Sequence[NDArray[Any]],
-    ) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32], NDArray[np.intp]]:
+    ) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.float32], NDArray[np.intp]]:
         """Concatenate the per-frame arrays into one array each, coarsest dtype preserved.
 
         Each is built explicitly when there is nothing to concatenate, because
@@ -298,7 +298,7 @@ class MOTStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructurer):
         """
         return (
             np.concatenate(labels).astype(np.intp) if labels else np.empty(0, dtype=np.intp),
-            np.concatenate(boxes).astype(np.float32) if boxes else np.empty((0, 4), dtype=np.float32),
+            np.concatenate(boxes).astype(np.float64) if boxes else np.empty((0, 4), dtype=np.float64),
             np.concatenate(scores).astype(np.float32) if scores else np.empty(0, dtype=np.float32),
             np.concatenate(track_ids).astype(np.intp) if track_ids else np.empty(0, dtype=np.intp),
         )

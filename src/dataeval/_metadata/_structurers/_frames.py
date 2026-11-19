@@ -26,6 +26,6 @@ class FrameRows(NamedTuple):
     width: int | None
     height: int | None
     labels: NDArray[np.intp]
-    boxes: NDArray[np.float32]
+    boxes: NDArray[np.float64]
     scores: NDArray[np.float32]
     track_ids: NDArray[np.intp]

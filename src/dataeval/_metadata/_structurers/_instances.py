@@ -26,7 +26,7 @@ class InstanceBuildingMixin:
     @staticmethod
     def _instance_arrays(
         target: ObjectDetectionTarget | SingleFrameObjectTrackingTarget,
-    ) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32]]:
+    ) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.float32]]:
         """One target's per-detection labels, boxes and scores."""
         return instance_arrays(target)
 

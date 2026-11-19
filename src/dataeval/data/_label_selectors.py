@@ -15,7 +15,7 @@ from dataeval.types._target import instance_arrays, track_ids_of
 _logger = get_logger(__name__)
 
 
-def _read(target: Any) -> tuple[NDArray[np.intp], NDArray[np.float32], NDArray[np.float32], NDArray[np.intp]]:
+def _read(target: Any) -> tuple[NDArray[np.intp], NDArray[np.float64], NDArray[np.float32], NDArray[np.intp]]:
     """One frame's ``(labels, boxes, scores, track_ids)``."""
     labels, boxes, scores = instance_arrays(target)
     return labels, boxes, scores, track_ids_of(target, len(labels))
