@@ -6,7 +6,13 @@ import numpy as np
 import pytest
 
 from dataeval.data import DetectionCrops, Operation, SequenceFrames, VideoSegments, VideoStitch, View, Window
-from dataeval.performance._feasibility_units import _dataset_id, resolve_replicas, resolve_units, split_units
+from dataeval.performance._feasibility_units import (
+    _dataset_id,
+    resolve_detection_units,
+    resolve_replicas,
+    resolve_units,
+    split_units,
+)
 from tests.data.conftest import MockODDataset
 from tests.data.test_crops import _simple_dataset
 from tests.data.test_frames import make_dataset
@@ -193,3 +199,99 @@ class TestSplits:
     def test_empty_side_raises(self):
         with pytest.raises(ValueError, match="empty"):
             split_units(self._units(), fit_fraction=0.99, seed=0)
+
+
+class _Boxes:
+    def __init__(self, boxes, labels) -> None:
+        self.boxes = np.asarray(boxes, dtype=np.float64).reshape(-1, 4)
+        self.labels = np.asarray(labels, dtype=np.intp)
+        self.scores = np.ones(len(self.labels))
+
+
+class _OD:
+    """Detection dataset: per image a list of ``(box, label)``; ``factors`` per image, lists for per-box values."""
+
+    def __init__(self, images, *, declare: bool | dict = True, factors=None) -> None:
+        self._targets = [_Boxes([b for b, _ in image], [c for _, c in image]) for image in images]
+        self._factors = factors or {}
+        self.metadata: dict[str, Any] = {"id": "toy-od"}
+        if declare:
+            self.metadata["index2label"] = {0: "car", 1: "person"} if declare is True else declare
+
+    def __len__(self) -> int:
+        return len(self._targets)
+
+    def __getitem__(self, i: int):
+        meta = {"id": f"im{i}"} | {k: v[i] for k, v in self._factors.items()}
+        return np.zeros((3, 2, 2), dtype=np.float32), self._targets[i], meta
+
+
+_CAR, _PERSON = [0.0, 0.0, 10.0, 10.0], [473.07, 212.13, 480.11, 219.59]
+
+
+@pytest.mark.required
+class TestDetectionUnits:
+    def test_every_image_is_a_unit_with_its_boxes_and_labels(self):
+        units = resolve_detection_units(_OD([[(_CAR, 0), (_PERSON, 1)], [], [(_PERSON, 1)]]), groups=None)
+        assert len(units.boxes) == len(units.labels) == 3
+        np.testing.assert_array_equal(units.boxes[0], [_CAR, _PERSON])  # float64, as the dataset gave them
+        np.testing.assert_array_equal(units.labels[0], [0, 1])
+        assert units.boxes[1].shape == (0, 4)  # an empty image stays in the population
+        assert units.labels[1].shape == (0,)
+        np.testing.assert_array_equal(units.groups, [0, 1, 2])
+        assert units.item_ids.tolist() == ["im0", "im1", "im2"]
+        assert units.n_classes == 2
+        assert units.class_names == ["car", "person"]
+        assert not units.grouped
+
+    def test_an_image_level_factor_groups_images(self):
+        ds = _OD([[(_CAR, 0)], [], [(_CAR, 0)]], factors={"site": ["a", "b", "a"]})
+        units = resolve_detection_units(ds, groups="site")
+        np.testing.assert_array_equal(units.groups, [0, 1, 0])
+        assert units.grouped
+
+    def test_a_box_level_factor_cannot_group_images(self):
+        ds = _OD([[(_CAR, 0), (_CAR, 1)], [], [(_CAR, 0)]], factors={"occluded": [[0, 1], [], [1]]})
+        with pytest.raises(ValueError, match="groups='occluded' names a metadata factor"):
+            resolve_detection_units(ds, groups="occluded")
+
+    def test_a_groups_array_is_one_per_image(self):
+        ds = _OD([[(_CAR, 0)], [], [(_CAR, 0)]])
+        np.testing.assert_array_equal(resolve_detection_units(ds, groups=[4, 4, 9]).groups, [0, 0, 1])
+        with pytest.raises(ValueError, match="group ids"):
+            resolve_detection_units(ds, groups=[0, 1])
+
+    def test_a_view_over_a_plain_dataset_groups_by_source_index(self):
+        units = resolve_detection_units(View(_OD([[(_CAR, 0)], [], [(_CAR, 1)]]), _Repeat()), groups=None)
+        np.testing.assert_array_equal(units.groups, [0, 0, 1, 2, 2])
+        assert units.grouped
+        np.testing.assert_array_equal(units.labels[4], [1])
+
+    def test_a_derived_view_needs_groups(self):
+        with pytest.raises(ValueError, match="derived view.*groups="):
+            resolve_detection_units(View(View(_OD([[(_CAR, 0)], [(_CAR, 1)]]))), groups=None)
+
+    @pytest.mark.parametrize("box", [[0.0, 0.0, 0.0, 10.0], [5.0, 0.0, 1.0, 10.0], [0.0, 0.0, np.inf, 1.0]])
+    def test_a_target_box_no_detection_could_match_is_refused(self, box):
+        ds = _OD([[(_CAR, 0)], [(_CAR, 0), (box, 1)]])
+        with pytest.raises(ValueError, match="^dataset item 1 targets: box 1"):
+            resolve_detection_units(ds, groups=None)
+
+    def test_a_label_outside_the_declared_classes_is_refused(self):
+        with pytest.raises(ValueError, match=r"item 0 .*label 2.*\[0, 2\)"):
+            resolve_detection_units(_OD([[(_CAR, 2)]]), groups=None)
+
+    def test_without_declared_classes_the_largest_label_sets_the_count(self):
+        units = resolve_detection_units(_OD([[(_CAR, 3)], []], declare=False), groups=None)
+        assert units.n_classes == 4
+        assert units.class_names is None
+
+    def test_classification_is_refused(self):
+        with pytest.raises(ValueError, match="object detection datasets only"):
+            resolve_detection_units(_IC([0, 1, 2]), groups=None)
+
+    def test_split_takes_detection_units(self):
+        units = resolve_detection_units(_OD([[(_CAR, 0)]] * 6, declare=True), groups=[0, 0, 1, 1, 2, 2])
+        fit, audit = split_units(units, fit_fraction=0.5, seed=0)
+        assert sorted(np.r_[fit, audit].tolist()) == list(range(6))
+        assert set(units.groups[fit]).isdisjoint(units.groups[audit])

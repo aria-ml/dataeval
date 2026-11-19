@@ -435,10 +435,11 @@ class TestToFrame:
         assert frame["box"].to_list() == [None] * frame.height
 
     def test_arrays_keep_their_own_dtype(self):
-        """Reaching polars as arrays, not Python floats, keeps boxes and scores narrow."""
+        """Reaching polars as arrays, not Python floats, keeps scores narrow; boxes are float64 by choice."""
         dataset = MockDataset(np.zeros((3, 3, 16, 16)), [_od_target(2)] * 3, [{}] * 3)
         frame = select_structurer(dataset, None).build(dataset).to_frame()
-        assert frame["box"].dtype == pl.Array(pl.Float32, 4)
+        assert frame["score"].dtype == pl.Float32
+        assert frame["box"].dtype == pl.Array(pl.Float64, 4)
 
     def test_factor_propagation_and_sibling_nulls_are_preserved(self):
         data = StructuredData(
@@ -1229,3 +1230,31 @@ def test_partial_factors_is_read_from_the_policy_flag():
 
     assert _Passthrough(partial_factors=True).partial_factors is True
     assert _Passthrough().partial_factors is False
+
+
+_PRECISE = np.array([[473.07, 212.13, 480.11, 219.59], [0.1, 0.2, 3.3, 4.4]])
+
+
+@pytest.mark.required
+class TestBoxCoordinatesKeepTheirPrecision:
+    """A box is stored as the dataset gave it: float32 moves an IoU near a matching threshold by up to about 5e-5."""
+
+    def _boxes(self, md: Metadata) -> pl.Series:
+        return md.rows_at("instance")["box"]
+
+    def test_detection_boxes_are_float64_and_exact(self):
+        dataset = MockDataset([np.zeros((3, 4, 4))], [ObjectDetectionTarget(_PRECISE, np.array([0, 1]), np.ones(2))])
+        boxes = self._boxes(Metadata(dataset))
+        assert boxes.dtype == pl.Array(pl.Float64, 4)
+        np.testing.assert_array_equal(boxes.to_numpy(), _PRECISE)
+
+    def test_tracking_boxes_are_float64_and_exact(self):
+        dataset = _mot_dataset([[2]])
+        dataset.targets[0].frame_tracks[0].boxes = _PRECISE
+        boxes = self._boxes(Metadata(dataset))
+        assert boxes.dtype == pl.Array(pl.Float64, 4)
+        np.testing.assert_array_equal(boxes.to_numpy(), _PRECISE)
+
+    def test_a_dataset_with_no_boxes_has_a_float64_box_column(self):
+        empty = ObjectDetectionTarget(np.zeros((0, 4)), np.zeros(0, dtype=np.intp), np.zeros(0))
+        assert self._boxes(Metadata(MockDataset([np.zeros((3, 4, 4))], [empty]))).dtype == pl.Array(pl.Float64, 4)

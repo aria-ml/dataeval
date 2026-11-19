@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from dataeval._metadata import Metadata
+from dataeval.core._detection_counts import check_boxes
 from dataeval.data._view import View
 from dataeval.exceptions import ShapeMismatchError
 from dataeval.performance._feasibility_evidence import Population
@@ -36,6 +37,25 @@ class Units:
     item_ids: NDArray[Any]
     n_excluded: int
     population: Population
+    class_names: list[str] | None
+    grouped: bool
+
+
+@dataclass(frozen=True)
+class DetectionUnits:
+    """
+    The images of a detection dataset, their target boxes and classes, and the physical unit each belongs to.
+
+    Every image is in the population, an image with no targets included. ``boxes`` (float64, ``(G_i, 4)`` as
+    (x0, y0, x1, y1)), ``labels`` and ``groups`` hold one entry per image, in dataset order; ``item_ids`` one datum id
+    per image. ``groups``, ``n_classes``, ``class_names`` and ``grouped`` mean what they mean on :class:`Units`.
+    """
+
+    boxes: tuple[NDArray[np.float64], ...]
+    labels: tuple[NDArray[np.intp], ...]
+    groups: NDArray[np.intp]
+    n_classes: int
+    item_ids: NDArray[Any]
     class_names: list[str] | None
     grouped: bool
 
@@ -79,6 +99,23 @@ def _group_values(dataset: Any, md: Metadata, groups: ArrayLike | str | None) ->
     return arr[items]
 
 
+def _default_groups(dataset: Any, groups: ArrayLike | str | None) -> ArrayLike | str | None:
+    """Default a ``View`` straight over a plain dataset to its source indices; refuse other derived views."""
+    if groups is None and isinstance(dataset, View) and getattr(dataset.source, "source", None) is None:
+        return np.asarray(dataset.selection)
+    if groups is None and getattr(dataset, "source", None) is not None:
+        raise ValueError(
+            f"{type(dataset).__name__} is a derived view of another dataset, so its items are not independent "
+            "(crops, frames and segments share a source). Pass groups= naming the physical unit of each item, "
+            "as an array aligned with the dataset or a metadata factor name."
+        )
+    return groups
+
+
+def _group_codes(dataset: Any, md: Metadata, groups: ArrayLike | str | None) -> NDArray[np.intp]:
+    return np.unique(_group_values(dataset, md, groups), return_inverse=True)[1].reshape(-1).astype(np.intp)
+
+
 def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
     """
     Resolve labeled items and physical units; a derived view needs ``groups=`` to say what is independent.
@@ -86,14 +123,7 @@ def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
     A ``View`` straight over a plain dataset defaults to its source indices (``selection``), so a repeated item
     groups with its copies; any other derived view must pass ``groups=``.
     """
-    if groups is None and isinstance(dataset, View) and getattr(dataset.source, "source", None) is None:
-        groups = np.asarray(dataset.selection)
-    if groups is None and getattr(dataset, "source", None) is not None:
-        raise ValueError(
-            f"{type(dataset).__name__} is a derived view of another dataset, so its items are not independent "
-            "(crops, frames and segments share a source). Pass groups= naming the physical unit of each item, "
-            "as an array aligned with the dataset or a metadata factor name."
-        )
+    groups = _default_groups(dataset, groups)
     md = Metadata(dataset)
     if md.multi_target:
         raise ValueError(
@@ -108,7 +138,7 @@ def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
     declared = _declared_indices(dataset)
     n_classes = max(declared) + 1 if declared else (int(labels.max()) + 1 if len(labels) else 0)
     unit_rows = md.rows_at("unit").sort("item_index")
-    codes = np.unique(_group_values(dataset, md, groups), return_inverse=True)[1].reshape(-1).astype(np.intp)
+    codes = _group_codes(dataset, md, groups)
     return Units(
         labels=labels,
         item_indices=items,
@@ -118,6 +148,57 @@ def resolve_units(dataset: Any, *, groups: ArrayLike | str | None) -> Units:
         n_excluded=n_excluded,
         population=population,
         class_names=class_names,
+        grouped=bool(len(codes)) and int(np.bincount(codes).max()) > 1,
+    )
+
+
+def _per_image(md: Metadata, n_images: int) -> tuple[tuple[NDArray[np.float64], ...], tuple[NDArray[np.intp], ...]]:
+    """Each image's target boxes and labels from Metadata's instance rows, in dataset order."""
+    rows = md.rows_at("instance").sort("item_index", "target_index")  # target order decides IoU ties
+    items = rows["item_index"].to_numpy().astype(np.intp)
+    boxes = rows["box"].to_numpy().astype(np.float64).reshape(-1, 4)
+    labels = rows["class_label"].to_numpy().astype(np.intp)
+    cuts = np.cumsum(np.bincount(items, minlength=n_images))[:-1]
+    return tuple(np.split(boxes, cuts)), tuple(np.split(labels, cuts))
+
+
+def resolve_detection_units(dataset: Any, *, groups: ArrayLike | str | None) -> DetectionUnits:
+    """
+    Resolve a detection dataset's images, their targets and their physical units, read from one Metadata pass.
+
+    Groups follow :func:`resolve_units`. A factor named in ``groups=`` is read per image, so a factor given per box
+    cannot group images. A target box that is not finite or has no positive width and height raises, since no
+    detection could match it.
+    """
+    groups = _default_groups(dataset, groups)
+    md = Metadata(dataset)
+    if not md.multi_target or md.item_level != "unit":
+        raise ValueError(
+            f"resolve_detection_units reads object detection datasets only, but {_dataset_id(dataset)} yields "
+            f"{md.unit_type} metadata with its items at the {md.item_level!r} level."
+        )
+    n_images = len(dataset)
+    boxes, labels = _per_image(md, n_images)
+    declared = _declared_indices(dataset)
+    observed = int(max((int(c.max()) for c in labels if len(c)), default=-1))
+    n_classes = max(declared) + 1 if declared else observed + 1
+    for i, (image_boxes, image_labels) in enumerate(zip(boxes, labels, strict=True)):
+        check_boxes(image_boxes, f"dataset item {i} targets")
+        outside = image_labels[(image_labels < 0) | (image_labels >= n_classes)]
+        if len(outside):
+            raise ValueError(
+                f"dataset item {i} has a target of label {int(outside[0])}, outside the declared classes "
+                f"[0, {n_classes}). Declare every class in index2label or fix the label."
+            )
+    image_md = md.at(md.item_level)
+    codes = _group_codes(dataset, image_md, groups)
+    return DetectionUnits(
+        boxes=boxes,
+        labels=labels,
+        groups=codes,
+        n_classes=n_classes,
+        item_ids=np.asarray(md.rows_at("unit").sort("item_index")["item_id"].to_list()),
+        class_names=_declared_class_names(dataset),
         grouped=bool(len(codes)) and int(np.bincount(codes).max()) > 1,
     )
 
@@ -161,7 +242,9 @@ def resolve_replicas(
     return out
 
 
-def split_units(units: Units, *, fit_fraction: float, seed: int) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+def split_units(
+    units: Units | DetectionUnits, *, fit_fraction: float, seed: int
+) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
     """Split labeled-item positions into fit and audit, whole physical groups to one side or the other."""
     n_groups = int(units.groups.max()) + 1 if len(units.groups) else 0
     n_fit = int(round(fit_fraction * n_groups))

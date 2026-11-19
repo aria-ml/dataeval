@@ -67,7 +67,7 @@ class ODImageStructurer(InstanceBuildingMixin, PropagationMixin, DatasetStructur
 
         unit_of_instance = np.asarray(srcidx, dtype=np.intp)
         class_labels = np.concatenate(labels).astype(np.intp) if labels else np.empty(0, dtype=np.intp)
-        box_values = np.concatenate(boxes).astype(np.float32) if boxes else np.empty((0, 4), dtype=np.float32)
+        box_values = np.concatenate(boxes).astype(np.float64) if boxes else np.empty((0, 4), dtype=np.float64)
         score_values = np.concatenate(scores).astype(np.float32) if scores else np.empty(0, dtype=np.float32)
         instance_index = running_index(unit_of_instance)
         instances = len(unit_of_instance)
