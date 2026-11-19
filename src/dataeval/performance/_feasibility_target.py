@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from typing import Literal, get_args
 
 from dataeval._experimental import experimental
+from dataeval.types._task import DatasetTask
 
-Task = Literal["IC", "OD", "MOT"]
+Task = DatasetTask
 Metric = Literal["accuracy", "ap", "recall", "recall_at_fp", "mota"]
 APFunctional = Literal["population_ap_integral", "population_ap_101"]
 Scope = Literal["full_input", "fixed_representation", "partition_restricted"]

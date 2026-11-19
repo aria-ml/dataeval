@@ -19,15 +19,13 @@ from numpy.typing import NDArray
 
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import (
-    Array,
     ArrayLike,
     Dataset,
-    MultiobjectTrackingTarget,
-    ObjectDetectionTarget,
     SegmentationTarget,
     _is_protocol_instance,
 )
 from dataeval.types._target import detection_count
+from dataeval.types._task import TASK_PROFILES
 from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import read_dataset
 
@@ -56,12 +54,14 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 
 # One predicate per target-consuming kind, **most specific first**. The order is what
 # resolves ``any_target`` to a concrete kind, so a target satisfying more than one is
-# reported as the most specific of them.
+# reported as the most specific of them. The tasks' own checks, in the order ``detect_task``
+# runs them, with segmentation, which no task structures, ahead of classification's bare
+# ``Array`` check, the least specific.
+*_SPECIFIC, _CLASSIFICATION = TASK_PROFILES.values()
 _TARGET_CHECKS: Mapping[str, Callable[[Any], bool]] = {
-    "multiobject_tracking": lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget),
-    "object_detection": lambda target: _is_protocol_instance(target, ObjectDetectionTarget),
+    **{profile.kind: profile.matches for profile in _SPECIFIC},
     "segmentation": lambda target: _is_protocol_instance(target, SegmentationTarget),
-    "classification": lambda target: isinstance(target, Array),
+    _CLASSIFICATION.kind: _CLASSIFICATION.matches,
 }
 
 

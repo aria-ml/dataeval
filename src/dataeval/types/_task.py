@@ -22,10 +22,14 @@ __all__ = []
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from dataeval.protocols import Array, MultiobjectTrackingTarget, ObjectDetectionTarget, _is_protocol_instance
 from dataeval.types._factors import FactorLevel, FactorLevelSchema
+
+if TYPE_CHECKING:
+    # Only a type: ``dataeval.utils.data`` imports this module to build its own checks.
+    from dataeval.utils.data import DatasetKind
 
 # The tasks a dataset can be *detected* as, which is narrower than the set of structuring
 # strategies: ``"factors"`` is reached through :meth:`~dataeval.Metadata.from_factors` and
@@ -35,12 +39,30 @@ DatasetTask = Literal["IC", "OD", "MOT"]
 
 @dataclass(frozen=True)
 class TaskProfile:
-    """The level model of one task: which levels it has, and what sits at each end.
+    """One task a dataset can be: how it is recognized, and the level model it structures into.
+
+    Each task, its ``kind``, and the MAITE types it reads:
+
+    - ``"MOT"``, ``multiobject_tracking``: a :obj:`.MultiobjectTrackingTarget` in a
+      :obj:`.MultiobjectTrackingDatum` of a :obj:`.MultiobjectTrackingDataset`.
+    - ``"OD"``, ``object_detection``: an :obj:`.ObjectDetectionTarget` in an
+      :obj:`.ObjectDetectionDatum` of an :obj:`.ObjectDetectionDataset`.
+    - ``"IC"``, ``classification``: an :class:`.Array` of class scores in an
+      :obj:`.ImageClassificationDatum` of an :obj:`.ImageClassificationDataset`.
+
+    Only the target is checked: the datum and dataset types are generic aliases, which cannot be
+    checked at run time.
 
     Attributes
     ----------
     task : str
         Short task identifier, ``"IC"``, ``"OD"`` or ``"MOT"``.
+    kind : DatasetKind
+        The same task in :data:`~dataeval.utils.data.DatasetKind`'s vocabulary, the name
+        :func:`~dataeval.utils.data.validate_dataset` returns and ``requires=`` takes.
+    matches : Callable[[Any], bool]
+        Whether a target, ``datum[1]``, belongs to this task. :func:`detect_task` and
+        :func:`~dataeval.utils.data.validate_dataset` both run it.
     levels : FactorLevelSchema
         Every level this task's rows sit at, and how they sit relative to each other.
     item_level : FactorLevel
@@ -56,32 +78,46 @@ class TaskProfile:
     """
 
     task: DatasetTask
+    kind: "DatasetKind"
+    matches: Callable[[Any], bool]
     levels: FactorLevelSchema
     item_level: FactorLevel
     label_level: FactorLevel
     unit_type: str
 
 
+# In the order the checks run; the first that matches wins. Most specific first, so the
+# tracking check, a *positive* check for its own target type, sits above the detection one
+# rather than being carved out of it.
 TASK_PROFILES: Mapping[DatasetTask, TaskProfile] = MappingProxyType({
-    "IC": TaskProfile("IC", FactorLevelSchema.of("unit", "instance"), "unit", "instance", "image"),
-    "OD": TaskProfile("OD", FactorLevelSchema.of("unit", "instance"), "unit", "instance", "image"),
     "MOT": TaskProfile(
         "MOT",
+        "multiobject_tracking",
+        lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget),
         FactorLevelSchema.of("sequence", "unit", "track", "instance"),
         "sequence",
         "instance",
         "frame",
     ),
+    "OD": TaskProfile(
+        "OD",
+        "object_detection",
+        lambda target: _is_protocol_instance(target, ObjectDetectionTarget),
+        FactorLevelSchema.of("unit", "instance"),
+        "unit",
+        "instance",
+        "image",
+    ),
+    "IC": TaskProfile(
+        "IC",
+        "classification",
+        lambda target: isinstance(target, Array),
+        FactorLevelSchema.of("unit", "instance"),
+        "unit",
+        "instance",
+        "image",
+    ),
 })
-
-# Target predicates in priority order; the first that matches wins. Most specific first, so
-# the tracking predicate — a *positive* check for its own target type — sits above the
-# detection entry rather than being carved out of it.
-DISPATCH: tuple[tuple[Callable[[Any], bool], DatasetTask], ...] = (
-    (lambda target: _is_protocol_instance(target, MultiobjectTrackingTarget), "MOT"),
-    (lambda target: _is_protocol_instance(target, ObjectDetectionTarget), "OD"),
-    (lambda target: isinstance(target, Array), "IC"),
-)
 
 
 def detect_task(target: Any) -> DatasetTask | None:
@@ -99,7 +135,7 @@ def detect_task(target: Any) -> DatasetTask | None:
         raise, because the two callers say different things about it: structuring refuses
         the dataset outright, while a locator can still answer at the item level.
     """
-    for matches, task in DISPATCH:
-        if matches(target):
-            return task
+    for profile in TASK_PROFILES.values():
+        if profile.matches(target):
+            return profile.task
     return None

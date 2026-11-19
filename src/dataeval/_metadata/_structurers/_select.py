@@ -56,7 +56,7 @@ def select_structurer(
     task : {"IC", "OD"} or None, default None
         Explicit task override. Matched case-insensitively, so an untyped caller
         may pass ``"od"``. When None the target of the first datum is matched
-        against ``dataeval.types._task.DISPATCH``.
+        against the checks in ``dataeval.types._task.TASK_PROFILES``.
     partial_factors : bool, default False
         Keep a factor only some rows declare, with the rest missing. Carried on the
         structurer rather than passed to :meth:`DatasetStructurer.build`, so that every
