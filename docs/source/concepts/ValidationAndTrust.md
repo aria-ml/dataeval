@@ -484,8 +484,10 @@ public datasets. See [Known gaps](#known-gaps-in-this-pages-evidence).
 
 Internal testing in October 2026, on the development code that followed v1.1.4,
 demonstrated the findings below for {func}`.ego_stats`, the sharpness of
-{func}`.image_stats` and the `PERSISTENCE` maps of {func}`.video_stats`. The
-scripts, saved outputs and footage checksums are available on request.
+{func}`.image_stats` and the `PERSISTENCE` maps of {func}`.video_stats`. The two
+rows dated November 2026 ran later, on the development code that followed
+v1.2.0, the real-footage one on 19 clips. The scripts, saved outputs and
+footage checksums are available on request.
 
 The footage is eleven public drone clips of 120 to 600 frames each: seven
 low-altitude urban sequences from the VisDrone2019-MOT validation set and four
@@ -503,7 +505,8 @@ footage's reading is trusted. A pair is wrong while trusted when
 | `image_stats` sharpness on unblurred frames, with and without each part | A hood with lens vignetting lowered sharpness to 89% of the clean value, and vignetting alone to 93%. |
 | A gate that drops the lowest 10% of sharpness, on 60 frames per clip with six blurred by 5, 9 or 21 px | With or without a part, the gate dropped all six blurred frames on 10 clips and none of them on the eleventh. |
 | Constructed scenes: the two-motion check on 2,095 cases of still, panning, zooming and rolling cameras, with and without movers | Still-camera readings that were wrong while trusted fell from 255 to 3, each with a mover covering 71% to 85% of the samples. One correct camera motion was newly refused. |
-| Constructed scenes: a half-frame mover in front of a still camera, pixel noise with a standard deviation of 3, five seeds | The pair read as a trusted zoom in every seed at 1 and 2 px per frame and in four of five at 3 px. It was refused at 4 and 5 px. |
+| Constructed scenes, November 2026, on the development code that followed v1.2.0, with and without the quadratic test, which refuses a pair that a camera and one mover explain much better than one smooth motion does: a half-frame mover in front of a still camera, a texture of about 5 gray levels standard deviation, pixel noise with a standard deviation of 3, five seeds | With the test, the pair was refused in every seed from 2 to 5 px per frame and in one of five at 1 px. Without it, the pair was trusted in every seed at 1 and 2 px per frame and in four of five at 3 px, and was refused at 4 and 5 px. |
+| Real footage, November 2026, on the development code that followed v1.2.0, with the quadratic test: 19 drone clips, the eleven above and eight more from Wikimedia Commons, every consecutive pair at gaps of 1, 2, 3 and 6 frames, unmodified. It counts the pairs the test newly refuses and does not judge whether they were right | Of 90,488 pairs read at a gap of one frame, 87,584 were trusted without the test and 275 of those (0.3%) are refused with it. None was newly trusted. Three clips, Cliffs of Moher, Graciosa and Solis Viaduct, hold 263 of the 275, 1.4% to 3.2% of the pairs each had trusted, and the other sixteen hold 12 (0.02%). At gaps of 2, 3 and 6 frames, 24, 8 and none were newly refused. All 19 clips are drone footage. On the rendered overlays and parts of the eleven, pairs read wrong while trusted fell from 135 to 129 under the densest overlay layout, from 173 to 125 under the hood and from 73 to 52 under the bow, while refusals rose from 33 to 40, from 15 to 69 and from 8 to 40. |
 | `video_stats` `PERSISTENCE` maps on 99 videos: each clip's first 150 frames, clean, under four overlay layouts, under a hood and a bow, and behind a smudge and a scratch | Cells read as fixed outside any overlay averaged 0.36%. The near-still clip (VisDrone `uav0000268`, about 1.25 px of camera motion per pair at a 360 px short side) reads NaN. Overlay and part recall, the share of an overlay's or part's cells read as fixed, averaged 24.7% over its 66 videos. |
 
 ### API stability discipline

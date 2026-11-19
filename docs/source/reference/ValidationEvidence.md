@@ -590,42 +590,45 @@ statistical and computational.
     [Camera motion as a per-frame factor](../concepts/MetadataLevels.md#camera-motion-as-a-per-frame-factor).
   - Ground-truth checked (kinematics recovered from analytically constructed
     flow fields)
-  - Measures apparent motion, so it cannot distinguish a moving camera from
-    a scene moving coherently against a still one. A pair is refused rather than
+  - Measures apparent motion, so it cannot distinguish a moving camera from a
+    scene moving coherently against a still one. A pair is refused rather than
     guessed when the camera cannot be told apart from an independent mover, a
-    mover captures the fit, or the fit settles between the camera's motion and a
-    large mover's, which the samples read better as two motions; when the fitted
-    motion does not explain the new frame
-    (a hard cut, a large field-of-view switch, a misread fast pan) or nothing in
-    the frame confirms it (a nearly textureless noisy frame); when the pair
-    cannot be read (the frames differ in size, a processed side is under 32 px,
-    or a frame holds a non-finite pixel or is a single gray level); when the flow
-    samples cannot pin an affine motion or, with a `mask`, too few remain or they
-    or the fit's inliers do not spread across the frame; or when the pair departs
-    from the camera state the rest of the sequence agrees on (the temporal gate,
-    which assumes a roughly steady camera). The per-frame `ego_trusted` flag
-    reports which frames were refused, and a sequence roll-up answers null rather
-    than from too little evidence once fewer than a quarter of its frames were
+    mover captures the fit, the fit settles between the camera's motion and a
+    large mover's (which the samples read better as two motions), or a camera
+    and one mover explain the samples much better than one smooth motion does;
+    when the fitted motion does not explain the new frame (a hard cut, a large
+    field-of-view switch, a misread fast pan) or nothing in the frame confirms
+    it (a nearly textureless noisy frame); when the pair cannot be read (the
+    frames differ in size, a processed side is under 32 px, or a frame holds a
+    non-finite pixel or is a single gray level); when the flow samples cannot
+    pin an affine motion or, with a `mask`, too few remain or they or the fit's
+    inliers do not spread across the frame; or when the pair departs from the
+    camera state the rest of the sequence agrees on (the temporal gate, which
+    assumes a roughly steady camera). The per-frame `ego_trusted` flag reports
+    which frames were refused, and a sequence roll-up answers null rather than
+    from too little evidence once fewer than a quarter of its frames were
     trusted. The affine model is first-order and carries no depth, so a camera
     translating through a scene with strong parallax is fitted only
-    approximately. `pan_speed` and `mover_speed` are in the pixels of the frames
-    they were measured on and are not comparable across resolutions without
-    normalizing; the rates are. A reading is attributed to the later frame of
-    the pair it was measured from, so the leading `gap` frames of every sequence
-    carry no reading. A burned-in overlay (a HUD, telemetry text) reads as scene
-    content: a light one gets pans refused, and a dense one drags a pan's reading
-    toward a still camera, which stays trusted when the drag is mild and is
-    refused when it splits the samples into two motions. Passing the overlay as
-    `mask=` excludes it. A part of the vehicle in view, such as a hood or a bow,
-    reads as scene content the same way. On real drone footage, an unmasked hood
-    covering about a fifth of the frame read about one pair in nine wrong while
-    trusting it, and a mask brought that under one in a hundred. A mover pulling
-    the fit toward its own motion is refused once its pull stands well above the
-    flow noise, so a slow mover in noisy footage can still read as a trusted
-    zoom of a pixel or two. A mover holding most of the samples the fit sees
-    (with a mask, most of what the mask leaves) can be read as the camera; one
-    pair cannot tell the two apart, and the temporal gate catches it only when
-    it is brief.
+    approximately. A pair whose flow falls in two groups, such as a camera
+    moving past a near cliff and a distant sea, can also be refused. `pan_speed`
+    and `mover_speed` are in the pixels of the frames they were measured on and
+    are not comparable across resolutions without normalizing; the rates are. A
+    reading is attributed to the later frame of the pair it was measured from,
+    so the leading `gap` frames of every sequence carry no reading. A burned-in
+    overlay (a HUD, telemetry text) reads as scene content: a light one gets
+    pans refused, and a dense one drags a pan's reading toward a still camera,
+    where a mild drag can stay trusted and a drag that leaves the samples
+    reading better as two motions is refused. Passing the overlay as `mask=`
+    excludes it. A part of the vehicle in view, such as a hood or a bow, reads
+    as scene content the same way. On real drone footage, an unmasked hood
+    covering about a fifth of the frame read about one pair in twelve wrong
+    while trusting it, and a mask brought that under one in a hundred. A mover
+    pulling the fit toward its own motion is refused once its pull stands well
+    above the flow noise, so a slow mover in noisy footage can still read as a
+    trusted zoom of a pixel or two. A mover holding most of the samples the fit
+    sees (with a mask, most of what the mask leaves) can be read as the camera;
+    one pair cannot tell the two apart, and the temporal gate catches it only
+    when it is brief.
 - - {func}`.frame_stats` ⚠️
   - Per-frame time since the previous frame and whether a frame repeats the one before it exactly, with declared
     roll-ups to the sequence level.
