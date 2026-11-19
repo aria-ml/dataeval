@@ -22,6 +22,7 @@ from dataeval.data._view import Operation, Transform, View
 from dataeval.flags import ImageStats
 from dataeval.protocols import Array, MultiobjectTrackingTarget, ObjectDetectionTarget, SegmentationTarget
 from dataeval.types import FactorLevel
+from dataeval.types._task import TASK_PROFILES
 from dataeval.utils._array import argmax_label, as_numpy
 from dataeval.utils._mask import MaskedTarget, mask_metadata
 from dataeval.utils.data import DatasetKind
@@ -58,9 +59,6 @@ def _predicate(  # noqa: C901
 def _without_pixels(datum: Any) -> Any:
     """Return `datum` without its pixels, unless it is a tracking datum, whose frames a target read never decodes."""
     return skeleton(datum) if recordable(datum) else datum
-
-
-_KINDS: dict[str, DatasetKind] = {"IC": "classification", "OD": "object_detection", "MOT": "multiobject_tracking"}
 
 
 def _resolve_level(  # noqa: C901
@@ -364,7 +362,7 @@ class Filter(Operation):
             kept = set(range(len(old))) if self.drop == "detections" else hit
             rows = _rows_to_drop(store, level, positions, matched, kept)
             if rows:
-                drop = _dropper(_KINDS[structurer.task])
+                drop = _dropper(next(p.kind for p in TASK_PROFILES.values() if p.task == structurer.task))
                 transforms = {old[position]: drop(within) for position, within in rows.items()}
                 view.map_each(transforms)
                 removed = sum(len(within.instances) + len(within.tracks) for within in rows.values())

@@ -5,10 +5,11 @@ __all__ = []
 from typing import Any, Literal
 
 from dataeval.types import FactorLevel, FactorLevelSchema
-from dataeval.types._task import TaskProfile
+from dataeval.types._task import DatasetTask, TaskProfile
 
-# Task identifier of a structuring strategy.
-TASK = Literal["IC", "OD", "MOT", "factors", "unknown"]
+# Task identifier of a structuring strategy: a task a dataset can be detected as, or one of the two
+# strategies with no dataset to detect one from.
+TASK = Literal[DatasetTask, "factors", "unknown"]
 
 
 class Structurer:
