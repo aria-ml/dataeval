@@ -39,7 +39,7 @@ from dataeval.protocols import (
     VideoDataset,
 )
 from dataeval.types import FactorLevel, SourceIndex
-from dataeval.types._target import instance_arrays
+from dataeval.types._target import detection_count, instance_arrays, track_ids_of
 from dataeval.types._track import frame_number
 from dataeval.utils._array import as_numpy
 from dataeval.utils.data import validate_dataset
@@ -637,7 +637,8 @@ class SequenceFrames(AnnotatedDataset[ObjectDetectionDatum]):
                 # `located` runs sequence by sequence, so one sequence's targets are all that has
                 # to be held at a time -- the same discipline the frame walk keeps.
                 held, tracks = sequence, self._dataset[sequence][1].frame_tracks
-            ids = as_numpy(cast(Any, tracks)[frame].track_ids).reshape(-1).astype(np.intp)
+            target = cast(Any, tracks)[frame]
+            ids = track_ids_of(target, detection_count(target))
             rows.append(np.stack((np.full(len(ids), position, dtype=np.intp), ids), axis=1))
         return np.concatenate(rows) if rows else np.empty((0, 2), dtype=np.intp)
 
