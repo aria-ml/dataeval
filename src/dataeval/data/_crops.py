@@ -20,6 +20,7 @@ from dataeval.protocols import (
     ObjectDetectionDataset,
 )
 from dataeval.types._index import SourceIndex
+from dataeval.types._target import track_ids_of
 from dataeval.utils._array import as_numpy
 from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import requires_maite_dataset
@@ -414,6 +415,7 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         # detection order — matching how Metadata flattens OD targets — applying the
         # min_size filter so crops and labels stay aligned by construction.
         index_map: list[tuple[int, int, int, NDArray[np.float64]]] = []
+        kept_track_ids: list[int] = []
         source_ids: list[int | str] = []
         observed: set[int] = set()
         n_dropped = 0
@@ -425,12 +427,15 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
             source_ids.append(datum_metadata.get("id", item_index))
             labels = as_numpy(target.labels).reshape(-1)
             boxes = as_numpy(target.boxes).reshape(-1, 4).astype(np.float64)
+            # Read where the detections are read, so a crop's track is the one its own detection has.
+            track_ids = track_ids_of(target, len(labels))
             for target_index, (label, box) in enumerate(zip(labels, boxes, strict=True)):
                 width, height = box[2] - box[0], box[3] - box[1]
                 if width <= 0 or height <= 0 or min(width, height) < self._min_size:
                     n_dropped += 1
                     continue
                 index_map.append((item_index, target_index, int(label), box))
+                kept_track_ids.append(int(track_ids[target_index]))
                 observed.add(int(label))
 
         self._index_map = index_map
@@ -440,8 +445,10 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         # make that quadratic. Read-only so a caller cannot corrupt the view's own map.
         self._item_indices = np.fromiter((row[0] for row in index_map), dtype=np.intp, count=len(index_map))
         self._target_indices = np.fromiter((row[1] for row in index_map), dtype=np.intp, count=len(index_map))
+        self._track_ids = np.asarray(kept_track_ids, dtype=np.intp)
         self._item_indices.flags.writeable = False
         self._target_indices.flags.writeable = False
+        self._track_ids.flags.writeable = False
         self.n_dropped: int = n_dropped
         self._index2label: Mapping[int, str] = self._resolve_index2label(observed)
         self._n_classes = (max(self._index2label) + 1) if self._index2label else 0
@@ -566,6 +573,43 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         array([0, 0, 1, 2])
         """
         return self._target_indices
+
+    @property
+    def track_ids(self) -> NDArray[np.intp]:
+        """Track each crop's detection belongs to, within its source video.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            One track id per crop, in crop order, as the source's target gave it. ``-1``
+            marks a detection no tracker linked, and every crop of a source that carries no
+            ``track_ids``. Read-only.
+
+        See Also
+        --------
+        item_indices : The source item each crop was cut from.
+        target_indices : Which detection within its source item each crop was cut from.
+
+        Notes
+        -----
+        A track id is unique only within one video, so it names a track together with the
+        video its crop came from. Over a :class:`~dataeval.data.SequenceFrames` view,
+        :attr:`item_indices` is a position in that view and
+        ``frames.frame_map[crops.item_indices]`` gives each crop's ``(video, frame)``.
+
+        Ids are read with the same reader as the other per-detection track readers: an
+        array shorter than the boxes is padded with ``-1``, and an id that is not a whole
+        number raises ``ValueError``.
+
+        Examples
+        --------
+        >>> from dataeval.data import SequenceFrames
+        >>> frames = SequenceFrames(train_videos)
+        >>> crops = DetectionCrops(frames)
+        >>> crops.track_ids[:3]
+        array([0, 0, 0])
+        """
+        return self._track_ids
 
     @property
     def source_indices(self) -> tuple[SourceIndex, ...]:

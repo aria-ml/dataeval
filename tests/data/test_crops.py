@@ -6,9 +6,10 @@ import numpy as np
 import pytest
 
 from dataeval import Metadata
-from dataeval.data import DetectionCrops, Reverse, View
+from dataeval.data import DetectionCrops, Reverse, SequenceFrames, View
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata, ObjectDetectionTarget
+from tests.data.test_frames import make_dataset_of, make_frame_target
 
 
 class _ODTarget:
@@ -397,3 +398,95 @@ def test_unzipped_images_support_next_as_well_as_iteration(get_od_dataset):
     images, _boxes = unzip_dataset(get_od_dataset(3), per_target=False)
     assert len(images) == 3  # type: ignore[arg-type]
     assert np.asarray(next(images)).ndim == 3  # type: ignore[call-overload]
+
+
+class _TrackedTarget(_ODTarget):
+    """An object-detection target that also carries the per-detection track ids a tracker gave it."""
+
+    def __init__(self, boxes: Sequence[Sequence[float]], labels: Sequence[int], track_ids: Sequence[float]) -> None:
+        super().__init__(boxes, labels)
+        self.track_ids = np.asarray(track_ids)
+
+
+def _tracking_dataset():
+    """Three videos of 14 x 12 frames. Track ids repeat across videos, and each property below is on purpose:
+
+    - vid0 frame 0 holds a 2 x 2 box (track 9) that ``min_size=4`` drops, leaving track 5 alone in that frame;
+    - vid1 frame 0 holds a box that touches the right and bottom edges of the frame;
+    - vid1 uses id 5 again for a different object, and track 7 is alone in the last frame;
+    - vid2 holds one detection no tracker linked (``-1``).
+    """
+    return make_dataset_of([
+        [
+            make_frame_target([[0, 0, 6, 6], [8, 2, 10, 4]], [5, 9]),
+            make_frame_target([[1, 1, 7, 7], [6, 3, 13, 10]], [5, 9]),
+            make_frame_target([[2, 2, 8, 8], [6, 4, 12, 11]], [5, 9]),
+        ],
+        [
+            make_frame_target([[8, 6, 14, 12], [0, 0, 5, 5]], [5, 7]),
+            make_frame_target([[0, 0, 5, 5]], [7]),
+        ],
+        [make_frame_target([[0, 0, 6, 6], [4, 4, 10, 10]], [-1, 3])],
+    ])
+
+
+@pytest.mark.required
+class TestTrackIds:
+    """A crop over a tracking dataset resolves to its track without any hand alignment."""
+
+    def test_each_crop_resolves_to_its_video_frame_and_track(self):
+        frames = SequenceFrames(_tracking_dataset())
+        crops = DetectionCrops(frames, min_size=4)
+        where = frames.frame_map[crops.item_indices]
+        resolved = list(zip(where[:, 0].tolist(), where[:, 1].tolist(), crops.track_ids.tolist(), strict=True))
+        assert crops.n_dropped == 1
+        assert resolved == [
+            (0, 0, 5),
+            (0, 1, 5), (0, 1, 9),
+            (0, 2, 5), (0, 2, 9),
+            (1, 0, 5), (1, 0, 7),
+            (1, 1, 7),
+            (2, 0, -1), (2, 0, 3),
+        ]  # fmt: skip
+
+    def test_a_source_without_track_ids_marks_every_crop_untracked(self):
+        crops = DetectionCrops(_simple_dataset())
+        assert crops.track_ids.dtype == np.intp
+        assert crops.track_ids.tolist() == [-1, -1, -1, -1, -1]
+
+    def test_carrying_track_ids_changes_nothing_else_about_the_view(self):
+        images = np.stack([_positional_image() for _ in range(2)])
+        boxes = [[[0, 0, 10, 10], [1, 1, 3, 3], [20, 20, 30, 30]], [[5, 5, 15, 25]]]
+        plain = DetectionCrops(_ODDataset(images, [_ODTarget(b, [0] * len(b)) for b in boxes]), min_size=4)
+        tracked = DetectionCrops(
+            _ODDataset(images, [_TrackedTarget(b, [0] * len(b), range(len(b))) for b in boxes]), min_size=4
+        )
+        assert tracked.n_dropped == plain.n_dropped == 1
+        assert tracked.item_indices.tolist() == plain.item_indices.tolist() == [0, 0, 1]
+        assert tracked.target_indices.tolist() == plain.target_indices.tolist() == [0, 2, 0]
+        assert all(np.array_equal(tracked[i][0], plain[i][0]) for i in range(len(plain)))
+        assert tracked.track_ids.tolist() == [0, 2, 0]
+
+    def test_ids_shorter_than_the_boxes_are_padded_as_untracked(self):
+        dataset = make_dataset_of([[make_frame_target([[0, 0, 6, 6], [4, 4, 10, 10], [1, 1, 8, 8]], [7, 9])]])
+        crops = DetectionCrops(SequenceFrames(dataset))
+        assert crops.track_ids.tolist() == [7, 9, -1]
+
+    def test_ids_that_are_not_whole_numbers_raise_instead_of_being_truncated(self):
+        dataset = _ODDataset(np.stack([_positional_image()]), [_TrackedTarget([[0, 0, 10, 10]], [0], [1.5])])
+        with pytest.raises(ValueError, match="track_ids"):
+            DetectionCrops(dataset)
+
+    def test_object_and_surround_views_keep_the_same_rows_and_tracks(self):
+        frames = SequenceFrames(_tracking_dataset())
+        obj = DetectionCrops(frames, min_size=4, square="pad")
+        ring = DetectionCrops(frames, min_size=4, region="surround", padding=0.5)
+        assert len(obj) == len(ring) == 10
+        assert obj.item_indices.tolist() == ring.item_indices.tolist()
+        assert obj.target_indices.tolist() == ring.target_indices.tolist()
+        assert obj.track_ids.tolist() == ring.track_ids.tolist()
+
+    def test_the_array_is_read_only(self):
+        crops = DetectionCrops(_simple_dataset())
+        with pytest.raises(ValueError, match="read-only"):
+            crops.track_ids[0] = 3
