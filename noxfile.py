@@ -240,6 +240,7 @@ def test(session: nox.Session) -> None:
     """Run unit tests with coverage reporting. Specify version using `nox -P {version} -e test`.
 
     Pass 'clear-cache' to clear the Numba cache before running tests: `nox -e test -- clear-cache`
+    Pass `--no-cov` to skip coverage, as a merge train car does: `nox -e test -- --no-cov`
     """
     python_version = get_python_version(session)
 
@@ -274,7 +275,8 @@ def test(session: nox.Session) -> None:
         *cov_html_args,
         *remaining_posargs,
     )
-    session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
+    if "--no-cov" not in remaining_posargs:
+        session.run("mv", ".coverage", f"output/.coverage.{python_version}", external=True)
 
 
 @session(uv_groups=["verify"], uv_extras=["cpu", "onnx", "opencv"])
