@@ -648,12 +648,20 @@ statistical and computational.
 - - {func}`.track_path_stats` ⚠️
   - Per-track distance between the mean embeddings of the first and last thirds of its rows, the value that distance
     would have on average for a random order of the rows, and the unit direction from the first mean to the last.
-  - Anchored (embeddings constructed with a known path, and a null checked against every order of small tracks)
+  - Anchored (embeddings constructed with a known path, and a null checked against every order of small tracks. A
+    study on real footage embedded, with an ImageNet ResNet18, the crops of the 542 ground-truth tracks with at least
+    60 crops in the seven VisDrone2019-MOT validation videos. The null was within 1% of the root-mean-square distance
+    over 200 random orders for at least half of the tracks. The distance barely followed track length (rank
+    correlation −0.02 to −0.11), and its ratio to the null rose with it (0.69 to 0.76). A track joined at a shared
+    frame to another track of its class scored above the same object on the same frames with AUC 0.84 on the object's
+    crops (0.72 to 0.92 by video) and 0.79 on its surroundings. A GPU run agreed with the CPU to 2.2e-4 per track)
   - Experimental: the names, `min_points`, the thirds and the geometry may change. It is not an ID-switch detector. A
     direction describes the path and does not state a cause, since the object, its surroundings, its scale and the
     camera can each move an embedding. The ratio of the distance to its null rises with the number of rows in a track,
-    so it is not a score to rank tracks by. A track shorter than `min_points` is NaN. The thirds are counted in rows, so
-    a gap in a track is not corrected for. Tested on constructed inputs only, not on real footage.
+    so it is not a score to rank tracks by. A track shorter than `min_points` is NaN; below 60 rows the distance reads
+    high, by 4% at 30 rows and 9% at 15 at the median. The thirds are counted in rows, so a gap in a track is not
+    corrected for. The study on real footage covers one aerial dataset, one ImageNet classifier and ground-truth
+    tracks, not a tracker's, and its joined tracks are not a tracker's identity switches.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same

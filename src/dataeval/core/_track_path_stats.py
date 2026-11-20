@@ -185,8 +185,8 @@ def track_path_stats(
     surroundings, agree more than directions of different tracks, but the agreement of a single pair says little.
 
     The first and last thirds are counted in rows, not frames, so a gap in a track is not corrected for. The study
-    behind these statistics covers two scenes of one drone dataset, tracks of at least 60 rows and one ImageNet
-    classifier, so its numbers describe those, and the constants above are provisional.
+    behind these statistics covers the seven validation videos of one drone dataset, ground-truth tracks of at least 60
+    rows and one ImageNet classifier, so its numbers describe those, and the constants above are provisional.
 
     Examples
     --------
