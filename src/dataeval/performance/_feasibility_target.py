@@ -5,6 +5,7 @@ __all__ = []
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from numbers import Integral
 from typing import Literal, get_args
 
 from dataeval._experimental import experimental
@@ -17,6 +18,10 @@ Scope = Literal["full_input", "fixed_representation", "partition_restricted"]
 Aggregation = Literal["frame_pooled", "sequence_mean"]
 FalsePositiveScope = Literal["pooled", "each_class"]
 
+_OD_CALL = "TargetSpec(task='OD', metric='ap', class_name=..., threshold=..., iou=..., max_detections=...)"
+_OD_HINT = "for an object detection target, set task='OD' with iou=... and max_detections=..."
+_AP_BOUNDED = "AP is bounded as ap_functional 'population_ap_integral' only in this release"
+
 _TASK_METRICS: dict[str, tuple[str, ...]] = {
     "IC": ("accuracy", "ap", "recall"),
     "OD": ("ap", "recall_at_fp"),
@@ -28,6 +33,13 @@ def _num(value: object, name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise ValueError(f"{name} must be a finite number, got {value!r}")
     return float(value)
+
+
+def positive_count(value: object, name: str) -> int:
+    """Return ``value`` as an ``int`` when it is a Python or NumPy integer of at least 1, never a bool."""
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
+        raise ValueError(f"{name} must be an integer of at least 1, got {value!r}")
+    return int(value)
 
 
 def _allowance(value: object, name: str) -> float:
@@ -77,10 +89,18 @@ class TargetSpec:
     .. warning::
        This feature is experimental and may change or be removed in future releases.
 
-    ``task`` defaults to ``"IC"``, the only supported task. ``class_name=None`` means macro for AP.
-    ``ap_functional`` is set for AP only and defaults to ``"population_ap_integral"`` for classification, the only AP
-    functional bounded for classification. ``fp_budget`` is set for ``recall_at_fp`` only, ``iou`` for OD and MOT
-    only, ``aggregation`` for grouped classification only.
+    ``task`` defaults to ``"IC"``. ``"OD"`` (object detection) is supported for ``ap`` on one named class, and
+    ``"MOT"`` is not supported in this release. ``class_name=None`` means macro for AP, for classification only.
+    ``ap_functional`` is set for AP only and defaults to ``"population_ap_integral"`` for every AP target, the only AP
+    functional bounded in this release. ``fp_budget`` is set for ``recall_at_fp`` only, ``iou`` for OD and MOT only,
+    ``aggregation`` for grouped classification only. ``max_detections`` (K) is required for OD and refused for the
+    other tasks: the most detections per image, for the target's class, that the AP counts.
+
+    An OD ``ap`` target is one class's AP at one IoU, with at most K detections per image matched greedily by score,
+    integrated over recall. That is not COCO's AP, which averages over classes and IoU 0.5 to 0.95 and interpolates at
+    101 points. A K below the number of the class's targets an image holds caps the true positives that image can show,
+    and so caps recall. A larger K also widens the confidence endpoints, so whether raising K raises or lowers the bound
+    depends on the detector and the data.
 
     ``recall`` (classification) is a minimum recall for ``class_name`` at a maximum false-positive rate
     ``max_false_positive_rate`` in (0, 1); it takes neither ``aggregation`` nor ``iou``. The negatives are
@@ -91,6 +111,12 @@ class TargetSpec:
     --------
     >>> TargetSpec(metric="accuracy", threshold=0.9).task
     'IC'
+
+    An object detection AP target needs no ``ap_functional``:
+
+    >>> person = TargetSpec(task="OD", metric="ap", class_name="person", threshold=0.5, iou=0.5, max_detections=100)
+    >>> person.ap_functional
+    'population_ap_integral'
     """
 
     metric: Metric
@@ -104,6 +130,7 @@ class TargetSpec:
     scope: Scope = "full_input"
     max_false_positive_rate: float | None = None
     false_positive_scope: FalsePositiveScope | None = None
+    max_detections: int | None = None
 
     def _check_enums(self) -> None:
         for name, valid in (
@@ -123,7 +150,7 @@ class TargetSpec:
             raise ValueError(
                 f"metric {self.metric!r} is not offered for task {self.task!r}: {_TASK_METRICS[self.task]}"
             )
-        if self.metric == "ap" and self.task == "IC" and self.ap_functional is None:
+        if self.metric == "ap" and self.ap_functional is None:
             object.__setattr__(self, "ap_functional", "population_ap_integral")
         # Normalize numerics so equal targets serialize identically (1 vs 1.0).
         for name in ("threshold", "iou", "fp_budget", "max_false_positive_rate"):
@@ -133,6 +160,7 @@ class TargetSpec:
         self._check_iou()
         self._check_metric_fields()
         self._check_aggregation()
+        self._check_max_detections()
 
     def _check_threshold(self) -> None:
         if self.metric == "mota":
@@ -144,13 +172,22 @@ class TargetSpec:
     def _check_iou(self) -> None:
         if self.task == "IC":
             if self.iou is not None or self.fp_budget is not None:
-                raise ValueError("IC targets take neither iou nor fp_budget")
+                raise ValueError(f"IC targets take neither iou nor fp_budget; {_OD_HINT}")
         elif self.iou is None or not 0 < self.iou <= 1:
             raise ValueError(f"{self.task} targets require iou in (0, 1], got {self.iou!r}")
 
+    def _check_max_detections(self) -> None:
+        if self.task != "OD":
+            if self.max_detections is not None:
+                raise ValueError(f"max_detections applies to object detection only, not task {self.task!r}; {_OD_HINT}")
+        elif self.max_detections is None:
+            raise ValueError(
+                "OD targets require max_detections, the most detections per image that the AP counts, e.g. 100"
+            )
+        else:
+            object.__setattr__(self, "max_detections", positive_count(self.max_detections, "max_detections"))
+
     def _check_ap_fields(self) -> None:
-        if self.metric == "ap" and self.ap_functional is None:
-            raise ValueError(f"'ap' targets require ap_functional, one of {list(get_args(APFunctional))}")
         if self.metric != "ap" and self.ap_functional is not None:
             raise ValueError(f"ap_functional applies to 'ap' only, not {self.metric!r}")
         if self.metric not in ("ap", "recall") and self.class_name is not None:
@@ -195,6 +232,17 @@ class TargetSpec:
             raise ValueError(f"aggregation 'sequence_mean' is defined for 'accuracy' only, not {self.metric!r}")
 
 
+def _check_od_support(s: TargetSpec) -> None:
+    if s.metric == "recall_at_fp":
+        raise ValueError(f"'recall_at_fp' is not supported for object detection in this release; use {_OD_CALL}")
+    if s.class_name is None:
+        raise ValueError(
+            f"Macro 'ap' is not supported for object detection in this release; name one class: {_OD_CALL}"
+        )
+    if s.ap_functional != "population_ap_integral":
+        raise ValueError(f"{_AP_BOUNDED}, got {s.ap_functional!r}; use {_OD_CALL}")
+
+
 def _check_classes(s: TargetSpec, class_names: Sequence[str] | None) -> None:
     if s.metric == "ap" and s.class_name is None and not class_names:
         raise ValueError("Macro 'ap' needs the class list; declare index2label on the dataset metadata")
@@ -204,12 +252,12 @@ def _check_classes(s: TargetSpec, class_names: Sequence[str] | None) -> None:
 
 def _check_context(s: TargetSpec, task: str, class_names: Sequence[str] | None, grouped: bool) -> None:
     if s.task != task:
-        raise ValueError(f"A {s.metric!r} target is a {s.task} target but the data is {task}")
-    if task == "IC" and s.metric == "ap" and s.ap_functional != "population_ap_integral":
-        raise ValueError(
-            "Classification AP is bounded as ap_functional 'population_ap_integral' only in this release, "
-            f"got {s.ap_functional!r}."
-        )
+        hint = f"; use {_OD_CALL}" if task == "OD" else ""
+        raise ValueError(f"A {s.metric!r} target is a {s.task} target but the data is {task}{hint}")
+    if task == "OD":
+        _check_od_support(s)
+    elif task == "IC" and s.metric == "ap" and s.ap_functional != "population_ap_integral":
+        raise ValueError(f"{_AP_BOUNDED}, got {s.ap_functional!r}.")
     _check_classes(s, class_names)
     _check_grouping(s, task, grouped)
 
@@ -236,8 +284,8 @@ def parse_targets(
     Check a sequence of ``TargetSpec`` against the data and return it as a list, in the order given.
 
     ``class_names`` come from a declared ``index2label``; ``grouped`` is whether some group holds more than one item.
-    Classification AP must be ``population_ap_integral``, the only AP functional this release bounds. Equal targets
-    are duplicates.
+    AP must be ``population_ap_integral``, the only AP functional this release bounds, for classification and object
+    detection. Object detection also refuses macro AP and ``recall_at_fp``. Equal targets are duplicates.
     """
     if (
         isinstance(target, str)

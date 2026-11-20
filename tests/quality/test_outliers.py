@@ -2082,6 +2082,15 @@ class TestOutliersOverMetadata:
     def test_encoding_digest_is_not_recorded(self):
         assert "encoding_digest" not in Outliers().evaluate(self._temperature()).meta().state
 
+    def test_a_resolved_threshold_mapping_keeps_its_length_record(self):
+        """``Outliers`` resolves every threshold to an object at construction, so its mapping holds no scalars.
+
+        State records a mapping by value only when all its values are scalars, so this one is still described
+        by its length.
+        """
+        state = Outliers(outlier_threshold={"temperature": 3.0}).evaluate(self._temperature()).meta().state
+        assert state["outlier_threshold"] == "dict: len=1"
+
     @staticmethod
     def _boxes(get_od_dataset):
         """Ten images of two boxes each: one image-level and one box-level factor, box 19 far off."""

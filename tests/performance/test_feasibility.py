@@ -168,12 +168,12 @@ class TestFeasibility:
         assert local["state"].to_list() == ["unavailable"]
         assert local["reason"].to_list() == ["fit_split_smaller_than_cells"]
 
-    def test_od_dataset_is_rejected_clearly(self):
-        dataset: Any = MockODDataset([[0, 1], [1]], AB)
-        msg = "Feasibility supports image and video classification in this release; OD is planned."
-        target = [TargetSpec(task="OD", metric="ap", threshold=0.5, iou=0.5, ap_functional="population_ap_integral")]
-        with pytest.raises(NotImplementedError, match=msg):
-            Feasibility().evaluate(dataset, target=target, embeddings=np.zeros((2, 2)))
+    def test_an_od_call_runs(self):
+        dataset: Any = MockODDataset([[0, 1], [1], [0], []] * 10, AB)
+        detections = [dataset[i][1] for i in range(len(dataset))]  # the targets, as a stand-in detector's output
+        target = [TargetSpec(task="OD", metric="ap", threshold=0.5, class_name="a", iou=0.5, max_detections=20)]
+        out = Feasibility(max_objects=2).evaluate(dataset, target=target, predictions=detections)
+        assert len(out.determinations) == 1
 
     def test_recall_with_no_audit_positives_is_unresolved(self):
         y, x = _three_classes(300)
@@ -290,7 +290,7 @@ class TestFeasibility:
 
     def test_repr_is_not_the_str(self, gauss2_run):
         assert repr(gauss2_run).startswith("FeasibilityOutput(requirements=")
-        assert "DataFrame(shape=(3, 18))" in repr(gauss2_run)
+        assert "DataFrame(shape=(3, 20))" in repr(gauss2_run)
         assert str(gauss2_run) != repr(gauss2_run)
 
     @pytest.mark.parametrize(

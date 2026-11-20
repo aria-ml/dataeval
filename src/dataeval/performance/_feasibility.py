@@ -3,12 +3,12 @@ __all__ = []
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, get_args
+from typing import Any, Literal, cast, get_args
 
 import numpy as np
 import polars as pl
 from numpy.typing import NDArray
-from pydantic import PositiveInt
+from pydantic import PositiveInt, field_validator
 
 from dataeval._experimental import experimental, quiet_experimental
 from dataeval._helpers import reject_filtered_metadata
@@ -22,6 +22,15 @@ from dataeval.performance._feasibility_classification import (
 )
 from dataeval.performance._feasibility_constants import FIT_FRACTION
 from dataeval.performance._feasibility_decide import Decision, Determination, Limitation, decide
+from dataeval.performance._feasibility_detection import (
+    check_counts,
+    check_detection_call,
+    check_detection_layout,
+    check_detections,
+    gather_detection_evidence,
+    resolve_class_ids,
+    resolve_count_bounds,
+)
 from dataeval.performance._feasibility_evidence import (
     Assumption,
     Bound,
@@ -48,9 +57,17 @@ from dataeval.performance._feasibility_target import (
     TargetSpec,
     Task,
     parse_targets,
+    positive_count,
 )
-from dataeval.performance._feasibility_units import Units, resolve_replicas, resolve_units, split_units
-from dataeval.protocols import AnnotatedDataset, ArrayLike, FeatureExtractor, Model
+from dataeval.performance._feasibility_units import (
+    Units,
+    _declared_class_names,
+    resolve_detection_units,
+    resolve_replicas,
+    resolve_units,
+    split_units,
+)
+from dataeval.protocols import AnnotatedDataset, ArrayLike, FeatureExtractor, Model, ObjectDetectionTarget
 from dataeval.types import DictOutput, Evaluator, EvaluatorConfig, set_metadata
 from dataeval.types._config import OpenUnitInterval
 from dataeval.types._task import detect_task
@@ -71,6 +88,8 @@ _DETERMINATIONS_SCHEMA = {
     "aggregation": _enum(Aggregation),
     "ap_functional": _enum(APFunctional),
     "max_false_positive_rate": pl.Float64,
+    "iou": pl.Float64,
+    "max_detections": pl.Int64,
     "determination": _enum(Determination),
     "limitation": _enum(Limitation),
     "suggested_minimum": pl.Int64,
@@ -103,7 +122,7 @@ _BOUNDS_SCHEMA = {
     "assumptions": pl.List(_enum(Assumption)),
     "is_determining": pl.Boolean,
 }
-_STATE = ["alpha", "max_sequence_length", "resolved_seed"]
+_STATE = ["alpha", "max_sequence_length", "max_objects", "resolved_seed"]
 _PRIVATE = ("mean", "support", "delta")  # on a ``Bound``, not columns of the ``bounds`` table
 
 
@@ -120,6 +139,8 @@ def _determinations_frame(specs: Sequence[TargetSpec], determinations: Sequence[
             "aggregation": s.aggregation,
             "ap_functional": s.ap_functional,
             "max_false_positive_rate": s.max_false_positive_rate,
+            "iou": s.iou,
+            "max_detections": s.max_detections,
             "determination": d.determination,
             "limitation": d.limitation,
             "suggested_minimum": d.suggested_minimum,
@@ -161,9 +182,21 @@ def _label(spec: TargetSpec) -> str:
     text += f" ≥{spec.threshold:g}"
     if spec.metric == "recall":
         text += f" fp≤{spec.max_false_positive_rate:g}"
+    if spec.task == "OD":
+        text += f" iou≥{spec.iou:g} k≤{spec.max_detections}"
     if spec.aggregation is not None:
         text += f" |{spec.aggregation}"
     return text if spec.scope == "full_input" else f"{text} @{spec.scope}"
+
+
+def _max_objects_lines(specs: Sequence[TargetSpec], bound: Any) -> list[str]:
+    """Return the ``max_objects`` line: each object detection class once, in requirement order, with its B."""
+    classes = dict.fromkeys(s.class_name for s in specs if s.task == "OD")
+    if not classes:
+        return []
+    if not isinstance(bound, int | dict):  # no execution metadata, as on a copy that never went through evaluate
+        return ["max_objects: —"]
+    return ["max_objects: " + ", ".join(f"{c} {bound[c] if isinstance(bound, dict) else bound}" for c in classes)]
 
 
 def _determining_source(bounds: list[dict[str, Any]], requirement: int, role: Role) -> str:
@@ -193,11 +226,13 @@ class FeasibilityOutput(DictOutput):
         One row per requirement, with columns:
 
         - requirement: int - Index into ``requirements``
-        - task, metric, threshold, judged_scope: Enum, Enum, float, Enum - What was asked: ``IC``, the metric, its
-          threshold and the scope it is judged at
+        - task, metric, threshold, judged_scope: Enum, Enum, float, Enum - What was asked: ``IC`` or ``OD``, the
+          metric, its threshold and the scope it is judged at
         - class_name: str - The class the requirement names, null otherwise
         - aggregation, ap_functional, max_false_positive_rate: Enum, Enum, float - The details that tell requirements
           of one metric apart, null where they do not apply
+        - iou, max_detections: float, int - The IoU and the most detections per image of an object detection
+          requirement, null for classification
         - determination: Enum - ``demonstrated_feasible``, ``infeasible_under_recorded_assumptions``,
           ``not_ruled_out`` or ``unresolved``
         - limitation: Enum - What limits a non-final determination, null for a final one: ``conflict``, ``no_envelope``,
@@ -221,7 +256,7 @@ class FeasibilityOutput(DictOutput):
         - bound_type: Enum - ``lower`` or ``upper``
         - information_scope, population, sample, unit: Enum - What the bound covers: ``full_input``,
           ``fixed_representation`` or ``partition_restricted``; ``items`` or ``labeled_items``; the sample it is
-          computed on; ``image`` or ``sequence``
+          computed on; ``image`` or ``sequence``, always ``image`` for object detection
         - state: Enum - ``unavailable``, ``uninformative`` or ``informative``
         - reason: Enum - Why a bound is unavailable or uninformative, null otherwise
         - bound: float - The confidence bound; null when unavailable
@@ -230,13 +265,13 @@ class FeasibilityOutput(DictOutput):
         - n, variance: int, float - Independent units behind the bound and their variance; null where the method does
           not define them
         - radius: float - The half-width the named method applied to the estimate to produce ``bound``; null for exact
-          intervals, AP and recall envelopes and ``frame_pooled`` bounds
+          intervals, AP and recall envelopes, object detection AP witnesses and ``frame_pooled`` bounds
         - method: Enum - ``hoeffding``, ``hybrid`` or ``exact_binomial``; null where the bound has no closed form
         - alpha: float - This bound's share of the call's error budget
         - assumptions: list[Enum] - What the bound rests on. Every member is declared and not verified
         - is_determining: bool - Whether the requirement's determination rests on this bound
 
-    The call's ``alpha`` and resolved seed are in ``meta().state``.
+    The call's ``alpha``, resolved seed and ``max_objects`` are in ``meta().state``.
     """
 
     requirements: tuple[TargetSpec, ...]
@@ -253,7 +288,9 @@ class FeasibilityOutput(DictOutput):
         Print one line per requirement, then the joint confidence, the assumptions and what a minimum means.
 
         A line gives the requirement, its determination, its limitation, the determining envelope and witness with their
-        sources, and the suggested minimum. Lower bounds round down and upper bounds up.
+        sources, and the suggested minimum. Lower bounds round down and upper bounds up. When a requirement is object
+        detection, a ``max_objects`` line after the assumptions gives the count bound of each class the requirements
+        name.
         """
         bounds = list(self.bounds.iter_rows(named=True))
         rows = [("#", "requirement", "determination", "limitation", "envelope", "witness", "minimum")]
@@ -279,6 +316,7 @@ class FeasibilityOutput(DictOutput):
             *lines,
             f"joint confidence: {confidence}",
             f"assumes: {assumptions}",
+            *_max_objects_lines(self.requirements, self.meta().state.get("max_objects")),
             "minimum: independent units to cross the requirement if the observed rates hold",
         ])
 
@@ -319,6 +357,16 @@ def _check_sources(
         )
 
 
+def _supported_task(dataset: AnnotatedDataset[Any]) -> Literal["IC", "OD"] | None:
+    """Return the dataset's task, read from its first target, or None when unknown; tracking raises."""
+    task = detect_task(dataset[0][1])
+    if task == "MOT":
+        raise NotImplementedError(
+            "Feasibility supports image and video classification and object detection in this release, not MOT."
+        )
+    return task
+
+
 def _model_scores(model: Model, dataset: AnnotatedDataset[Any], units: Units, batch_size: int) -> NDArray[np.float64]:
     """Run the model over the dataset and check it scored every item for every class."""
     scores = model_scores(model, dataset, batch_size)
@@ -334,7 +382,7 @@ def _model_scores(model: Model, dataset: AnnotatedDataset[Any], units: Units, ba
 @experimental
 class Feasibility(Evaluator):
     """
-    Decide whether a classification requirement is reachable on a dataset, with a proof behind every claim.
+    Decide whether a classification or object detection AP requirement is reachable, with a proof behind every claim.
 
     .. warning::
        This feature is experimental and may change or be removed in future releases.
@@ -348,7 +396,7 @@ class Feasibility(Evaluator):
     ``conflict``. A non-final determination names its limitation. A recall requirement (a ``TargetSpec`` with
     ``metric="recall"``, a class and a false-positive limit) counts a witness only when its false-positive upper bound
     is within the limit, and its envelopes bound the recall any model in their scope reaches at that limit; the
-    ``bounds`` table shows both of a witness's bounds.
+    ``bounds`` table shows both of a witness's bounds. An object detection requirement is the AP of one class.
 
     Sources: local-panel envelopes, DataEval's post-stratified pooling (C3) of the DFE's disjoint label panels [4]_
     within the cells of a label-blind partition fitted on a group-disjoint fit split, proved in
@@ -357,13 +405,15 @@ class Feasibility(Evaluator):
     ``predictions=``, which counts at ``full_input`` scope. Each (requirement, source) pair gets an equal share of
     ``alpha``. Bounds on means use Hoeffding [1]_ and empirical Bernstein [2]_ radii, except that ungrouped witness
     bounds (accuracy, recall, false-positive rate and AP indicators) use exact Clopper-Pearson [5]_ intervals; AP and
-    recall envelopes use envelopes built on the cost-weighted risk inequality of [3]_.
+    recall envelopes use envelopes built on the cost-weighted risk inequality of [3]_. An object detection AP witness
+    bounds the means of per-image counts with the Hoeffding and empirical Bernstein radii.
 
     Parameters
     ----------
     extractor : FeatureExtractor or None, default None
         Feature extractor that computes the representation; optional when ``embeddings`` are given to
-        :meth:`evaluate`. It must have been fitted and selected independently of the audit items' labels.
+        :meth:`evaluate`. It must have been fitted and selected independently of the audit items' labels. Ignored for
+        object detection.
     batch_size : int or None, default None
         Batch size for embedding computation and for scoring a ``model``; a ``model`` also needs this or a global
         batch size from :func:`dataeval.config.set_batch_size`.
@@ -373,7 +423,13 @@ class Feasibility(Evaluator):
         Seed of the splits, partition and panels; None uses :func:`dataeval.config.get_seed`, else 0.
     max_sequence_length : int or None, default None
         Declared largest group size for grouped (video) data, needed by ``frame_pooled`` requirements. Data that
-        violate it raise rather than being truncated.
+        violate it raise rather than being truncated. Ignored for object detection.
+    max_objects : int or Mapping[str, int] or None, default None
+        Required for object detection. Declared largest number of targets of a class in any image of the population:
+        one int for every class, or a mapping keyed by ``TargetSpec.class_name`` that names every requirement class.
+        It is assumed and not verified, and recorded as ``max_objects_holds``. A larger value weakens the bound, and a
+        value below the truth makes the bound invalid. The largest count in the data is only a floor for it, and data
+        of a requirement's class above it raise.
     config : Feasibility.Config or None, default None
         Optional configuration object; parameters passed directly to ``__init__`` override it.
 
@@ -386,7 +442,7 @@ class Feasibility(Evaluator):
     **Witness only.** A call with a witness (``predictions`` or ``model``) but neither embeddings nor replicas has no
     envelope of any scope. Its determination is ``demonstrated_feasible``, or ``unresolved`` with limitation
     ``no_envelope``. It can never be ``infeasible_under_recorded_assumptions`` or ``not_ruled_out``, because only an
-    envelope can bound what is unreachable.
+    envelope can bound what is unreachable. Every object detection call is witness only in this release.
 
     **Scope.** An envelope decides at its information scope and every narrower one (``full_input`` ⊃
     ``fixed_representation`` ⊃ ``partition_restricted``). Image local-panel accuracy envelopes are
@@ -394,9 +450,10 @@ class Feasibility(Evaluator):
     Γ; AP, recall and video local-panel envelopes stay ``partition_restricted``; replica envelopes are ``full_input``.
     Built-in witnesses read the representation, so they are eligible at ``fixed_representation`` and broader.
 
-    **Population.** Unlabeled items are excluded and every claim is about the labeled items. A derived view
-    (segments, frames, crops) needs ``groups=`` to say which items are independent; a ``View`` straight over a plain
-    dataset groups by its source indices.
+    **Population.** For classification, unlabeled items are excluded and every claim is about the labeled items. For
+    object detection, every image counts, images with no targets included. A derived view (segments, frames, crops)
+    needs ``groups=`` to say which items are independent; a ``View`` straight over a plain dataset groups by its source
+    indices.
 
     References
     ----------
@@ -467,6 +524,24 @@ class Feasibility(Evaluator):
     ╞════════╪═════════╪════════════╪══════════════════════╡
     │ knn    ┆ witness ┆ lower      ┆ fixed_representation │
     └────────┴─────────┴────────────┴──────────────────────┘
+
+    An object detection requirement names one class, an IoU and the most detections per image. Here the dataset's own
+    targets stand in for a detector's output. ``max_objects=3`` comes from how the dataset was generated, with at most
+    three boxes per image:
+
+    >>> detections = [dataset[i][1] for i in range(len(dataset))]
+    >>> person = TargetSpec(task="OD", metric="ap", class_name="person", threshold=0.5, iou=0.5, max_detections=10)
+    >>> result = Feasibility(max_objects=3).evaluate(dataset, target=[person], predictions=detections)
+    >>> print(result)
+    #   requirement                   determination   limitation    envelope   witness           minimum
+    0   ap:person ≥0.5 iou≥0.5 k≤10   unresolved      no_envelope   —          0.0% user_model   —
+    joint confidence: 95%
+    assumes: model_independent_of_audit_items, class_order_matches_dataset, max_objects_holds
+    max_objects: person 3
+    minimum: independent units to cross the requirement if the observed rates hold
+
+    The detections match the targets, and the witness is still 0.0%. This call's audit is too small for an informative
+    bound, whatever the detector.
     """
 
     class Config(EvaluatorConfig):
@@ -484,6 +559,8 @@ class Feasibility(Evaluator):
             Error budget of one call.
         max_sequence_length : int or None, default None
             Declared largest group size, for ``frame_pooled`` requirements.
+        max_objects : int or dict[str, int] or None, default None
+            Declared count bound for object detection requirements.
         seed : int or None, default None
             Seed of the splits, partition and panels.
         """
@@ -492,12 +569,29 @@ class Feasibility(Evaluator):
         batch_size: PositiveInt | None = None
         alpha: OpenUnitInterval = 0.05
         max_sequence_length: PositiveInt | None = None
+        max_objects: int | dict[str, int] | None = None
         seed: int | None = None
+
+        @field_validator("max_objects", mode="before")
+        @classmethod
+        def _check_max_objects(cls, value: Any) -> Any:
+            """Accept integers of at least 1, never a bool or a float, before pydantic's own coercion runs."""
+            if value is None:
+                return None
+            if not isinstance(value, Mapping):
+                return positive_count(value, "max_objects")
+            for key in value:
+                if not isinstance(key, str):
+                    raise ValueError(
+                        f"max_objects keys are class names (TargetSpec.class_name), e.g. {{'0': 18}}; got key {key!r}"
+                    )
+            return {key: positive_count(count, f"max_objects[{key!r}]") for key, count in value.items()}
 
     extractor: FeatureExtractor | None
     batch_size: int | None
     alpha: float
     max_sequence_length: int | None
+    max_objects: int | dict[str, int] | None
     seed: int | None
     config: Config
 
@@ -509,6 +603,7 @@ class Feasibility(Evaluator):
         alpha: float | None = None,
         seed: int | None = None,
         max_sequence_length: int | None = None,
+        max_objects: int | Mapping[str, int] | None = None,
         config: Config | None = None,
     ) -> None:
         super().__init__(locals())
@@ -549,7 +644,7 @@ class Feasibility(Evaluator):
         dataset: AnnotatedDataset[Any],
         *,
         target: Sequence[TargetSpec],
-        predictions: ArrayLike | None = None,
+        predictions: ArrayLike | Sequence[ObjectDetectionTarget] | None = None,
         model: Model | None = None,
         embeddings: ArrayLike | None = None,
         groups: ArrayLike | str | None = None,
@@ -562,39 +657,46 @@ class Feasibility(Evaluator):
         Parameters
         ----------
         dataset : AnnotatedDataset
-            An image or video classification dataset. Unlabeled items are excluded from the population.
+            An image or video classification dataset, or an object detection dataset. Unlabeled classification items
+            are excluded from the population.
         target : Sequence[TargetSpec]
             The requirements, in the order wanted back. The judged scope of each defaults to ``full_input``.
-        predictions : ArrayLike or None, default None
-            A frozen model's output on every dataset item, used as a user witness: class scores of shape
-            ``(len(dataset), n_classes)``, whose top class is the decision, or a 1-D integer array of class
+        predictions : ArrayLike or Sequence[ObjectDetectionTarget] or None, default None
+            A frozen model's output on every dataset item, used as a user witness. For classification, class scores of
+            shape ``(len(dataset), n_classes)``, whose top class is the decision, or a 1-D integer array of class
             decisions, indices of the dataset's declared classes (booleans and floats are rejected). Apply any other
             decision policy, such as a threshold on one class's score, before the call and pass its decisions; one
             call's decisions feed every requirement, so a different operating point needs its own call, with the
             error budget split across the planned calls. Class decisions rank nothing, so they give no AP witness. The
             model is assumed frozen before the audit and independent of the audit items, and counts at ``full_input``.
-            Give ``predictions`` or ``model``, not both.
+            Give ``predictions`` or ``model``, not both. For object detection, ``predictions`` is required: one
+            detections object per image, in dataset order, with ``boxes`` ``(N, 4)`` as ``(x0, y0, x1, y1)``,
+            ``labels`` (indices of the declared classes) and ``scores`` ``(N,)`` or ``(N, n_classes)``, the MAITE
+            ``ObjectDetectionTarget`` shape. The labels are assumed to follow the dataset's class order, recorded as
+            ``class_order_matches_dataset``.
         model : Model or None, default None
-            A frozen MAITE model, run over the whole dataset in batches of ``batch_size`` (or the global batch size) in
-            place of ``predictions``.
+            Classification only. A frozen MAITE model, run over the whole dataset in batches of ``batch_size`` (or the
+            global batch size) in place of ``predictions``.
             Its class scores keep the model's own precision and feed the same witness, so a model gives the same
             determinations and bounds as its own scores passed as ``predictions``, and it can witness AP, which class
             decisions cannot. If the model's ``metadata`` and the dataset both declare an ``index2label`` they must be
             equal, else ``ValueError``; a class order is never remapped. If either declares none, the dataset's class
             order is assumed and recorded as ``class_order_matches_dataset``.
         embeddings : ArrayLike or None, default None
-            One representation, shape ``(len(dataset), d)``; computed with the extractor when None. With neither
-            embeddings nor an extractor the call has no local-panel envelope and no built-in witness.
+            Classification only. One representation, shape ``(len(dataset), d)``; computed with the extractor when
+            None. With neither embeddings nor an extractor the call has no local-panel envelope and no built-in
+            witness.
         groups : ArrayLike or str or None, default None
             The independent unit of each item (array aligned with the dataset, or a metadata factor name).
             Required for derived views, except a ``View`` straight over a plain dataset, which defaults to its
-            source indices. When some group holds more than one item, requirements need an aggregation.
+            source indices. When some group holds more than one item, requirements need an aggregation. Object
+            detection images are assumed independent, and grouping them is refused.
         replicas : Mapping[int or str, ArrayLike] or None, default None
-            Extra independent class labels by datum id, for full_input replica envelopes. The covered items
-            are recorded as a random sample of the population.
+            Classification only. Extra independent class labels by datum id, for full_input replica envelopes. The
+            covered items are recorded as a random sample of the population.
         allowances : Allowances or None, default None
-            ``beta`` (cell heterogeneity) and ``gamma`` (information loss), recorded as assumed. They widen the scope
-            of image local-panel accuracy envelopes.
+            Classification only. ``beta`` (cell heterogeneity) and ``gamma`` (information loss), recorded as assumed.
+            They widen the scope of image local-panel accuracy envelopes.
 
         Returns
         -------
@@ -604,25 +706,34 @@ class Feasibility(Evaluator):
         Raises
         ------
         NotImplementedError
-            If the dataset is object detection or tracking (planned).
+            If the dataset is tracking.
         ValueError
-            If the dataset has fewer than 2 classes; a requirement, a class name or the allowances is invalid; both
-            ``model`` and ``predictions`` are given; ``model`` is given with no ``batch_size`` and no global batch
-            size; none of ``predictions``, ``model``, ``replicas``, ``embeddings``
-            or an extractor is given; the model's and the dataset's ``index2label`` differ; class scores are
-            misshapen or not finite, or class decisions are not integer indices of declared classes, one per item; a
-            replica key is unknown; or a derived view lacks ``groups``.
+            If a classification dataset has fewer than 2 classes; a requirement, a class name or the allowances is
+            invalid; both ``model`` and ``predictions`` are given; ``model`` is given with no ``batch_size`` and no
+            global batch size; none of ``predictions``, ``model``, ``replicas``, ``embeddings`` or an extractor is
+            given; the model's and the dataset's ``index2label`` differ; class scores are misshapen or not finite, or
+            class decisions are not integer indices of declared classes, one per item; a replica key is unknown; a
+            derived view lacks ``groups``; or, for object detection, an input is missing, invalid or classification
+            only, or the data exceed ``max_objects``. Each error names the fix.
         ShapeMismatchError
             If the embeddings do not have one row per dataset item, or a ``groups`` array is not aligned with the
             dataset.
         """
         reject_filtered_metadata(dataset, "Feasibility")
-        task = detect_task(dataset[0][1])
-        if task in ("OD", "MOT"):
-            raise NotImplementedError(
-                f"Feasibility supports image and video classification in this release; {task} is planned."
-            )
         # The evaluator warned on construction; its experimental parts stay quiet without spending their warnings.
+        if _supported_task(dataset) == "OD":
+            with quiet_experimental():
+                return self._evaluate_detection(
+                    dataset,
+                    target=target,
+                    predictions=predictions,
+                    model=model,
+                    embeddings=embeddings,
+                    groups=groups,
+                    replicas=replicas,
+                    allowances=allowances,
+                )
+        predictions = cast("ArrayLike | None", predictions)  # classification takes arrays only
         with quiet_experimental():
             units = resolve_units(dataset, groups=groups)
             if units.n_classes < 2:
@@ -673,3 +784,52 @@ class Feasibility(Evaluator):
                 _determinations_frame(specs, determinations),
                 _bounds_frame(bounds, determinations),
             )
+
+    def _evaluate_detection(
+        self,
+        dataset: AnnotatedDataset[Any],
+        *,
+        target: Sequence[TargetSpec],
+        predictions: ArrayLike | Sequence[ObjectDetectionTarget] | None,
+        model: Model | None,
+        embeddings: ArrayLike | None,
+        groups: ArrayLike | str | None,
+        replicas: Mapping[Any, ArrayLike] | None,
+        allowances: Allowances | None,
+    ) -> FeasibilityOutput:
+        """Judge object detection requirements from a detector's detections; every check that needs no pass is first."""
+        specs = parse_targets(target, task="OD", class_names=_declared_class_names(dataset), grouped=False)
+        max_objects = resolve_count_bounds(self.max_objects, specs)
+        check_detection_call(
+            model=model, predictions=predictions, embeddings=embeddings, replicas=replicas, allowances=allowances
+        )
+        class_ids = resolve_class_ids(dataset, specs)
+        check_detection_layout(predictions, len(dataset))
+        units = resolve_detection_units(dataset, groups=groups)
+        if units.grouped:
+            raise ValueError(
+                "Object detection images must be independent units, but some unit holds more than one image: groups= "
+                "pairs images, or a View repeats one. Grouping images, or a video's frames, is not supported in this "
+                "release; pass images that are each their own unit."
+            )
+        check_counts(units, class_ids, max_objects, specs)
+        detections = check_detections(cast(Sequence[Any], predictions), len(dataset), units.n_classes)
+        fit, audit = split_units(units, fit_fraction=FIT_FRACTION, seed=self.resolved_seed)
+        bounds = gather_detection_evidence(
+            specs,
+            units=units,
+            detections=detections,
+            fit=fit,
+            audit=audit,
+            alpha_claim=allocate(self.alpha, len(specs)),  # one claim per requirement: the detector's witness
+            class_ids=class_ids,
+            max_objects=max_objects,
+        )
+        check_ledger(bounds, self.alpha)
+        determinations = [decide(spec, i, bounds) for i, spec in enumerate(specs)]
+        return FeasibilityOutput(
+            tuple(specs),
+            None,
+            _determinations_frame(specs, determinations),
+            _bounds_frame(bounds, determinations),
+        )

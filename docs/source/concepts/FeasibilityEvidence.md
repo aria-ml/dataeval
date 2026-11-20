@@ -4,7 +4,8 @@
 
 ```{important}
 `Feasibility` and its types are experimental and may change in future releases. This page describes the
-first release, which covers image and video classification.
+first release, which covers image and video classification. For object detection, see the {class}`.Feasibility`
+and {class}`.TargetSpec` API reference.
 ```
 
 This page is the practical companion to [Performance limits](PerformanceLimits.md).

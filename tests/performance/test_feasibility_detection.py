@@ -65,13 +65,25 @@ class TestCheckDetections:
             ([_one(), _one(boxes=[[5, 0, 1, 1]])], r"^predictions\[1\]: box 0 .*positive width and height"),
             ([_one(), _one(labels=[1.5])], "labels"),
             ([_one(), _one(labels=[True])], r"predictions\[1\]: labels are booleans"),
-            ([_one(), _one(labels=[3])], r"predictions\[1\]: label 3 is outside the declared classes \[0, 3\)"),
+            (
+                [_one(), _one(labels=[3])],
+                (
+                    r"predictions\[1\]: label 3 is outside the classes the dataset declares, \[0, 3\) \(without "
+                    r"index2label, the labels its targets hold\)\. Drop detections of other classes, or map the "
+                    r"detector's labels onto the dataset's class indices\.$"
+                ),
+            ),
             ([_one(), _one(labels=[-1])], r"predictions\[1\]: label -1 is outside"),
         ],
     )
     def test_refuses(self, predictions, match):
         with pytest.raises(ValueError, match=match):
             check_detections(predictions, 2, 3)
+
+    def test_mapping_detections_are_refused(self):
+        det = {"boxes": np.zeros((1, 4)), "labels": np.zeros(1, dtype=int), "scores": np.ones(1)}
+        with pytest.raises(ValueError, match=r"^predictions\[1\] is a mapping; .*attributes boxes, labels and scores"):
+            check_detections([_one(), det], 2, 3)
 
     def test_a_single_array_is_not_a_sequence_of_detections(self):
         with pytest.raises(ValueError, match="one detections object per image"):

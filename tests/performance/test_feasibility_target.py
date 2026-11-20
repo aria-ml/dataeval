@@ -1,5 +1,7 @@
+import re
 from typing import Any
 
+import numpy as np
 import pytest
 
 from dataeval.performance._feasibility_constants import n_cells_for
@@ -69,25 +71,23 @@ class TestFeasibilityTarget:
             _spec("ap", 0.9, aggregation="sequence_mean")
 
     def test_od_and_mot_targets_parse(self):
-        integral: dict[str, Any] = {"ap_functional": "population_ap_integral"}
         od = _parse(
             [
-                TargetSpec(task="OD", metric="ap", threshold=0.7, class_name="cat", iou=0.5, **integral),
-                TargetSpec(task="OD", metric="ap", threshold=0.5, iou=0.75, **integral),
+                TargetSpec(task="OD", metric="ap", threshold=0.7, class_name="cat", iou=0.5, max_detections=20),
+                TargetSpec(task="OD", metric="ap", threshold=0.5, class_name="dog", iou=0.75, max_detections=100),
             ],
             task="OD",
         )
-        assert [(s.class_name, s.iou) for s in od] == [("cat", 0.5), (None, 0.75)]
+        assert [(s.class_name, s.iou, s.max_detections) for s in od] == [("cat", 0.5, 20), ("dog", 0.75, 100)]
         mot = _parse([_mota(0.4)], task="MOT")[0]
         assert (mot.task, mot.metric, mot.iou) == ("MOT", "mota", 0.5)
-        rec = TargetSpec(task="OD", metric="recall_at_fp", threshold=0.9, iou=0.5, fp_budget=2.0)
-        assert _parse([rec], task="OD") == [rec]
+        # The iou and fp_budget errors come before the max_detections one, which is checked last.
         with pytest.raises(ValueError, match="iou"):
-            TargetSpec(task="OD", metric="ap", threshold=0.7, class_name="cat", **integral)
+            TargetSpec(task="OD", metric="ap", threshold=0.7, class_name="cat")
         with pytest.raises(ValueError, match="iou"):
             _spec("ap", 0.7, class_name="cat", iou=0.5)  # IC rejects iou
         with pytest.raises(ValueError, match="fp_budget"):
-            TargetSpec(task="OD", metric="recall_at_fp", threshold=0.9, iou=0.5)
+            TargetSpec(task="OD", metric="recall_at_fp", threshold=0.9, iou=0.5, max_detections=20)
 
     def test_classification_ap_takes_the_integral_functional_only(self):
         ap101 = _spec("ap", 0.8, class_name="cat", ap_functional="population_ap_101")
@@ -161,3 +161,75 @@ class TestFeasibilityTarget:
         s = TargetSpec(task="IC", metric="recall", threshold=0.9, class_name="Tank", max_false_positive_rate=0.05)
         with pytest.raises(ValueError, match="grouped data"):
             _parse([s], class_names=["Tank", "BMP"], grouped=True)
+
+
+def _od(**kwargs: Any) -> TargetSpec:
+    return TargetSpec(**{"task": "OD", "metric": "ap", "threshold": 0.5, "class_name": "cat", "iou": 0.5, **kwargs})
+
+
+@pytest.mark.required
+class TestDetectionTargets:
+    def test_max_detections_is_required_and_stored_as_int(self):
+        k = _od(max_detections=np.int64(20)).max_detections
+        assert k == 20
+        assert type(k) is int
+        with pytest.raises(ValueError, match="max_detections"):
+            _od()
+
+    @pytest.mark.parametrize("k", [True, np.True_, 0, -1, 20.0, np.float64(20), 2.5, "20"])
+    def test_max_detections_refuses_bool_zero_and_floats(self, k):
+        with pytest.raises(ValueError, match="max_detections"):
+            _od(max_detections=k)
+
+    def test_max_detections_applies_to_od_only(self):
+        with pytest.raises(ValueError, match="object detection only"):
+            _spec(max_detections=20)
+        with pytest.raises(ValueError, match="object detection only"):
+            TargetSpec(task="MOT", metric="mota", threshold=0.4, iou=0.5, max_detections=20)
+
+    def test_ap_functional_defaults_for_od(self):
+        assert _od(max_detections=20).ap_functional == "population_ap_integral"
+
+    def test_k_is_part_of_equality(self):
+        ten, twenty = _od(max_detections=10), _od(max_detections=20)
+        assert ten != twenty
+        assert _parse([ten, twenty], task="OD") == [ten, twenty]
+        assert _od(max_detections=np.int64(20)) == twenty
+        assert hash(_od(max_detections=np.int64(20))) == hash(twenty)
+
+    @pytest.mark.parametrize(
+        ("kwargs", "match"),
+        [
+            (
+                {"metric": "recall_at_fp", "threshold": 0.9, "class_name": None, "fp_budget": 2.0},
+                r"^'recall_at_fp' is not supported for object detection in this release; use TargetSpec\(task='OD'",
+            ),
+            ({"class_name": None}, r"^Macro 'ap' is not supported for object detection .*name one class: TargetSpec\("),
+            (
+                {"ap_functional": "population_ap_101"},
+                r"'population_ap_integral' only in this release, got 'population_ap_101'; use TargetSpec\(task='OD'",
+            ),
+        ],
+        ids=["recall_at_fp", "macro_ap", "population_ap_101"],
+    )
+    def test_od_parse_refusals(self, kwargs, match):
+        with pytest.raises(ValueError, match=match):
+            _parse([_od(max_detections=20, **kwargs)], task="OD")
+
+    def test_ic_errors_point_to_od(self):
+        with pytest.raises(ValueError, match="task='OD'"):
+            _spec("ap", 0.6, class_name="tank", iou=0.5, max_detections=20)
+        with pytest.raises(ValueError, match="object detection only, not task 'IC'; .*set task='OD'"):
+            _spec("ap", 0.6, class_name="tank", max_detections=20)
+        with pytest.raises(ValueError, match="task='OD'"):
+            _parse([_spec("ap", 0.6, class_name="cat")], task="OD")
+
+    def test_an_ic_recall_target_on_od_data_is_shown_the_supported_od_target(self):
+        recall = _spec("recall", 0.9, class_name="cat", max_false_positive_rate=0.05)
+        supported = re.escape(
+            "TargetSpec(task='OD', metric='ap', class_name=..., threshold=..., iou=..., max_detections=...)"
+        )
+        with pytest.raises(
+            ValueError, match=rf"^A 'recall' target is a IC target but the data is OD; use {supported}$"
+        ):
+            _parse([recall], task="OD")

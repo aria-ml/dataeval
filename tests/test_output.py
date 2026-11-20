@@ -143,6 +143,22 @@ class TestStateIsReadFromTheInstance:
 
         assert _Late().evaluate().meta().state == {"computed": "after"}
 
+    def test_state_records_a_mapping_by_value(self):
+        """Configuration that is a small mapping of scalars is recorded as a copy, not as its length."""
+
+        class _Mapped:
+            bound = {"cat": 3, "dog": 5}
+            nested = {"cat": [3]}
+
+            @set_metadata(state=["bound", "nested"])
+            def evaluate(self) -> MockOutput:
+                return MockOutput(1, True, "value")
+
+        state = _Mapped().evaluate().meta().state
+        assert state["bound"] == {"cat": 3, "dog": 5}
+        assert state["bound"] is not _Mapped.bound
+        assert state["nested"] == "dict: len=1"
+
 
 class _Chosen:
     """A dataset whose items a rule chose, as a frame view is."""

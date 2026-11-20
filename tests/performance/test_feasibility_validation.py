@@ -32,6 +32,14 @@ measured against a posterior label draw, as replicas are):
 - AP witness staircase of the posterior scorer (1,000 fit, 1,000 audit) <= its population AP (quad, 0.92177). This
   checks validity only: the slack belongs to the bound, 39 Bonferroni'd endpoints (19 thresholds) at 1,000 audit
   items, while the population staircase on the same thresholds sits only about 0.01 below the AP;
+- object detection AP witness (``ap_from_counts``, 1,000 audit images, B = 6, K = 4) <= the population staircase on
+  its own thresholds -inf, 0.4, 0.7: ``ap_lower_staircase`` at E[TP(t)], E[FP(t)] and E[N] (0.72082), each
+  enumerated exactly. The count model has no boxes: N targets on 0..6 (12% empty, E[N] = 2.6), each missed or
+  detected at score 0.3, 0.6 or 0.9, then 0 to 2 false positives at 0.2 or 0.5, and the top K kept (the cut binds on
+  19% of images). Detections at 0.3 count only at -inf, which lifts the staircase from 0.59811. It catches gross
+  errors only: with no delta split (every endpoint at the whole claim) it still covers 346/346, so the supports and
+  the split are pinned in ``test_feasibility_detection_witness.py``, by its known-answer and ledger-share tests;
+- negative control: the plug-in staircase at the sample means, with no radius, must fail the harness;
 - kink cost grid vs G_DFE (spike report §8): C3 AP ceilings on the same gauss2 panels and cells (20,000 units, 50
   seeds, sampled endpoints); the mean paired difference kink - G_DFE is at most 3 SE, per class;
 - determination errors of a representative call (gauss2, 600 items, 2 replicas on 300, built-in witnesses):
@@ -63,7 +71,9 @@ endpoint covered 346/346 at (0.0014, 0.0294)); point estimate 175/346 (-0.0262, 
 ``sequence_mean`` 346/346 (0.0225, 0.0527) and ``frame_pooled`` 346/346 (0.1627, 0.1824, the ratio's support is the
 declared length), 0 ambiguous; C3 346/346 (0.0063, 0.0126); C3 AP ceiling 346/346 (0.0614, 0.0650); AP witness
 346/346 (0.189, 0.230; hybrid: 0.273, 0.318). The witness and AP witness were re-measured on 2026-10-23 after the
-exact binomial switch. Kink - G_DFE: mean -0.00095 (SE 6e-6) in both classes, negative in every seed.
+exact binomial switch. Kink - G_DFE: mean -0.00095 (SE 6e-6) in both classes, negative in every seed. On 2026-11-19:
+object detection AP witness 346/346 (0.1661, 0.1856; 0.1283, 0.1476 with no delta split); its plug-in staircase
+169/346 (-0.0181, -0.0003); the two tests run in under 1 s.
 
 Recall claims, observed on 2026-10-23: witness 331/346 jointly (-0.0109, 0.0169; recall alone 339, false positives
 alone 338); recall point estimate 173/346 (-0.0373, -0.0005); C3 recall 346/346 (0.0301, 0.0460; to the cell NP recall
@@ -76,6 +86,7 @@ witness would demonstrate the upper threshold in 345/346. Runtime about 20 s for
 (single-threaded BLAS): the two determination tests 9 s, the recall claims 8 s.
 """
 
+import itertools
 import math
 from collections.abc import Callable
 from dataclasses import replace
@@ -89,11 +100,12 @@ from scipy.integrate import quad
 from scipy.special import expit
 from scipy.stats import binom, norm
 
-from dataeval.core import disjoint_panels, kink_costs
+from dataeval.core import ap_lower_staircase, disjoint_panels, kink_costs
 from dataeval.performance import Feasibility, TargetSpec
 from dataeval.performance import _feasibility_classification as fc
 from dataeval.performance._feasibility_constants import COVERAGE_CRITICAL, COVERAGE_SEEDS, PANEL_SIZE
 from dataeval.performance._feasibility_decide import decide
+from dataeval.performance._feasibility_detection import ap_from_counts
 from tests.data.conftest import MockICDataset
 from tests.performance.feasibility_helpers import Population, draw_labels, make_population, make_sequences, make_units
 
@@ -425,6 +437,105 @@ def _ap_witness_margin(seed: int) -> float:
     return AP_TRUTH - source.ap_class(None, 0, ALPHA)[0]
 
 
+# The object detection AP witness on a count model with no boxes. Per image, N targets follow OD_N_PMF on 0..6
+# (12% empty, E[N] = 2.6). Each target is missed or detected at one of OD_TARGET_SCORES, by OD_HIT_PMF (the miss
+# first). 0, 1 or 2 false positives (OD_FP_COUNT_PMF) each score one of OD_FP_SCORES. The top OD_K detections by score
+# are kept, so the cut binds on images with more than 4 detections. Target and false-positive scores never coincide,
+# so ties at the cut change no count.
+OD_B, OD_K = 6, 4
+OD_THRESHOLDS = np.array([-np.inf, 0.4, 0.7])  # targets at 0.3 count only at -inf, so -inf raises recall
+OD_N_PMF = np.array([0.12, 0.18, 0.22, 0.18, 0.13, 0.10, 0.07])
+OD_TARGET_SCORES, OD_HIT_PMF = np.array([0.3, 0.6, 0.9]), np.array([0.15, 0.20, 0.30, 0.35])
+OD_FP_SCORES, OD_FP_SCORE_PMF, OD_FP_COUNT_PMF = np.array([0.2, 0.5]), np.array([0.6, 0.4]), np.array([0.5, 0.3, 0.2])
+
+
+def _od_draw(rng: np.random.Generator, n_images: int) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
+    """Per-image TP(t) and FP(t) on OD_THRESHOLDS, and N: each image's detections sorted, and the top OD_K kept."""
+    n = rng.choice(len(OD_N_PMF), n_images, p=OD_N_PMF)
+    hit = rng.choice(len(OD_HIT_PMF), (n_images, OD_B), p=OD_HIT_PMF)
+    n_fp = rng.choice(len(OD_FP_COUNT_PMF), n_images, p=OD_FP_COUNT_PMF)
+    fp_scores = rng.choice(OD_FP_SCORES, (n_images, 2), p=OD_FP_SCORE_PMF)  # at most 2 false positives
+    # an absent detection (a miss, or a slot beyond the image's count) is NaN: it sorts last and passes no threshold
+    scores = np.c_[
+        np.where(np.arange(OD_B) < n[:, None], np.r_[np.nan, OD_TARGET_SCORES][hit], np.nan),
+        np.where(np.arange(2) < n_fp[:, None], fp_scores, np.nan),
+    ]
+    top = np.argsort(-scores, axis=1)[:, :OD_K]
+    passes = np.take_along_axis(scores, top, axis=1)[..., None] >= OD_THRESHOLDS  # (images, K, thresholds)
+    target = (top < OD_B)[..., None]
+    return (passes & target).sum(axis=1), (passes & ~target).sum(axis=1), n
+
+
+def _od_kept(target_counts: tuple[int, ...], fp_counts: tuple[int, ...]) -> NDArray[np.float64]:
+    """FP(t) and TP(t) (rows 0 and 1) of an image with these counts per score: fill the top OD_K from the top score."""
+    groups = [(s, 1, c) for s, c in zip(OD_TARGET_SCORES, target_counts, strict=True)]
+    groups += [(s, 0, c) for s, c in zip(OD_FP_SCORES, fp_counts, strict=True)]
+    out, room = np.zeros((2, len(OD_THRESHOLDS))), OD_K
+    for score, is_target, count in sorted(groups, reverse=True):
+        kept = min(count, room)
+        room -= kept
+        out[is_target] += kept * (score >= OD_THRESHOLDS)
+    return out
+
+
+def _compositions(n: int, parts: int) -> list[tuple[int, ...]]:
+    return [c for c in itertools.product(range(n + 1), repeat=parts) if sum(c) == n]
+
+
+def _multinomial(counts: tuple[int, ...], probs: NDArray[np.float64]) -> float:
+    """The multinomial probability of ``counts``, 1 at a total of 0 (scipy 1.10's ``multinomial.pmf`` gives NaN)."""
+    coefficient = math.factorial(sum(counts)) / math.prod(map(math.factorial, counts))
+    return coefficient * math.prod(float(p) ** c for p, c in zip(probs, counts, strict=True))
+
+
+@cache
+def _od_population_staircase() -> float:
+    """
+    ap_lower_staircase at E[TP(t)], E[FP(t)] and E[N], each by exact enumeration of the per-image counts at each score,
+    weighted by their multinomial probabilities.
+
+    Checked against the closed form of E[N], and against 200,000 images of ``_od_draw`` to 4 SE, which sorts and cuts
+    each image's detections rather than filling counts in score order.
+    """
+    targets = [
+        (n, hits, p * _multinomial(hits, OD_HIT_PMF))
+        for n, p in enumerate(OD_N_PMF)
+        for hits in _compositions(n, len(OD_HIT_PMF))  # the misses, then the detections at each target score
+    ]
+    false = [
+        (fps, p * _multinomial(fps, OD_FP_SCORE_PMF))
+        for f, p in enumerate(OD_FP_COUNT_PMF)
+        for fps in _compositions(f, len(OD_FP_SCORES))
+    ]
+    fp, tp, mean_n = np.zeros(len(OD_THRESHOLDS)), np.zeros(len(OD_THRESHOLDS)), 0.0
+    for (n, hits, p), (fps, q) in itertools.product(targets, false):
+        kept = _od_kept(hits[1:], fps)
+        fp, tp, mean_n = fp + p * q * kept[0], tp + p * q * kept[1], mean_n + p * q * n
+    assert mean_n == pytest.approx(OD_N_PMF @ np.arange(len(OD_N_PMF)), rel=1e-12)
+    drawn = np.c_[_od_draw(np.random.default_rng(10**6), 200_000)]  # no test seed reuses it
+    se = drawn.std(axis=0, ddof=1) / math.sqrt(len(drawn))
+    assert (np.abs(drawn.mean(axis=0) - np.r_[tp, fp, mean_n]) <= 4 * se).all()
+    staircase = ap_lower_staircase(tp, fp, mean_n)
+    assert tp[0] > tp[1]  # the -inf point reaches more targets than the next threshold
+    assert staircase > ap_lower_staircase(tp[1:], fp[1:], mean_n)  # and so it enters the target
+    return staircase
+
+
+def _od_audit(seed: int) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
+    return _od_draw(np.random.default_rng(seed), 1_000)
+
+
+def _od_witness_margin(seed: int) -> float:
+    tp, fp, n = _od_audit(seed)
+    bound = ap_from_counts(tp, fp, n, max_objects=OD_B, max_detections=OD_K, alpha_claim=ALPHA)[0]
+    return _od_population_staircase() - bound
+
+
+def _od_point_staircase_margin(seed: int) -> float:
+    tp, fp, n = _od_audit(seed)
+    return _od_population_staircase() - ap_lower_staircase(tp.mean(axis=0), fp.mean(axis=0), n.mean())  # no radius
+
+
 def _kink_minus_g_dfe(seed: int) -> NDArray[np.float64]:
     """Per class, the C3 AP ceiling with the kink grid minus the one with G_DFE, on the same gauss2 panels."""
     source, y, panels = _c3(seed)
@@ -499,6 +610,15 @@ def test_c3_ap_ceiling_covers_the_best_cell_scorer_ap():
 
 def test_ap_witness_staircase_covers_the_posterior_ap():
     _accept(_covered(_ap_witness_margin), "AP witness staircase <= population AP")
+
+
+def test_od_ap_witness_covers_its_population_staircase():
+    _accept(_covered(_od_witness_margin), "OD AP witness <= the population staircase on its thresholds")
+
+
+def test_the_od_point_staircase_without_a_radius_fails_the_harness():
+    covered, _ = _covered(_od_point_staircase_margin)
+    assert covered <= COVERAGE_CRITICAL, f"negative control: {covered}/{COVERAGE_SEEDS} covered"
 
 
 def test_recall_witness_of_the_np_rule_covers_its_recall_and_false_positive_rate():
