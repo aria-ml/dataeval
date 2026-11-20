@@ -22,6 +22,8 @@
 #
 # Use it to analyze a slice of a dataset chosen by how it was collected, or to remove detections that fail a quality
 # bar. To filter by class label alone, see [Build dataset views with View and Operation](./h2_build_dataset_views.py).
+# A filter reads every item; for a slow dataset, see
+# [Speed up passes over a large dataset](./h2_speed_up_large_datasets.py).
 #
 # You need `dataeval` and `maite-datasets`, and about 1.1 GB of disk for the SeaDrone download.
 

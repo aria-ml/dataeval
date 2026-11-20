@@ -57,6 +57,7 @@ datasets for machine learning.
 ../notebooks/h2_wrap_dataframe_dataset.py
 ../notebooks/h2_wrap_video_files.py
 ../notebooks/h2_defer_decoding.py
+../notebooks/h2_speed_up_large_datasets.py
 ../notebooks/h2_select_frames.py
 ../notebooks/h2_metadata_from_dataframe.py
 ../notebooks/h2_build_dataset_views.py
@@ -102,6 +103,10 @@ datasets for machine learning.
   - Return lazy images and video frames from a dataset you write, so a
     metadata-only walk decodes no pixels
   - [![Open In Colab][colab-badge]][ddc-colab]
+- - [](../notebooks/h2_speed_up_large_datasets.py)
+  - Read a dataset that decodes each item in several threads, build its
+    metadata from that read, and compute statistics in several processes
+  - [![Open In Colab][colab-badge]][spd-colab]
 - - [](../notebooks/h2_select_frames.py)
   - Thin each video to a budget of frames with Stride, EvenlySpaced or
     Representative, and read how many source frames each kept frame stands for
@@ -250,6 +255,7 @@ datasets for machine learning.
 [wvf-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_wrap_video_files.ipynb
 [sel-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_select_frames.ipynb
 [ddc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_defer_decoding.ipynb
+[spd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_speed_up_large_datasets.ipynb
 
 ## Model development
 
