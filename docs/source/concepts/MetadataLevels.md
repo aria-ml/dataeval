@@ -539,5 +539,7 @@ what granularity was this measured?" is a level question.
   once.
 - [Measure frames and tracks in a tracking dataset](../notebooks/h2_measure_frames_and_tracks.py): attaching frame
   timing, exact repeats, track steps and track statistics, each at its own level.
+- [Speed up passes over a large dataset](../notebooks/h2_speed_up_large_datasets.py): reading the pixels in threads
+  and building the metadata from that read, so the dataset is read once.
 - [Trace a finding back to its source](../notebooks/h2_trace_findings_to_source.py): retrieving the image,
   frame, track or detection that a finding's `SourceIndex` names.

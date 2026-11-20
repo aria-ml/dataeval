@@ -430,6 +430,13 @@ def use_load_threads(threads: int) -> _ConfigContextManager:
     -------
     _ConfigContextManager
         Context manager that restores the previous value on exit.
+
+    Notes
+    -----
+    The setting reaches only the reads made inside the block. :class:`~dataeval.Metadata` and
+    :class:`~dataeval.Embeddings` read their dataset on first use, not when they are built, so run the pass inside the
+    block, for example with ``Metadata(dataset).dataframe`` or ``Embeddings(dataset, ...).compute()``. One built inside
+    and first used after the block reads one item at a time.
     """
     if threads > 1:
         warn_experimental_once("load_threads", details=_LOAD_THREADS_DETAILS)

@@ -73,7 +73,8 @@ dataeval.config.set_batch_size(None)
 #
 # DataEval follows the conventions of [`scikit-learn`](https://scikit-learn.org/stable/glossary.html#term-n_jobs) and
 # [`joblib`](https://joblib.readthedocs.io/en/stable/generated/joblib.Parallel.html): `-1` uses all visible CPU cores
-# and `None` unsets the limit.
+# and `None` unsets the limit. Worker processes compute; to read a dataset's items in several threads, see
+# [Speed up passes over a large dataset](./h2_speed_up_large_datasets.py).
 
 # %%
 dataeval.config.set_max_processes(4)

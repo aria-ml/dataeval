@@ -183,7 +183,7 @@ lines and the order of the sections.
 | Section | Level | Required | Content |
 | ------- | ----- | -------- | ------- |
 | Title | H1 | yes | An imperative verb phrase, for example `Create embeddings` |
-| Lead | | yes | No heading. At most 120 words in up to three short blocks: the problem and the tool that solves it, with a link to its concept page; when to use it, as a sentence or a short list; and any requirement beyond `pip install dataeval` |
+| Lead | | yes | No heading. At most 120 words in up to three short blocks: the problem and the tool that solves it, with a link to its concept page, or to its API reference when no concept page covers it; when to use it, as a sentence or a short list; and any requirement beyond `pip install dataeval` |
 | Working sections | H2 | yes | One per step, named for the action, for example `Create embeddings with PyTorch` |
 | `Next steps` | H2 | yes | See the Next steps section |
 
