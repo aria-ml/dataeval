@@ -252,10 +252,10 @@ only in the [API reference](autoapi/dataeval/index.rst).
   - Object detection
   - Video tracking
 * - {class}`.Feasibility` ⚠️
-  - Decides whether a classification target (accuracy, AP or recall) is demonstrated, ruled out under recorded
-    assumptions, or neither, and returns the evidence behind each determination
+  - Decides whether a classification target (accuracy, AP or recall) or an object detection AP target on one class is
+    demonstrated, ruled out under recorded assumptions, or neither, and returns the evidence behind each determination
   - ✔
-  -
+  - ✔
   - Crops, Groups
 * - {class}`.Sufficiency`
   - Determines how much training data a performance target needs, by training the model on growing subsets and fitting

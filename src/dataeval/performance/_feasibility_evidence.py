@@ -10,12 +10,13 @@ from typing import Literal, get_args
 from dataeval.performance._feasibility_target import Scope
 
 # Every column of the ``bounds`` table that is not a number is one of these closed sets. They are also the Enum dtypes.
-Source = Literal["local_panels", "replicas", "knn", "linear_probe", "user_model"]  # the order of the table's rows
+# Source is in the order of the table's rows.
+Source = Literal["local_panels", "replicas", "capacity", "knn", "linear_probe", "user_model"]
 Role = Literal["envelope", "witness"]
 Quantity = Literal["accuracy", "ap", "recall", "recall_at_fp", "mota", "false_positive_rate"]
 BoundType = Literal["lower", "upper"]
 Population = Literal["items", "labeled_items"]
-Sample = Literal["audit_split", "audit_split_one_per_group", "replica_items"]
+Sample = Literal["audit_split", "audit_split_one_per_group", "replica_items", "all_items"]
 Unit = Literal["image", "sequence"]
 State = Literal["unavailable", "uninformative", "informative"]
 Reason = Literal[

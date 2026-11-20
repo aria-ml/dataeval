@@ -72,6 +72,11 @@ _MODELS: dict[Source, Callable[[], Any]] = {
 _SOURCES = get_args(Source)  # the order of the bounds table's rows
 
 
+def table_order(b: Bound) -> tuple[int, int, bool]:
+    """Sort key of the bounds table: by requirement, then source, a witness's false-positive bound after its own."""
+    return (b.requirement, _SOURCES.index(b.source), b.quantity == "false_positive_rate")
+
+
 class _UnavailableError(Exception):
     """A bound that cannot be computed; ``reason`` says why."""
 
@@ -845,4 +850,4 @@ def gather_evidence(
         bounds += _builtin(call, specs)
     if predictions is not None:
         bounds += _user(call, specs, predictions, class_order_verified)
-    return sorted(bounds, key=lambda b: (b.requirement, _SOURCES.index(b.source), b.quantity == "false_positive_rate"))
+    return sorted(bounds, key=table_order)

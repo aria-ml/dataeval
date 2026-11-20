@@ -19,7 +19,7 @@ pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.Experimenta
 
 AB = {0: "a", 1: "b"}
 _SCOPE = pl.Enum(["full_input", "fixed_representation", "partition_restricted"])
-_SOURCE = pl.Enum(["local_panels", "replicas", "knn", "linear_probe", "user_model"])
+_SOURCE = pl.Enum(["local_panels", "replicas", "capacity", "knn", "linear_probe", "user_model"])
 _QUANTITY = pl.Enum(["accuracy", "ap", "recall", "recall_at_fp", "mota", "false_positive_rate"])
 _ASSUMPTION = pl.Enum([
     "representation_independent_of_audit_labels",
@@ -78,7 +78,7 @@ BOUNDS_SCHEMA: dict[str, Any] = {
     "bound_type": pl.Enum(["lower", "upper"]),
     "information_scope": _SCOPE,
     "population": pl.Enum(["items", "labeled_items"]),
-    "sample": pl.Enum(["audit_split", "audit_split_one_per_group", "replica_items"]),
+    "sample": pl.Enum(["audit_split", "audit_split_one_per_group", "replica_items", "all_items"]),
     "unit": pl.Enum(["image", "sequence"]),
     "state": pl.Enum(["unavailable", "uninformative", "informative"]),
     "reason": pl.Enum([
@@ -251,7 +251,7 @@ class TestBounds:
             for r, s, q in zip(run.bounds["requirement"], run.bounds["source"], run.bounds["quantity"], strict=True)
         ]
         assert keys == sorted(keys)
-        assert set(run.bounds["source"]) == set(sources)
+        assert set(run.bounds["source"]) == set(sources) - {"capacity"}  # the capacity envelope is object detection's
         recall = run.bounds.filter((pl.col("requirement") == 3) & (pl.col("source") == "user_model"))
         assert recall["quantity"].to_list() == [
             "recall",

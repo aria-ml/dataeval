@@ -40,6 +40,14 @@ measured against a posterior label draw, as replicas are):
   errors only: with no delta split (every endpoint at the whole claim) it still covers 346/346, so the supports and
   the split are pinned in ``test_feasibility_detection_witness.py``, by its known-answer and ledger-share tests;
 - negative control: the plug-in staircase at the sample means, with no radius, must fail the harness;
+- object detection capacity bound (``capacity_from_counts``, 1,000 images, B = 12, K = 3) >= ``E[min(N, K)] / E[N]`` of
+  Binomial(12, 0.4) counts (0.60308, from the binomial pmf), and below 1 on every seed. It catches only a radius
+  missing from a whole form, both endpoints of the direct or the risk form at their sample means (170/346): with any
+  single endpoint's radius removed it still covers 346/346, and the risk form never binds at this truth. A half
+  radius still covers 346/346, a quarter radius 345/346 and no delta split (every endpoint at the whole claim)
+  346/346, so the formula's correctness is pinned against the DFE reference in
+  ``test_feasibility_detection_capacity.py``;
+- negative control: the same ratio at the sample means, with no radius, must fail the harness;
 - kink cost grid vs G_DFE (spike report §8): C3 AP ceilings on the same gauss2 panels and cells (20,000 units, 50
   seeds, sampled endpoints); the mean paired difference kink - G_DFE is at most 3 SE, per class;
 - determination errors of a representative call (gauss2, 600 items, 2 replicas on 300, built-in witnesses):
@@ -73,7 +81,10 @@ declared length), 0 ambiguous; C3 346/346 (0.0063, 0.0126); C3 AP ceiling 346/34
 346/346 (0.189, 0.230; hybrid: 0.273, 0.318). The witness and AP witness were re-measured on 2026-10-23 after the
 exact binomial switch. Kink - G_DFE: mean -0.00095 (SE 6e-6) in both classes, negative in every seed. On 2026-11-19:
 object detection AP witness 346/346 (0.1661, 0.1856; 0.1283, 0.1476 with no delta split); its plug-in staircase
-169/346 (-0.0181, -0.0003); the two tests run in under 1 s.
+169/346 (-0.0181, -0.0003); the two tests run in under 1 s. Object detection capacity bound 346/346 (0.0452,
+0.0645; median bound 0.6676, largest 0.6893, so below 1 in every seed; 0.0139, 0.0310 at a half radius, -0.0010,
+0.0151 at a quarter, 0.0335, 0.0520 with no delta split); its plug-in ratio 170/346 (-0.0153, -0.0001); the two
+tests run in under 1 s.
 
 Recall claims, observed on 2026-10-23: witness 331/346 jointly (-0.0109, 0.0169; recall alone 339, false positives
 alone 338); recall point estimate 173/346 (-0.0373, -0.0005); C3 recall 346/346 (0.0301, 0.0460; to the cell NP recall
@@ -105,7 +116,7 @@ from dataeval.performance import Feasibility, TargetSpec
 from dataeval.performance import _feasibility_classification as fc
 from dataeval.performance._feasibility_constants import COVERAGE_CRITICAL, COVERAGE_SEEDS, PANEL_SIZE
 from dataeval.performance._feasibility_decide import decide
-from dataeval.performance._feasibility_detection import ap_from_counts
+from dataeval.performance._feasibility_detection import ap_from_counts, capacity_from_counts
 from tests.data.conftest import MockICDataset
 from tests.performance.feasibility_helpers import Population, draw_labels, make_population, make_sequences, make_units
 
@@ -536,6 +547,40 @@ def _od_point_staircase_margin(seed: int) -> float:
     return _od_population_staircase() - ap_lower_staircase(tp.mean(axis=0), fp.mean(axis=0), n.mean())  # no radius
 
 
+OD_CAPACITY_B, OD_CAPACITY_K, OD_CAPACITY_P = 12, 3, 0.4
+
+
+@cache
+def _od_capacity_truth() -> float:
+    """
+    ``E[min(N, K)] / E[N]`` of N ~ Binomial(B, p), from the pmf by ``math.comb``, independent of scipy, as
+    ``_multinomial`` is.
+    """
+    pmf = [
+        math.comb(OD_CAPACITY_B, k) * OD_CAPACITY_P**k * (1 - OD_CAPACITY_P) ** (OD_CAPACITY_B - k)
+        for k in range(OD_CAPACITY_B + 1)
+    ]
+    return sum(p * min(k, OD_CAPACITY_K) for k, p in enumerate(pmf)) / (OD_CAPACITY_B * OD_CAPACITY_P)
+
+
+def _od_capacity_counts(seed: int) -> NDArray[np.intp]:
+    return np.random.default_rng(seed).binomial(OD_CAPACITY_B, OD_CAPACITY_P, size=1_000)
+
+
+def _od_capacity_bound(seed: int) -> tuple[float, dict[str, Any]]:
+    return capacity_from_counts(
+        _od_capacity_counts(seed), max_objects=OD_CAPACITY_B, max_detections=OD_CAPACITY_K, alpha_claim=ALPHA
+    )
+
+
+def _od_capacity_margin(seed: int) -> float:
+    return _od_capacity_bound(seed)[0] - _od_capacity_truth()
+
+
+def _od_capacity_point_margin(seed: int) -> float:
+    return _od_capacity_bound(seed)[1]["mean"] - _od_capacity_truth()  # the plug-in ratio: no radius
+
+
 def _kink_minus_g_dfe(seed: int) -> NDArray[np.float64]:
     """Per class, the C3 AP ceiling with the kink grid minus the one with G_DFE, on the same gauss2 panels."""
     source, y, panels = _c3(seed)
@@ -618,6 +663,16 @@ def test_od_ap_witness_covers_its_population_staircase():
 
 def test_the_od_point_staircase_without_a_radius_fails_the_harness():
     covered, _ = _covered(_od_point_staircase_margin)
+    assert covered <= COVERAGE_CRITICAL, f"negative control: {covered}/{COVERAGE_SEEDS} covered"
+
+
+def test_od_capacity_bound_covers_its_ratio():
+    _accept(_covered(_od_capacity_margin), "OD capacity bound >= E[min(N, K)] / E[N]")
+    assert all(_od_capacity_bound(seed)[0] < 1 for seed in range(COVERAGE_SEEDS))  # informative, not vacuous
+
+
+def test_the_od_capacity_point_ratio_without_a_radius_fails_the_harness():
+    covered, _ = _covered(_od_capacity_point_margin)
     assert covered <= COVERAGE_CRITICAL, f"negative control: {covered}/{COVERAGE_SEEDS} covered"
 
 
