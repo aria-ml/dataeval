@@ -43,6 +43,7 @@ Assumption = Literal[
     "replicas_same_video_context",
     "replicated_sequences_random_sample",
     "replicated_frames_uniform_sample",
+    "max_objects_holds",
 ]
 
 _ENUMS: dict[str, tuple[str, ...]] = {

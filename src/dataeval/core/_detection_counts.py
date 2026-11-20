@@ -80,15 +80,45 @@ def _matched(targets: NDArray[np.float64], boxes: NDArray[np.float64], iou: floa
     return matched
 
 
-def _check_arguments(iou: float, thresholds: ArrayLike, max_detections: int) -> NDArray[np.float64]:
+def _check_arguments(
+    target_boxes: Sequence[ArrayLike],
+    detection_boxes: Sequence[ArrayLike],
+    detection_scores: Sequence[ArrayLike],
+    iou: float,
+    max_detections: int,
+) -> int:
+    """Check what both public functions take, and return the number of images."""
+    n_images = len(target_boxes)
+    if not len(detection_boxes) == len(detection_scores) == n_images:
+        raise ValueError(
+            "target_boxes, detection_boxes and detection_scores need one entry per image, got "
+            f"{n_images}, {len(detection_boxes)} and {len(detection_scores)}."
+        )
     if not 0 < iou <= 1:
         raise ValueError(f"iou must be in (0, 1], got {iou}.")
     if isinstance(max_detections, bool) or not isinstance(max_detections, int | np.integer) or max_detections < 1:
         raise ValueError(f"max_detections must be an integer of at least 1, got {max_detections!r}.")
-    grid = np.asarray(thresholds, dtype=np.float64)
-    if grid.ndim != 1 or not grid.size or not np.isfinite(grid).all():
-        raise ValueError(f"thresholds must be a nonempty 1-D array of finite scores, got shape {grid.shape}.")
-    return grid
+    return n_images
+
+
+def _kept(
+    i: int,
+    target_boxes: ArrayLike,
+    detection_boxes: ArrayLike,
+    detection_scores: ArrayLike,
+    iou: float,
+    max_detections: int,
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    """One image's kept detections, as their scores in kept order and whether each matched a target."""
+    targets = check_boxes(target_boxes, f"image {i} targets")
+    boxes = check_boxes(detection_boxes, f"image {i} detections")
+    scores = np.asarray(detection_scores, dtype=np.float64).reshape(-1)
+    if len(scores) != len(boxes):
+        raise ValueError(f"image {i}: {len(scores)} scores for {len(boxes)} detection boxes; give one each.")
+    if not np.isfinite(scores).all():
+        raise ValueError(f"image {i}: scores must be finite; found NaN or infinite scores.")
+    order = np.argsort(-scores, kind="stable")[:max_detections]
+    return scores[order], _matched(targets, boxes[order], iou)
 
 
 def detection_counts(
@@ -122,7 +152,8 @@ def detection_counts(
     iou : float
         The IoU a detection needs with a target to match it, in ``(0, 1]``.
     thresholds : ArrayLike
-        Shape ``(n_thresholds,)`` score thresholds; the result's columns follow them as given.
+        Shape ``(n_thresholds,)`` score thresholds; the result's columns follow them as given. A threshold of ``-inf``
+        counts every kept detection.
     max_detections : int
         The most detections kept per image, at least 1.
 
@@ -135,33 +166,61 @@ def detection_counts(
     ------
     ValueError
         If the three sequences differ in length, a box is not finite or has no positive width and height, scores are
-        not finite or not one per detection box, ``thresholds`` is not a nonempty 1-D finite array, ``iou`` is outside
-        ``(0, 1]``, or ``max_detections`` is not an integer of at least 1.
+        not finite or not one per detection box, ``thresholds`` is not a nonempty 1-D array without NaN or ``+inf``,
+        ``iou`` is outside ``(0, 1]``, or ``max_detections`` is not an integer of at least 1.
 
     References
     ----------
     .. [1] Lin, T.-Y. et al. (2014). Microsoft COCO: Common Objects in Context. ECCV. arXiv:1405.0312.
     """
-    n_images = len(target_boxes)
-    if not len(detection_boxes) == len(detection_scores) == n_images:
+    n_images = _check_arguments(target_boxes, detection_boxes, detection_scores, iou, max_detections)
+    grid = np.asarray(thresholds, dtype=np.float64)
+    if grid.ndim != 1 or not grid.size or np.isnan(grid).any() or np.isposinf(grid).any():
         raise ValueError(
-            "target_boxes, detection_boxes and detection_scores need one entry per image, got "
-            f"{n_images}, {len(detection_boxes)} and {len(detection_scores)}."
+            "thresholds must be a nonempty 1-D array of scores; -inf counts every kept detection, NaN and +inf are "
+            f"refused. Got shape {grid.shape}."
         )
-    grid = _check_arguments(iou, thresholds, max_detections)
     tp = np.zeros((n_images, len(grid)), dtype=np.intp)
     fp = np.zeros((n_images, len(grid)), dtype=np.intp)
     for i in range(n_images):
-        targets = check_boxes(target_boxes[i], f"image {i} targets")
-        boxes = check_boxes(detection_boxes[i], f"image {i} detections")
-        scores = np.asarray(detection_scores[i], dtype=np.float64).reshape(-1)
-        if len(scores) != len(boxes):
-            raise ValueError(f"image {i}: {len(scores)} scores for {len(boxes)} detection boxes; give one each.")
-        if not np.isfinite(scores).all():
-            raise ValueError(f"image {i}: scores must be finite; found NaN or infinite scores.")
-        order = np.argsort(-scores, kind="stable")[:max_detections]
-        hits = np.r_[0, np.cumsum(_matched(targets, boxes[order], iou))]
-        counted = np.searchsorted(-scores[order], -grid, side="right")  # detections scoring at least each threshold
+        kept, matched = _kept(i, target_boxes[i], detection_boxes[i], detection_scores[i], iou, max_detections)
+        hits = np.r_[0, np.cumsum(matched)]
+        counted = np.searchsorted(-kept, -grid, side="right")  # detections scoring at least each threshold
         tp[i] = hits[counted]
         fp[i] = counted - tp[i]
     return DetectionCountsResult(true_positives=tp, false_positives=fp)
+
+
+def kept_matches(
+    target_boxes: Sequence[ArrayLike],
+    detection_boxes: Sequence[ArrayLike],
+    detection_scores: Sequence[ArrayLike],
+    *,
+    iou: float,
+    max_detections: int,
+) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    """
+    Return the score of every kept detection and whether it matched a target, as :func:`detection_counts` matches.
+
+    The detections kept are the top ``max_detections`` of each image, and the match is the same greedy pass, from the
+    same code, so a detection counted as a true positive by :func:`detection_counts` at some threshold is a ``True``
+    here. The arguments are those of :func:`detection_counts` without ``thresholds``.
+
+    Returns
+    -------
+    tuple[NDArray[np.float64], NDArray[np.bool_]]
+        The scores and the matched flags, each of shape ``(n_kept,)``, over the images in order and each image's
+        detections in kept order (highest score first). Both are empty when no detection is kept.
+
+    Raises
+    ------
+    ValueError
+        As :func:`detection_counts`, apart from ``thresholds``.
+    """
+    n_images = _check_arguments(target_boxes, detection_boxes, detection_scores, iou, max_detections)
+    parts = [
+        _kept(i, target_boxes[i], detection_boxes[i], detection_scores[i], iou, max_detections) for i in range(n_images)
+    ]
+    if not parts:
+        return np.empty(0, dtype=np.float64), np.empty(0, dtype=bool)
+    return np.concatenate([scores for scores, _ in parts]), np.concatenate([matched for _, matched in parts])

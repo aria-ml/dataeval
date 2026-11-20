@@ -5,7 +5,7 @@ import pytest
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_bipartite_matching
 
-from dataeval.core._detection_counts import check_boxes, detection_counts
+from dataeval.core._detection_counts import check_boxes, detection_counts, kept_matches
 from dataeval.utils.preprocessing import compute_iou
 
 # Reference values: DFE_DataEval_Documentation/examples/dfe_reference.py, pairwise_iou (torch float64), run with
@@ -146,9 +146,25 @@ class TestKnownAnswers:
         assert _counts([_BOX], [[50, 50, 60, 60], _BOX], [0.9, 0.8], k=1) == ([0], [1])
         assert _counts([_BOX], [[50, 50, 60, 60], _BOX], [0.9, 0.8], k=2) == ([1], [1])
 
+    @pytest.mark.parametrize("bad", [np.nan, np.inf])
+    def test_nan_and_plus_inf_thresholds_are_refused(self, bad):
+        with pytest.raises(ValueError, match="thresholds"):
+            _counts([_BOX], [_BOX], [0.9], thresholds=[0.5, bad])
+
     def test_counts_follow_the_thresholds_as_given(self):
         tp, fp = _counts([_BOX], [_BOX, [50, 50, 60, 60]], [0.8, 0.6], thresholds=[0.7, 0.9, 0.5, 0.7])
         assert (tp, fp) == ([1, 0, 1, 1], [0, 0, 1, 0])
+
+    def test_minus_inf_counts_every_kept_detection(self):
+        rng = np.random.default_rng(3)
+        scenes = [_scene(rng, n, 3) for n in (0, 2, 4, 1)]
+        parts = [list(part) for part in zip(*scenes, strict=True)]
+        k = 3
+        result = detection_counts(*parts, iou=0.5, thresholds=np.array([-np.inf, -1e9]), max_detections=k)
+        kept = np.array([min(len(boxes), k) for boxes in parts[1]])
+        np.testing.assert_array_equal((result["true_positives"] + result["false_positives"])[:, 0], kept)
+        np.testing.assert_array_equal(result["true_positives"][:, 0], result["true_positives"][:, 1])
+        np.testing.assert_array_equal(result["false_positives"][:, 0], result["false_positives"][:, 1])
 
 
 @pytest.mark.required
@@ -185,6 +201,74 @@ class TestAgainstTheReferences:
             [targets], [boxes], [np.array([0.3, 0.9, 0.6])], iou=0.5, thresholds=np.array([0.0]), max_detections=100
         )
         assert result["true_positives"][0, 0] == 3
+
+
+@pytest.mark.required
+class TestKeptMatches:
+    @pytest.mark.parametrize("seed", range(40))
+    def test_kept_matches_agree_with_detection_counts(self, seed):
+        rng = np.random.default_rng(seed)
+        scenes = [_scene(rng, int(rng.integers(0, 6)), int(rng.integers(0, 5))) for _ in range(3)]
+        parts = [list(part) for part in zip(*scenes, strict=True)]
+        iou, k = float(rng.choice([0.3, 0.5, 0.75])), int(rng.integers(1, 8))
+        scores, matched = kept_matches(*parts, iou=iou, max_detections=k)
+        assert scores.dtype == np.float64
+        assert matched.dtype == np.bool_
+        every = detection_counts(*parts, iou=iou, thresholds=np.array([-np.inf]), max_detections=k)
+        assert len(scores) == (every["true_positives"] + every["false_positives"]).sum()
+        assert matched.sum() == every["true_positives"].sum()
+        for t in np.unique(scores):
+            counted = detection_counts(*parts, iou=iou, thresholds=np.array([t]), max_detections=k)
+            assert (matched & (scores >= t)).sum() == counted["true_positives"].sum()
+
+    def test_kept_matches_cut_to_k(self):
+        rng = np.random.default_rng(11)
+        scenes = [_scene(rng, 3, 6) for _ in range(4)]
+        parts = [list(part) for part in zip(*scenes, strict=True)]
+        for k in (1, 2, 5):
+            scores, _ = kept_matches(*parts, iou=0.5, max_detections=k)
+            assert len(scores) == sum(min(len(s), k) for s in parts[2])
+
+    def test_kept_matches_are_in_image_order_then_kept_order(self):
+        far = [50, 50, 60, 60]
+        scores, matched = kept_matches(
+            [np.array([_BOX]), np.array([_BOX])],
+            [np.array([far, _BOX]), np.array([_BOX])],
+            [np.array([0.6, 0.9]), np.array([0.3])],
+            iou=0.5,
+            max_detections=2,
+        )
+        assert scores.tolist() == [0.9, 0.6, 0.3]
+        assert matched.tolist() == [True, False, True]
+
+    def test_kept_matches_with_nothing_kept(self):
+        for parts in (([], [], []), ([_EMPTY], [_EMPTY], [np.zeros(0)])):
+            scores, matched = kept_matches(*parts, iou=0.5, max_detections=2)
+            assert (scores.shape, scores.dtype, matched.shape, matched.dtype) == ((0,), np.float64, (0,), np.bool_)
+
+    @pytest.mark.parametrize(
+        ("overrides", "match"),
+        [
+            ({"detection_scores": []}, "one entry per image"),
+            ({"detection_scores": [np.array([0.9, 0.8])]}, "image 0: 2 scores for 1 detection boxes"),
+            ({"detection_scores": [np.array([np.nan])]}, "image 0: scores must be finite"),
+            ({"detection_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 detections: "),
+            ({"target_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 targets: "),
+            ({"max_detections": 0}, "max_detections"),
+            ({"max_detections": True}, "max_detections"),
+            ({"iou": 0.0}, "iou"),
+        ],
+    )
+    def test_kept_matches_refuses(self, overrides, match):
+        kwargs = {
+            "target_boxes": [np.array([_BOX])],
+            "detection_boxes": [np.array([_BOX])],
+            "detection_scores": [np.array([0.9])],
+            "iou": 0.5,
+            "max_detections": 1,
+        } | overrides
+        with pytest.raises(ValueError, match=match):
+            kept_matches(**kwargs)
 
 
 @pytest.mark.required
@@ -269,7 +353,6 @@ class TestChecks:
             ({"target_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 targets: "),
             ({"thresholds": np.array([])}, "thresholds"),
             ({"thresholds": np.array([[0.5]])}, "thresholds"),
-            ({"thresholds": np.array([np.inf])}, "thresholds"),
             ({"max_detections": 0}, "max_detections"),
             ({"max_detections": True}, "max_detections"),
             ({"max_detections": 1.5}, "max_detections"),

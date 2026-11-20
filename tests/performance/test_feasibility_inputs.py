@@ -1,6 +1,7 @@
 """Tests for Feasibility's inputs: typed requirements and allowances, and the arguments that no longer exist."""
 
 import dataclasses
+import re
 from typing import Any
 
 import numpy as np
@@ -72,9 +73,9 @@ class TestTargetSpecDefaults:
             "population_ap_101"
         )
 
-    def test_detection_ap_still_requires_a_functional(self):
-        with pytest.raises(ValueError, match="ap_functional"):
-            TargetSpec(task="OD", metric="ap", threshold=0.5, iou=0.5)
+    def test_detection_ap_builds_without_a_functional(self):
+        spec = TargetSpec(task="OD", metric="ap", threshold=0.5, iou=0.5, max_detections=20)
+        assert spec.ap_functional == "population_ap_integral"
 
 
 @pytest.mark.required
@@ -106,3 +107,51 @@ class TestRemovedArguments:
         dataset, x = _data()
         with pytest.raises(TypeError):
             Feasibility().evaluate(dataset, target=_target(), embeddings=x, **kwargs)
+
+
+@pytest.mark.required
+class TestMaxObjects:
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            (True, "max_objects must be an integer of at least 1, got True"),
+            (1.0, "max_objects must be an integer of at least 1, got 1.0"),
+            ("3", "max_objects must be an integer of at least 1, got '3'"),
+            (0, "max_objects must be an integer of at least 1, got 0"),
+            (-2, "max_objects must be an integer of at least 1, got -2"),
+            ({0: 18}, "max_objects keys are class names (TargetSpec.class_name), e.g. {'0': 18}; got key 0"),
+            ({"cat": 0}, "max_objects['cat'] must be an integer of at least 1, got 0"),
+            ({"cat": True}, "max_objects['cat'] must be an integer of at least 1, got True"),
+            ({"cat": 2.0}, "max_objects['cat'] must be an integer of at least 1, got 2.0"),
+        ],
+    )
+    def test_max_objects_values(self, value, message):
+        with pytest.raises(ValueError, match=re.escape(message)):
+            Feasibility(max_objects=value)
+
+    def test_integers_are_stored_as_python_ints(self):
+        assert Feasibility().max_objects is None
+        stored = Feasibility(max_objects=np.int64(3)).max_objects  # pyright: ignore[reportArgumentType]
+        assert stored == 3
+        assert type(stored) is int
+        by_class = Feasibility(max_objects={"cat": np.int64(3), "dog": 5}).max_objects  # pyright: ignore[reportArgumentType]
+        assert isinstance(by_class, dict)
+        assert by_class == {"cat": 3, "dog": 5}
+        assert all(type(v) is int for v in by_class.values())
+
+    def test_a_mapping_is_copied(self):
+        given = {"cat": 3}
+        feasibility = Feasibility(max_objects=given)
+        given["cat"] = 99
+        assert feasibility.max_objects == {"cat": 3}
+
+    def test_the_config_form_is_checked_the_same_way(self):
+        assert Feasibility(config=Feasibility.Config(max_objects={"cat": 3})).max_objects == {"cat": 3}
+        with pytest.raises(ValueError, match="keys are class names"):
+            Feasibility.Config(max_objects={0: 18})  # pyright: ignore[reportArgumentType]
+
+    def test_state_records_max_objects(self):
+        dataset, x = _data()
+        state = Feasibility().evaluate(dataset, target=_target(), embeddings=x).meta().state
+        assert state["max_objects"] == "NoneType"
+        assert state["max_sequence_length"] == "NoneType"

@@ -24,8 +24,9 @@ The Bayes Error Rate (BER) metric is applicable to classification tasks only.
 BER operates on class embeddings. The Upper-bound Average Precision (UAP) metric
 reduces an object detection problem to a classification problem over bounding
 box crops. See the UAP section below for details. The experimental
-{class}`.Feasibility` evaluator supports image and video classification in this
-release; object detection and tracking datasets raise `NotImplementedError`.
+{class}`.Feasibility` evaluator supports image and video classification, and the
+AP of one class in object detection, in this release; tracking datasets raise
+`NotImplementedError`.
 ```
 
 ## How these tools relate

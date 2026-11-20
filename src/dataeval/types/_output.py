@@ -304,6 +304,13 @@ def _fmt(v: Any) -> Any:
     return f"{v.__class__.__name__}"
 
 
+def _fmt_state(v: Any) -> Any:
+    """Describe one state value: state is evaluator configuration, so a mapping of scalars is kept by value."""
+    if isinstance(v, Mapping) and all(np.isscalar(x) for x in v.values()):
+        return dict(v)
+    return _fmt(v)
+
+
 def _recorded_arguments(signature: inspect.Signature, bound: inspect.BoundArguments) -> dict[str, Any]:
     """Describe a bound call's arguments for its execution record, each under its own parameter.
 
@@ -371,7 +378,7 @@ def set_metadata(fn: Callable[_P, _R] | None = None, *, state: Sequence[str] | N
         # Still an unguarded lookup. A name in ``state`` that the class does not carry is a
         # typo in the decorator, and recording it as ``None`` writes a plausible-looking
         # null into every result rather than saying so.
-        state_attrs = {k: _fmt(getattr(args[0], k)) for k in state or []} if is_method else {}
+        state_attrs = {k: _fmt_state(getattr(args[0], k)) for k in state or []} if is_method else {}
 
         # Update output with recorded metadata
         metadata = ExecutionMetadata(name, time, duration, arguments, state_attrs, __version__)

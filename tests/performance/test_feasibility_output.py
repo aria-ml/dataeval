@@ -10,8 +10,10 @@ import pytest
 
 from dataeval.config import set_seed
 from dataeval.performance import Allowances, Feasibility, FeasibilityOutput, TargetSpec
+from dataeval.performance._feasibility import _label
 from tests.data.conftest import MockICDataset
 from tests.performance.feasibility_helpers import draw_labels, make_population
+from tests.performance.test_feasibility_detection_route import _ap, _run
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -30,6 +32,7 @@ _ASSUMPTION = pl.Enum([
     "replicas_same_video_context",
     "replicated_sequences_random_sample",
     "replicated_frames_uniform_sample",
+    "max_objects_holds",
 ])
 DETERMINATIONS_SCHEMA: dict[str, Any] = {
     "requirement": pl.Int64,
@@ -41,6 +44,8 @@ DETERMINATIONS_SCHEMA: dict[str, Any] = {
     "aggregation": pl.Enum(["frame_pooled", "sequence_mean"]),
     "ap_functional": pl.Enum(["population_ap_integral", "population_ap_101"]),
     "max_false_positive_rate": pl.Float64,
+    "iou": pl.Float64,
+    "max_detections": pl.Int64,
     "determination": pl.Enum([
         "demonstrated_feasible",
         "infeasible_under_recorded_assumptions",
@@ -388,3 +393,63 @@ class TestOutputObject:
         row = run.determinations.row(0, named=True)
         witness_pct = f"{int(row['witness'] * 1000) / 10:.1f}%"  # a lower bound rounds down
         assert witness_pct in str(run).splitlines()[1]
+
+
+def _od_run() -> FeasibilityOutput:
+    """Two requirements on the synthetic detection dataset; B has a key no requirement names, in a different order."""
+    specs = [_ap("person", 0.5, 5), _ap("car", 0.3, 3)]
+    return _run(target=specs, max_objects={"truck": 7, "car": 1, "person": 3})
+
+
+@pytest.mark.required
+class TestObjectDetectionOutput:
+    def test_od_columns_and_null_for_classification(self, run):
+        out = _od_run()
+        assert list(out.determinations.schema.items()) == list(DETERMINATIONS_SCHEMA.items())
+        assert out.determinations["iou"].to_list() == [0.5, 0.5]
+        assert out.determinations["max_detections"].to_list() == [5, 3]
+        assert run.determinations["iou"].null_count() == run.determinations.height
+        assert run.determinations["max_detections"].null_count() == run.determinations.height
+
+    def test_od_label(self):
+        spec = TargetSpec(task="OD", metric="ap", class_name="person", threshold=0.5, iou=0.5, max_detections=20)
+        assert _label(spec) == "ap:person ≥0.5 iou≥0.5 k≤20"
+
+    def test_labels_differ_in_k(self):
+        out = _run(target=[_ap(k=3), _ap(k=5)])
+        labels = [line.split("   ")[1] for line in str(out).splitlines()[1:3]]
+        assert labels == ["ap:person ≥0.5 iou≥0.5 k≤3", "ap:person ≥0.5 iou≥0.5 k≤5"]
+        assert _label(_ap(k=3)) != _label(_ap(k=5))
+
+    def test_od_printout_exact(self):
+        assert str(_od_run()).splitlines() == [
+            "#   requirement                  determination   limitation    envelope   witness           minimum",
+            "0   ap:person ≥0.5 iou≥0.5 k≤5   unresolved      no_envelope   —          0.0% user_model   —",
+            "1   ap:car ≥0.3 iou≥0.5 k≤3      unresolved      no_envelope   —          3.2% user_model   —",
+            "joint confidence: 95%",
+            "assumes: model_independent_of_audit_items, class_order_matches_dataset, max_objects_holds",
+            "max_objects: person 3, car 1",
+            "minimum: independent units to cross the requirement if the observed rates hold",
+        ]
+
+    def test_an_int_bound_is_shown_for_every_requirement_class(self):
+        out = _run(target=[_ap("car", 0.3, 3), _ap("person", 0.5, 5)])  # _run's default B is the int 3
+        assert "max_objects: car 3, person 3\n" in str(out)
+
+    def test_a_class_named_twice_is_shown_once(self):
+        out = _run(target=[_ap("person", 0.5, 3), _ap("person", 0.3, 5)], max_objects={"person": 3})
+        assert "max_objects: person 3\n" in str(out)
+
+    def test_str_without_execution_metadata_does_not_guess_the_bound(self):
+        bare = replace(_od_run())  # a copy that never went through evaluate, so it has no metadata
+        assert str(bare).splitlines()[-2] == "max_objects: —"
+
+    def test_classification_printout_unchanged(self, run):
+        assert "max_objects" not in str(run)
+        assert "iou" not in str(run)
+        assert [_label(spec) for spec in run.requirements] == [
+            "accuracy ≥0.6",
+            "accuracy ≥0.97 @fixed_representation",
+            "ap:a ≥0.5",
+            "recall:a ≥0.6 fp≤0.3",
+        ]
