@@ -99,8 +99,9 @@ class TargetSpec:
     An OD ``ap`` target is one class's AP at one IoU, with at most K detections per image matched greedily by score,
     integrated over recall. That is not COCO's AP, which averages over classes and IoU 0.5 to 0.95 and interpolates at
     101 points. A K below the number of the class's targets an image holds caps the true positives that image can show,
-    and so caps recall. A larger K also widens the confidence endpoints, so whether raising K raises or lowers the bound
-    depends on the detector and the data.
+    and so caps recall. A larger K also widens the confidence endpoints, so whether raising K raises or lowers the
+    witness bound depends on the detector and the data. A K below the class's ``Feasibility(max_objects=...)`` lets the
+    capacity envelope bound the AP of any detector with that cap.
 
     ``recall`` (classification) is a minimum recall for ``class_name`` at a maximum false-positive rate
     ``max_false_positive_rate`` in (0, 1); it takes neither ``aggregation`` nor ``iou``. The negatives are

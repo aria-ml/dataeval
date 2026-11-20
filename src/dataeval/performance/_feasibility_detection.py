@@ -130,20 +130,44 @@ def _count(predictions: Any) -> str:
 # --- the checks of an object detection call ---------------------------------------------------------------------------
 
 _DETECTION_CALL = (
-    "Object detection is judged from a detector's detections in this release: pass predictions=, one detections "
-    "object per image. It has no envelope in this release, so more audit images or a stronger detector are what "
-    "raise the witness."
+    "Object detection takes the targets, each requirement's max_detections K and Feasibility(max_objects=...) for the "
+    "capacity envelope, and predictions=, one detections object per image, for the witness."
 )
 
 
-def check_detection_call(*, model: Any, predictions: Any, embeddings: Any, replicas: Any, allowances: Any) -> None:
-    """Refuse, in one error, every argument an object detection call cannot use, and a missing ``predictions``."""
+def check_detection_call(
+    *,
+    model: Any,
+    predictions: Any,
+    embeddings: Any,
+    replicas: Any,
+    allowances: Any,
+    specs: Sequence[TargetSpec],
+    max_objects: Sequence[int],
+) -> None:
+    """
+    Refuse, in one error, every argument an object detection call cannot use, and a missing ``predictions``.
+
+    A missing ``predictions`` is refused only where a requirement's K is at or above its B, ``max_objects`` in
+    ``specs`` order: its cap cannot bind, so only a witness can judge it.
+    """
     unusable = {"model": model, "embeddings": embeddings, "replicas": replicas or None, "allowances": allowances}
     given = [f"{name}=" for name, value in unusable.items() if value is not None]
     verb = "applies" if len(given) == 1 else "apply"
     problems = [f"{', '.join(given)} {verb} to classification only"] if given else []
-    if predictions is None:
-        problems.append("predictions= is missing")
+    unbound = [
+        (f"{s.class_name!r} at K = {s.max_detections}, max_objects {b} (requirement {r})", b)
+        for r, (s, b) in enumerate(zip(specs, max_objects, strict=True))
+        if cast(int, s.max_detections) >= b  # an OD target always has its K
+    ]
+    if predictions is None and unbound:
+        # K is at least 1, so a bound of 1 leaves no K below it to state
+        fix = ", or state a max_detections below max_objects" if any(b > 1 for _, b in unbound) else ""
+        problems.append(
+            "predictions= is missing, and every requirement whose max_detections K is at or above max_objects needs "
+            f"it, since its cap cannot bind and no capacity envelope is built: {', '.join(n for n, _ in unbound)}. "
+            f"Pass predictions={fix}"
+        )
     if problems:
         raise ValueError(f"{'; '.join(problems)}. {_DETECTION_CALL}")
 
@@ -194,14 +218,16 @@ def resolve_class_ids(dataset: Any, specs: Sequence[TargetSpec]) -> list[int]:
 
 def check_counts(
     units: DetectionUnits, class_ids: Sequence[int], max_objects: Sequence[int], specs: Sequence[TargetSpec]
-) -> None:
+) -> list[NDArray[np.intp]]:
     """
     Check each requirement's class against the data: a label the data can hold, and at most B targets per image.
 
-    One error lists every class over its B, with its largest count, the item that holds it and B.
+    One error lists every class over its B, with its largest count, the item that holds it and B. It returns, for each
+    requirement in ``specs`` order, the number of targets of its class in every image.
     """
     item_ids = units.item_ids.tolist()
     over: dict[str, str] = {}
+    out: list[NDArray[np.intp]] = []
     for spec, c, b in zip(specs, class_ids, max_objects, strict=True):
         name = cast(str, spec.class_name)
         if c >= units.n_classes:  # only without index2label: a declared id is always below n_classes
@@ -210,7 +236,8 @@ def check_counts(
                 f"Class {name!r} is label {c}, but the dataset declares no index2label and its targets hold labels "
                 f"{found}. Name the class by a label its targets hold, or declare index2label."
             )
-        counts = [int(np.count_nonzero(labels == c)) for labels in units.labels]
+        counts = np.array([np.count_nonzero(labels == c) for labels in units.labels], dtype=np.intp)
+        out.append(counts)
         i = int(np.argmax(counts))  # the first image with the largest count
         if counts[i] > b:
             over[name] = (
@@ -222,6 +249,7 @@ def check_counts(
             f"{'; '.join(over.values())}. max_objects bounds every image of the population, so the largest count in "
             "the data is only a floor: raise it to a bound you can justify for the population."
         )
+    return out
 
 
 # --- the AP witness ---------------------------------------------------------------------------------------------------
@@ -276,6 +304,65 @@ def ap_from_counts(
         "fp_results": fp_results,
         "mu_result": mu_result,
         "deltas": [delta] * (2 * t + 1),
+    }
+
+
+def capacity_from_counts(
+    n: NDArray[Any], *, max_objects: int, max_detections: int, alpha_claim: float
+) -> tuple[float, dict[str, Any]]:
+    """
+    Bound AP above for any detector capped at K detections per image, from the targets per image ``n`` ``(n_images,)``.
+
+    Four hybrid endpoints each spend ``alpha_claim / 4``: the count per image, lower and upper, with support ``B``;
+    the shortfall ``(N - K)+``, lower, with support ``B - K``; and ``min(N, K)``, upper, with support ``K``. The value
+    is the smaller of the direct form ``U[min(N, K)] / L[N]`` (1 when ``L[N]`` is 0) and the risk form
+    ``1 - L[(N - K)+] / U[N]``. ``raw`` also holds the sample ratio ``mean``, None when no image holds a target. Fewer
+    than 2 images raise ``_UnavailableError("too_few_units")``.
+
+    Raises
+    ------
+    ValueError
+        If ``max_detections`` is not below ``max_objects``. Such a cap cannot bind and the bound is 1 for any data, so
+        build no capacity bound for it.
+
+    Notes
+    -----
+    A detector with at most K detections in an image matches at most ``min(N, K)`` of its N targets, so its recall at
+    every operating point is at most ``E[min(N, K)] / E[N]``. Precision is at most 1, so AP, the integral of the
+    interpolated precision over recall, is at most that ratio too [1]_, and the value also caps recall. Since
+    ``E[min(N, K)] = E[N] - E[(N - K)+]``, both forms bound the same ratio, and they hold together when the four
+    endpoints do, with probability at least ``1 - alpha_claim``. To first order, with radii in proportion to the
+    supports, the direct form is the tighter one when the ratio is below ``1 - K/B``.
+
+    References
+    ----------
+    .. [1] DFE manuscript, capacity evidence (the output-cap bounds on risk and AP).
+    """
+    if max_detections >= max_objects:
+        raise ValueError(
+            f"max_detections ({max_detections}) must be below max_objects ({max_objects}) for a capacity bound; at or "
+            "above it the cap cannot bind and the bound is 1, so build none."
+        )
+    n = np.asarray(n, dtype=np.float64)
+    delta = alpha_claim / 4
+    count_lower = _mean(n, max_objects, delta, "lower")
+    count_upper = _mean(n, max_objects, delta, "upper")
+    shortfall_lower = _mean(np.maximum(n - max_detections, 0), max_objects - max_detections, delta, "lower")
+    matched_upper = _mean(np.minimum(n, max_detections), max_detections, delta, "upper")
+    low = count_lower["endpoint"]
+    direct = min(1.0, matched_upper["endpoint"] / low) if low > 0 else 1.0
+    risk = 1.0 - shortfall_lower["endpoint"] / count_upper["endpoint"]  # U[N] > 0: every radius is positive
+    value = max(0.0, min(direct, risk))
+    total = n.sum()
+    return value, {
+        "value": value,
+        "count_lower": count_lower,
+        "count_upper": count_upper,
+        "shortfall_lower": shortfall_lower,
+        "matched_upper": matched_upper,
+        "mean": float(np.minimum(n, max_detections).sum() / total) if total else None,
+        "n": len(n),
+        "deltas": [delta] * 4,
     }
 
 
@@ -389,4 +476,46 @@ def gather_detection_evidence(
             "assumptions": _ASSUMED,
         }
         out.append(_make_bound(shared, "ap", value, None, alpha_claim, reason))
+    return out
+
+
+# --- the capacity envelope --------------------------------------------------------------------------------------------
+
+
+def capacity_evidence(
+    specs: Sequence[TargetSpec], *, counts: Sequence[NDArray[Any]], alpha_claim: float, max_objects: Sequence[int]
+) -> list[Bound]:
+    """
+    One ``capacity`` AP envelope per requirement whose K is below its B, in ``specs`` order, each at ``alpha_claim``.
+
+    ``counts`` and ``max_objects`` give each requirement's targets per image and B, in the same order. A requirement
+    with K at or above B gets no row: its cap cannot bind. The rows read the targets alone, never detections or a split.
+    """
+    out: list[Bound] = []
+    for r, (spec, n, b) in enumerate(zip(specs, counts, max_objects, strict=True)):
+        k = cast(int, spec.max_detections)  # an OD target always has its K
+        if k >= b:
+            continue
+        reason: Reason | None = None
+        try:
+            value, raw = capacity_from_counts(n, max_objects=b, max_detections=k, alpha_claim=alpha_claim)
+        except _UnavailableError as e:
+            value, raw, reason = None, None, e.reason
+        spent = 0.0 if raw is None else math.fsum(raw["deltas"])
+        if spent > alpha_claim + 1e-12:
+            raise RuntimeError(
+                f"Internal error: the capacity envelope splits {spent} inside an ap bound, over its claim {alpha_claim}"
+            )
+        shared = {
+            "requirement": r,
+            "source": "capacity",
+            "role": "envelope",
+            "information_scope": "full_input",  # it bounds any predictor, so it decides at every scope
+            "population": "items",
+            "sample": "all_items",
+            "unit": "image",
+            "assumptions": ("max_objects_holds",),
+        }
+        stats = None if raw is None else {"mean": raw["mean"], "n": raw["n"]}
+        out.append(_make_bound(shared, "ap", value, stats, alpha_claim, reason))
     return out

@@ -13,7 +13,9 @@ import dataeval.performance._feasibility as feasibility_module
 from dataeval.data import Indices, View
 from dataeval.extractors import FlattenExtractor
 from dataeval.performance import Allowances, Feasibility, TargetSpec
-from dataeval.performance._feasibility_detection import resolve_class_ids
+from dataeval.performance._feasibility_constants import FIT_FRACTION
+from dataeval.performance._feasibility_detection import capacity_from_counts, resolve_class_ids
+from dataeval.performance._feasibility_units import resolve_detection_units, split_units
 from dataeval.protocols import DatasetMetadata
 from tests.data.conftest import VIDEO_FACTORS, VIDEOS, FactorVideos
 
@@ -117,16 +119,38 @@ class TestRefusals:
             _run(**unusable)
         message = str(info.value)
         assert all(f"{name}=" in message for name in unusable)
-        assert "pass predictions=, one detections object per image" in message
-        assert "no envelope" in message
+        assert "max_objects=...) for the capacity envelope" in message
+        assert "predictions=, one detections object per image, for the witness" in message
+        assert "no envelope" not in message
+        assert "pass predictions=" not in message.lower()
         assert "predictions= is missing" not in message
 
     def test_missing_predictions_is_named_with_the_unusable_inputs(self):
         with _no_pass(), pytest.raises(ValueError, match="embeddings=") as info:
             _run(predictions=None, embeddings=np.zeros((N, 2)))
         assert "predictions= is missing" in str(info.value)
-        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing"):
-            _run(predictions=None)
+        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+            _run(predictions=None)  # K = 5 and B = 3: the cap cannot bind, so only a witness can judge it
+        assert "'person' at K = 5, max_objects 3 (requirement 0)" in str(info.value)
+
+    def test_missing_predictions_names_every_requirement_whose_cap_cannot_bind(self):
+        # A mixed call: person at K = 1 has a capacity envelope, car at K = 5 and 3 do not; B is 3 for both.
+        target = [_ap("person", k=1), _ap("car", k=5), _ap("car", k=3)]
+        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+            _run(target=target, predictions=None)
+        message = str(info.value)
+        assert "'car' at K = 5, max_objects 3 (requirement 1), 'car' at K = 3, max_objects 3 (requirement 2)" in message
+        assert "requirement 0" not in message
+        assert "every requirement whose max_detections K is at or above max_objects needs it" in message
+        assert "Pass predictions=, or state a max_detections below max_objects" in message
+
+    def test_missing_predictions_at_a_bound_of_one_offers_only_predictions(self):
+        # B = 1 leaves no K below it, since TargetSpec refuses max_detections=0, so the only fix is a detector.
+        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+            _run(target=[_ap("car", k=1)], max_objects={"car": 1}, predictions=None)
+        message = str(info.value)
+        assert "'car' at K = 1, max_objects 1 (requirement 0). Pass predictions=." in message
+        assert "state a max_detections" not in message
 
     def test_an_empty_replicas_mapping_is_not_an_input(self):
         assert len(_run(replicas={}).determinations) == 1
@@ -289,10 +313,16 @@ class TestCalls:
         assert from_torch.bounds.equals(from_numpy.bounds)
 
     def test_requirements_differing_in_k_are_two_claims(self):
+        # A mixed call with a detector (B = 3): K = 1 gets a capacity claim and K = 5 none, and each of the 2 + 1
+        # claims, the K = 5 witness's included, spends alpha / 3.
         out = _run(target=[_ap(k=1), _ap(k=5)])
         assert len(out.determinations) == 2
-        assert out.bounds["requirement"].to_list() == [0, 1]
-        assert out.bounds["alpha"].to_list() == [0.05 / 2, 0.05 / 2]
+        assert out.bounds.select("requirement", "source").rows() == [
+            (0, "capacity"),
+            (0, "user_model"),
+            (1, "user_model"),
+        ]
+        assert out.bounds["alpha"].to_list() == [0.05 / 3] * 3
 
     def test_view_over_od_dataset(self):
         images = _scenes()
@@ -325,3 +355,196 @@ class TestCalls:
         assert out.bounds["alpha"].sum() <= 0.05 + 1e-12
         assert set(out.determinations["determination"]) <= {"demonstrated_feasible", "unresolved"}
         assert set(out.determinations["limitation"].drop_nulls()) <= {"no_envelope"}  # witness only: no envelope
+
+
+def _fit_side(n: int) -> set[int]:
+    """The images that ``split_units`` puts on the fit side of ``n`` ungrouped images at seed 0, read from the split."""
+    units = resolve_detection_units(_OD([[]] * n), groups=None)  # the split reads only the units and the seed
+    return set(split_units(units, fit_fraction=FIT_FRACTION, seed=0)[0].tolist())
+
+
+def _capacity_row(out) -> dict[str, Any]:
+    (row,) = [r for r in out.bounds.iter_rows(named=True) if r["source"] == "capacity"]
+    return row
+
+
+@pytest.mark.required
+class TestCapacity:
+    """The capacity envelope of a requirement whose K is below its B, with a detector and without one."""
+
+    def test_dense_scene_is_ruled_out_without_a_detector(self):
+        # Six persons in every image and K = 2: no detector capped at 2 finds more than a third of them.
+        out = _run([[0] * 6] * 200, [_ap(threshold=0.5, k=2)], max_objects=6, predictions=None)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("infeasible_under_recorded_assumptions", None)
+        assert row["envelope"] == pytest.approx(0.3575138752967017, rel=1e-9)  # measured: the ratio 1/3 and its radius
+        assert out.bounds.select("source", "role", "alpha", "is_determining").rows() == [
+            ("capacity", "envelope", 0.05, True)
+        ]
+
+    def test_informative_bound_above_the_threshold_is_not_ruled_out(self):
+        # Every other image holds 4 persons and K = 2: the ratio 0.5 is below the 0.6 asked, the bound (0.877) above.
+        out = _run([[0] * 4, []] * 50, [_ap(threshold=0.6, k=2)], max_objects=6, predictions=None)
+        assert out.bounds["state"].to_list() == ["informative"]
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "no_eligible_witness")
+        assert row["suggested_minimum"] is None  # the capacity row records no variance to project from
+
+    def test_bound_is_one_when_no_image_exceeds_k(self):
+        # _scenes holds at most 2 persons in an image, so at K = 2 the cap never binds on this data.
+        out = _run(target=[_ap(k=2)], predictions=None)
+        bound = _capacity_row(out)
+        assert (bound["bound"], bound["state"], bound["reason"]) == (1.0, "uninformative", "bound_at_maximum")
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("unresolved", "no_eligible_witness")
+
+    def test_one_image_gives_no_envelope(self):
+        out = _run([[0, 0]], [_ap(k=1)], predictions=None)
+        bound = _capacity_row(out)
+        assert (bound["bound"], bound["state"], bound["reason"]) == (None, "unavailable", "too_few_units")
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("unresolved", "envelope_unavailable")
+
+    def test_every_image_is_used_whatever_the_seed(self):
+        images = _scenes(300)
+        counts = np.array([labels.count(0) for labels in images])
+        expected = capacity_from_counts(counts, max_objects=3, max_detections=1, alpha_claim=0.05 / 2)[0]
+        outs = [
+            Feasibility(seed=seed, max_objects=3).evaluate(
+                _OD(images), target=[_ap(k=1)], predictions=_detector(images)
+            )
+            for seed in (0, 1)
+        ]
+        first, second = (_capacity_row(out) for out in outs)
+        assert (first["bound"], first["n"], first["sample"]) == (expected, len(images), "all_items")
+        assert (second["bound"], second["n"]) == (first["bound"], first["n"])
+        assert outs[0].bounds["bound"][1] != outs[1].bounds["bound"][1]  # the seed moved the witness's audit
+
+    def test_a_detector_adds_its_witness_after_the_envelope(self):
+        # K = 1 and B = 3 on _scenes(300): the ratio 2/3 is below the 0.7 asked and the bound (0.894) above it.
+        out = _run(_scenes(300), [_ap(threshold=0.7, k=1)])
+        assert out.bounds.select("source", "role").rows() == [("capacity", "envelope"), ("user_model", "witness")]
+        assert out.bounds["alpha"].to_list() == [0.05 / 2, 0.05 / 2]
+        assert out.bounds["alpha"].sum() <= 0.05 + 1e-12
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "within_radius")
+        assert row["suggested_minimum"] is None
+
+    def test_a_detector_demonstrates_beside_a_capacity_row(self):
+        # One person per image, K = 2 and B = 3: the envelope is built, sits at 1 and spends alpha / 2, and the
+        # perfect detector's witness (0.576, measured) still clears the 0.3 asked.
+        images = [[0]] * 400
+        perfect = [_Det([_box(0)], [0], [0.9]) for _ in images]
+        out = _run(images, [_ap(threshold=0.3, k=2)], max_objects=3, predictions=perfect)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("demonstrated_feasible", None)
+        assert row["witness"] == pytest.approx(0.5756907188845602, rel=1e-9)
+        assert out.bounds.select("source", "state", "is_determining").rows() == [
+            ("capacity", "uninformative", False),
+            ("user_model", "informative", True),
+        ]
+
+    def test_a_detector_on_a_dense_scene_is_ruled_out(self):
+        # Six persons in every image, K = 2 and B = 6: the envelope (0.361, measured) is below the 0.5 asked, and the
+        # perfect detector's witness (0.237) is below the envelope, so there is no conflict.
+        images = [[0] * 6] * 200
+        perfect = [_Det([_box(j) for j in range(6)], [0] * 6, [0.9] * 6) for _ in images]
+        out = _run(images, [_ap(threshold=0.5, k=2)], max_objects=6, predictions=perfect)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("infeasible_under_recorded_assumptions", None)
+        assert (row["envelope"], row["witness"]) == pytest.approx((0.3606577015545407, 0.23657412924565846), rel=1e-9)
+        assert _capacity_row(out)["is_determining"]
+
+    def test_no_detector_at_a_narrower_scope_is_not_ruled_out(self):
+        # The informative bound of test_informative_bound_above_the_threshold_is_not_ruled_out, judged at
+        # fixed_representation: the full_input envelope decides there too.
+        target = [_ap(threshold=0.6, k=2, scope="fixed_representation")]
+        out = _run([[0] * 4, []] * 50, target, max_objects=6, predictions=None)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "no_eligible_witness")
+        assert (row["envelope"], row["envelope_scope"]) == (pytest.approx(0.8772551488514445, rel=1e-9), "full_input")
+
+    def test_every_k_at_or_above_b_is_as_before(self):
+        # Recorded by running the route before it had a capacity envelope. Every K here is at or above B, so the
+        # call makes no capacity claim and every value is the same float.
+        perfect = [_Det([_box(0)], [0], [0.9]) for _ in range(400)]
+        calls = [
+            _run(),
+            _run(target=[_ap("person", 0.5, 5), _ap("car", 0.3, 3)], max_objects={"truck": 7, "car": 1, "person": 3}),
+            _run([[0]] * 400, [_ap(threshold=0.3, k=1)], max_objects=1, predictions=perfect),
+        ]
+        assert [out.bounds.select("requirement", "source", "alpha", "bound").rows() for out in calls] == [
+            [(0, "user_model", 0.05, 0.0035885242332850415)],
+            [(0, "user_model", 0.025, 0.0007832551857172316), (1, "user_model", 0.025, 0.03264955812285865)],
+            [(0, "user_model", 0.05, 0.864431942063233)],
+        ]
+        columns = ("determination", "limitation", "envelope", "witness", "suggested_minimum")
+        assert [out.determinations.select(columns).rows() for out in calls] == [
+            [("unresolved", "no_envelope", None, 0.0035885242332850415, None)],
+            [
+                ("unresolved", "no_envelope", None, 0.0007832551857172316, None),
+                ("unresolved", "no_envelope", None, 0.03264955812285865, None),
+            ],
+            [("demonstrated_feasible", None, None, 0.864431942063233, None)],
+        ]
+
+    def test_narrower_scope_is_decided_by_capacity(self):
+        # The detector's witness counts at full_input only; the capacity envelope bounds any predictor, so it decides
+        # at every scope.
+        out = _run(_scenes(300), [_ap(threshold=0.7, k=1, scope="fixed_representation")])
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"], row["witness"]) == (
+            "not_ruled_out",
+            "no_eligible_witness",
+            None,
+        )
+        capacity = _capacity_row(out)
+        assert (row["envelope"], capacity["is_determining"]) == (capacity["bound"], True)
+
+    def test_capacity_and_witness_can_conflict(self):
+        # Every fit image holds 6 persons and every audit image 1: the witness sees only the audit, where the class
+        # is easy, and capacity sees every image. A sampling event, at most alpha likely when both bounds hold.
+        fit = _fit_side(400)
+        images = [[0] * 6 if i in fit else [0] for i in range(400)]
+        perfect = [_Det([_box(j) for j in range(len(labels))], labels, [0.9] * len(labels)) for labels in images]
+        out = _run(images, [_ap(threshold=0.3, k=1)], max_objects=6, predictions=perfect)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("unresolved", "conflict")
+        assert row["envelope"] == pytest.approx(0.334, abs=1e-3)
+        assert row["witness"] == pytest.approx(0.578, abs=1e-3)
+
+    def test_capacity_counts_by_declared_id(self):
+        # Class 'c' is label 7: two in each odd image, one in each even one. By position it would be label 2, which
+        # no box has, and its bound would be 1.
+        images = [[7, 7, 1] if i % 2 else [3, 7] for i in range(400)]
+        out = _run(images, [_ap("c", k=1)], dataset=_OD(images, {1: "a", 3: "b", 7: "c"}), predictions=None)
+        counts = np.array([labels.count(7) for labels in images])
+        expected = capacity_from_counts(counts, max_objects=3, max_detections=1, alpha_claim=0.05)[0]
+        bound = _capacity_row(out)
+        assert (bound["bound"], bound["state"]) == (expected, "informative")
+
+    def test_no_audit_targets_with_capacity(self):
+        # Three persons in every fit image and none in the audit: the witness has nothing to find and reads 0, while
+        # capacity, over every image at K = 1, is informative. Nothing can demonstrate the requirement.
+        fit = _fit_side(400)
+        images = [[0] * 3 if i in fit else [] for i in range(400)]
+        out = _run(images, [_ap(threshold=0.2, k=1)])
+        capacity, witness = out.bounds.iter_rows(named=True)
+        assert (capacity["source"], capacity["state"]) == ("capacity", "informative")
+        assert (witness["source"], witness["bound"]) == ("user_model", 0.0)
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "weak_witness")
+
+    def test_capacity_ignores_image_order(self):
+        images, ids = _scenes(300), np.arange(300)
+        order = np.random.default_rng(1).permutation(300)
+        detections = _detector(images)
+        given = _run(images, [_ap(k=1)], predictions=detections, groups=ids)
+        reordered = _run(
+            [images[i] for i in order],
+            [_ap(k=1)],
+            dataset=_OD([images[i] for i in order], ids=[f"im{i}" for i in order]),
+            predictions=[detections[i] for i in order],
+            groups=ids[order],
+        )
+        assert _capacity_row(reordered) == _capacity_row(given)
