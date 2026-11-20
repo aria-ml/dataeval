@@ -146,9 +146,10 @@ Merge request pipelines are best effort. They start from the cache of the merge 
 release line, for a merge request into a `release/v*` branch), and re-execute only the notebooks whose code cells
 changed. They skip the check above and leave `execution-inputs.json` as they found it, so it still describes the tree
 the cached outputs were last validated against. A merge request that changes the library can therefore show notebook
-outputs that are older than its code, and the assertion cells in the notebooks that are not re-executed do not run. The
-merge train pipeline, main, release branches and tags run the check, so a notebook that a change breaks or whose numbers
-move fails there. Merge request caches are never used to seed main, a release branch or a tag.
+outputs that are older than its code, and the assertion cells in the notebooks that are not re-executed do not run.
+Merge train pipelines do not build the docs. Main, release branches and tags run the check, so a notebook that a change
+breaks or whose numbers move first fails on the target branch, after the merge. Merge request caches are never used to
+seed main, a release branch or a tag.
 
 Scheduled main builds (`DOCS_NIGHTLY`) and version tags always run a clean build, to refresh external datasets and model
 downloads and to rebuild what a release publishes. To request a clean build on main or a release branch, run a pipeline

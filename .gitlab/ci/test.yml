@@ -3,7 +3,9 @@
 lint:
   extends:
     - .nox
-    - .rules_main_mr
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == 'merge_train'
+    - !reference [.rules_main_mr, rules]
   script:
     - uvx nox -e lint
 
@@ -23,7 +25,11 @@ typecheck:
     - k8s-medium-cpu
   extends:
     - .nox_all
-    - .rules_main_mr_types
+  rules:
+    # A merge train car checks the latest Python only; see .rules_not_on_train.
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == 'merge_train' && $PYTHON_VERSION != $PYTHON_LATEST_SUPPORTED_VERSION
+      when: never
+    - !reference [.rules_main_mr_types, rules]
   script:
     - uvx nox -e type
 
@@ -34,14 +40,20 @@ test:
     TEST_WORKERS: '2'
   extends:
     - .nox_all
-    - .rules_main_mr
+  rules:
+    # A merge train car tests the latest Python only, without coverage, since the coverage job does not run there;
+    # see .rules_not_on_train. The other versions fall through to its skip rule.
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == 'merge_train' && $PYTHON_VERSION == $PYTHON_LATEST_SUPPORTED_VERSION
+      variables:
+        TEST_ARGS: --no-cov
+    - !reference [.rules_main_mr, rules]
   before_script:
     # The comprehensive lane runs the ffmpeg-marked tests, which build their synthetic
     # clips with ffmpeg/ffprobe (see tests/fixtures/videos.py).
     - apt-get update -qq && apt-get install -qq -y --no-install-recommends ffmpeg > /dev/null
     - uv tool install nox --with nox-uv
   script:
-    - uvx nox -e test
+    - uvx nox -e test -- $TEST_ARGS
   cache:
     # `extends` replaces list values, so the uv cache from .nox is repeated here.
     - key:

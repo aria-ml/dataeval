@@ -21,10 +21,11 @@ docs:
     # cache, not the previous commit, means a skipped or canceled pipeline cannot leave stale outputs.
     # Merge request pipelines are best effort instead: they start from the restored cache and
     # re-execute only the notebooks whose code cells changed, so main's builds are the only ones that
-    # pay for a widely imported file. The merge train pipeline still runs the check, as the gate.
+    # pay for a widely imported file, and a notebook that a library change breaks first fails on the target branch.
+    # Merge train cars do not build the docs (see .rules_not_on_train in base.yml).
     - |
       BEST_EFFORT=
-      if [ "$CI_PIPELINE_SOURCE" = merge_request_event ] && [ "$CI_MERGE_REQUEST_EVENT_TYPE" != merge_train ]; then
+      if [ "$CI_PIPELINE_SOURCE" = merge_request_event ]; then
         BEST_EFFORT=1
         echo "Docs cache: best effort on a merge request pipeline; skipping the execution-input check."
       fi
@@ -49,7 +50,7 @@ docs:
     # Stamp only after a successful build; the manifest travels with the cache
     # to docs-artifacts/<ref>, including when a later build falls back to main.
     # A best-effort build leaves the manifest alone: it keeps describing the tree the cached
-    # outputs were last validated against, so the merge train check computes the right difference.
+    # outputs were last validated against.
     - |
       if [ -z "$BEST_EFFORT" ]; then
         uv run --no-project python docs/notebook_cache_inputs.py record
