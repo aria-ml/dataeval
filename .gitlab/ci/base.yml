@@ -124,8 +124,19 @@ stages:
 
 ### SHARED RULE TEMPLATES ###
 
+# A merge train car runs only quick, deterministic jobs. Its merge request has already passed its own pipeline, which
+# GitLab runs on the merged result, and main runs every job again after the merge. The car only has to show that the
+# request still works on top of the cars ahead of it, and a slow or flaky job there holds up every car behind it. A car
+# runs lint, typecheck and test on the latest Python (test without coverage), the lock check when the lock changes, and
+# the security scans. The other rule templates start with this rule.
+.rules_not_on_train:
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == 'merge_train'
+      when: never
+
 .rules_main_mr:
   rules:
+    - !reference [.rules_not_on_train, rules]
     - if: $PUBLISH_VERIFICATION
       when: never
     # A release runs the whole gate; the verification evidence records its results.
@@ -137,6 +148,7 @@ stages:
 
 .rules_main_mr_code:
   rules:
+    - !reference [.rules_not_on_train, rules]
     - if: $PUBLISH_VERIFICATION
       when: never
     # A release runs the whole gate; the verification evidence records its results.
@@ -193,6 +205,7 @@ stages:
 
 .rules_main_mr_docs:
   rules:
+    - !reference [.rules_not_on_train, rules]
     - if: $PUBLISH_VERIFICATION
       when: never
     # A version tag always rebuilds every notebook and republishes them to docs-artifacts/<tag>,
@@ -231,12 +244,14 @@ stages:
 # assembled from whichever of the docs and coverage jobs actually ran.
 .rules_mr_preview:
   rules:
+    - !reference [.rules_not_on_train, rules]
     - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
 
 .rules_mr_only:
   rules:
+    - !reference [.rules_not_on_train, rules]
     - if: $CI_COMMIT_TAG || $PUBLISH_VERIFICATION || $CI_COMMIT_BRANCH == 'main'
       when: never
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event' && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'main'
