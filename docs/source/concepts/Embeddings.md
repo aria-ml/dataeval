@@ -185,6 +185,7 @@ and how each can mislead a metric.
 
 - [Create embeddings](../notebooks/h2_create_embeddings.py)
 - [Embed object detection crops and visualize class clusters](../notebooks/h2_embed_detection_crops.py)
+- [Measure the paths of tracks in embedding space](../notebooks/h2_track_embedding_paths.py)
 - [Measure train and test dataset divergence](../notebooks/h2_measure_divergence.py)
 - [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
 
