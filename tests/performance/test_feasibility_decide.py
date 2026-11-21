@@ -1,13 +1,16 @@
 """Tests for the ordered decision rules, the limitation of a non-final determination and the suggested minimum."""
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, get_args
 
+import polars as pl
 import pytest
 
 from dataeval._experimental import quiet_experimental
 from dataeval.core import units_to_cross
+from dataeval.core._concentration import _MAX_UNITS
+from dataeval.performance._feasibility import _bounds_frame
 from dataeval.performance._feasibility_decide import Limitation, _pool, decide
 from dataeval.performance._feasibility_evidence import Bound, Quantity, Role, Source
 from dataeval.performance._feasibility_target import Scope, TargetSpec
@@ -33,6 +36,8 @@ def _b(
     variance: float = 0.04,
     method: Any = "hybrid",
     quantity: Quantity = "accuracy",
+    n: int = 100,
+    project: Callable[[int], float] | None = None,
 ) -> Bound:
     """One accuracy bound; the recorded mean defaults to the bound's value (no crossing)."""
     source = source or ("replicas" if role == "envelope" else "user_model")
@@ -56,7 +61,7 @@ def _b(
         reason=reason,
         bound=value,
         observed=mean if role == "witness" else None,
-        n=100 if has else None,
+        n=n if has else None,
         variance=variance if has else None,
         radius=None,
         method=method if has else None,
@@ -65,6 +70,7 @@ def _b(
         mean=mean,
         support=support if has else None,
         delta=0.01 if has else None,
+        project=project,
     )
 
 
@@ -442,3 +448,104 @@ class TestRecallDecide:
     def test_observed_recall_at_the_requirement_has_no_attainable_minimum(self):
         d = _decide(R90_F05, [*_witness(recall_mean=0.9, recall_lb=0.85, fpr_ub=0.03), _ceiling(0.95)])
         assert (d.limitation, d.suggested_minimum, d.minimum_source) == ("within_radius", None, None)
+
+
+with quiet_experimental():  # at import, outside the module's warning filter
+    AP = TargetSpec(task="IC", metric="ap", threshold=0.5)
+
+
+def _ap_witness(value: float, mean: float, project: Callable[[int], float] | None, **kw: Any) -> Bound:
+    return _witness_bound(value, mean=mean, quantity="ap", project=project, **kw)
+
+
+def _ap_envelope(value: float, **kw: Any) -> Bound:
+    return _envelope(value, quantity="ap", **kw)
+
+
+@pytest.mark.required
+class TestProjectedMinimum:
+    """The search over a bound's ``project``, with a toy projection: 0.9 - 50 / m crosses 0.5 at m = 125."""
+
+    @staticmethod
+    def toy(m: int) -> float:
+        return 0.9 - 50 / m
+
+    def test_witness_projection_gives_the_smallest_crossing_size(self):
+        # AT3: an informative envelope above the threshold, a witness whose estimate clears it and whose bound does not
+        witness = _ap_witness(0.4, 0.85, self.toy)
+        d = _decide(AP, [_ap_envelope(0.9), witness])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
+        assert (d.minimum_source, d.minimum_quantity) == (witness.source, "ap")
+        m = d.suggested_minimum
+        assert m is not None
+        assert self.toy(m) >= AP.threshold > self.toy(m - 1)
+        assert m > (witness.n or 0)  # a projection is searched above the bound's own size
+
+    def test_envelope_projection_crosses_below_the_threshold(self):
+        # rises to 0.7 at the envelope's own n = 100, then falls toward 0.3; only m > n is searched
+        def project(m: int) -> float:
+            return 0.7 * m / 100 if m <= 100 else 0.3 + 40 / m
+
+        envelope = _ap_envelope(0.7, mean=0.3, project=project)
+        d = _decide(AP, [envelope, _ap_witness(0.2, 0.3, None)])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
+        assert (d.minimum_source, d.minimum_quantity) == (envelope.source, "ap")
+        m = d.suggested_minimum
+        assert m is not None
+        assert m > (envelope.n or 0)  # a projection is searched above the bound's own size
+        assert project(m) < AP.threshold <= project(m - 1)
+
+    def test_projection_beyond_the_ceiling_has_no_minimum(self):
+        # AT7: the projection stops at t - 1e-9, so no size up to the ceiling crosses and nothing hangs
+        def project(m: int) -> float:
+            return min(self.toy(m), AP.threshold - 1e-9)
+
+        d = _decide(AP, [_ap_envelope(0.9), _ap_witness(0.4, 0.85, project)])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
+        assert (d.suggested_minimum, d.minimum_source, d.minimum_quantity) == (None, None, None)
+
+    def test_a_projection_that_crosses_only_at_the_ceiling_is_found(self):
+        d = _decide(AP, [_ap_envelope(0.9), _ap_witness(0.4, 0.85, lambda m: 0.4 + 0.1 * (m >= _MAX_UNITS))])
+        assert d.suggested_minimum == _MAX_UNITS
+
+    def test_witness_whose_estimate_clears_projects_over_a_larger_bound(self):
+        # AT5. A has the larger bound but its estimate is at the threshold; B's estimate clears it.
+        a = _ap_witness(0.45, 0.5, lambda m: 0.5 - 1 / m, source="knn")
+        b = _ap_witness(0.3, 0.8, self.toy, source="user_model")
+        d = _decide(AP, [_ap_envelope(0.9), a, b])
+        assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")
+        assert (d.minimum_source, d.suggested_minimum) == ("user_model", 125)
+        # when both clear, the minimum comes from the larger bound, not the smaller minimum
+        a = _ap_witness(0.45, 0.8, lambda m: 0.9 - 400 / m, source="knn")  # crosses at 1,000
+        d = _decide(AP, [_ap_envelope(0.9), a, b])
+        assert (d.minimum_source, d.suggested_minimum) == ("knn", 1000)
+        d = _decide(AP, [_ap_envelope(0.9), b, a])  # table order does not matter when the bounds differ
+        assert (d.minimum_source, d.suggested_minimum) == ("knn", 1000)
+
+    def test_an_equal_bound_goes_to_the_first_in_table_order(self):
+        first = _ap_witness(0.4, 0.8, lambda m: 0.9 - 400 / m, source="knn")
+        second = _ap_witness(0.4, 0.8, self.toy, source="user_model")
+        assert _decide(AP, [_ap_envelope(0.9), first, second]).minimum_source == "knn"
+        assert _decide(AP, [_ap_envelope(0.9), second, first]).minimum_source == "user_model"
+
+    def test_ungrouped_accuracy_minimum_is_unchanged(self):
+        # exact-binomial fields, no projection: the witness with the largest bound is the one with the largest estimate
+        low = _witness_bound(0.7, mean=0.82, method="exact_binomial", source="knn")
+        high = _witness_bound(0.75, mean=0.85, method="exact_binomial", source="user_model")
+        d = _decide(_spec(), [_envelope(0.95), low, high])
+        n = units_to_cross(0.85, 0.04, 1.0, 0.01, 0.05, method="exact_binomial", side="lower")
+        assert n is not None
+        assert (d.limitation, d.suggested_minimum, d.minimum_source) == ("within_radius", n, "user_model")
+
+    def test_project_is_not_a_column(self, monkeypatch):
+        with_project = _ap_witness(0.4, 0.85, self.toy)
+        without = _ap_witness(0.4, 0.85, None)
+        assert with_project == without
+        assert hash(with_project) == hash(without)
+        assert "project" not in repr(with_project)
+        rows: list[dict[str, Any]] = []  # polars drops a key the schema lacks, so look at the rows it is given
+        build = pl.DataFrame
+        monkeypatch.setattr(pl, "DataFrame", lambda data, **kw: (rows.extend(data), build(data, **kw))[1])
+        _bounds_frame([with_project], [_decide(AP, [with_project])])
+        assert rows
+        assert all("project" not in row for row in rows)

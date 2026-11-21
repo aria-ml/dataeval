@@ -103,6 +103,10 @@ def _radius(n: int, variance: float | None, support: float, delta: float, method
     return {"hoeffding": hoeffding, "empirical_bernstein": fallback}.get(method, min(hoeffding, fallback))
 
 
+def _clip_endpoint(mean: float, radius: float, support: float, side: str) -> float:
+    return max(0.0, mean - radius) if side == "lower" else min(support, mean + radius)
+
+
 @experimental
 def mean_endpoint(
     values: ArrayLike,
@@ -184,7 +188,7 @@ def mean_endpoint(
     variance = float(x.var(ddof=1)) if n >= 2 else None
     hoeffding, bernstein = _radii(n, variance, support, delta, method)
     radius = _radius(n, variance, support, delta, method)
-    endpoint = max(0.0, mean - radius) if side == "lower" else min(support, mean + radius)
+    endpoint = _clip_endpoint(mean, radius, support, side)
     return EndpointResult(
         n=n,
         mean=mean,
@@ -205,6 +209,14 @@ def _projected_bound(p: float, n: int, delta: float, side: str) -> float:
     if side == "lower":
         return 0.0 if k <= 0 else float(beta.ppf(delta, k, n - k + 1))
     return 1.0 if p >= 1 else float(beta.ppf(1 - delta, k + 1, n - k))
+
+
+def _endpoint_at(result: EndpointResult, n: int) -> float:
+    """Return the endpoint the same mean and variance give at ``n`` observations; ``result["n"]`` reproduces it."""
+    if result["method"] == "exact_binomial":
+        return _projected_bound(result["mean"], n, result["delta"], result["side"])
+    radius = _radius(n, result["variance"], result["support"], result["delta"], result["method"])
+    return _clip_endpoint(result["mean"], radius, result["support"], result["side"])
 
 
 def _is_count(x: object) -> bool:

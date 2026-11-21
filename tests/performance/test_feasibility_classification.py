@@ -1,5 +1,6 @@
 """Tests for the classification feasibility compositions: every bound source on synthetic populations."""
 
+from dataclasses import replace
 from statistics import NormalDist
 from typing import Any
 
@@ -15,8 +16,9 @@ from dataeval.performance._feasibility_classification import count_claims, gathe
 from dataeval.performance._feasibility_decide import decide
 from dataeval.performance._feasibility_evidence import Bound, allocate, check_ledger
 from dataeval.performance._feasibility_target import Allowances, Scope, TargetSpec
-from dataeval.performance._feasibility_units import split_units
+from dataeval.performance._feasibility_units import resolve_units, split_units
 from tests.performance.feasibility_helpers import draw_labels, make_population, make_sequences, make_units
+from tests.performance.test_feasibility_units import _IC
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -28,11 +30,11 @@ def _acc(aggregation=None) -> TargetSpec:  # built per test, so collection const
     return TargetSpec(task="IC", metric="accuracy", threshold=0.8, aggregation=aggregation)
 
 
-def _ap(cls: str | None = None, aggregation=None) -> TargetSpec:
+def _ap(cls: str | None = None, aggregation=None, threshold: float = 0.5) -> TargetSpec:
     return TargetSpec(
         task="IC",
         metric="ap",
-        threshold=0.5,
+        threshold=threshold,
         class_name=cls,
         ap_functional="population_ap_integral",
         aggregation=aggregation,
@@ -489,3 +491,110 @@ class TestFeasibilityClassification:
         ]
         assert _one(bounds, "local_panels", 1).assumptions[-1] == "allowance_beta"
         check_ledger(bounds, 0.05)
+
+
+def _ap_case(kind: str):
+    """The bounds of an IC AP call whose witnesses (knn, probe and the user's model) are of one kind."""
+    if kind == "hybrid":  # grouped frames pooled: the hybrid endpoints
+        rng = np.random.default_rng(4)
+        x, y, post, seq, _ = make_sequences(make_population("gauss2"), 600, max_len=8, rng=rng)
+        units = make_units(y, groups=seq, n_classes=2, class_names=["a", "b"])
+        return _gather([_ap("b", "frame_pooled")], units, x, predictions=post, max_sequence_length=8)[0]
+    x, y, post, _ = _gauss2(2000, 1)  # ungrouped: exact binomial endpoints
+    units = make_units(y, class_names=["a", "b"])
+    return _gather([_ap("b" if kind == "exact" else None)], units, x, predictions=post)[0]
+
+
+def _witnesses(bounds: list[Bound]) -> list[Bound]:
+    found = [b for b in bounds if b.role == "witness"]
+    assert {b.source for b in found} == {*WITNESSES, "user_model"}
+    return found
+
+
+@pytest.mark.required
+class TestApWitnessProjection:
+    """An AP witness records its estimate and its audit size, and projects its bound to another audit size (#1652)."""
+
+    @pytest.mark.parametrize("kind", ["exact", "hybrid", "macro"])
+    def test_projection_reproduces_the_bound(self, kind):
+        for b in _witnesses(_ap_case(kind)):
+            assert b.project is not None
+            assert b.n is not None
+            assert b.project(b.n) == b.bound  # exactly, not approximately
+            assert b.observed is not None
+            assert b.bound is not None
+            assert b.bound < b.observed < 1  # the estimate is the bound with every radius at zero
+
+    @pytest.mark.parametrize("kind", ["exact", "macro"])
+    def test_projection_is_monotone(self, kind):
+        for b in _witnesses(_ap_case(kind)):
+            assert b.project is not None
+            assert b.n is not None
+            projected = [b.project(int(m)) for m in np.unique(np.geomspace(b.n, 1e6, 25).astype(int))]
+            assert all(later >= earlier - 1e-12 for earlier, later in zip(projected, projected[1:], strict=False))
+            assert b.observed is not None
+            assert projected[0] < projected[-1] <= b.observed  # the limit as the audit grows is the estimate
+
+    def test_ap_envelopes_do_not_project(self):
+        x, y, post, rng = _gauss2(2000, 1)
+        units = make_units(y, class_names=["a", "b"])
+        replicas = dict(enumerate(draw_labels(post[:500], 2, rng)))
+        bounds, _, _ = _gather([_ap("b"), _ap()], units, x, replicas=replicas, predictions=post)
+        envelopes = [b for b in bounds if b.role == "envelope"]
+        assert {b.source for b in envelopes} == {"local_panels", "replicas"}
+        for b in envelopes:
+            assert (b.mean, b.project) == (None, None)
+
+    def test_the_limitation_follows_the_estimate(self):
+        x, y, post, rng = _gauss2(2000, 1)
+        units = make_units(y, class_names=["a", "b"])
+        replicas = dict(enumerate(draw_labels(post[:500], 2, rng)))  # a full_input envelope that does not cross
+        spec = _ap("b")
+        bounds, _, _ = _gather([spec], units, x, replicas=replicas, predictions=post, builtin=False)
+        (witness,) = [b for b in bounds if b.source == "user_model"]
+        (envelope,) = [b for b in bounds if b.source == "replicas"]
+        assert witness.bound is not None
+        assert witness.observed is not None
+        assert witness.n is not None
+        assert envelope.bound is not None
+        assert witness.bound < witness.observed < envelope.bound
+        # The estimate clears the threshold and the bound does not: a minimum, and the relation AT3 asks of it.
+        above = replace(spec, threshold=(witness.bound + witness.observed) / 2)
+        row = decide(above, 0, bounds)
+        assert (row.determination, row.limitation) == ("not_ruled_out", "within_radius")
+        assert row.minimum_source == "user_model"
+        m = row.suggested_minimum
+        assert m is not None
+        assert m > witness.n
+        assert witness.project is not None
+        assert witness.project(m) >= above.threshold > witness.project(m - 1)
+        # The estimate is at the threshold, so no number of audit items carries the bound across.
+        at = replace(spec, threshold=witness.observed)
+        row = decide(at, 0, bounds)
+        assert (row.determination, row.limitation, row.suggested_minimum) == ("not_ruled_out", "weak_witness", None)
+
+    def test_labeled_items_projection(self):
+        x, y, post, _ = _gauss2(1000, 4)
+        labels: list[int | None] = [int(v) for v in y]
+        labels[::7] = [None] * len(labels[::7])
+        units = resolve_units(_IC(labels, declare={0: "a", 1: "b"}), groups=None)
+        keep = units.item_indices
+        assert units.population == "labeled_items"
+        assert len(keep) < len(labels)
+        bounds, _, audit = _gather([_ap("b")], units, x[keep], predictions=post)  # predictions cover every item
+        for b in _witnesses(bounds):
+            assert b.n == len(audit)  # the labeled items the audit holds, not the dataset's
+            assert b.project is not None
+            assert b.project(len(audit)) == b.bound
+
+    def test_macro_with_an_absent_class_has_no_estimate(self):
+        x, y, post, rng = _gauss2(2000, 2)  # labels 0 and 1 only; class "c" (index 2) is declared but absent
+        units = make_units(y, n_classes=3, class_names=["a", "b", "c"])
+        replicas = dict(enumerate(draw_labels(post[:500], 2, rng)))  # a full_input envelope, so the limitation is named
+        bounds, _, audit = _gather([_ap()], units, x, replicas=replicas)
+        assert {b.source for b in bounds if b.role == "witness"} == set(WITNESSES)
+        for b in bounds:
+            if b.role == "witness":
+                assert (b.observed, b.n, b.state) == (None, len(audit), "informative")  # an unknown value is not 0
+        row = decide(_ap(), 0, bounds)
+        assert (row.limitation, row.suggested_minimum) == ("weak_witness", None)

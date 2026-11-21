@@ -13,7 +13,7 @@ with scikit-learn (the local-panel partition's KMeans, the built-in k-NN and pro
 import functools
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -336,16 +336,45 @@ def test_pin_rows_exist_and_independent_rows_match(name, golden):
             _assert_same(g, w, 1e-9, f"{name}{_key(w)}")
 
 
-@pytest.mark.parametrize("name", SCENARIOS)
-def test_pin_fitted_stages_and_determinations_match(name, golden):
+def _skip_unless_pinned_versions(golden: dict[str, Any]) -> None:
     versions = golden["versions"]
     if (_minor(np.__version__), _minor(sklearn.__version__)) != (
         _minor(versions["numpy"]),
         _minor(versions["scikit-learn"]),
     ):
         pytest.skip("KMeans, k-NN and the probe can differ across numpy and scikit-learn minor versions")
+
+
+@pytest.mark.parametrize("name", SCENARIOS)
+def test_pin_fitted_stages_and_determinations_match(name, golden):
+    _skip_unless_pinned_versions(golden)
     want, got = golden["scenarios"][name], _observed_scenario(name)
     for g, w in zip(got["bounds"], want["bounds"], strict=True):
         if w["source"] in FITTED:
             _assert_same(g, w, 1e-6, f"{name}{_key(w)}")
     _assert_same(got["determinations"], want["determinations"], 1e-6, f"{name}.determinations")
+
+
+@pytest.mark.parametrize(
+    ("threshold", "clearing", "source"),
+    [(0.5, {"knn", "linear_probe", "user_model"}, "knn"), (0.8, {"linear_probe", "user_model"}, "user_model")],
+)
+def test_witness_choice_end_to_end(threshold, clearing, source, golden):
+    """The minimum comes from the largest bound among the witnesses whose estimate clears the threshold (#1652)."""
+    _skip_unless_pinned_versions(golden)
+    scenario = SCENARIOS["video_frame_pooled"]()
+    scenario = replace(scenario, specs=[scenario.specs[0], replace(scenario.specs[1], threshold=threshold)])
+    bounds, determinations = _run(scenario)
+    witnesses = [b for b in bounds if b.requirement == 1 and b.role == "witness"]
+    estimated = [b for b in witnesses if b.observed is not None and b.observed > threshold]
+    assert {
+        b.source for b in estimated
+    } == clearing  # knn's estimate (0.77) is below 0.8; the probe's and model's are not
+    chosen = max(estimated, key=lambda b: b.bound or 0.0)
+    d = determinations[1]
+    assert (d.determination, d.limitation) == ("not_ruled_out", "within_radius")  # it was weak_witness before
+    assert d.minimum_source == chosen.source == source
+    m = d.suggested_minimum
+    assert m is not None
+    assert chosen.project is not None
+    assert chosen.project(m) >= threshold > chosen.project(m - 1)  # the smallest audit size that clears
