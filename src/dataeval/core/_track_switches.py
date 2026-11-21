@@ -288,8 +288,9 @@ def track_switches(
     first track's ``window`` rows before ``t`` and from ``t``, and ``b2`` and ``a2`` the same for the second track,
     counted in rows, not frames. The score is
     ``|b1 - a1| + |b2 - a2| - |b1 - a2| - |b2 - a1|``: the straight distances minus the crossed ones. It is above 0
-    where each track's later rows look more like the other track's earlier rows. An encounter takes its largest score,
-    at the earliest frame on a tie. A window that holds a row of zero length is not scored.
+    where, summed over the two tracks, the later rows lie closer to the other track's earlier rows than to their own,
+    which can hold when only one of the two fits crossed. An encounter takes its largest score, at the earliest frame
+    on a tie. A window that holds a row of zero length is not scored.
 
     **What a flag means.** A flag says the crossed matching fits better. The ids may have swapped; a box may have
     drifted onto the other track's object, as boxes interpolated between keyframes can during camera motion; or one

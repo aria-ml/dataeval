@@ -69,6 +69,7 @@ datasets for machine learning.
 ../notebooks/h2_deduplicate.py
 ../notebooks/h2_measure_frames_and_tracks.py
 ../notebooks/h2_track_embedding_paths.py
+../notebooks/h2_find_track_switches.py
 ../notebooks/h2_find_factor_outliers.py
 ../notebooks/h2_find_conditional_outliers.py
 ../notebooks/h2_find_annotation_review_candidates.py
@@ -156,6 +157,10 @@ datasets for machine learning.
 - - [](../notebooks/h2_track_embedding_paths.py)
   - Measure how far, and in which direction, the crop embeddings of each track travel
   - [![Open In Colab][colab-badge]][tpath-colab]
+- - [](../notebooks/h2_find_track_switches.py)
+  - Score where two tracks meet by whether their crop embeddings fit better crossed than straight, and look
+    at the frames of a flagged pair
+  - [![Open In Colab][colab-badge]][tswitch-colab]
 - - [](../notebooks/h2_find_factor_outliers.py)
   - Threshold metadata factors, each against its own level, and trace a
     flagged track back to the metadata
@@ -234,6 +239,7 @@ datasets for machine learning.
 [dupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_deduplicate.ipynb
 [mft-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_measure_frames_and_tracks.ipynb
 [tpath-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_track_embedding_paths.ipynb
+[tswitch-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_track_switches.ipynb
 [fout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_factor_outliers.ipynb
 [cout-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_conditional_outliers.ipynb
 [review-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_find_annotation_review_candidates.ipynb

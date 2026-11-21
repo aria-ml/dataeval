@@ -22,7 +22,8 @@
 # in [Validation evidence by evaluator](../reference/ValidationEvidence.md) for what its tests cover.
 #
 # Use it when you want to see which tracks of a tracking dataset change most between their first frames and their last.
-# It does not detect identity switches.
+# It does not detect identity switches; for those, see
+# [Find tracks whose ids may have switched](./h2_find_track_switches.py).
 #
 # You need `dataeval`, `dataeval-plots`, `maite-datasets` and `torchvision`.
 

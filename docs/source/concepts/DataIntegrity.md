@@ -518,6 +518,7 @@ run deduplication across the train/validation split boundary.
 - [Identify duplicates](../notebooks/h2_deduplicate.py)
 - [Run clustering analysis](../notebooks/h2_cluster_analysis.py)
 - [Specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py)
+- [Find tracks whose ids may have switched](../notebooks/h2_find_track_switches.py)
 
 ### Tutorials
 
