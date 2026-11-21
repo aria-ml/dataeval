@@ -156,6 +156,15 @@ neighbors in any other class. A ratio ≥ 1.0 means the sample is at least as cl
 This is consistent with a labeling problem. It is also consistent with an ambiguous sample or an embedding that does
 not separate the classes.
 
+In a tracking dataset, label noise can also sit in the track ids. An **identity switch** is an id that moves to another
+object partway through a track: two ids exchanged where two objects cross, or a box that drifts onto another track's
+object until a corrected keyframe. {func}`.track_switches` looks where two tracks of one class meet. It compares the
+embeddings of each track before and after a frame where their boxes meet, and asks whether the two tracks fit better
+crossed than straight. A flagged meeting marks a place to look, not a certain error: the ids may have swapped, the boxes
+may sit off their objects, or one object may pass behind an occluder as the other comes out. An empty result does not
+mean the ids are right. A switch that lasts a few frames, a switch with no second track nearby, and a jump to a distant
+object are not looked at; {func}`.track_steps` shows the last as a large step.
+
 Label statistics ({func}`.label_stats`) address a different but related concern: structural problems in the label
 distribution that concern completeness and consistency and not correctness. The function counts
 `label_counts_per_class`, `image_counts_per_class`, `label_counts_per_image`, and, for object detection,
