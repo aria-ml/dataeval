@@ -1179,7 +1179,7 @@ dev = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "codespell", extras = ["toml"], specifier = ">=2.3" },
     { name = "coverage", extras = ["toml"], specifier = ">=7.6" },
-    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.20" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.21" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -1222,7 +1222,7 @@ dev = [
 docs = [
     { name = "av", specifier = ">=12.0.0" },
     { name = "certifi", specifier = ">=2024.7.4" },
-    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.20" },
+    { name = "dataeval-plots", extras = ["plotly"], specifier = ">=0.0.21" },
     { name = "ipykernel", specifier = ">=6.26.0" },
     { name = "ipywidgets", specifier = ">=8.1.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
@@ -1283,16 +1283,16 @@ verify = [
 
 [[package]]
 name = "dataeval-plots"
-version = "0.0.20"
+version = "0.0.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "polars" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/fa/8fb340be0d61e5e18d5d11fa26ebdaec30e7683dd4eb48b7cd872621233b/dataeval_plots-0.0.20.tar.gz", hash = "sha256:0f479183e7a2dad8b94b7e35b19f84f2d4e9fac3667c290ae17a4ab550eee74d", size = 73759, upload-time = "2026-11-17T21:13:33.748Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/66/0a/e90f4f2a82d6de693767abc48fee00174fc6649e60cf3457d55dcd193631/dataeval_plots-0.0.21.tar.gz", hash = "sha256:c0ffda7d0c1c149a9ee267c13a27ae817dd9caa0a9cad77a0f4d0a50f562cbca", size = 74022, upload-time = "2026-11-21T21:58:33.136Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/0e/a63ccdb2b4af630ea6de9028e64506af285bc8912cc1a60a46ef619a53ab/dataeval_plots-0.0.20-py3-none-any.whl", hash = "sha256:88b3572c3b455f34e471ed1cf3ca06e496edd710eee93310b690de4944dceebc", size = 83330, upload-time = "2026-11-17T21:13:32.484Z" },
+    { url = "https://files.pythonhosted.org/packages/73/dc/6fbafb965c39c62f7dc09c699c70bb7d85eb4574ec713798a6ebbf2ad046/dataeval_plots-0.0.21-py3-none-any.whl", hash = "sha256:7085feb6f936c82ab3aa4db3fa356e80aefe5b2b7c11f2638586f4b3843aada1", size = 83599, upload-time = "2026-11-21T21:58:32.177Z" },
 ]
 
 [package.optional-dependencies]
