@@ -306,8 +306,9 @@ def track_switches(
     **Cost.** Each frame compares every pair of tracks of one class present in it, so a frame with ``k`` such tracks
     costs ``k**2``.
 
-    The meeting rule, the gap of 5, ``window`` and the flag at 0 are not tuned. The function is tested on constructed
-    inputs only, not on real footage.
+    The meeting rule, the gap of 5, ``window`` and the flag at 0 are not tuned. The study behind the function covers
+    the seven validation videos of one drone dataset, one ImageNet classifier and a tracker run over the annotated
+    boxes, so its numbers describe those.
 
     Examples
     --------

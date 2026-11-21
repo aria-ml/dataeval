@@ -667,13 +667,22 @@ statistical and computational.
     where their boxes meet fit better crossed than straight, the frame where they fit best, and a flag where the
     crossed matching fits better.
   - Anchored (embeddings constructed with a known swap, a half swap and straight tracks, and the frame of the swap
-    known)
+    known. A study on real footage embedded, with an ImageNet ResNet18, the object crops of the seven VisDrone2019-MOT
+    validation videos, and ran a tracker (ByteTrack, one per class) over their annotated boxes for real identity
+    switches. At full frame rate and the default window, the flag found 14 of the 17 switches it could score, at a
+    median of 0 frames from the switch, at 20 false alarms per 1,000 encounters of tracks with no switch; at that rate
+    the box step of `track_steps` found 0.06 of them, or 0.29 counting steps across gaps. With every 2nd or 3rd frame
+    kept, the box step found about as many or more. Of the 31 encounters it flagged in the annotations, 6 were errors (2
+    swapped ids, 4 boxes off their objects), 4 were occluders, 9 could not be read and 12 showed nothing wrong. A GPU
+    run changed no flag)
   - Experimental: the names, `window`, the meeting rule and the flag at 0 may change. A flag marks a place to look:
     swapped ids, a box drifted onto the other track's object, and an object passing behind an occluder as the other
     comes out all fit better crossed. An empty result does not mean the ids are right: a switch of a few frames, a
     switch with no second track nearby and tracks that never meet are not scored, and neither is a meeting without
     `window` rows on both sides of both tracks. Windows are counted in rows, so a gap in a track widens them. The
-    constants are not tuned. Tested on constructed inputs only, not on real footage.
+    constants are not tuned. In the study, the tracker's 456 identity changes held 17 the function could score, from 3
+    videos, so its rates are rough; it covers one aerial dataset, one ImageNet classifier and a tracker run over
+    annotated boxes, not a detector's.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same
