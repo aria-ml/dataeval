@@ -794,6 +794,22 @@ class _Model:
         return [np.array([float(np.mean(image)), 1.0], dtype=np.float32) for image in batch]
 
 
+class _Detector:
+    """A MAITE-shaped detector that finds one box per image, as wide and as tall as the image's mean."""
+
+    metadata = {"id": "mean-detector"}
+
+    def __call__(self, batch: Any) -> Any:
+        return [_Box(float(np.mean(image))) for image in batch]
+
+
+class _Box:
+    def __init__(self, mean: float) -> None:
+        self.boxes = np.array([[0.0, 0.0, mean, mean]])
+        self.labels = np.array([int(mean) % 3])
+        self.scores = np.array([mean / 255])
+
+
 class TestTargetReads:
     """The walks that read targets, which on a typical dataset decode the image too, load in threads."""
 
@@ -804,6 +820,18 @@ class TestTargetReads:
             lambda: _Reversed(delay=0.004), lambda dataset: model_scores(cast(Any, _Model()), dataset, batch_size=8)
         )
         np.testing.assert_array_equal(threaded, serial)
+        assert dataset.off_main_thread > 0
+        assert sorted(dataset.order) == list(range(N))
+
+    def test_feasibility_runs_a_detector_over_every_item_once_in_order_from_several_threads(self):
+        from dataeval.performance._feasibility_detection import read_model_output
+        from dataeval.performance._feasibility_model import run_model
+
+        def detect(dataset: Any) -> Any:
+            return run_model(cast(Any, _Detector()), dataset, 8, lambda i, output: read_model_output(i, output, 3))
+
+        serial, threaded, dataset = _threaded(lambda: _Detections(delay=0.004), detect)
+        _equal(threaded, serial)
         assert dataset.off_main_thread > 0
         assert sorted(dataset.order) == list(range(N))
 

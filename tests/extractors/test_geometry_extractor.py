@@ -1,12 +1,16 @@
 """Tests for per-detection geometry features feeding drift."""
 
 import json
+import re
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import pytest
 
 from dataeval.extractors import DetectionGeometryExtractor
 from dataeval.models import OnnxObjectDetector
+from dataeval.models._predictors import _BaseObjectDetector
 from dataeval.protocols import FeatureExtractor
 
 
@@ -85,3 +89,32 @@ def test_no_kept_detections_returns_empty():
     preds = [_Prediction(np.zeros((0, 4)), np.zeros((0, 2)))]
     out = DetectionGeometryExtractor(_FakeDetector(preds))([np.zeros((3, 8, 8), dtype=np.uint8)])
     assert out.shape == (0, 6)
+
+
+class _Backend:
+    input_name = "image"
+    output_names = ["boxes", "scores"]
+
+    def run(self, tensor: Any) -> dict[str, Any]:
+        return {"boxes": np.zeros((tensor.shape[0], 5, 4)), "scores": np.zeros((tensor.shape[0], 5, 4))}
+
+
+class _Detector(_BaseObjectDetector):
+    """A real detector class with no ONNX runtime behind it."""
+
+    def _make_backend(self, model_path: Any) -> _Backend:
+        return _Backend()
+
+
+def test_a_pixel_detector_is_refused(tmp_path: Path):
+    pixel = _Detector("unused.model", _meta(tmp_path), box_coordinates="pixel")
+    expected = (
+        "DetectionGeometryExtractor reads normalized boxes, but this detector was built with "
+        "box_coordinates='pixel'. Build it with the default box_coordinates='normalized'."
+    )
+    with pytest.raises(ValueError, match=re.escape(expected)):
+        DetectionGeometryExtractor(pixel)
+
+    # the default detector, and a double with no box_coordinates attribute, are accepted as before
+    DetectionGeometryExtractor(_Detector("unused.model", _meta(tmp_path)))
+    DetectionGeometryExtractor(_FakeDetector([]))

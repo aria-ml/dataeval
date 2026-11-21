@@ -99,6 +99,23 @@ class TestKnownAnswers:
     def test_a_duplicate_detection_is_a_false_positive(self):
         assert _counts([_BOX], [_BOX, _BOX], [0.9, 0.9]) == ([1], [1])
 
+    @pytest.mark.parametrize("empty", [[0, 0, 0, 0], [3, 3, 3, 3], [5, 0, 5, 10]])
+    def test_a_detection_box_with_no_area_is_a_false_positive(self, empty):
+        """It matches no target, so it counts as a box far from every target: a false positive."""
+        far = [100, 100, 110, 110]
+        thresholds = np.array([-np.inf, 0.9, 0.95])
+
+        def run(extra):
+            args = ([np.array([_BOX])], [np.array([_BOX, extra])], [np.array([0.9, 0.95])])
+            counts = detection_counts(*args, iou=0.5, thresholds=thresholds, max_detections=2)
+            return counts, kept_matches(*args, iou=0.5, max_detections=2)
+
+        (counts, (scores, matched)), (expected, (expected_scores, expected_matched)) = run(empty), run(far)
+        assert counts["true_positives"].tolist() == expected["true_positives"].tolist() == [[1, 1, 0]]
+        assert counts["false_positives"].tolist() == expected["false_positives"].tolist() == [[1, 1, 1]]
+        assert (scores.tolist(), matched.tolist()) == (expected_scores.tolist(), expected_matched.tolist())
+        assert matched.tolist() == [False, True]
+
     def test_two_identical_targets_are_both_matchable(self):
         assert _counts([_BOX, _BOX], [_BOX, _BOX], [0.9, 0.8]) == ([2], [0])
 
@@ -252,7 +269,7 @@ class TestKeptMatches:
             ({"detection_scores": []}, "one entry per image"),
             ({"detection_scores": [np.array([0.9, 0.8])]}, "image 0: 2 scores for 1 detection boxes"),
             ({"detection_scores": [np.array([np.nan])]}, "image 0: scores must be finite"),
-            ({"detection_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 detections: "),
+            ({"detection_boxes": [np.array([[5, 0, 1, 1]])]}, "image 0 detections: "),
             ({"target_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 targets: "),
             ({"max_detections": 0}, "max_detections"),
             ({"max_detections": True}, "max_detections"),
@@ -316,6 +333,32 @@ class TestChecks:
         with pytest.raises(ValueError, match=match):
             check_boxes(boxes, "image 3 detections")
 
+    @pytest.mark.parametrize(
+        ("boxes", "match"),
+        [
+            (np.array([[0, 0, 1]]), r"shape \(N, 4\)"),
+            (np.array([[0, 0, 1, 1], [0, 0, 1, np.nan]]), "box 1 .*not finite"),
+            (np.array([[0, 0, 1, 1], [5, 0, 1, 1]]), r"box 1 is \[5.0, 0.0, 1.0, 1.0\], with x1 < x0 or y1 < y0"),
+            (np.array([[0, 0, 1, 1], [0, 5, 1, 1]]), "box 1"),
+        ],
+    )
+    def test_check_boxes_allowing_empty_refuses_only_negative_extent(self, boxes, match):
+        with pytest.raises(ValueError, match=match) as info:
+            check_boxes(boxes, "image 3 detections", allow_empty=True)
+        if "x1 < x0" in match:
+            assert str(info.value) == (
+                "image 3 detections: box 1 is [5.0, 0.0, 1.0, 1.0], with x1 < x0 or y1 < y0. Boxes need nonnegative "
+                "width and height, in (x0, y0, x1, y1) order; fix or drop it."
+            )
+
+    def test_check_boxes_allowing_empty_accepts_no_area(self):
+        boxes = np.array([[0, 0, 0, 0], [3, 3, 3, 3], [5, 0, 5, 10], [0, 2, 4, 2], [0, 0, 1, 1]], dtype=np.float64)
+        np.testing.assert_array_equal(check_boxes(boxes, "x", allow_empty=True), boxes)
+
+    def test_check_boxes_still_refuses_no_area_by_default(self):
+        with pytest.raises(ValueError, match="with x1 <= x0 or y1 <= y0. Boxes need positive width and height"):
+            check_boxes(np.array([[3, 3, 3, 3]]), "x")
+
     def test_check_boxes_names_where(self):
         with pytest.raises(ValueError, match="^image 3 detections: "):
             check_boxes(np.array([[0, 0, 0, 1]]), "image 3 detections")
@@ -349,7 +392,7 @@ class TestChecks:
             ({"detection_scores": []}, "one entry per image"),
             ({"detection_scores": [np.array([0.9, 0.8])]}, "image 0: 2 scores for 1 detection boxes"),
             ({"detection_scores": [np.array([np.nan])]}, "image 0: scores must be finite"),
-            ({"detection_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 detections: "),
+            ({"detection_boxes": [np.array([[5, 0, 1, 1]])]}, "image 0 detections: "),
             ({"target_boxes": [np.array([[0, 0, 0, 1]])]}, "image 0 targets: "),
             ({"thresholds": np.array([])}, "thresholds"),
             ({"thresholds": np.array([[0.5]])}, "thresholds"),

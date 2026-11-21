@@ -1,6 +1,7 @@
 """Feasibility judges an object detection requirement end to end, from a detector's detections."""
 
 import inspect
+import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, cast
@@ -23,6 +24,12 @@ pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.Experimenta
 
 NAMES = {0: "person", 1: "car"}
 N = 60
+NO_DETECTOR = "No detector is given (predictions= or model=)"
+CALL = (
+    "Object detection takes the targets, each requirement's max_detections K and Feasibility(max_objects=...) for the "
+    "capacity envelope, and a detector for the witness: predictions=, one detections object per image, or model=, a "
+    "MAITE object detector."
+)
 
 
 @dataclass
@@ -109,47 +116,43 @@ def _no_pass():
 @pytest.mark.required
 class TestRefusals:
     def test_unusable_inputs_are_named_together_before_the_pass(self):
-        unusable = {
-            "model": cast(Any, object()),
-            "embeddings": np.zeros((N, 2)),
-            "replicas": {"im0": [0]},
-            "allowances": Allowances(beta=0.0),
-        }
+        unusable = {"embeddings": np.zeros((N, 2)), "replicas": {"im0": [0]}, "allowances": Allowances(beta=0.0)}
+        detector = cast(Any, lambda batch: pytest.fail("the detector ran"))  # with predictions=, two detectors
         with _no_pass(), pytest.raises(ValueError, match="apply to classification only") as info:
-            _run(**unusable)
+            _run(model=detector, **unusable)
         message = str(info.value)
-        assert all(f"{name}=" in message for name in unusable)
-        assert "max_objects=...) for the capacity envelope" in message
-        assert "predictions=, one detections object per image, for the witness" in message
+        assert message.startswith("embeddings=, replicas=, allowances= apply to classification only; ")
+        assert "model= and predictions= are both given; pass one, since a call has one detector" in message
+        assert message.endswith(CALL)
         assert "no envelope" not in message
-        assert "pass predictions=" not in message.lower()
-        assert "predictions= is missing" not in message
+        assert NO_DETECTOR not in message
 
-    def test_missing_predictions_is_named_with_the_unusable_inputs(self):
+    def test_missing_detector_is_named_with_the_unusable_inputs(self):
         with _no_pass(), pytest.raises(ValueError, match="embeddings=") as info:
             _run(predictions=None, embeddings=np.zeros((N, 2)))
-        assert "predictions= is missing" in str(info.value)
-        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+        assert NO_DETECTOR in str(info.value)
+        assert str(info.value).endswith(CALL)
+        with _no_pass(), pytest.raises(ValueError, match=re.escape(NO_DETECTOR)) as info:
             _run(predictions=None)  # K = 5 and B = 3: the cap cannot bind, so only a witness can judge it
         assert "'person' at K = 5, max_objects 3 (requirement 0)" in str(info.value)
 
-    def test_missing_predictions_names_every_requirement_whose_cap_cannot_bind(self):
+    def test_missing_detector_names_every_requirement_whose_cap_cannot_bind(self):
         # A mixed call: person at K = 1 has a capacity envelope, car at K = 5 and 3 do not; B is 3 for both.
         target = [_ap("person", k=1), _ap("car", k=5), _ap("car", k=3)]
-        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+        with _no_pass(), pytest.raises(ValueError, match=re.escape(NO_DETECTOR)) as info:
             _run(target=target, predictions=None)
         message = str(info.value)
         assert "'car' at K = 5, max_objects 3 (requirement 1), 'car' at K = 3, max_objects 3 (requirement 2)" in message
         assert "requirement 0" not in message
-        assert "every requirement whose max_detections K is at or above max_objects needs it" in message
-        assert "Pass predictions=, or state a max_detections below max_objects" in message
+        assert "every requirement whose max_detections K is at or above max_objects needs one" in message
+        assert f"Pass predictions= or model=, or state a max_detections below max_objects. {CALL}" in message
 
-    def test_missing_predictions_at_a_bound_of_one_offers_only_predictions(self):
+    def test_missing_detector_at_a_bound_of_one_offers_only_a_detector(self):
         # B = 1 leaves no K below it, since TargetSpec refuses max_detections=0, so the only fix is a detector.
-        with _no_pass(), pytest.raises(ValueError, match="predictions= is missing") as info:
+        with _no_pass(), pytest.raises(ValueError, match=re.escape(NO_DETECTOR)) as info:
             _run(target=[_ap("car", k=1)], max_objects={"car": 1}, predictions=None)
         message = str(info.value)
-        assert "'car' at K = 1, max_objects 1 (requirement 0). Pass predictions=." in message
+        assert f"'car' at K = 1, max_objects 1 (requirement 0). Pass predictions= or model=. {CALL}" in message
         assert "state a max_detections" not in message
 
     def test_an_empty_replicas_mapping_is_not_an_input(self):
@@ -345,6 +348,37 @@ class TestCalls:
             feasibility.evaluate(dataset, target=[_ap()], predictions=missed)
         (warning,) = [w for w in record if "None of the" in str(w.message)]
         assert (warning.filename, warning.lineno) == (__file__, line)
+
+    def test_detection_boxes_with_no_area_are_false_positives(self):
+        # The padding of a fixed-size detector export: a box with no area has IoU 0 with every target, so it is a false
+        # positive, the same as a box far from every target. Every third image gets one of class 0 at 0.95.
+        def padded(box):
+            images = _scenes()
+            out = []
+            for i, d in enumerate(_detector(images)):
+                if i % 3 == 0:
+                    d = _Det(np.r_[d.boxes, [box]], np.r_[d.labels, 0], np.r_[d.scores, 0.95])
+                out.append(d)
+            return out
+
+        plain = _run().bounds["bound"][0]
+        empty = _run(predictions=padded([0.0, 0.0, 0.0, 0.0])).bounds["bound"][0]
+        far = _run(predictions=padded(_box(8))).bounds["bound"][0]
+        assert plain > 0  # a visible drop needs a baseline above 0
+        assert empty == far
+        assert empty < plain
+
+    def test_a_target_box_with_no_area_is_still_refused(self):
+        class Flat(_OD):
+            def __getitem__(self, i: int):
+                image, target, meta = super().__getitem__(i)
+                if i == 4:
+                    target = _Det(np.array([[5.0, 0.0, 5.0, 10.0]]), np.array([0]), np.ones(1))
+                return image, target, meta
+
+        images = _scenes()
+        with pytest.raises(ValueError, match=r"dataset item 4 targets: box 0 .*positive width and height"):
+            _run(images, dataset=Flat(images))
 
     def test_an_od_call_has_one_user_witness_bound_per_requirement(self):
         out = _run(target=[_ap("person"), _ap("car")])

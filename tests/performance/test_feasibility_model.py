@@ -1,5 +1,6 @@
 """Tests for Feasibility's ``model=`` input: the same determinations as ``predictions=``, in batches, class order."""
 
+import re
 from typing import Any
 
 import numpy as np
@@ -10,7 +11,7 @@ from polars.testing import assert_frame_equal
 
 from dataeval.config import set_batch_size
 from dataeval.performance import Feasibility, TargetSpec
-from dataeval.performance._feasibility_model import check_class_order, model_scores
+from dataeval.performance._feasibility_model import check_class_order, model_scores, run_model
 from tests.data.conftest import MockICDataset
 from tests.performance.feasibility_helpers import make_population
 
@@ -70,6 +71,64 @@ class _TorchModel:
 
 def _torch_model(scores: Any) -> Any:
     return _TorchModel(scores)
+
+
+def _wrong_count(scores: Any, sizes: list[int]) -> Any:
+    return _WrongCount(scores, sizes)
+
+
+def _wrapped(inner: Any, wrap: Any) -> Any:
+    return _Wrapped(inner, wrap)
+
+
+def _reusing_buffer(scores: Any) -> Any:
+    return _ReusingBuffer(scores)
+
+
+class _WrongCount(_Model):
+    """A model whose k-th batch returns ``sizes[k]`` rows, whatever the batch holds."""
+
+    def __init__(self, scores, sizes: list[int]):
+        super().__init__(scores)
+        self.sizes = iter(sizes)
+
+    def __call__(self, batch):
+        return (super().__call__(batch) * 2)[: next(self.sizes)]
+
+
+class _Wrapped:
+    """A model whose batch output is passed through ``wrap`` before it is returned."""
+
+    def __init__(self, inner: Any, wrap: Any):
+        self.inner, self.wrap = inner, wrap
+
+    def __call__(self, batch):
+        return self.wrap(self.inner(batch))
+
+
+class _ByGetitem:
+    """A sequence with only ``__getitem__`` and ``__len__``: it iterates through the legacy protocol."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, i):
+        return self.rows[i]
+
+
+class _ReusingBuffer:
+    """A model that writes each batch into one float64 array it keeps and returns a view of it."""
+
+    def __init__(self, scores):
+        self.scores, self.buffer = np.asarray(scores, dtype=np.float64), np.zeros((3, scores.shape[1]))
+
+    def __call__(self, batch):
+        for k, image in enumerate(batch):
+            self.buffer[k] = self.scores[int(image[0])]
+        return self.buffer[: len(batch)]
 
 
 def _population(n: int = 1500, seed: int = 0):
@@ -202,6 +261,70 @@ class TestModelInput:
         out = Feasibility(seed=1).evaluate(_gapped(labels), target=_target()[:1], embeddings=x, model=model)
         assert sum(model.batches) == len(labels)  # every item, labeled or not, aligned with the embeddings
         assert set(out.bounds["population"]) == {"labeled_items"}
+
+    def test_a_short_second_batch_is_refused_naming_its_first_image(self):
+        _, y, post = _population(n=6)
+        message = (
+            "The model returned 2 outputs for the batch of 3 images starting at image 3. "
+            "Return one output per image of the batch, in order."
+        )
+        with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+            model_scores(_wrong_count(post, [3, 2]), _dataset(y), 3)
+
+    def test_a_long_first_batch_is_refused_at_image_0(self):
+        _, y, post = _population(n=6)
+        message = (
+            "The model returned 4 outputs for the batch of 3 images starting at image 0. "
+            "Return one output per image of the batch, in order."
+        )
+        with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+            model_scores(_wrong_count(post, [4]), _dataset(y), 3)
+
+    @pytest.mark.parametrize(
+        ("wrap", "name"), [(lambda rows: {"scores": rows}, "dict"), (lambda _: object(), "object")]
+    )
+    def test_a_mapping_or_non_iterable_batch_output_is_refused(self, wrap, name):
+        _, y, post = _population(n=6)
+        message = (
+            f"The model returned a {name} for the batch of 3 images starting at image 0. "
+            "Return one output per image of the batch, in order."
+        )
+        with pytest.raises(ValueError, match=f"^{re.escape(message)}$"):
+            model_scores(_wrapped(_model(post), wrap), _dataset(y), 3)
+
+    def test_a_sequence_that_iterates_by_getitem_is_accepted(self):
+        _, y, post = _population(n=20)
+        by_getitem = model_scores(_wrapped(_model(post), _ByGetitem), _dataset(y), 7)
+        np.testing.assert_array_equal(by_getitem, model_scores(_model(post), _dataset(y), 7))
+
+    def test_a_reused_float64_output_buffer_does_not_overwrite_earlier_rows(self):
+        _, y, post = _population(n=20)
+        reused = model_scores(_reusing_buffer(post), _dataset(y), 3)
+        np.testing.assert_array_equal(reused, model_scores(_model(post), _dataset(y), 3))
+
+    def test_autograd_is_on_after_a_refused_batch(self):
+        _, y, post = _population(n=20)
+        one_row_short = _wrapped(_torch_model(post), lambda rows: rows[:-1])
+        with pytest.raises(ValueError, match="returned 6 outputs for the batch of 7"):
+            model_scores(one_row_short, _dataset(y), 7)
+        assert torch.is_grad_enabled()
+
+    def test_a_batch_size_above_the_dataset_runs_one_batch(self):
+        _, y, post = _population(n=10)
+        model = _model(post)
+        assert model_scores(model, _dataset(y), 64).shape == post.shape
+        assert model.batches == [10]
+
+    def test_run_model_reads_each_output_with_its_dataset_index_and_without_autograd(self):
+        _, y, post = _population(n=20)
+        seen: list[tuple[int, bool]] = []
+
+        def read(i: int, output: Any) -> int:
+            seen.append((i, torch.is_grad_enabled()))
+            return i
+
+        assert run_model(_torch_model(post), _dataset(y), 7, read) == list(range(20))
+        assert seen == [(i, False) for i in range(20)]
 
     def test_check_class_order_reports_what_it_could_verify(self):
         post = np.full((4, 2), 0.5)

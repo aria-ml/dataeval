@@ -45,6 +45,11 @@ class TestCheckDetections:
         out = check_detections([_Det(np.zeros(0), np.zeros(0, dtype=int), np.zeros(0))], 1, 3)
         assert out[0].boxes.shape == (0, 4)
 
+    def test_a_box_with_no_area_is_accepted(self):
+        boxes = [[0, 0, 0, 0], [3, 3, 3, 3], [5, 0, 5, 10], [0, 0, 10, 10]]
+        out = check_detections([_one(boxes=boxes, labels=[1] * 4, scores=[0.9] * 4)], 1, 3)
+        np.testing.assert_array_equal(out[0].boxes, boxes)
+
     def test_scores_keep_float64_precision(self):
         """float32 would make these two scores one tie."""
         out = check_detections(
@@ -62,15 +67,16 @@ class TestCheckDetections:
             ([_one(), _one(scores=np.ones((1, 4)))], r"predictions\[1\]: scores of shape \(1, 4\) .*\(1, 3\)"),
             ([_one(), _one(scores=[np.nan])], r"predictions\[1\]: scores must be finite"),
             ([_one(), _one(boxes=[[0, 0, np.inf, 1]])], r"^predictions\[1\]: box 0 .*not finite"),
-            ([_one(), _one(boxes=[[5, 0, 1, 1]])], r"^predictions\[1\]: box 0 .*positive width and height"),
+            ([_one(), _one(boxes=[[5, 0, 1, 1]])], r"^predictions\[1\]: box 0 .*nonnegative width and height"),
             ([_one(), _one(labels=[1.5])], "labels"),
             ([_one(), _one(labels=[True])], r"predictions\[1\]: labels are booleans"),
             (
                 [_one(), _one(labels=[3])],
                 (
                     r"predictions\[1\]: label 3 is outside the classes the dataset declares, \[0, 3\) \(without "
-                    r"index2label, the labels its targets hold\)\. Drop detections of other classes, or map the "
-                    r"detector's labels onto the dataset's class indices\.$"
+                    r"index2label, the labels its targets hold\)\. Map the detector's labels onto the dataset's class "
+                    r"indices \(a detector that reserves label 0 for background, as torchvision's do, can give class i "
+                    r"the label i \+ 1\), or drop detections of classes the dataset does not declare\.$"
                 ),
             ),
             ([_one(), _one(labels=[-1])], r"predictions\[1\]: label -1 is outside"),

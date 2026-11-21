@@ -30,6 +30,7 @@ from dataeval.performance._feasibility_detection import (
     check_detection_layout,
     check_detections,
     gather_detection_evidence,
+    read_model_output,
     resolve_class_ids,
     resolve_count_bounds,
 )
@@ -49,7 +50,7 @@ from dataeval.performance._feasibility_evidence import (
     allocate,
     check_ledger,
 )
-from dataeval.performance._feasibility_model import check_class_order, model_scores
+from dataeval.performance._feasibility_model import check_class_order, model_scores, run_model
 from dataeval.performance._feasibility_target import (
     Aggregation,
     Allowances,
@@ -405,9 +406,9 @@ class Feasibility(Evaluator):
     within the cells of a label-blind partition fitted on a group-disjoint fit split, proved in
     :func:`~dataeval.core.local_panel_bound`'s Notes with two Hoeffding [1]_ steps; replica envelopes from
     ``replicas=``; object detection capacity envelopes from the targets of every image; built-in frozen k-NN and
-    linear-probe witnesses fitted on the fit split; and a user witness from ``predictions=``, which counts at
-    ``full_input`` scope. Each (requirement, source) pair gets an equal share of ``alpha``. Bounds on means use
-    Hoeffding [1]_ and empirical Bernstein [2]_ radii, except that ungrouped witness bounds (accuracy, recall,
+    linear-probe witnesses fitted on the fit split; and a user witness from ``predictions=`` or ``model=``, which
+    counts at ``full_input`` scope. Each (requirement, source) pair gets an equal share of ``alpha``. Bounds on means
+    use Hoeffding [1]_ and empirical Bernstein [2]_ radii, except that ungrouped witness bounds (accuracy, recall,
     false-positive rate and AP indicators) use exact Clopper-Pearson [5]_ intervals; classification AP and recall
     envelopes are built on the cost-weighted risk inequality of [3]_. An object detection AP witness or capacity
     envelope bounds the means of per-image counts with the Hoeffding and empirical Bernstein radii.
@@ -459,10 +460,10 @@ class Feasibility(Evaluator):
     informative only when some images hold more than K targets of the class. A capacity envelope below the threshold
     means that, under the recorded assumptions, no detector with at most K detections per image reaches the
     threshold: K is too small for how many targets of the class the images hold, and only a larger K, which is a
-    different requirement, could reach it. A call without ``predictions`` can never be ``demonstrated_feasible``.
-    In such a call, a requirement whose envelope is computed and does not rule it out has limitation
-    ``no_eligible_witness``. More images, which narrow the envelope, can also settle it, but only when the share of
-    the class's targets that K detections can match is below the threshold.
+    different requirement, could reach it. A call without a detector (``predictions`` or ``model``) can never be
+    ``demonstrated_feasible``. In such a call, a requirement whose envelope is computed and does not rule it out has
+    limitation ``no_eligible_witness``. More images, which narrow the envelope, can also settle it, but only when the
+    share of the class's targets that K detections can match is below the threshold.
 
     **Scope.** An envelope decides at its information scope and every narrower one (``full_input`` ⊃
     ``fixed_representation`` ⊃ ``partition_restricted``). Image local-panel accuracy envelopes are
@@ -690,20 +691,29 @@ class Feasibility(Evaluator):
             decision policy, such as a threshold on one class's score, before the call and pass its decisions; one
             call's decisions feed every requirement, so a different operating point needs its own call, with the
             error budget split across the planned calls. Class decisions rank nothing, so they give no AP witness. The
-            model is assumed frozen before the audit and independent of the audit items, and counts at ``full_input``.
-            Give ``predictions`` or ``model``, not both. For object detection, ``predictions`` is required unless
-            every requirement's ``max_detections`` is below its ``max_objects``. It is one detections object per image,
-            in dataset order, with ``boxes`` ``(N, 4)`` as ``(x0, y0, x1, y1)``, ``labels`` (indices of the declared
-            classes) and ``scores`` ``(N,)`` or ``(N, n_classes)``, the MAITE ``ObjectDetectionTarget`` shape. The
-            labels are assumed to follow the dataset's class order, recorded as ``class_order_matches_dataset``.
+            model is assumed frozen before the audit and independent of the audit items, which a public pretrained
+            model may not be. It counts at ``full_input``. Give ``predictions`` or ``model``, not both. For object
+            detection, a detector, ``predictions`` or ``model``, is required unless every requirement's
+            ``max_detections`` is below its ``max_objects``. ``predictions`` is one detections object per image, in
+            dataset order, with ``boxes`` ``(N, 4)`` as ``(x0, y0, x1, y1)`` in the coordinates of the dataset's
+            targets, ``labels`` (indices of the declared classes) and ``scores`` ``(N,)`` or ``(N, n_classes)``, the
+            MAITE ``ObjectDetectionTarget`` shape. The labels are assumed to follow the dataset's class order,
+            recorded as ``class_order_matches_dataset``.
         model : Model or None, default None
-            Classification only. A frozen MAITE model, run over the whole dataset in batches of ``batch_size`` (or the
-            global batch size) in place of ``predictions``.
-            Its class scores keep the model's own precision and feed the same witness, so a model gives the same
-            determinations and bounds as its own scores passed as ``predictions``, and it can witness AP, which class
-            decisions cannot. If the model's ``metadata`` and the dataset both declare an ``index2label`` they must be
-            equal, else ``ValueError``; a class order is never remapped. If either declares none, the dataset's class
-            order is assumed and recorded as ``class_order_matches_dataset``.
+            A frozen MAITE image classifier or object detector, run over the whole dataset in batches of
+            ``batch_size`` (or the global batch size) in place of ``predictions``. Each batch is a list of the
+            dataset's images, as the dataset returns them. Its output feeds the same witness, so a model gives the
+            same determinations and bound values as its own output passed as ``predictions``. A classifier's class
+            scores keep the model's own precision, so it can witness AP, which class decisions cannot. A detector
+            returns one detections object per image in the ``predictions`` layout, taken as it is: DataEval applies no
+            NMS and no score cut, so the witness of a raw-candidate export stays valid but can be weak. Wrap a
+            detector whose boxes are in a resized input's pixels or normalized to ``[0, 1]``, or whose labels follow
+            another class list. DataEval's own :class:`.OnnxObjectDetector` and :class:`.LiteRtObjectDetector` need
+            ``box_coordinates="pixel"``, an export whose class count equals the dataset's, and a batch size the export
+            accepts for every batch, the short last one included; they declare no ``index2label``, so the class order
+            is assumed. If the model's ``metadata`` and the dataset both declare an ``index2label`` they must be equal,
+            else ``ValueError``; a class order is never remapped. If either declares none, the dataset's class order is
+            assumed and recorded as ``class_order_matches_dataset``.
         embeddings : ArrayLike or None, default None
             Classification only. One representation, shape ``(len(dataset), d)``; computed with the extractor when
             None. With neither embeddings nor an extractor the call has no local-panel envelope and no built-in
@@ -735,10 +745,11 @@ class Feasibility(Evaluator):
             global batch size; a classification call is given none of ``predictions``, ``model``, ``replicas``,
             ``embeddings`` or an extractor; the model's and the dataset's ``index2label`` differ; class scores are
             misshapen or not finite, or class decisions are not integer indices of declared classes, one per item; a
-            replica key is unknown; a derived view lacks ``groups``; or, for object detection, ``max_objects`` gives
-            no bound for a requirement's class, an input is invalid or classification only, ``predictions`` is missing
-            while a requirement's ``max_detections`` is at or above its ``max_objects``, or the data exceed
-            ``max_objects``. Each error names the fix.
+            replica key is unknown; or a derived view lacks ``groups``. For object detection, it is also raised if
+            ``max_objects`` gives no bound for a requirement's class, an input or a detector's output is invalid, an
+            input is classification only, neither ``predictions`` nor ``model`` is given while a requirement's
+            ``max_detections`` is at or above its ``max_objects``, or the data exceed ``max_objects``. Each error
+            names the fix.
         ShapeMismatchError
             If the embeddings do not have one row per dataset item, or a ``groups`` array is not aligned with the
             dataset.
@@ -833,6 +844,9 @@ class Feasibility(Evaluator):
             specs=specs,
             max_objects=max_objects,
         )
+        # Neither reads the dataset's items, so both refuse before the targets' pass.
+        batch_size = self._model_batch_size() if model is not None else 0
+        class_order_verified = model is not None and check_class_order(model, dataset)
         class_ids = resolve_class_ids(dataset, specs)
         if predictions is not None:
             check_detection_layout(predictions, len(dataset))
@@ -847,11 +861,17 @@ class Feasibility(Evaluator):
         # One claim per requirement whose K is below its B, the capacity envelope, and one per requirement for a
         # detector's witness. check_detection_call refused a call without a detector in which any requirement lacks
         # a capacity claim.
+        has_detector = predictions is not None or model is not None
         n_capacity = sum(cast(int, s.max_detections) < b for s, b in zip(specs, max_objects, strict=True))
-        alpha_claim = allocate(self.alpha, n_capacity + (len(specs) if predictions is not None else 0))
+        alpha_claim = allocate(self.alpha, n_capacity + (len(specs) if has_detector else 0))
         bounds = capacity_evidence(specs, counts=counts, alpha_claim=alpha_claim, max_objects=max_objects)
-        if predictions is not None:
-            detections = check_detections(cast(Sequence[Any], predictions), len(dataset), units.n_classes)
+        if has_detector:
+            n_classes = units.n_classes
+            detections = (
+                run_model(model, dataset, batch_size, lambda i, output: read_model_output(i, output, n_classes))
+                if model is not None
+                else check_detections(cast(Sequence[Any], predictions), len(dataset), n_classes)
+            )
             fit, audit = split_units(units, fit_fraction=FIT_FRACTION, seed=self.resolved_seed)
             bounds += gather_detection_evidence(
                 specs,
@@ -862,6 +882,7 @@ class Feasibility(Evaluator):
                 alpha_claim=alpha_claim,
                 class_ids=class_ids,
                 max_objects=max_objects,
+                class_order_verified=class_order_verified,
             )
         bounds = sorted(bounds, key=table_order)
         check_ledger(bounds, self.alpha)

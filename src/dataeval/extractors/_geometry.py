@@ -19,9 +19,20 @@ class DetectionGeometryExtractor(ReprMixin):
     Each kept detection becomes ``[center_x, center_y, width, height, area, aspect]``,
     derived from normalized ``(x0, y0, x1, y1)`` boxes (resolution-independent).
     Detections whose max class score is below ``confidence`` are dropped.
+
+    Raises
+    ------
+    ValueError
+        If ``model`` is a detector built with ``box_coordinates="pixel"``, whose
+        boxes would make these rows depend on image size.
     """
 
     def __init__(self, model: Any, *, confidence: float = 0.0) -> None:
+        if getattr(model, "box_coordinates", "normalized") == "pixel":
+            raise ValueError(
+                "DetectionGeometryExtractor reads normalized boxes, but this detector was built with "
+                "box_coordinates='pixel'. Build it with the default box_coordinates='normalized'."
+            )
         self._model = model
         self._confidence = confidence
 
