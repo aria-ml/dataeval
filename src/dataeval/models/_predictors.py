@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from maite.protocols import ModelMetadata
@@ -27,6 +27,7 @@ from dataeval.models._backends import LiteRtBackend, OnnxBackend, RuntimeBackend
 from dataeval.models._input import build_model_input
 from dataeval.models._metadata import ModelIOSpec, read_model_metadata
 from dataeval.protocols import ObjectDetectionTarget
+from dataeval.utils.data import unwrap_image
 
 
 class _BaseImageClassifier(ABC):
@@ -230,7 +231,7 @@ class LiteRtImageClassifier(_BaseImageClassifier):
 
 @dataclass
 class _ObjectDetectionTarget:
-    boxes: NDArray[Any]  # (N, 4), normalized (x0, y0, x1, y1)
+    boxes: NDArray[Any]  # (N, 4), normalized (x0, y0, x1, y1) unless box_coordinates="pixel"
     labels: NDArray[Any]  # (N,)
     scores: NDArray[Any]  # (N, nClasses)
 
@@ -269,7 +270,10 @@ class _BaseObjectDetector(ABC):
         image_size: tuple[int, int] | None = None,
         boxes_name: str = "boxes",
         scores_name: str = "scores",
+        box_coordinates: Literal["normalized", "pixel"] = "normalized",
     ) -> None:
+        if box_coordinates not in ("normalized", "pixel"):
+            raise ValueError(f"box_coordinates must be 'normalized' or 'pixel', got {box_coordinates!r}.")
         self._spec: ModelIOSpec = read_model_metadata(metadata_path)
         if self._spec.task != "IMAGE_OBJECT_DETECTION":
             raise ValueError(f"metadata declares {self._spec.task}, not IMAGE_OBJECT_DETECTION")
@@ -277,6 +281,7 @@ class _BaseObjectDetector(ABC):
         self._image_size = image_size
         self._boxes_name = boxes_name
         self._scores_name = scores_name
+        self.box_coordinates: Literal["normalized", "pixel"] = box_coordinates
         self.metadata: ModelMetadata = {"id": f"dataeval-{self._backend_label}-detector:{Path(model_path).name}"}
 
     @abstractmethod
@@ -301,23 +306,33 @@ class _BaseObjectDetector(ABC):
         -------
         list[ObjectDetectionTarget]
             One :obj:`ObjectDetectionTarget` per input image, with labels taken
-            as the argmax over each detection's class scores.
+            as the argmax over each detection's class scores. The boxes are
+            ``(x0, y0, x1, y1)``, normalized to ``[0, 1]`` of the model's input by
+            default, or in that input image's own pixel coordinates, unclipped,
+            when ``box_coordinates="pixel"``.
 
         Raises
         ------
         ValueError
-            If the ``boxes_name`` or ``scores_name`` output is missing, or the
-            output shapes are not ``(B, nBoxes, 4)`` and ``(B, nBoxes, nClasses)``.
+            If the ``boxes_name`` or ``scores_name`` output is missing, the
+            output shapes are not ``(B, nBoxes, 4)`` and ``(B, nBoxes, nClasses)``,
+            or the outputs do not have one row per input image and the same ``nBoxes``.
         """
         h, w = self._image_size or (None, None)
-        tensor = build_model_input(input_batch, self._spec, height=h, width=w)
+        batch = list(input_batch)
+        sizes = [np.shape(unwrap_image(image))[-2:] for image in batch] if self.box_coordinates == "pixel" else []
+        tensor = build_model_input(batch, self._spec, height=h, width=w)
         outputs = self._backend.run(tensor)
         for name in (self._boxes_name, self._scores_name):
             if name not in outputs:
                 raise ValueError(f"model output {name!r} not found; got {list(outputs)}")
         boxes = np.asarray(outputs[self._boxes_name], dtype=np.float32)  # (B, nBoxes, 4)
         scores = np.asarray(outputs[self._scores_name], dtype=np.float32)  # (B, nBoxes, nClasses)
-        self._validate_outputs(boxes, scores)
+        self._validate_outputs(boxes, scores, len(batch))
+        if self.box_coordinates == "pixel":
+            # build_model_input stretches each image to the model's input with no letterbox or crop, so a
+            # normalized coordinate is the same fraction of the original image: scale by its own [W, H, W, H].
+            boxes = boxes * np.array([[iw, ih, iw, ih] for ih, iw in sizes], dtype=np.float32)[:, None, :]
         return [
             _ObjectDetectionTarget(
                 boxes=boxes[i],
@@ -327,12 +342,17 @@ class _BaseObjectDetector(ABC):
             for i in range(boxes.shape[0])
         ]
 
-    def _validate_outputs(self, boxes: NDArray[Any], scores: NDArray[Any]) -> None:
+    def _validate_outputs(self, boxes: NDArray[Any], scores: NDArray[Any], n_images: int) -> None:
         """Validate detection output shapes."""
         if boxes.ndim != 3 or boxes.shape[-1] != 4:
             raise ValueError(f"detection boxes must be (B, nBoxes, 4); got {boxes.shape}")
         if scores.ndim != 3:
             raise ValueError(f"detection scores must be (B, nBoxes, nClasses); got {scores.shape}")
+        if boxes.shape[0] != n_images or scores.shape[:2] != boxes.shape[:2]:
+            raise ValueError(
+                f"detection outputs must have one row per input image ({n_images}) and the same nBoxes; "
+                f"got boxes {boxes.shape} and scores {scores.shape}"
+            )
 
 
 class OnnxObjectDetector(_BaseObjectDetector):
@@ -361,11 +381,22 @@ class OnnxObjectDetector(_BaseObjectDetector):
         Name of the model output tensor holding detection boxes.
     scores_name : str, default "scores"
         Name of the model output tensor holding per-class detection scores.
+    box_coordinates : {"normalized", "pixel"}, default "normalized"
+        Frame of the returned boxes. ``"normalized"`` returns the export's boxes,
+        ``(x0, y0, x1, y1)`` normalized to ``[0, 1]`` of the model's input.
+        ``"pixel"`` multiplies each image's boxes by that input image's own
+        ``[W, H, W, H]``, which puts them in the image's pixel coordinates, as
+        float32 and unclipped. Each image is stretched to the model's input size
+        with no letterbox or crop, so a normalized coordinate is the same fraction
+        of the original image. An export in ``(y0, x0, y1, x1)`` order, as the
+        TensorFlow Object Detection API emits, breaks this contract under either
+        setting.
 
     Raises
     ------
     ValueError
-        If the metadata declares a task other than ``IMAGE_OBJECT_DETECTION``.
+        If the metadata declares a task other than ``IMAGE_OBJECT_DETECTION``, or
+        ``box_coordinates`` is neither ``"normalized"`` nor ``"pixel"``.
     ImportError
         If ``onnxruntime`` is not installed.
     FileNotFoundError
@@ -430,11 +461,22 @@ class LiteRtObjectDetector(_BaseObjectDetector):
         Name of the model output tensor holding detection boxes.
     scores_name : str, default "scores"
         Name of the model output tensor holding per-class detection scores.
+    box_coordinates : {"normalized", "pixel"}, default "normalized"
+        Frame of the returned boxes. ``"normalized"`` returns the export's boxes,
+        ``(x0, y0, x1, y1)`` normalized to ``[0, 1]`` of the model's input.
+        ``"pixel"`` multiplies each image's boxes by that input image's own
+        ``[W, H, W, H]``, which puts them in the image's pixel coordinates, as
+        float32 and unclipped. Each image is stretched to the model's input size
+        with no letterbox or crop, so a normalized coordinate is the same fraction
+        of the original image. An export in ``(y0, x0, y1, x1)`` order, as the
+        TensorFlow Object Detection API emits, breaks this contract under either
+        setting.
 
     Raises
     ------
     ValueError
-        If the metadata declares a task other than ``IMAGE_OBJECT_DETECTION``.
+        If the metadata declares a task other than ``IMAGE_OBJECT_DETECTION``, or
+        ``box_coordinates`` is neither ``"normalized"`` nor ``"pixel"``.
     ImportError
         If no LiteRT interpreter is available.
     FileNotFoundError

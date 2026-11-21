@@ -32,17 +32,19 @@ class DetectionCountsResult(TypedDict):
     false_positives: NDArray[np.intp]
 
 
-def check_boxes(boxes: ArrayLike, where: str) -> NDArray[np.float64]:
+def check_boxes(boxes: ArrayLike, where: str, *, allow_empty: bool = False) -> NDArray[np.float64]:
     """
     Return ``boxes`` as float64 of shape ``(N, 4)``, refusing any that is not finite or has no positive area.
 
-    An empty 1-D array is no boxes, ``(0, 4)``. Boxes are (x0, y0, x1, y1) and are not clipped to an image.
+    An empty 1-D array is no boxes, ``(0, 4)``. Boxes are (x0, y0, x1, y1) and are not clipped to an image. With
+    ``allow_empty``, a box of zero width or height is accepted, since its IoU with any box is 0 and a detection like
+    that matches no target. Only a box with ``x1 < x0`` or ``y1 < y0`` is refused for its extent.
 
     Raises
     ------
     ValueError
         Prefixed with ``where`` and naming the first bad box, if the boxes are not ``(N, 4)``, a box is not finite, or
-        a box has ``x1 <= x0`` or ``y1 <= y0``.
+        a box has ``x1 <= x0`` or ``y1 <= y0`` (``x1 < x0`` or ``y1 < y0`` with ``allow_empty``).
     """
     arr = np.asarray(boxes, dtype=np.float64)
     if arr.shape == (0,):
@@ -52,11 +54,12 @@ def check_boxes(boxes: ArrayLike, where: str) -> NDArray[np.float64]:
     infinite = np.flatnonzero(~np.isfinite(arr).all(axis=1))
     if len(infinite):
         raise ValueError(f"{where}: box {infinite[0]} is {arr[infinite[0]].tolist()}, not finite. Fix or drop it.")
-    flat = np.flatnonzero((arr[:, 2] <= arr[:, 0]) | (arr[:, 3] <= arr[:, 1]))
-    if len(flat):
+    op, sign, need = (np.less, "<", "nonnegative") if allow_empty else (np.less_equal, "<=", "positive")
+    bad = np.flatnonzero(op(arr[:, 2:], arr[:, :2]).any(axis=1))
+    if len(bad):
         raise ValueError(
-            f"{where}: box {flat[0]} is {arr[flat[0]].tolist()}, with x1 <= x0 or y1 <= y0. Boxes need positive width "
-            "and height, in (x0, y0, x1, y1) order; fix or drop it."
+            f"{where}: box {bad[0]} is {arr[bad[0]].tolist()}, with x1 {sign} x0 or y1 {sign} y0. Boxes need {need} "
+            "width and height, in (x0, y0, x1, y1) order; fix or drop it."
         )
     return arr
 
@@ -111,7 +114,7 @@ def _kept(
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
     """One image's kept detections, as their scores in kept order and whether each matched a target."""
     targets = check_boxes(target_boxes, f"image {i} targets")
-    boxes = check_boxes(detection_boxes, f"image {i} detections")
+    boxes = check_boxes(detection_boxes, f"image {i} detections", allow_empty=True)
     scores = np.asarray(detection_scores, dtype=np.float64).reshape(-1)
     if len(scores) != len(boxes):
         raise ValueError(f"image {i}: {len(scores)} scores for {len(boxes)} detection boxes; give one each.")
@@ -139,7 +142,9 @@ def detection_counts(
     (capped at ``1 - 1e-10``); on an IoU tie the later target wins. A detection with no such target is a false
     positive. This is pycocotools' ``evaluateImg`` without crowd, ignore or area ranges [1]_. A detection counts at
     threshold ``t`` when its score is at least ``t``. Matching in score order makes the detections counted at ``t`` a
-    prefix of one pass, so both counts rise as ``t`` falls. Boxes are not clipped to the image.
+    prefix of one pass, so both counts rise as ``t`` falls. Boxes are not clipped to the image. A detection box of zero
+    width or height, as a fixed-size detector pads its output with, has IoU 0 with every target, so it is a false
+    positive; a target box needs positive width and height.
 
     Parameters
     ----------
@@ -165,9 +170,10 @@ def detection_counts(
     Raises
     ------
     ValueError
-        If the three sequences differ in length, a box is not finite or has no positive width and height, scores are
-        not finite or not one per detection box, ``thresholds`` is not a nonempty 1-D array without NaN or ``+inf``,
-        ``iou`` is outside ``(0, 1]``, or ``max_detections`` is not an integer of at least 1.
+        If the three sequences differ in length, a box is not finite, a target box has no positive width and height or
+        a detection box has negative width or height, scores are not finite or not one per detection box,
+        ``thresholds`` is not a nonempty 1-D array without NaN or ``+inf``, ``iou`` is outside ``(0, 1]``, or
+        ``max_detections`` is not an integer of at least 1.
 
     References
     ----------
@@ -204,7 +210,8 @@ def kept_matches(
 
     The detections kept are the top ``max_detections`` of each image, and the match is the same greedy pass, from the
     same code, so a detection counted as a true positive by :func:`detection_counts` at some threshold is a ``True``
-    here. The arguments are those of :func:`detection_counts` without ``thresholds``.
+    here. The arguments are those of :func:`detection_counts` without ``thresholds``. A detection box with no area
+    matches no target, so it is a ``False`` here; a target box needs positive width and height.
 
     Returns
     -------

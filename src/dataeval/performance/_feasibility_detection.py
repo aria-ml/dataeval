@@ -47,8 +47,9 @@ def _labels(where: str, raw: Any, n_classes: int) -> NDArray[np.intp]:
     if len(outside):
         raise ValueError(
             f"{where}: label {int(outside[0])} is outside the classes the dataset declares, [0, {n_classes}) (without "
-            "index2label, the labels its targets hold). Drop detections of other classes, or map the detector's "
-            "labels onto the dataset's class indices."
+            "index2label, the labels its targets hold). Map the detector's labels onto the dataset's class indices (a "
+            "detector that reserves label 0 for background, as torchvision's do, can give class i the label i + 1), or "
+            "drop detections of classes the dataset does not declare."
         )
     return labels
 
@@ -72,13 +73,14 @@ def check_detections(predictions: Sequence[Any], n_items: int, n_classes: int) -
 
     Each object carries ``boxes``, ``labels`` and ``scores``, the MAITE ``ObjectDetectionTarget`` shape. Labels are
     indices of the declared classes; a float array of whole values is accepted. Scores of shape ``(N, n_classes)``
-    give each detection the score in its own label's column. Boxes are not clipped.
+    give each detection the score in its own label's column. Boxes are not clipped. A box with no area, which a
+    fixed-size detector pads its output with, is accepted: it matches no target, so it counts as a false positive.
 
     Raises
     ------
     ValueError
         Naming the item and the fix, if there is not one detections object per item, an object is a mapping or lacks
-        ``boxes``, ``labels`` or ``scores``, a box is not finite or has no positive width and height, labels are
+        ``boxes``, ``labels`` or ``scores``, a box is not finite or has negative width or height, labels are
         booleans, not whole numbers, not one per box, or outside ``[0, n_classes)``, or scores are not finite or
         neither ``(N,)`` nor ``(N, n_classes)``.
     """
@@ -116,11 +118,32 @@ def _check_fields(where: str, detections: Any) -> None:
 
 
 def _image(where: str, detections: Any, n_classes: int) -> ImageDetections:
-    boxes = check_boxes(as_numpy(detections.boxes), where)
+    boxes = check_boxes(as_numpy(detections.boxes), where, allow_empty=True)
     labels = _labels(where, detections.labels, n_classes)
     if len(labels) != len(boxes):
         raise ValueError(f"{where}: {len(labels)} labels for {len(boxes)} boxes; give one label and score per box.")
     return ImageDetections(boxes, labels, _scores(where, detections.scores, labels, n_classes))
+
+
+_WRAP = " Wrap the model so that its output passes this check."
+
+
+def read_model_output(i: int, output: Any, n_classes: int) -> ImageDetections:
+    """
+    Check a detector's output for dataset image ``i`` as ``predictions[i]`` is checked, and return copies of it.
+
+    The copies keep the image's detections when a model reuses one output buffer for every batch. Errors name
+    ``model output for image i`` and end by saying to wrap the model.
+    """
+    where = f"model output for image {i}"
+    # ponytail: keeps every checked detection, 48 bytes each; for raw-candidate exports, with thousands of boxes per
+    # image, keep each named class's top K here at ingestion.
+    try:
+        _check_fields(where, output)
+        boxes, labels, scores = _image(where, output, n_classes)
+    except ValueError as error:
+        raise ValueError(f"{error}{_WRAP}") from error
+    return ImageDetections(boxes.copy(), labels, scores.copy())  # the labels are already a copy
 
 
 def _count(predictions: Any) -> str:
@@ -131,7 +154,8 @@ def _count(predictions: Any) -> str:
 
 _DETECTION_CALL = (
     "Object detection takes the targets, each requirement's max_detections K and Feasibility(max_objects=...) for the "
-    "capacity envelope, and predictions=, one detections object per image, for the witness."
+    "capacity envelope, and a detector for the witness: predictions=, one detections object per image, or model=, a "
+    "MAITE object detector."
 )
 
 
@@ -146,27 +170,29 @@ def check_detection_call(
     max_objects: Sequence[int],
 ) -> None:
     """
-    Refuse, in one error, every argument an object detection call cannot use, and a missing ``predictions``.
+    Refuse, in one error, every argument an object detection call cannot use, two detectors, and a missing detector.
 
-    A missing ``predictions`` is refused only where a requirement's K is at or above its B, ``max_objects`` in
-    ``specs`` order: its cap cannot bind, so only a witness can judge it.
+    A detector is ``predictions`` or ``model``. A missing detector is refused only where a requirement's K is at or
+    above its B, ``max_objects`` in ``specs`` order: its cap cannot bind, so only a witness can judge it.
     """
-    unusable = {"model": model, "embeddings": embeddings, "replicas": replicas or None, "allowances": allowances}
+    unusable = {"embeddings": embeddings, "replicas": replicas or None, "allowances": allowances}
     given = [f"{name}=" for name, value in unusable.items() if value is not None]
     verb = "applies" if len(given) == 1 else "apply"
     problems = [f"{', '.join(given)} {verb} to classification only"] if given else []
+    if model is not None and predictions is not None:
+        problems.append("model= and predictions= are both given; pass one, since a call has one detector")
     unbound = [
         (f"{s.class_name!r} at K = {s.max_detections}, max_objects {b} (requirement {r})", b)
         for r, (s, b) in enumerate(zip(specs, max_objects, strict=True))
         if cast(int, s.max_detections) >= b  # an OD target always has its K
     ]
-    if predictions is None and unbound:
+    if predictions is None and model is None and unbound:
         # K is at least 1, so a bound of 1 leaves no K below it to state
         fix = ", or state a max_detections below max_objects" if any(b > 1 for _, b in unbound) else ""
         problems.append(
-            "predictions= is missing, and every requirement whose max_detections K is at or above max_objects needs "
-            f"it, since its cap cannot bind and no capacity envelope is built: {', '.join(n for n, _ in unbound)}. "
-            f"Pass predictions={fix}"
+            "No detector is given (predictions= or model=), and every requirement whose max_detections K is at or "
+            "above max_objects needs one, since its cap cannot bind and no capacity envelope is built: "
+            f"{', '.join(n for n, _ in unbound)}. Pass predictions= or model={fix}"
         )
     if problems:
         raise ValueError(f"{'; '.join(problems)}. {_DETECTION_CALL}")
@@ -405,7 +431,7 @@ def ap_witness(
         warnings.warn(
             f"None of the {len(scores)} kept detections of class {class_name!r} (label {class_id}) on the fit split "
             f"matches a target at IoU {iou}, so the witness thresholds come from every kept score. Check that the "
-            "boxes are (x0, y0, x1, y1), in the same image frame as the targets (pixels, not normalized), and that "
+            "boxes are (x0, y0, x1, y1), in the targets' coordinates, not a resized or normalized input's, and that "
             "the labels follow the dataset's class order.",
             UserWarning,
             stacklevel=_caller_stacklevel(),  # the caller's own line, through evaluate's wrappers or directly
@@ -436,12 +462,16 @@ def gather_detection_evidence(
     alpha_claim: float,
     class_ids: Sequence[int],
     max_objects: Sequence[int],
+    class_order_verified: bool = False,
 ) -> list[Bound]:
     """
     One ``user_model`` AP witness bound per requirement, in ``specs`` order, each spent at ``alpha_claim``.
 
     ``class_ids`` and ``max_objects`` give each requirement's declared class index and B, in the same order.
+    ``class_order_verified`` says a model's own ``index2label`` matched the dataset's, which leaves
+    ``class_order_matches_dataset`` off the bounds.
     """
+    assumed = tuple(a for a in _ASSUMED if a != "class_order_matches_dataset") if class_order_verified else _ASSUMED
     out: list[Bound] = []
     for r, (spec, c, b) in enumerate(zip(specs, class_ids, max_objects, strict=True)):
         reason: Reason | None = None
@@ -473,7 +503,7 @@ def gather_detection_evidence(
             "population": "items",
             "sample": "audit_split",
             "unit": "image",
-            "assumptions": _ASSUMED,
+            "assumptions": assumed,
         }
         out.append(_make_bound(shared, "ap", value, None, alpha_claim, reason))
     return out
