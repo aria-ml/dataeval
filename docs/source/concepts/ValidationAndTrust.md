@@ -592,6 +592,10 @@ Experimental ⚠️ (API may change or be removed):
 - {func}`.track_path_stats` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The
   statistic and detail names, the `min_points` keyword and its default, the thirds the displacement compares and the
   geometry (rows scaled to unit length, no video mean) may change.
+- {func}`.track_switches` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The
+  column names, the `window` keyword and its default, when two tracks meet (box centers within the larger box diagonal),
+  when meetings join into one encounter (consecutive meetings within 5 shared frames), the score and the flag at 0 may
+  change.
 - {func}`.noise_pca` raises {class}`~dataeval.exceptions.ExperimentalWarning` on the first call in a process. The patch
   size, the floor of clear patches, the `n_patches` keyword and its default, and the correction may change. Nothing in
   DataEval calls it. {func}`.noise_immerkaer`, the other noise estimate, is stable.

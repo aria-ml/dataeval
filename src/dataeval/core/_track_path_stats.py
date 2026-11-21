@@ -10,6 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from dataeval._experimental import experimental
 from dataeval.core._compute_stats import FactorResult
+from dataeval.exceptions import ShapeMismatchError
 from dataeval.types import MeasurementSpec
 from dataeval.types._target import whole_ids
 from dataeval.utils._array import as_numpy
@@ -43,7 +44,11 @@ def _read(
     embeddings: ArrayLike, track_ids: ArrayLike, frame_indices: ArrayLike, sequence_indices: ArrayLike
 ) -> tuple[NDArray[np.float64], NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
     """Return the four inputs as arrays, one entry for each row, refusing what cannot be measured."""
-    x = as_numpy(embeddings, dtype=np.float64, required_ndim=2)
+    x = as_numpy(embeddings, dtype=np.float64)
+    if x.ndim != 2:
+        raise ShapeMismatchError(
+            f"embeddings must be two-dimensional, (N, D); got {x.ndim} dimensions. Give one row per detection."
+        )
     track = whole_ids(track_ids, "track_ids", "Give -1 to a row no tracker linked.")
     frame = whole_ids(frame_indices, "frame_indices")
     sequence = whole_ids(sequence_indices, "sequence_indices")

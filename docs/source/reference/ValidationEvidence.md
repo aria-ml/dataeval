@@ -655,13 +655,25 @@ statistical and computational.
     correlation −0.02 to −0.11), and its ratio to the null rose with it (0.69 to 0.76). A track joined at a shared
     frame to another track of its class scored above the same object on the same frames with AUC 0.84 on the object's
     crops (0.72 to 0.92 by video) and 0.79 on its surroundings. A GPU run agreed with the CPU to 2.2e-4 per track)
-  - Experimental: the names, `min_points`, the thirds and the geometry may change. It is not an ID-switch detector. A
-    direction describes the path and does not state a cause, since the object, its surroundings, its scale and the
-    camera can each move an embedding. The ratio of the distance to its null rises with the number of rows in a track,
-    so it is not a score to rank tracks by. A track shorter than `min_points` is NaN; below 60 rows the distance reads
-    high, by 4% at 30 rows and 9% at 15 at the median. The thirds are counted in rows, so a gap in a track is not
-    corrected for. The study on real footage covers one aerial dataset, one ImageNet classifier and ground-truth
-    tracks, not a tracker's, and its joined tracks are not a tracker's identity switches.
+  - Experimental: the names, `min_points`, the thirds and the geometry may change. It is not an ID-switch detector; for
+    that, see {func}`.track_switches`. A direction describes the path and does not state a cause, since the object, its
+    surroundings, its scale and the camera can each move an embedding. The ratio of the distance to its null rises with
+    the number of rows in a track, so it is not a score to rank tracks by. A track shorter than `min_points` is NaN;
+    below 60 rows the distance reads high, by 4% at 30 rows and 9% at 15 at the median. The thirds are counted in rows,
+    so a gap in a track is not corrected for. The study on real footage covers one aerial dataset, one ImageNet
+    classifier and ground-truth tracks, not a tracker's, and its joined tracks are not a tracker's identity switches.
+- - {func}`.track_switches` ⚠️
+  - Per encounter of two tracks of one class: whether the means of each track's embeddings before and after a frame
+    where their boxes meet fit better crossed than straight, the frame where they fit best, and a flag where the
+    crossed matching fits better.
+  - Anchored (embeddings constructed with a known swap, a half swap and straight tracks, and the frame of the swap
+    known)
+  - Experimental: the names, `window`, the meeting rule and the flag at 0 may change. A flag marks a place to look:
+    swapped ids, a box drifted onto the other track's object, and an object passing behind an occluder as the other
+    comes out all fit better crossed. An empty result does not mean the ids are right: a switch of a few frames, a
+    switch with no second track nearby and tracks that never meet are not scored, and neither is a meeting without
+    `window` rows on both sides of both tracks. Windows are counted in rows, so a gap in a track widens them. The
+    constants are not tuned. Tested on constructed inputs only, not on real footage.
 - - {func}`.video_stats` (`VideoStats.PERSISTENCE`)
   - Per-pixel persistence while the scene moves behind the camera, and a
     flat-field estimate of how much each part of the frame softens the same

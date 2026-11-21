@@ -446,9 +446,10 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         self._item_indices = np.fromiter((row[0] for row in index_map), dtype=np.intp, count=len(index_map))
         self._target_indices = np.fromiter((row[1] for row in index_map), dtype=np.intp, count=len(index_map))
         self._track_ids = np.asarray(kept_track_ids, dtype=np.intp)
-        self._item_indices.flags.writeable = False
-        self._target_indices.flags.writeable = False
-        self._track_ids.flags.writeable = False
+        self._boxes = np.asarray([row[3] for row in index_map], dtype=np.float64).reshape(-1, 4)
+        self._labels = np.fromiter((row[2] for row in index_map), dtype=np.intp, count=len(index_map))
+        for column in (self._item_indices, self._target_indices, self._track_ids, self._boxes, self._labels):
+            column.flags.writeable = False
         self.n_dropped: int = n_dropped
         self._index2label: Mapping[int, str] = self._resolve_index2label(observed)
         self._n_classes = (max(self._index2label) + 1) if self._index2label else 0
@@ -610,6 +611,57 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
         array([0, 0, 0])
         """
         return self._track_ids
+
+    @property
+    def boxes(self) -> NDArray[np.float64]:
+        """Box each crop was cut from, in its source image.
+
+        Returns
+        -------
+        NDArray[np.float64]
+            Shape ``(N, 4)``, one ``x0, y0, x1, y1`` box per crop, in crop order, in the
+            source image's pixels as its target gave it: before the crop is squared or
+            padded, and with the detections ``min_size`` dropped left out. Read-only.
+
+        See Also
+        --------
+        labels : The class of each crop.
+        item_indices : The source item each crop was cut from.
+
+        Notes
+        -----
+        Read here, rather than from each crop's metadata, a box costs no image decode.
+
+        Examples
+        --------
+        >>> crops = DetectionCrops(dataset)
+        >>> crops.boxes.shape[1]
+        4
+        """
+        return self._boxes
+
+    @property
+    def labels(self) -> NDArray[np.intp]:
+        """Class index of each crop's detection.
+
+        Returns
+        -------
+        NDArray[np.intp]
+            One class index per crop, in crop order, as the source's target gave it, with
+            the detections ``min_size`` dropped left out. Read-only.
+
+        See Also
+        --------
+        boxes : The box of each crop.
+        metadata : The ``index2label`` that names each class.
+
+        Examples
+        --------
+        >>> crops = DetectionCrops(dataset)
+        >>> len(crops.labels) == len(crops)
+        True
+        """
+        return self._labels
 
     @property
     def source_indices(self) -> tuple[SourceIndex, ...]:

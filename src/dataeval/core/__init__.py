@@ -41,6 +41,7 @@ __all__ = [
     "StatsResult",
     "SubsequenceAlignment",
     "TrackStatsResult",
+    "TrackSwitchesResult",
     "align_subsequence",
     "annotation_divergence",
     "annotation_fingerprint",
@@ -120,6 +121,7 @@ __all__ = [
     "track_path_stats",
     "track_stats",
     "track_steps",
+    "track_switches",
     "units_to_cross",
     "xxhash",
     "uap",
@@ -223,5 +225,6 @@ from dataeval.core._temporal import RedundantRunResult, redundant_runs
 from dataeval.core._track_path_stats import track_path_stats
 from dataeval.core._track_stats import TrackStatsResult, track_stats
 from dataeval.core._track_steps import track_steps
+from dataeval.core._track_switches import TrackSwitchesResult, track_switches
 from dataeval.core._uap import uap
 from dataeval.core._video_stats import video_stats

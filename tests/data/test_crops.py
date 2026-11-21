@@ -490,3 +490,36 @@ class TestTrackIds:
         crops = DetectionCrops(_simple_dataset())
         with pytest.raises(ValueError, match="read-only"):
             crops.track_ids[0] = 3
+
+
+@pytest.mark.required
+class TestBoxesAndLabels:
+    """Each crop's box and class as arrays, read without decoding an image."""
+
+    def test_each_crop_has_its_box_and_label(self):
+        crops = DetectionCrops(_simple_dataset(), min_size=4)  # the 2x2 box, labeled 2, is dropped
+        assert crops.labels.tolist() == [0, 1, 1, 0]
+        for i in range(len(crops)):
+            _, target, meta = crops[i]
+            assert crops.boxes[i].tolist() == dict(meta)["box"]
+            assert crops.labels[i] == int(np.argmax(target))
+
+    def test_shapes_and_dtypes_follow_min_size_drops(self):
+        crops = DetectionCrops(SequenceFrames(_tracking_dataset()), min_size=4)
+        assert crops.n_dropped == 1
+        assert crops.boxes.shape == (len(crops), 4)
+        assert crops.boxes.dtype == np.float64
+        assert crops.labels.shape == (len(crops),)
+        assert crops.labels.dtype == np.intp
+
+    def test_every_box_dropped_gives_empty_arrays(self):
+        crops = DetectionCrops(SequenceFrames(make_dataset_of([[make_frame_target([[0, 0, 2, 2]], [1])]])), min_size=4)
+        assert crops.boxes.shape == (0, 4)
+        assert crops.labels.shape == (0,)
+
+    def test_they_are_read_only(self):
+        crops = DetectionCrops(_simple_dataset(), min_size=4)
+        with pytest.raises(ValueError, match="read-only"):
+            crops.boxes[0, 0] = 1.0
+        with pytest.raises(ValueError, match="read-only"):
+            crops.labels[0] = 1
