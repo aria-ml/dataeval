@@ -3,8 +3,8 @@
 __all__ = []
 
 import math
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from typing import Literal, get_args
 
 from dataeval.performance._feasibility_target import Scope
@@ -71,6 +71,10 @@ class Bound:
     ``assumptions`` lists what the bound rests on, in the order of :data:`Assumption`. ``mean``, ``support`` and
     ``delta`` are what ``units_to_cross`` needs to project a suggested minimum; they are not table columns. ``mean``
     is the recorded estimate on the metric's scale, which an envelope has although it publishes no ``observed``.
+    ``project``, when set, gives the bound the same evidence would give at ``m`` units, with every rate held at its
+    observed value; at ``m = n`` it returns ``bound`` exactly. It must be monotone for ``m >= n``, nondecreasing for a
+    witness and nonincreasing for an envelope, because ``decide`` binary-searches it from ``n + 1`` for the suggested
+    minimum instead of inverting one radius. It is not a table column, and ``Bound`` equality and hashing ignore it.
     """
 
     requirement: int
@@ -95,6 +99,7 @@ class Bound:
     mean: float | None = None
     support: float | None = None
     delta: float | None = None
+    project: Callable[[int], float] | None = field(default=None, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         self._check_enums()

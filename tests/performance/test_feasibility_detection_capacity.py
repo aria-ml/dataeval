@@ -78,6 +78,27 @@ def test_mean_is_the_sample_ratio():
     assert raw["n"] == 25
 
 
+@pytest.mark.parametrize("case", PINS)
+def test_projection_reproduces_the_bound(case):
+    n, k, b, _, _ = PINS[case]
+    value, raw = capacity_from_counts(n, max_objects=b, max_detections=k, alpha_claim=ALPHA)
+    assert raw["project"](len(n)) == value
+
+
+@pytest.mark.parametrize("case", PINS)
+def test_projection_is_nonincreasing(case):
+    n, k, b, _, _ = PINS[case]
+    _, raw = capacity_from_counts(n, max_objects=b, max_detections=k, alpha_claim=ALPHA)
+    projected = [raw["project"](m) for m in range(len(n), 200_000, 1_009)]
+    assert all(later <= earlier for earlier, later in zip(projected, projected[1:], strict=False))
+    assert projected[-1] < projected[0]
+
+
+def test_absent_class_projects_one():
+    _, raw = capacity_from_counts(np.zeros(50, dtype=np.intp), max_objects=6, max_detections=2, alpha_claim=ALPHA)
+    assert {raw["project"](m) for m in (50, 500, 10**6)} == {1.0}
+
+
 def test_four_equal_deltas():
     _, raw = capacity_from_counts(_counts([0, 3, 5], 30), max_objects=6, max_detections=2, alpha_claim=ALPHA)
     assert raw["deltas"] == [ALPHA / 4] * 4
@@ -138,6 +159,8 @@ def test_capacity_row_fields():
     assert row.assumptions == ("max_objects_holds",)
     assert row.observed is None
     assert (row.bound, row.mean, row.n, row.alpha) == (value, raw["mean"], 60, ALPHA)
+    assert row.project is not None
+    assert row.project(60) == row.bound
     assert row.mean == n.clip(max=2).sum() / n.sum()
     assert row.variance is None
     assert row.radius is None

@@ -2,8 +2,9 @@ import numpy as np
 import pytest
 from scipy.stats import beta
 
+from dataeval._experimental import quiet_experimental
 from dataeval.core import binomial_endpoint, mean_endpoint, ratio_endpoint, units_to_cross
-from dataeval.core._concentration import _projected_bound, _radius
+from dataeval.core._concentration import _endpoint_at, _projected_bound, _radius
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -209,3 +210,55 @@ class TestUnitsToCrossExactBinomial:
 
     def test_side_is_ignored_by_other_methods(self):
         assert units_to_cross(0.5, 0.25, 1.0, 0.05, 0.05, side="upper") == units_to_cross(0.5, 0.25, 1.0, 0.05, 0.05)
+
+
+def _endpoint_results():
+    """Hybrid, Hoeffding and empirical Bernstein mean endpoints (one clipped) and exact binomial endpoints."""
+    rng = np.random.default_rng(0)
+    out = []
+    for method in ("hybrid", "hoeffding", "empirical_bernstein"):
+        for side in ("lower", "upper"):
+            for support in (1.0, 18.0):
+                for n in (2, 7, 400):
+                    x = rng.uniform(0, support, n)
+                    out.append(mean_endpoint(x, support, 0.01, side=side, method=method))
+    out.append(mean_endpoint(np.zeros(7), 1.0, 0.01, side="lower"))  # a clipped endpoint: mean 0, radius > 0
+    out.append(mean_endpoint(np.ones(7), 1.0, 0.01, side="upper"))
+    for n in (2, 7, 400):
+        for k in (0, 3, n):
+            for side in ("lower", "upper"):
+                if k <= n:
+                    out.append(binomial_endpoint(k, n, 0.01, side=side))
+    return out
+
+
+with quiet_experimental():  # at collection, outside the module's warning filter
+    ENDPOINTS = _endpoint_results()
+
+
+def _endpoint_id(r):
+    return f"{r['method']}-{r['side']}-{r['n']}-{r['mean']:.3f}"
+
+
+@pytest.mark.required
+class TestEndpointAt:
+    @pytest.mark.parametrize("r", ENDPOINTS, ids=_endpoint_id)
+    def test_endpoint_at_reproduces_the_endpoint(self, r):
+        assert _endpoint_at(r, r["n"]) == r["endpoint"]
+
+    def test_clipped_cases_are_in_the_set(self):
+        assert any(r["endpoint"] == 0.0 and r["mean"] == 0.0 and r["method"] == "hybrid" for r in ENDPOINTS)
+        assert any(r["endpoint"] == r["support"] and r["method"] == "hybrid" for r in ENDPOINTS)
+
+    @pytest.mark.parametrize("side", ["lower", "upper"])
+    @pytest.mark.parametrize("exact", [False, True], ids=["hybrid", "exact"])
+    def test_endpoint_at_moves_toward_the_mean(self, side, exact):
+        if exact:
+            r, slack = binomial_endpoint(30, 40, 0.01, side=side), 1e-12
+        else:
+            r, slack = mean_endpoint(np.r_[np.ones(30), np.zeros(10)], 1.0, 0.01, side=side), 0.0
+        values = np.array([_endpoint_at(r, m) for m in range(r["n"], 50_000, 997)])
+        assert (values >= 0).all()
+        assert (values <= r["support"]).all()
+        diffs = np.diff(values)
+        assert (diffs >= -slack).all() if side == "lower" else (diffs <= slack).all()

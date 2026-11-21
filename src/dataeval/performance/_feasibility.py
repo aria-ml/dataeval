@@ -126,7 +126,7 @@ _BOUNDS_SCHEMA = {
     "is_determining": pl.Boolean,
 }
 _STATE = ["alpha", "max_sequence_length", "max_objects", "resolved_seed"]
-_PRIVATE = ("mean", "support", "delta")  # on a ``Bound``, not columns of the ``bounds`` table
+_PRIVATE = ("mean", "support", "delta", "project")  # on a ``Bound``, not columns of the ``bounds`` table
 
 
 def _determinations_frame(specs: Sequence[TargetSpec], determinations: Sequence[Decision]) -> pl.DataFrame:
@@ -241,9 +241,13 @@ class FeasibilityOutput(DictOutput):
         - limitation: Enum - What limits a non-final determination, null for a final one: ``conflict``, ``no_envelope``,
           ``scope_restricted``, ``missing_bound``, ``envelope_unavailable``, ``no_eligible_witness``,
           ``within_radius`` or ``weak_witness``
-        - suggested_minimum: int - Independent units at which the bound named by ``minimum_source`` and
-          ``minimum_quantity`` would cross the requirement if the observed rates held: a projection, not a bound.
-          Null when not attainable or when a final determination needs none
+        - suggested_minimum: int - Units at which the bound named by ``minimum_source`` and ``minimum_quantity`` would
+          cross the requirement if the observed rates held: a projection, not a bound. It counts the units of that
+          row's ``n``, drawn as its ``sample`` says: audit units for a witness or local panels, units with replicas for
+          a replica envelope, every image for a capacity envelope, and for recall the evaluation images, counted as the
+          recall row's ``n`` plus the false-positive row's are. So ``suggested_minimum / n`` (for recall, the sum of the
+          two rows' ``n``) is how much that sample must grow. Null when not attainable or when a final determination
+          needs none
         - minimum_source, minimum_quantity: Enum - The ``bounds`` row, with ``requirement``, that the minimum projects
           from
         - envelope, envelope_scope: float, Enum - The determining envelope's upper bound and its information scope
@@ -264,12 +268,15 @@ class FeasibilityOutput(DictOutput):
         - state: Enum - ``unavailable``, ``uninformative`` or ``informative``
         - reason: Enum - Why a bound is unavailable or uninformative, null otherwise
         - bound: float - The confidence bound; null when unavailable
-        - observed: float - A witness's point estimate of the quantity; null for every envelope and where the source
-          records no estimate (such as AP)
+        - observed: float - A witness's point estimate of the quantity. It is null for every envelope, for an
+          unavailable witness, for a ``frame_pooled`` accuracy witness, and for an AP witness when its class has no
+          target (object detection) or positive (classification) on the audit, or, for macro AP, when any class has
+          none. For an AP witness it is the AP staircase of the witness's thresholds at the observed rates, computed at
+          those thresholds only: compare it with ``bound``, not with AP from the model's full output
         - n, variance: int, float - Independent units behind the bound and their variance; null where the method does
           not define them
         - radius: float - The half-width the named method applied to the estimate to produce ``bound``; null for exact
-          intervals, AP and recall envelopes, object detection AP witnesses and ``frame_pooled`` bounds
+          intervals, AP and recall envelopes, AP witnesses and ``frame_pooled`` bounds
         - method: Enum - ``hoeffding``, ``hybrid`` or ``exact_binomial``; null where the bound has no closed form
         - alpha: float - This bound's share of the call's error budget
         - assumptions: list[Enum] - What the bound rests on. Every member is declared and not verified
@@ -294,7 +301,7 @@ class FeasibilityOutput(DictOutput):
         A line gives the requirement, its determination, its limitation, the determining envelope and witness with their
         sources, and the suggested minimum. Lower bounds round down and upper bounds up. When a requirement is object
         detection, a ``max_objects`` line after the assumptions gives the count bound of each class the requirements
-        name.
+        name, and the printout ends with a line naming the units of a witness's and a capacity envelope's minimum.
         """
         bounds = list(self.bounds.iter_rows(named=True))
         rows = [("#", "requirement", "determination", "limitation", "envelope", "witness", "minimum")]
@@ -316,12 +323,18 @@ class FeasibilityOutput(DictOutput):
         confidence = "—" if alpha is None else _pct(1 - alpha, "lower").replace(".0%", "%")
         assumed = {a for b in bounds for a in b["assumptions"]}
         assumptions = ", ".join(a for a in get_args(Assumption) if a in assumed) or "none"
+        units = (
+            ["minimum units: a witness counts audit images, half of all images; a capacity envelope counts every image"]
+            if any(s.task == "OD" for s in self.requirements)
+            else []
+        )
         return "\n".join([
             *lines,
             f"joint confidence: {confidence}",
             f"assumes: {assumptions}",
             *_max_objects_lines(self.requirements, self.meta().state.get("max_objects")),
-            "minimum: independent units to cross the requirement if the observed rates hold",
+            "minimum: units of the named bound's n to cross the requirement if the observed rates hold",
+            *units,
         ])
 
 
@@ -460,7 +473,11 @@ class Feasibility(Evaluator):
     informative only when some images hold more than K targets of the class. A capacity envelope below the threshold
     means that, under the recorded assumptions, no detector with at most K detections per image reaches the
     threshold: K is too small for how many targets of the class the images hold, and only a larger K, which is a
-    different requirement, could reach it. A call without a detector (``predictions`` or ``model``) can never be
+    different requirement, could reach it. A capacity envelope's ``suggested_minimum`` is the number of images at which
+    it would rule the requirement out at this K, and it counts every image. A witness's is the number of audit images
+    at which it would demonstrate the requirement. The audit is half of the images in this release, so supply about
+    twice a witness's minimum. Both hold ``max_objects`` and the requirement's ``max_detections`` fixed, along with the
+    rates observed in this call. A call without a detector (``predictions`` or ``model``) can never be
     ``demonstrated_feasible``. In such a call, a requirement whose envelope is computed and does not rule it out has
     limitation ``no_eligible_witness``. More images, which narrow the envelope, can also settle it, but only when the
     share of the class's targets that K detections can match is below the threshold.
@@ -517,7 +534,7 @@ class Feasibility(Evaluator):
     0   accuracy ≥0.5   demonstrated_feasible   —            —          81.4% knn   —
     joint confidence: 95%
     assumes: representation_independent_of_audit_labels
-    minimum: independent units to cross the requirement if the observed rates hold
+    minimum: units of the named bound's n to cross the requirement if the observed rates hold
 
     The minimal classification call is a dataset, predictions (or a ``model``) and a requirement. With no embeddings,
     no extractor and no replicas there is no envelope, so a requirement that the witness cannot demonstrate stays
@@ -557,14 +574,16 @@ class Feasibility(Evaluator):
     >>> result = Feasibility(max_objects=3).evaluate(dataset, target=[person], predictions=detections)
     >>> print(result)
     #   requirement                   determination   limitation    envelope   witness           minimum
-    0   ap:person ≥0.5 iou≥0.5 k≤10   unresolved      no_envelope   —          0.0% user_model   —
+    0   ap:person ≥0.5 iou≥0.5 k≤10   unresolved      no_envelope   —          0.0% user_model   2,154 user_model ap
     joint confidence: 95%
     assumes: model_independent_of_audit_items, class_order_matches_dataset, max_objects_holds
     max_objects: person 3
-    minimum: independent units to cross the requirement if the observed rates hold
+    minimum: units of the named bound's n to cross the requirement if the observed rates hold
+    minimum units: a witness counts audit images, half of all images; a capacity envelope counts every image
 
-    The detections match the targets, and the witness is still 0.0%. This call's audit is too small for an informative
-    bound, whatever the detector.
+    The detections match the targets, and the witness is still 0.0%: this 25-image audit is too small for an informative
+    bound, whatever the detector. The minimum projects how many audit images would carry the witness to 0.5 if this
+    synthetic audit's rates held. It is not a bound and says nothing about a real detector.
     """
 
     class Config(EvaluatorConfig):

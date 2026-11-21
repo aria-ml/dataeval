@@ -3,11 +3,11 @@
 __all__ = []
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal, NamedTuple, cast
 
-from dataeval.core._concentration import units_to_cross
+from dataeval.core._concentration import _MAX_UNITS, _first_true, units_to_cross
 from dataeval.performance._feasibility_evidence import Bound, Method, Quantity, Source
 from dataeval.performance._feasibility_target import Scope, TargetSpec
 
@@ -41,8 +41,9 @@ class Decision:
 
     ``envelope`` is the smallest available envelope at the judged scope or broader, ``witness`` the largest available
     eligible witness (for recall, certified at the false-positive limit) and ``witness_source`` its source; for a
-    conflict, both are the conflicting pair. ``suggested_minimum`` is the independent units at which the bound named by
-    ``minimum_source`` and ``minimum_quantity`` would cross the requirement if the observed rates held: a projection.
+    conflict, both are the conflicting pair. ``suggested_minimum`` is the units, counted as that bound's ``n`` is, at
+    which the bound named by ``minimum_source`` and ``minimum_quantity`` would cross the requirement if the observed
+    rates held: a projection.
     ``determining`` names the bounds the determination rests on, as ``(source, quantity)`` of its requirement.
     """
 
@@ -158,17 +159,20 @@ def decide(spec: TargetSpec, requirement: int, bounds: Sequence[Bound]) -> Decis
        panels;
     5. ``no_eligible_witness`` — no available witness is eligible for the judged scope, certified or not (at
        ``partition_restricted`` none can be in this release);
-    6. ``within_radius`` — a crossing exists: the determining envelope's recorded mean is below the threshold, or the
-       best witness's above it, so the bound is on the wrong side by less than its radius. For a recall requirement, an
-       eligible witness, certified or not, whose observed recall is at or above the threshold and observed
-       false-positive rate at or below the limit, while a bound falls short;
-    7. ``weak_witness`` — otherwise: the witness is weak (for recall: its observed recall is below the threshold or its
-       observed false-positive rate above the limit).
+    6. ``within_radius`` — a crossing exists: the determining envelope's recorded mean is below the threshold, or an
+       eligible witness's is above it (the one with the largest bound among those), so the bound is on the wrong side
+       by less than its radius. For a recall requirement, an eligible witness, certified or not, whose observed recall
+       is at or above the threshold and observed false-positive rate at or below the limit, while a bound falls short;
+    7. ``weak_witness`` — otherwise: every eligible witness is weak (for recall: its observed recall is below the
+       threshold or its observed false-positive rate above the limit).
 
-    The suggested minimum is set whenever a crossing as in rule 6 exists, whatever the limitation: ``units_to_cross``
-    at the bound's recorded mean, variance, support and delta (inverted on the observation's scale: ``1 - mean`` for an
-    envelope, which observes a loss, clipped into the support), with gap ``|mean - threshold|``. It is None when not
-    attainable: beyond ``units_to_cross``'s search, or recorded values it rejects (a ratio method, an invalid support).
+    The suggested minimum is set whenever a crossing as in rule 6 exists, whatever the limitation. A bound that carries
+    a projection (``Bound.project``, the bound the same evidence gives at ``m`` units) takes the smallest ``m`` above
+    its own ``n`` at which the projection meets the decision rule: at or above the threshold for a witness, below it for
+    an envelope. Any other bound uses ``units_to_cross`` at its recorded mean, variance, support and delta (inverted on
+    the observation's scale: ``1 - mean`` for an envelope, which observes a loss, clipped into the support), with gap
+    ``|mean - threshold|``. It is None when not attainable: no ``m`` up to ``_MAX_UNITS`` meets the rule, the
+    ``units_to_cross`` search fails, or it rejects the recorded values (a ratio method, an invalid support).
     A recall requirement counts evaluation items: the positives its recall bound needs and the negatives its
     false-positive bound needs (the upper exact binomial bound), each converted through the estimated prevalence, the
     larger taken; ``minimum_quantity`` names which.
@@ -298,15 +302,45 @@ def _recall_crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Qua
     return b, max(images_for_recall, images_for_fp), quantity
 
 
+def _search(b: Bound, spec: TargetSpec) -> int | None:
+    """
+    Return the smallest size above ``b.n`` at which ``b.project`` meets the decision rule, None if ``_MAX_UNITS`` fails.
+
+    A witness's projection must reach the threshold (rule 2), an envelope's must fall below it (rule 3). The crossing
+    bound itself is on the wrong side of the rule at its own size, so the search starts at ``n + 1``.
+    """
+    project, t = cast(Callable[[int], float], b.project), spec.threshold
+
+    def meets(m: int) -> bool:
+        return project(m) >= t if b.role == "witness" else project(m) < t
+
+    # ponytail: about 24 evaluations of ``project``; an exact-binomial macro costs seconds, so vectorize ``beta.ppf``
+    # over the endpoints for each m if that matters.
+    return _first_true(meets, cast(int, b.n) + 1, _MAX_UNITS) if meets(_MAX_UNITS) else None
+
+
+def _minimum(b: Bound, spec: TargetSpec) -> int | None:
+    # A bound without a projection inverts its one radius through ``_units``, which crosses strictly (``radius < gap``);
+    # the search uses the rule's own ``>=`` / ``<``. The two can differ only at exact ties, so do not align them.
+    return _units(b, abs(cast(float, b.mean) - spec.threshold)) if b.project is None else _search(b, spec)
+
+
 def _crossing(p: _Pool, spec: TargetSpec) -> tuple[Bound, int | None, Quantity] | None:
-    """Return the determining envelope or best witness whose recorded mean is past the threshold, with its units."""
+    """
+    Return the crossing bound and its units.
+
+    That is the determining envelope when its recorded mean is below the threshold; otherwise the available eligible
+    witness with the largest bound among those whose recorded mean is above it.
+    """
     if spec.metric == "recall":  # a recall envelope has no single recorded mean to project; the witness side decides
         return _recall_crossing(p, spec)
-    threshold = spec.threshold
-    for b, sign in ((p.envelope, -1), (p.witness, 1)):
-        if b is not None and b.mean is not None and sign * (b.mean - threshold) > 0:
-            return b, _units(b, abs(b.mean - threshold)), b.quantity
-    return None
+    threshold, b = spec.threshold, p.envelope
+    if b is None or b.mean is None or b.mean >= threshold:
+        candidates = [w for w in _tested(p, spec.scope) if w.mean is not None and w.mean > threshold]
+        if not candidates:
+            return None
+        b = max(candidates, key=lambda w: cast(float, w.bound))  # the first in table order on a tie
+    return b, _minimum(b, spec), b.quantity
 
 
 def _factor(spec: TargetSpec, p: _Pool, crossing: bool) -> Limitation:  # noqa: C901

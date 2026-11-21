@@ -422,7 +422,8 @@ class TestCapacity:
         assert out.bounds["state"].to_list() == ["informative"]
         row = out.determinations.row(0, named=True)
         assert (row["determination"], row["limitation"]) == ("not_ruled_out", "no_eligible_witness")
-        assert row["suggested_minimum"] is None  # the capacity row records no variance to project from
+        # Measured (#1652): images at which the capacity envelope, projected at the observed rates, falls below 0.6.
+        assert (row["suggested_minimum"], row["minimum_source"], row["minimum_quantity"]) == (1_697, "capacity", "ap")
 
     def test_bound_is_one_when_no_image_exceeds_k(self):
         # _scenes holds at most 2 persons in an image, so at K = 2 the cap never binds on this data.
@@ -462,7 +463,36 @@ class TestCapacity:
         assert out.bounds["alpha"].sum() <= 0.05 + 1e-12
         row = out.determinations.row(0, named=True)
         assert (row["determination"], row["limitation"]) == ("not_ruled_out", "within_radius")
+        # Measured (#1652): only the envelope crosses, since the witness's estimate (0.58) is below the 0.7 asked. Its
+        # units are all images, as its row's n is.
+        assert (row["suggested_minimum"], row["minimum_source"], row["minimum_quantity"]) == (8_408, "capacity", "ap")
+
+    def test_a_witness_that_would_clear_names_the_audit_images_it_needs(self):
+        # K = 1 and B = 3 on _scenes(300): the capacity bound (0.894) is above the 0.5 asked, so the witness decides.
+        # Its estimate clears 0.5 and its bound does not. Both numbers are measured (#1652), not derived.
+        row = _run(_scenes(300), [_ap(threshold=0.5, k=1)]).determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "within_radius")
+        assert (row["suggested_minimum"], row["minimum_source"], row["minimum_quantity"]) == (2_474, "user_model", "ap")
+        # At 0.6 the estimate is below the threshold, so no number of images would carry the bound across.
+        row = _run(_scenes(300), [_ap(threshold=0.6, k=1)]).determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "weak_witness")
         assert row["suggested_minimum"] is None
+
+    def test_a_crossing_envelope_is_reported_before_a_crossing_witness(self):
+        # Fit images hold 2 persons and audit images 1, K = 1 and B = 2, a perfect detector, 0.74 asked. The envelope's
+        # estimate (0.667, the ratio) is below it and its bound (0.749, measured) above it. The witness's estimate (1.0)
+        # is above it and its bound (0.734) below it. Both cross, with no conflict, and the envelope is checked first.
+        fit = _fit_side(400)
+        images = [[0] * 2 if i in fit else [0] for i in range(400)]
+        perfect = [_Det([_box(j) for j in range(len(labels))], labels, [0.9] * len(labels)) for labels in images]
+        out = _run(images, [_ap(threshold=0.74, k=1)], max_objects=2, predictions=perfect)
+        capacity, witness = out.bounds.iter_rows(named=True)
+        assert (capacity["bound"], witness["bound"], witness["observed"]) == pytest.approx(
+            (0.7494, 0.7343, 1.0), abs=1e-4
+        )
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "within_radius")
+        assert (row["suggested_minimum"], row["minimum_source"], row["minimum_quantity"]) == (465, "capacity", "ap")
 
     def test_a_detector_demonstrates_beside_a_capacity_row(self):
         # One person per image, K = 2 and B = 3: the envelope is built, sits at 1 and spends alpha / 2, and the
@@ -500,7 +530,8 @@ class TestCapacity:
 
     def test_every_k_at_or_above_b_is_as_before(self):
         # Recorded by running the route before it had a capacity envelope. Every K here is at or above B, so the
-        # call makes no capacity claim and every value is the same float.
+        # call makes no capacity claim and every bound is the same float as before. The minimum is new (#1652), a
+        # measured projection of the user_model witness, in audit images.
         perfect = [_Det([_box(0)], [0], [0.9]) for _ in range(400)]
         calls = [
             _run(),
@@ -512,14 +543,14 @@ class TestCapacity:
             [(0, "user_model", 0.025, 0.0007832551857172316), (1, "user_model", 0.025, 0.03264955812285865)],
             [(0, "user_model", 0.05, 0.864431942063233)],
         ]
-        columns = ("determination", "limitation", "envelope", "witness", "suggested_minimum")
+        columns = ("determination", "limitation", "envelope", "witness", "suggested_minimum", "minimum_source")
         assert [out.determinations.select(columns).rows() for out in calls] == [
-            [("unresolved", "no_envelope", None, 0.0035885242332850415, None)],
+            [("unresolved", "no_envelope", None, 0.0035885242332850415, 508, "user_model")],
             [
-                ("unresolved", "no_envelope", None, 0.0007832551857172316, None),
-                ("unresolved", "no_envelope", None, 0.03264955812285865, None),
+                ("unresolved", "no_envelope", None, 0.0007832551857172316, 567, "user_model"),
+                ("unresolved", "no_envelope", None, 0.03264955812285865, 182, "user_model"),
             ],
-            [("demonstrated_feasible", None, None, 0.864431942063233, None)],
+            [("demonstrated_feasible", None, None, 0.864431942063233, None, None)],
         ]
 
     def test_narrower_scope_is_decided_by_capacity(self):
@@ -566,8 +597,25 @@ class TestCapacity:
         capacity, witness = out.bounds.iter_rows(named=True)
         assert (capacity["source"], capacity["state"]) == ("capacity", "informative")
         assert (witness["source"], witness["bound"]) == ("user_model", 0.0)
+        assert (witness["observed"], witness["n"]) == (None, 400 - len(fit))  # no estimate, and still the audit's size
         row = out.determinations.row(0, named=True)
         assert (row["determination"], row["limitation"]) == ("not_ruled_out", "weak_witness")
+        assert row["suggested_minimum"] is None
+
+    def test_a_class_the_detector_never_predicts_reads_zero_without_a_minimum(self):
+        # Persons are in the audit but the detector predicts only cars, so the witness's AP is 0.0 and not None. The
+        # capacity envelope does not cross at K = 1 and B = 3 (its ratio 2/3 is above the 0.5 asked), so the witness's
+        # estimate decides: it cannot clear, so no number of images would carry the bound across.
+        images = _scenes(300)
+        cars_only = [
+            _Det(d.boxes[d.labels == 1], d.labels[d.labels == 1], d.scores[d.labels == 1]) for d in _detector(images)
+        ]
+        out = _run(images, [_ap("person", 0.5, k=1)], predictions=cars_only)
+        witness = next(r for r in out.bounds.iter_rows(named=True) if r["role"] == "witness")
+        assert witness["observed"] == 0.0
+        row = out.determinations.row(0, named=True)
+        assert (row["determination"], row["limitation"]) == ("not_ruled_out", "weak_witness")
+        assert row["suggested_minimum"] is None
 
     def test_capacity_ignores_image_order(self):
         images, ids = _scenes(300), np.arange(300)

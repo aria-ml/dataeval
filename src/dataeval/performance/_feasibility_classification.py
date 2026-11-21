@@ -26,7 +26,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 
 from dataeval.core._ap_bounds import ap_lower_staircase, ap_upper_envelope, witness_thresholds
-from dataeval.core._concentration import EndpointResult, binomial_endpoint, mean_endpoint, ratio_endpoint
+from dataeval.core._concentration import (
+    EndpointResult,
+    _endpoint_at,
+    binomial_endpoint,
+    mean_endpoint,
+    ratio_endpoint,
+)
 from dataeval.core._consensus import (
     consensus_max,
     cost_consensus,
@@ -56,7 +62,7 @@ from dataeval.performance._feasibility_evidence import (
 from dataeval.performance._feasibility_target import Aggregation, Allowances, Scope, TargetSpec
 from dataeval.performance._feasibility_units import Units
 
-# value (None: unavailable, its reason in raw), the bound's stats (None: no closed form), raw
+# value (None: unavailable, its reason in raw), the bound's stats, raw
 _Bound = tuple[float | None, dict[str, Any] | None, dict[str, Any]]
 _ClassBound = tuple[float, dict[str, Any]]  # one class's AP or recall endpoint and its raw results
 _RiskAt = Callable[[float, float], tuple[float, Mapping[str, Any]]]  # (cost, delta) -> risk lower bound, raw result
@@ -139,6 +145,34 @@ def _mean(
             raise RuntimeError("Internal error: exact binomial endpoints need 0/1 trials with support 1.")
         return binomial_endpoint(int(obs.sum()), len(obs), delta, side=side)
     return mean_endpoint(_within(obs, support), support, delta, side=side, method=method)
+
+
+def _ap_estimate(
+    tp_results: Sequence[EndpointResult], fp_results: Sequence[EndpointResult], mu_result: EndpointResult
+) -> tuple[float | None, Callable[[int], float]]:
+    """
+    Return an AP witness's point estimate and its projection, from the endpoints its staircase is built on.
+
+    The estimate is the staircase at the endpoints' means, which is the bound with every radius at zero; it is None
+    when the positives' mean is 0, since the staircase needs a positive prevalence. ``project(m)`` is the bound the
+    same means and variances give at ``m`` units, and ``project(n)`` is the bound itself.
+    """
+
+    def project(m: int) -> float:
+        return ap_lower_staircase(
+            np.array([_endpoint_at(r, m) for r in tp_results]),
+            np.array([_endpoint_at(r, m) for r in fp_results]),
+            _endpoint_at(mu_result, m),
+        )
+
+    mean = (
+        ap_lower_staircase(
+            np.array([r["mean"] for r in tp_results]), np.array([r["mean"] for r in fp_results]), mu_result["mean"]
+        )
+        if mu_result["mean"] > 0
+        else None
+    )
+    return mean, project
 
 
 def _flip(x: float, loss: bool) -> float:
@@ -297,7 +331,7 @@ def _make_bound(
     alpha: float,
     reason: Reason | None,
 ) -> Bound:
-    """One ``Bound`` from a computed value and the stats recorded beside it (None: no closed form)."""
+    """One ``Bound`` from a computed value and the stats recorded beside it."""
     role: Role = shared["role"]
     upper = role == "envelope" or quantity == "false_positive_rate"
     state, why = _state(value, upper, reason)
@@ -318,6 +352,7 @@ def _make_bound(
         mean=_plain(s.get("mean"), float),
         support=_plain(s.get("support"), float),
         delta=_plain(s.get("delta"), float),
+        project=s.get("project"),
     )
 
 
@@ -623,7 +658,15 @@ class _Scores:
         if spec.metric == "ap":
             if self.decisions:
                 raise _UnavailableError("needs_scores")  # class decisions rank nothing
-            return _ap_bound(spec, self.call, partial(self.ap_class, spec.aggregation))
+            value, _, raw = _ap_bound(spec, self.call, partial(self.ap_class, spec.aggregation))
+            parts = raw.get("per_class", [raw])  # one class, or the macro's classes
+            means = [p["mean"] for p in parts]
+            stats = {
+                "mean": None if None in means else math.fsum(means) / len(parts),  # no estimate if a class has none
+                "n": parts[0]["n"],
+                "project": lambda m: math.fsum(p["project"](m) for p in parts) / len(parts),
+            }
+            return value, stats, raw
         if spec.metric == "recall":
             return self.recall(spec)
         labels, groups = self.call.units.labels[self.call.audit], self.call.units.groups[self.call.audit]
@@ -655,17 +698,26 @@ class _Scores:
 
         method: _Method = "hybrid" if aggregation == "frame_pooled" else _bernoulli(self.call)
 
-        def count(indicator: NDArray[np.bool_], side: _Side) -> float:
+        def count(indicator: NDArray[np.bool_], side: _Side) -> EndpointResult:
             obs = _per_unit(indicator.astype(np.float64), groups, aggregation)
-            return _mean(obs, scale, d, side, method)["endpoint"]
+            return _mean(obs, scale, d, side, method)
 
         emit = self.audit[None, :, c] >= thresholds[:, None]
-        tp = np.array([count(e & positive, "lower") for e in emit])
-        fp = np.array([count(e & ~positive, "upper") for e in emit])
-        mu = count(positive, "upper")
+        tp_results = [count(e & positive, "lower") for e in emit]
+        fp_results = [count(e & ~positive, "upper") for e in emit]
+        mu_result = count(positive, "upper")
+        tp, fp = np.array([r["endpoint"] for r in tp_results]), np.array([r["endpoint"] for r in fp_results])
+        mu = mu_result["endpoint"]
         value = ap_lower_staircase(tp, fp, mu)
+        mean, project = _ap_estimate(tp_results, fp_results, mu_result)
         raw = {"value": value, "thresholds": thresholds.tolist(), "tp_lower": tp.tolist(), "fp_upper": fp.tolist()}
-        return value, raw | {"mu_upper": mu, "deltas": [d] * (2 * len(thresholds) + 1)}
+        return value, raw | {
+            "mu_upper": mu,
+            "mean": mean,
+            "n": mu_result["n"],
+            "project": project,
+            "deltas": [d] * (2 * len(thresholds) + 1),
+        }
 
 
 def _onto_classes(proba: NDArray[np.float64], classes: NDArray[Any], n_classes: int) -> NDArray[np.float64]:

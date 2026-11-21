@@ -18,8 +18,9 @@ from numpy.typing import NDArray
 
 from dataeval._metadata._metadata import _caller_stacklevel
 from dataeval.core._ap_bounds import ap_lower_staircase
+from dataeval.core._concentration import _endpoint_at
 from dataeval.core._detection_counts import check_boxes, detection_counts, kept_matches
-from dataeval.performance._feasibility_classification import _make_bound, _mean, _UnavailableError
+from dataeval.performance._feasibility_classification import _ap_estimate, _make_bound, _mean, _UnavailableError
 from dataeval.performance._feasibility_constants import WITNESS_QUANTILES
 from dataeval.performance._feasibility_evidence import Assumption, Bound, Reason
 from dataeval.performance._feasibility_target import TargetSpec
@@ -315,6 +316,10 @@ def ap_from_counts(
     Each of the ``2T + 1`` hybrid endpoints spends ``alpha_claim / (2T + 1)``: per threshold a lower TP endpoint, with
     support ``min(B, K)``, and an upper FP endpoint, with support ``K``; then an upper endpoint on the targets per
     image, with support ``B``. Fewer than 2 images raise ``_UnavailableError("too_few_units")``.
+
+    ``raw`` also holds ``mean``, the staircase at the endpoints' means, which is the bound with every radius at zero
+    (None when the targets' mean is 0, since the staircase needs a positive prevalence), and ``project``, which gives
+    the bound the same means and variances give at ``m`` audit images. ``project(n)`` is the bound itself.
     """
     tp, fp = np.asarray(tp, dtype=np.float64), np.asarray(fp, dtype=np.float64)
     t = tp.shape[1]
@@ -325,12 +330,22 @@ def ap_from_counts(
     tp_lower, fp_upper = [r["endpoint"] for r in tp_results], [r["endpoint"] for r in fp_results]
     value = ap_lower_staircase(np.array(tp_lower), np.array(fp_upper), mu_result["endpoint"])
     raw = {"value": value, "tp_lower": tp_lower, "fp_upper": fp_upper, "mu_upper": mu_result["endpoint"]}
+    mean, project = _ap_estimate(tp_results, fp_results, mu_result)
     return value, raw | {
         "tp_results": tp_results,
         "fp_results": fp_results,
         "mu_result": mu_result,
+        "mean": mean,
+        "project": project,
         "deltas": [delta] * (2 * t + 1),
     }
+
+
+def _capacity_value(count_lower: float, count_upper: float, shortfall_lower: float, matched_upper: float) -> float:
+    """Return the capacity bound at four endpoints: the smaller of the direct and risk forms, floored at 0."""
+    direct = min(1.0, matched_upper / count_lower) if count_lower > 0 else 1.0
+    risk = 1.0 - shortfall_lower / count_upper  # count_upper > 0: every radius is positive
+    return max(0.0, min(direct, risk))
 
 
 def capacity_from_counts(
@@ -342,8 +357,9 @@ def capacity_from_counts(
     Four hybrid endpoints each spend ``alpha_claim / 4``: the count per image, lower and upper, with support ``B``;
     the shortfall ``(N - K)+``, lower, with support ``B - K``; and ``min(N, K)``, upper, with support ``K``. The value
     is the smaller of the direct form ``U[min(N, K)] / L[N]`` (1 when ``L[N]`` is 0) and the risk form
-    ``1 - L[(N - K)+] / U[N]``. ``raw`` also holds the sample ratio ``mean``, None when no image holds a target. Fewer
-    than 2 images raise ``_UnavailableError("too_few_units")``.
+    ``1 - L[(N - K)+] / U[N]``. ``raw`` also holds the sample ratio ``mean``, None when no image holds a target, and
+    ``project``, which gives the bound the same means and variances give at ``m`` images. ``project(len(n))`` is the
+    bound itself. Fewer than 2 images raise ``_UnavailableError("too_few_units")``.
 
     Raises
     ------
@@ -375,10 +391,12 @@ def capacity_from_counts(
     count_upper = _mean(n, max_objects, delta, "upper")
     shortfall_lower = _mean(np.maximum(n - max_detections, 0), max_objects - max_detections, delta, "lower")
     matched_upper = _mean(np.minimum(n, max_detections), max_detections, delta, "upper")
-    low = count_lower["endpoint"]
-    direct = min(1.0, matched_upper["endpoint"] / low) if low > 0 else 1.0
-    risk = 1.0 - shortfall_lower["endpoint"] / count_upper["endpoint"]  # U[N] > 0: every radius is positive
-    value = max(0.0, min(direct, risk))
+    endpoints = (count_lower, count_upper, shortfall_lower, matched_upper)
+    value = _capacity_value(*(r["endpoint"] for r in endpoints))
+
+    def project(m: int) -> float:
+        return _capacity_value(*(_endpoint_at(r, m) for r in endpoints))
+
     total = n.sum()
     return value, {
         "value": value,
@@ -386,7 +404,10 @@ def capacity_from_counts(
         "count_upper": count_upper,
         "shortfall_lower": shortfall_lower,
         "matched_upper": matched_upper,
+        # The ratio of sums can differ by an ulp from ``_capacity_value`` at the endpoint means. A ratio within an ulp
+        # of the threshold then gives ``within_radius`` and a null minimum, which is harmless.
         "mean": float(np.minimum(n, max_detections).sum() / total) if total else None,
+        "project": project,
         "n": len(n),
         "deltas": [delta] * 4,
     }
@@ -505,7 +526,8 @@ def gather_detection_evidence(
             "unit": "image",
             "assumptions": assumed,
         }
-        out.append(_make_bound(shared, "ap", value, None, alpha_claim, reason))
+        stats = None if raw is None else {"mean": raw["mean"], "n": raw["mu_result"]["n"], "project": raw["project"]}
+        out.append(_make_bound(shared, "ap", value, stats, alpha_claim, reason))
     return out
 
 
@@ -546,6 +568,6 @@ def capacity_evidence(
             "unit": "image",
             "assumptions": ("max_objects_holds",),
         }
-        stats = None if raw is None else {"mean": raw["mean"], "n": raw["n"]}
+        stats = None if raw is None else {"mean": raw["mean"], "n": raw["n"], "project": raw["project"]}
         out.append(_make_bound(shared, "ap", value, stats, alpha_claim, reason))
     return out

@@ -12,7 +12,8 @@ images and the audit the second, each 10% empty.
 
 import math
 import warnings
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -119,6 +120,13 @@ def _witness(units, dets, fit=FIT, audit=AUDIT, **kwargs):
     return ap_witness(units, dets, fit, audit, **args)
 
 
+def _same_as(a, b) -> bool:
+    """Two witnesses agree in value and in everything ``raw`` records but ``project``, a closure that never equals."""
+    return a[0] == b[0] and {k: v for k, v in a[1].items() if k != "project"} == {
+        k: v for k, v in b[1].items() if k != "project"
+    }
+
+
 def _spec(iou: float = IOU) -> TargetSpec:
     return TargetSpec(task="OD", metric="ap", threshold=0.5, class_name="0", iou=iou, max_detections=K)
 
@@ -169,7 +177,7 @@ class TestWitnessValue:
     def test_detections_below_the_top_k_change_nothing(self):
         """Every image already holds K detections at 0.05 or more; matching boxes at 0.01 are cut."""
         units, dets = _scene(COUNTS)
-        assert _witness(units, _add(dets, [_box(0), _box(1), _box(2)], 0, 0.01)) == _witness(units, dets)
+        assert _same_as(_witness(units, _add(dets, [_box(0), _box(1), _box(2)], 0, 0.01)), _witness(units, dets))
 
     def test_empty_images_count(self):
         """Ten audit images with no target and no detection enter every count as zeros."""
@@ -187,7 +195,7 @@ class TestWitnessValue:
         """Class-1 detections on the class-0 targets, scored above them, would take the K slots if not filtered."""
         units, dets = _scene(COUNTS)
         other = _add(dets, [_box(0), _box(1), _box(2)], 1, 0.99)
-        assert _witness(units, other) == _witness(units, dets)
+        assert _same_as(_witness(units, other), _witness(units, dets))
         assert _evidence(units, other, [_spec()]) == _evidence(units, dets, [_spec()])
 
     def test_negative_and_logit_scores_give_a_valid_grid(self):
@@ -201,6 +209,51 @@ class TestWitnessValue:
         assert grid[1] < 0 < 1 < grid[-1]
         assert math.isfinite(value)
         assert 0 < value < 1
+
+
+@pytest.mark.required
+class TestProjection:
+    """``raw["project"](m)`` is the bound the same counts would give at ``m`` audit images, at the observed rates."""
+
+    def test_projection_reproduces_the_bound(self):
+        value, raw = _witness(*_scene(COUNTS))
+        n_audit = raw["mu_result"]["n"]
+        assert n_audit == len(AUDIT)
+        assert raw["project"](n_audit) == value
+        results = [*raw["tp_results"], *raw["fp_results"], raw["mu_result"]]
+        assert [r["n"] for r in results] == [n_audit] * len(results)
+        estimate = ap_lower_staircase(
+            np.array([r["mean"] for r in raw["tp_results"]]),
+            np.array([r["mean"] for r in raw["fp_results"]]),
+            raw["mu_result"]["mean"],
+        )
+        assert raw["mean"] == estimate
+        assert 0 < value < raw["mean"] < 1  # the estimate is the bound with every radius at zero
+
+    def test_projection_is_monotone(self):
+        _, raw = _witness(*_scene(COUNTS))
+        n_audit = raw["mu_result"]["n"]
+        projected = [raw["project"](m) for m in range(n_audit, 200_000, 1_009)]
+        assert all(later >= earlier for earlier, later in zip(projected, projected[1:], strict=False))
+        assert projected[-1] > projected[0]
+
+    def test_a_class_never_predicted_has_estimate_zero(self):
+        """No detection of the class: the grid is -inf alone, every count 0, and the estimate is 0, not None."""
+        units, _ = _scene(COUNTS)
+        silent = ImageDetections(np.empty((0, 4)), np.empty(0, dtype=np.intp), np.empty(0))
+        value, raw = _witness(units, [silent] * 100)
+        assert raw["thresholds"] == [-np.inf]
+        assert (value, raw["mean"]) == (0.0, 0.0)
+        assert raw["project"](len(AUDIT)) == 0.0
+
+    def test_no_audit_target_has_no_estimate(self):
+        """The target mean is 0: the staircase needs a positive prevalence, so no estimate, and the projection runs."""
+        units, dets = _scene(np.r_[COUNTS[:50], np.zeros(50, dtype=np.intp)], low=(1,))
+        value, raw = _witness(units, dets)
+        assert raw["mu_result"]["mean"] == 0.0
+        assert raw["mean"] is None
+        assert raw["project"](len(AUDIT)) == value
+        assert math.isfinite(raw["project"](10_000))
 
 
 @pytest.mark.required
@@ -259,13 +312,17 @@ class TestEvidence:
 
     def test_bounds_row_fields(self):
         units, dets = _scene(COUNTS)
+        raw = _witness(units, dets)[1]
         bounds = _evidence(units, dets, [_spec(), _spec(iou=0.75)])
         assert [b.requirement for b in bounds] == [0, 1]
         assert [b.bound for b in bounds] == [_witness(units, dets, iou=iou)[0] for iou in (IOU, 0.75)]
         for b in bounds:
             row = (b.source, b.role, b.quantity, b.bound_type, b.information_scope, b.population, b.sample, b.unit)
             assert row == ("user_model", "witness", "ap", "lower", "full_input", "items", "audit_split", "image")
-            assert (b.observed, b.n, b.variance, b.radius, b.method) == (None,) * 5
+            assert (b.variance, b.radius, b.method) == (None,) * 3
+            assert b.n == len(AUDIT)  # the audit images behind the bound, its row's own sample (D6)
+            assert b.observed == raw["mean"]
+            assert cast(Callable[[int], float], b.project)(len(AUDIT)) == b.bound
             assert b.assumptions == (
                 "model_independent_of_audit_items",
                 "class_order_matches_dataset",
@@ -282,6 +339,7 @@ class TestEvidence:
         units, dets = _scene(np.r_[COUNTS[:50], np.zeros(50, dtype=np.intp)], low=(1,))
         (b,) = _evidence(units, dets, [_spec()])
         assert (b.bound, b.state, b.reason) == (0.0, "uninformative", "bound_at_minimum")
+        assert (b.observed, b.n) == (None, len(AUDIT))  # no estimate without a target, and still the audit's size
 
     def test_an_overspent_ledger_raises(self, monkeypatch):
         spend = (0.5, {"deltas": [ALPHA, ALPHA]})

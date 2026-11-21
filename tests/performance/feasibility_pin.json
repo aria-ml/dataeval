@@ -2058,7 +2058,7 @@
      "envelope": 0.9847167065849105,
      "envelope_scope": "full_input",
      "requirement": 1,
-     "suggested_minimum": null,
+     "suggested_minimum": 1976,
      "witness": 0.134970948575666,
      "witness_source": "knn"
     }

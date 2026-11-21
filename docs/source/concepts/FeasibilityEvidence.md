@@ -31,8 +31,8 @@ Terms used on this page, each defined in more depth on the concept page:
 ## Read a result
 
 Start with `print(result)`. It shows one line per requirement, the call's joint confidence, the assumptions the bounds
-rest on, which DataEval declares and does not verify, and what a minimum means: the independent units that would cross
-the requirement if the observed rates hold.
+rest on, which DataEval declares and does not verify, and what a minimum means: the units of the named bound's `n` that
+would cross the requirement if the observed rates hold.
 
 `result.bounds` lays out every bound of the call as one table, with one row per source, requirement and quantity, and
 `is_determining` marks the bounds a determination rests on. `result.determinations` holds the printed rows as a table.
@@ -339,7 +339,7 @@ decisions from a classifier and nothing else, prints:
 0   recall:Tank ≥0.9 fp≤0.1   demonstrated_feasible   —            —          96.7% user_model   —
 joint confidence: 95%
 assumes: model_independent_of_audit_items, class_order_matches_dataset
-minimum: independent units to cross the requirement if the observed rates hold
+minimum: units of the named bound's n to cross the requirement if the observed rates hold
 ```
 
 The witness is certified (its false-positive upper bound, 7.0%, is within 10%) and its recall lower bound, 96.7%,
@@ -406,8 +406,8 @@ evidence that addresses it:
 | 3 | `missing_bound` | An envelope is unavailable because `max_sequence_length` was not declared | Declare the bound |
 | 4 | `envelope_unavailable` | Every envelope is unavailable for lack of units or complete panels | More independent units |
 | 5 | `no_eligible_witness` | No available witness is eligible at the judged scope | A frozen model's predictions on held-out units, from the judged scope's model class (none can be eligible at `partition_restricted`) |
-| 6 | `within_radius` | The determining envelope's point estimate is below the threshold, or the best witness's above it, but the bound is not | More independent units |
-| 7 | `weak_witness` | Otherwise: the best witness is weak | A stronger model's predictions on held-out units |
+| 6 | `within_radius` | The determining envelope's point estimate is below the threshold, or an eligible witness's above it, but the bound is not | More independent units |
+| 7 | `weak_witness` | Otherwise: every eligible witness is weak | A stronger model's predictions on held-out units |
 
 For a recall requirement, the limitation follows the witness's observed rates:
 
@@ -416,26 +416,38 @@ For a recall requirement, the limitation follows the witness's observed rates:
 - `weak_witness` when observed recall is below the minimum or the observed false-positive rate is above the limit. A
   stronger model or a different frozen operating point is needed, and there is no suggested minimum.
 
+For a classification AP requirement, the limitation follows the eligible witnesses' AP at the observed rates, the
+staircase with every endpoint at its observed value: `within_radius` when an eligible witness's is above the threshold
+and its bound is not, and `weak_witness` when every eligible witness's is at or below it. A class with no positive on
+the audit (for macro AP, any class) has no such value and also gets `weak_witness`, but what it needs is audit items of
+that class, not a stronger model.
+
 When unlabeled items were excluded, the bounds cover labeled items only, and `population` is `labeled_items`. That never
 displaces the limitation, so label the excluded items to extend the result to the full dataset.
 
 ### The suggested minimum
 
-When the determining envelope's point estimate is already below the threshold, or the best witness's already above it, the
-bound misses only by its confidence radius. `suggested_minimum` is the number of independent units behind the bound
-at which it would cross the threshold, if the observed rates hold.
+When the determining envelope's point estimate is already below the threshold, or an eligible witness's already above
+it, the bound misses only by its sampling uncertainty. `suggested_minimum` is the number of independent units behind the
+bound at which it would cross the threshold, if the observed rates hold.
 
 - `minimum_source` and `minimum_quantity` name the `bounds` row it projects from.
-- For local panels and witnesses these are audit-split units (the audit is half of the independent units in this release).
-  For a replica envelope they are units with replicas.
-- An exact binomial bound is inverted directly: {func}`.units_to_cross` finds the smallest number of trials at which
-  the Clopper–Pearson bound, evaluated at the observed rate projected to that size, clears the gap.
+- They count the same units as the `n` of that row, so `suggested_minimum / n` is how much that sample must grow. For
+  witnesses and local panels these are audit units, and the audit is half of the independent units in this release. For
+  a replica envelope they are units with replicas. For recall, see below.
+- An exact binomial accuracy or recall bound is inverted directly: {func}`.units_to_cross` finds the smallest number of
+  trials at which the Clopper–Pearson bound, evaluated at the observed rate projected to that size, clears the gap.
+- An AP witness has no single radius. Its minimum recomputes each endpoint at the larger size and applies the staircase
+  again, holding the thresholds fixed on this call's fit split, the split of the call's error budget across its claims
+  and the endpoints, and each count's observed mean and variance. A sample of that size does not ensure that the bound
+  crosses, because the rates held fixed are themselves estimates.
 - For a recall requirement only a witness projects. The minimum counts the positives its recall bound needs and the
   negatives its false-positive bound needs, converts each to evaluation images through the estimated prevalence (rounded
   up), and takes the larger. `minimum_quantity` says which bound would cross.
 - It is null when the determination is final or a conflict, when no bound's point estimate is past the threshold, when
-  the bound is a recall envelope (no single point estimate to project), when the bound has no closed-form radius to
-  invert (AP bounds and `frame_pooled` ratios), or when no size up to $10^7$ suffices.
+  the bound is a recall envelope or an AP envelope from local panels or replicas (no point estimate is recorded to
+  project), when it is a `frame_pooled` accuracy ratio (no closed-form radius to invert), or when no size up to $10^7$
+  suffices.
 
 ## Limitations of the first release
 

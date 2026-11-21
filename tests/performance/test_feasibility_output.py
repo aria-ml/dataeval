@@ -262,8 +262,10 @@ class TestBounds:
         envelopes = run.bounds.filter(pl.col("role") == "envelope")
         assert envelopes.height > 0
         assert envelopes["observed"].null_count() == envelopes.height
-        witnesses = run.bounds.filter((pl.col("role") == "witness") & (pl.col("quantity") != "ap"))
-        assert witnesses["observed"].null_count() == 0  # a witness's estimate is recorded, except where AP has none
+        witnesses = run.bounds.filter(pl.col("role") == "witness")
+        assert (
+            witnesses["observed"].null_count() == 0
+        )  # a witness's estimate is recorded; class "a" has audit positives
 
     def test_the_alpha_shares_sum_to_the_call_budget(self, run):
         assert run.bounds["alpha"].sum() == pytest.approx(0.05)
@@ -370,7 +372,8 @@ class TestOutputObject:
             assert (row["limitation"] or "—") in line
         assert lines[-3] == "joint confidence: 95%"
         assert lines[-2].startswith("assumes: representation_independent_of_audit_labels, allowance_beta")
-        assert lines[-1] == "minimum: independent units to cross the requirement if the observed rates hold"
+        assert lines[-1] == "minimum: units of the named bound's n to cross the requirement if the observed rates hold"
+        assert not any(line.startswith("minimum units:") for line in lines)  # line 2 is for object detection only
 
     def test_str_names_the_bounds_and_the_minimum(self):
         x, y, post, _ = _gauss2(2000, 1)
@@ -424,12 +427,19 @@ class TestObjectDetectionOutput:
     def test_od_printout_exact(self):
         assert str(_od_run()).splitlines() == [
             "#   requirement                  determination   limitation    envelope   witness           minimum",
-            "0   ap:person ≥0.5 iou≥0.5 k≤5   unresolved      no_envelope   —          0.0% user_model   —",
-            "1   ap:car ≥0.3 iou≥0.5 k≤3      unresolved      no_envelope   —          3.2% user_model   —",
+            (
+                "0   ap:person ≥0.5 iou≥0.5 k≤5   unresolved      no_envelope   —          0.0% user_model   "
+                "567 user_model ap"
+            ),
+            (
+                "1   ap:car ≥0.3 iou≥0.5 k≤3      unresolved      no_envelope   —          3.2% user_model   "
+                "182 user_model ap"
+            ),
             "joint confidence: 95%",
             "assumes: model_independent_of_audit_items, class_order_matches_dataset, max_objects_holds",
             "max_objects: person 3, car 1",
-            "minimum: independent units to cross the requirement if the observed rates hold",
+            "minimum: units of the named bound's n to cross the requirement if the observed rates hold",
+            "minimum units: a witness counts audit images, half of all images; a capacity envelope counts every image",
         ]
 
     def test_an_int_bound_is_shown_for_every_requirement_class(self):
@@ -442,7 +452,7 @@ class TestObjectDetectionOutput:
 
     def test_str_without_execution_metadata_does_not_guess_the_bound(self):
         bare = replace(_od_run())  # a copy that never went through evaluate, so it has no metadata
-        assert str(bare).splitlines()[-2] == "max_objects: —"
+        assert str(bare).splitlines()[-3] == "max_objects: —"
 
     def test_classification_printout_unchanged(self, run):
         assert "max_objects" not in str(run)
