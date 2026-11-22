@@ -1,19 +1,21 @@
 """`View(record_reads=True)` records each datum's pixel-free structure as the view reads it, so `Metadata` built after a
 pass that reads the pixels does not read the dataset again."""
 
-import logging
+import inspect
 import pickle
 import warnings
 from collections import Counter
 from typing import Any, cast
 
 import numpy as np
+import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
 from dataeval import Embeddings, Metadata
 from dataeval import _experimental as experimental_module
-from dataeval.data import Filter, View
+from dataeval.bias import Balance
+from dataeval.data import Filter, Limit, Operation, View
 from dataeval.exceptions import ExperimentalWarning, MaiteShapeError
 from dataeval.extractors import FlattenExtractor
 from dataeval.protocols import DatasetMetadata, DatumMetadata
@@ -95,7 +97,8 @@ class TestRecordReads:
         for index in range(N // 2):
             view[index]
         before = Counter(dataset.reads)
-        frame = _frame(view)
+        with pytest.warns(UserWarning, match=f"held {N // 2} of the {N} dataset items"):
+            frame = _frame(view)
         assert all(dataset.reads[i] - before[i] <= (1 if i == 0 else 0) for i in range(N // 2))
         assert all(dataset.reads[i] - before[i] == 1 for i in range(N // 2, N))
         assert_frame_equal(frame, _frame(View(_Images())))
@@ -183,7 +186,7 @@ class TestDatumsItDoesNotRecord:
 
 
 @pytest.mark.required
-class TestExperimentalAndLogging:
+class TestExperimentalWarning:
     def test_passing_it_warns_once(self):
         with pytest.warns(ExperimentalWarning, match="record_reads"):
             View(_Images(), record_reads=True)
@@ -196,13 +199,98 @@ class TestExperimentalAndLogging:
             warnings.simplefilter("error")
             _read_all(View(_Images()))
 
-    def test_a_partial_record_is_logged_when_metadata_completes_it(self, caplog):
+
+def _re_read_warnings(caught: list[warnings.WarningMessage]) -> list[str]:
+    return [str(w.message) for w in caught if issubclass(w.category, UserWarning) and "held" in str(w.message)]
+
+
+def _frame_warnings(view: Any) -> tuple[Any, list[str]]:
+    """Build the metadata of `view` and return its dataframe with the re-read warnings it raised."""
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        frame = _frame(view)
+    return frame, _re_read_warnings(caught)
+
+
+@pytest.mark.required
+class TestReReadWarning:
+    """`Metadata` from a recording view that holds only part of the selection warns, with the counts and the fix.
+
+    The record holds item 0 before any pass runs: building a consumer, such as `Embeddings` or `Metadata`, reads it
+    to check the dataset, and the view records that read like any other. Hence "held 1" when no pass ran.
+    """
+
+    def test_metadata_without_a_pixel_pass_warns(self):
         view = View(_Images(), record_reads=True)
-        for index in range(N // 2):
-            view[index]
-        with caplog.at_level(logging.INFO, logger="dataeval"):
-            _frame(view)
-        assert any(
-            "record_reads" in record.getMessage() and f"{N // 2} of {N}" in record.getMessage()
-            for record in caplog.records
+        frame, messages = _frame_warnings(view)
+        expected = (
+            f"View(record_reads=True) held 1 of the {N} dataset items it selects, so Metadata reads the other {N - 1} "
+            "from the dataset. Run the pass that reads the pixels on this view, such as "
+            "Embeddings(view, ...).compute(), before building Metadata from it."
         )
+        assert messages == [expected]
+        assert_frame_equal(frame, _frame(View(_Images())))
+
+    def test_an_embeddings_never_computed_warns(self):
+        view = View(_Images(), record_reads=True)
+        Embeddings(view, extractor=FlattenExtractor(), batch_size=8)
+        _, messages = _frame_warnings(view)
+        assert len(messages) == 1
+        assert f"held 1 of the {N} dataset items" in messages[0]
+
+    def test_a_computed_pass_does_not_warn(self):
+        view = View(_Images(), record_reads=True)
+        Embeddings(view, extractor=FlattenExtractor(), batch_size=8).compute()
+        _, messages = _frame_warnings(view)
+        assert messages == []
+
+    def test_a_pass_over_part_of_the_view_warns_with_the_counts(self):
+        view = View(_Images(), record_reads=True)
+        Embeddings(View(view, Limit(10)), extractor=FlattenExtractor(), batch_size=8).compute()
+        frame, messages = _frame_warnings(view)
+        assert len(messages) == 1
+        assert f"held 10 of the {N} dataset items it selects, so Metadata reads the other {N - 10}" in messages[0]
+        assert_frame_equal(frame, _frame(View(_Images())))
+
+    def test_a_filter_that_structured_every_item_does_not_warn(self):
+        view = View(_Images(), Filter(pl.col("group") == "x"), record_reads=True)
+        _, messages = _frame_warnings(view)
+        assert messages == []
+
+    def test_a_second_metadata_on_the_same_view_does_not_warn_again(self):
+        view = View(_Images(), record_reads=True)
+        _, first = _frame_warnings(view)
+        _, second = _frame_warnings(view)
+        assert len(first) == 1
+        assert second == []
+
+    def test_a_filter_completing_the_record_while_the_view_is_built_does_not_warn(self):
+        class _Peek(Operation):
+            def apply(self, view: View[Any]) -> None:
+                view[0]
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            View(_Images(), [_Peek(), Filter(pl.col("group") == "x")], record_reads=True)
+        assert _re_read_warnings(caught) == []
+
+    @pytest.mark.parametrize("path", ["dataframe", "factor_names", "evaluator"])
+    def test_the_warning_points_at_the_line_that_builds_the_metadata(self, path):
+        # The depth from the warning to this line differs by path, so a fixed stack level would miss some of them.
+        view = View(_Images(), record_reads=True)
+        frame = inspect.currentframe()
+        assert frame is not None
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            if path == "dataframe":
+                line = frame.f_lineno + 1
+                _ = Metadata(view).dataframe
+            elif path == "factor_names":
+                line = frame.f_lineno + 1
+                _ = Metadata(view).factor_names
+            else:
+                line = frame.f_lineno + 1
+                Balance().evaluate(view)
+        held = [w for w in caught if "held" in str(w.message)]
+        assert len(held) == 1
+        assert (held[0].filename, held[0].lineno) == (__file__, line)

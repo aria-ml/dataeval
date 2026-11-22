@@ -1,5 +1,6 @@
 __all__ = []
 
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, TypeVar
@@ -8,15 +9,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dataeval._experimental import warn_experimental_once
-from dataeval._log import get_logger
 from dataeval.data._reads import Reads, recordable, skeleton
 from dataeval.flags import ImageStats
 from dataeval.protocols import AnnotatedDataset, Dataset, DatasetMetadata
 from dataeval.types import ReprMixin, SourceIndex
 from dataeval.utils._internal import read_dataset
 from dataeval.utils.data import DatasetKind, validate_dataset
-
-_logger = get_logger(__name__)
 
 _TDatum = TypeVar("_TDatum")
 
@@ -176,7 +174,9 @@ class View(AnnotatedDataset[_TDatum]):
         proportion to them. It keeps the first read of each item, so a dataset whose targets
         change between reads gives metadata that differs from a fresh walk. Set it on the
         outermost view that both consumers receive. It has no effect on a tracking dataset, on
-        an item that is not an ``(item, target, metadata)`` tuple, or on a pickled copy.
+        an item that is not an ``(item, target, metadata)`` tuple, or on a pickled copy. When
+        the record holds only part of the view, as when no pass ran or one was built but never
+        computed, :class:`~dataeval.Metadata` raises a ``UserWarning`` with the counts.
         Setting it raises :class:`~dataeval.exceptions.ExperimentalWarning` once per process.
 
         .. versionadded:: 1.3
@@ -312,14 +312,6 @@ class View(AnnotatedDataset[_TDatum]):
         reads = {} if self._reads is None else self._reads
         wanted = list(dict.fromkeys(self.selection))
         missing = [index for index in wanted if index not in reads]
-        if self._record_reads and reads and missing:
-            _logger.info(
-                "View(record_reads=True) held %d of %d items, so the other %d are read again. "
-                "Run the pass that reads the pixels over every item first.",
-                len(wanted) - len(missing),
-                len(wanted),
-                len(missing),
-            )
         for index, datum in zip(missing, self._read_each(missing, skeleton), strict=True):
             reads[index] = datum
         self._reads = reads
@@ -339,7 +331,32 @@ class View(AnnotatedDataset[_TDatum]):
 
         A view with no cache answers itself, so building metadata never starts one.
         """
-        return self if self._reads is None else Reads(self._skeletons(), self.metadata)
+        if self._reads is None:
+            return self
+        if self._record_reads:
+            self._warn_unrecorded(self._reads)
+        return Reads(self._skeletons(), self.metadata)
+
+    def _warn_unrecorded(self, reads: dict[int, Any]) -> None:
+        """Warn that :class:`~dataeval.Metadata` reads from the dataset the selected items the record does not hold.
+
+        Only the metadata path warns: a :class:`Filter` that completes the record while the view is built reads what
+        it must anyway, and names no consumer the reader asked to save.
+        """
+        wanted = dict.fromkeys(self.selection)
+        missing = sum(index not in reads for index in wanted)
+        if not missing:
+            return
+        # Imported here: dataeval._metadata imports this module, so a module-level import would be circular.
+        from dataeval._metadata._metadata import _caller_stacklevel
+
+        warnings.warn(
+            f"View(record_reads=True) held {len(wanted) - missing} of the {len(wanted)} dataset items it selects, so "
+            f"Metadata reads the other {missing} from the dataset. Run the pass that reads the pixels on this view, "
+            "such as Embeddings(view, ...).compute(), before building Metadata from it.",
+            UserWarning,
+            stacklevel=_caller_stacklevel(),
+        )
 
     def _keep_reads(self, reads: dict[int, Any] | None, changed: Mapping[int, Transform]) -> None:
         """Reinstate a read cache an operation's own transform cleared, pruned to the selection.
