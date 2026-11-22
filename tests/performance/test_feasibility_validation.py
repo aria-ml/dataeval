@@ -34,11 +34,12 @@ measured against a posterior label draw, as replicas are):
   items, while the population staircase on the same thresholds sits only about 0.01 below the AP;
 - object detection AP witness (``ap_from_counts``, 1,000 audit images, B = 6, K = 4) <= the population staircase on
   its own thresholds -inf, 0.4, 0.7: ``ap_lower_staircase`` at E[TP(t)], E[FP(t)] and E[N] (0.72082), each
-  enumerated exactly. The count model has no boxes: N targets on 0..6 (12% empty, E[N] = 2.6), each missed or
-  detected at score 0.3, 0.6 or 0.9, then 0 to 2 false positives at 0.2 or 0.5, and the top K kept (the cut binds on
-  19% of images). Detections at 0.3 count only at -inf, which lifts the staircase from 0.59811. It catches gross
-  errors only: with no delta split (every endpoint at the whole claim) it still covers 346/346, so the supports and
-  the split are pinned in ``test_feasibility_detection_witness.py``, by its known-answer and ledger-share tests;
+  enumerated exactly. The count model has no boxes (the route test below gives it boxes): N targets on 0..6 (12%
+  empty, E[N] = 2.6), each missed or detected at score 0.3, 0.6 or 0.9, then 0 to 2 false positives at 0.2 or 0.5,
+  and the top K kept (the cut binds on 19% of images). Detections at 0.3 count only at -inf, which lifts the staircase
+  from 0.59811. It catches gross errors only: with no delta split (every endpoint at the whole claim) it still covers
+  346/346, so the supports and the split are pinned in ``test_feasibility_detection_witness.py``, by its known-answer
+  and ledger-share tests;
 - negative control: the plug-in staircase at the sample means, with no radius, must fail the harness;
 - object detection capacity bound (``capacity_from_counts``, 1,000 images, B = 12, K = 3) >= ``E[min(N, K)] / E[N]`` of
   Binomial(12, 0.4) counts (0.60308, from the binomial pmf), and below 1 on every seed. It catches only a radius
@@ -48,6 +49,14 @@ measured against a posterior label draw, as replicas are):
   346/346, so the formula's correctness is pinned against the DFE reference in
   ``test_feasibility_detection_capacity.py``;
 - negative control: the same ratio at the sample means, with no radius, must fail the harness;
+- object detection route, not a coverage claim (``Feasibility.evaluate`` with ``predictions=``, B = 6, K = 4,
+  ``OD_ROUTE_SEEDS`` seeds of 1,000 images): the witness count model's images as boxes, target j in slot j and any
+  detection of it in that slot (IoU 1), false positives in empty slots. On every seed the route's capacity and
+  witness bounds equal ``capacity_from_counts`` and ``ap_from_counts`` on the constructed counts, at the thresholds
+  ``detection_grid`` fixes on the fit side of the route's split and at the call's ``alpha_claim`` (0.025, two
+  claims), and both lie strictly inside (0, 1). The counts are built without the route's scorer, so the test checks
+  its IoU matching, top-K cut and counting, and how the route wires the split, the grid, the allocation and the two
+  count functions; it reuses those four functions, so it does not check their internals;
 - kink cost grid vs G_DFE (spike report §8): C3 AP ceilings on the same gauss2 panels and cells (20,000 units, 50
   seeds, sampled endpoints); the mean paired difference kink - G_DFE is at most 3 SE, per class;
 - determination errors of a representative call (gauss2, 600 items, 2 replicas on 300, built-in witnesses):
@@ -84,7 +93,8 @@ object detection AP witness 346/346 (0.1661, 0.1856; 0.1283, 0.1476 with no delt
 169/346 (-0.0181, -0.0003); the two tests run in under 1 s. Object detection capacity bound 346/346 (0.0452,
 0.0645; median bound 0.6676, largest 0.6893, so below 1 in every seed; 0.0139, 0.0310 at a half radius, -0.0010,
 0.0151 at a quarter, 0.0335, 0.0520 with no delta split); its plug-in ratio 170/346 (-0.0153, -0.0001); the two
-tests run in under 1 s.
+tests run in under 1 s. On 2026-11-21: the object detection route test's capacity bounds lie in 0.944 to 0.962 and
+its witness bounds in 0.475 to 0.508 over its 20 seeds; it runs in about 2.5 s.
 
 Recall claims, observed on 2026-10-23: witness 331/346 jointly (-0.0109, 0.0169; recall alone 339, false positives
 alone 338); recall point estimate 173/346 (-0.0373, -0.0005); C3 recall 346/346 (0.0301, 0.0460; to the cell NP recall
@@ -114,11 +124,21 @@ from scipy.stats import binom, norm
 from dataeval.core import ap_lower_staircase, disjoint_panels, kink_costs
 from dataeval.performance import Feasibility, TargetSpec
 from dataeval.performance import _feasibility_classification as fc
-from dataeval.performance._feasibility_constants import COVERAGE_CRITICAL, COVERAGE_SEEDS, PANEL_SIZE
+from dataeval.performance._feasibility_constants import COVERAGE_CRITICAL, COVERAGE_SEEDS, FIT_FRACTION, PANEL_SIZE
 from dataeval.performance._feasibility_decide import decide
-from dataeval.performance._feasibility_detection import ap_from_counts, capacity_from_counts
+from dataeval.performance._feasibility_detection import ap_from_counts, capacity_from_counts, detection_grid
+from dataeval.performance._feasibility_units import resolve_detection_units, split_units
 from tests.data.conftest import MockICDataset
-from tests.performance.feasibility_helpers import Population, draw_labels, make_population, make_sequences, make_units
+from tests.performance.feasibility_helpers import (
+    _OD,
+    Population,
+    _box,
+    _Det,
+    draw_labels,
+    make_population,
+    make_sequences,
+    make_units,
+)
 
 pytestmark = [pytest.mark.performance, pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")]
 
@@ -460,8 +480,11 @@ OD_TARGET_SCORES, OD_HIT_PMF = np.array([0.3, 0.6, 0.9]), np.array([0.15, 0.20, 
 OD_FP_SCORES, OD_FP_SCORE_PMF, OD_FP_COUNT_PMF = np.array([0.2, 0.5]), np.array([0.6, 0.4]), np.array([0.5, 0.3, 0.2])
 
 
-def _od_draw(rng: np.random.Generator, n_images: int) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
-    """Per-image TP(t) and FP(t) on OD_THRESHOLDS, and N: each image's detections sorted, and the top OD_K kept."""
+def _od_scores(rng: np.random.Generator, n_images: int) -> tuple[NDArray[np.float64], NDArray[np.intp]]:
+    """
+    Per image, the scores of its OD_B target slots and then its 2 false-positive slots, NaN where there is no
+    detection, and N.
+    """
     n = rng.choice(len(OD_N_PMF), n_images, p=OD_N_PMF)
     hit = rng.choice(len(OD_HIT_PMF), (n_images, OD_B), p=OD_HIT_PMF)
     n_fp = rng.choice(len(OD_FP_COUNT_PMF), n_images, p=OD_FP_COUNT_PMF)
@@ -471,10 +494,28 @@ def _od_draw(rng: np.random.Generator, n_images: int) -> tuple[NDArray[np.intp],
         np.where(np.arange(OD_B) < n[:, None], np.r_[np.nan, OD_TARGET_SCORES][hit], np.nan),
         np.where(np.arange(2) < n_fp[:, None], fp_scores, np.nan),
     ]
+    return scores, n
+
+
+def _od_top_k(scores: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.bool_]]:
+    """The top OD_K scores of each image, NaN where there is none, and whether each is a target's detection."""
     top = np.argsort(-scores, axis=1)[:, :OD_K]
-    passes = np.take_along_axis(scores, top, axis=1)[..., None] >= OD_THRESHOLDS  # (images, K, thresholds)
-    target = (top < OD_B)[..., None]
-    return (passes & target).sum(axis=1), (passes & ~target).sum(axis=1), n
+    return np.take_along_axis(scores, top, axis=1), top < OD_B
+
+
+def _od_counts(
+    kept: NDArray[np.float64], is_target: NDArray[np.bool_], thresholds: NDArray[np.float64]
+) -> tuple[NDArray[np.intp], NDArray[np.intp]]:
+    """Per-image TP(t) and FP(t): the kept target and false-positive detections scoring at or above each threshold."""
+    passes = kept[..., None] >= thresholds  # (images, K, thresholds)
+    target = is_target[..., None]
+    return (passes & target).sum(axis=1), (passes & ~target).sum(axis=1)
+
+
+def _od_draw(rng: np.random.Generator, n_images: int) -> tuple[NDArray[np.intp], NDArray[np.intp], NDArray[np.intp]]:
+    """Per-image TP(t) and FP(t) on OD_THRESHOLDS, and N: each image's detections sorted, and the top OD_K kept."""
+    scores, n = _od_scores(rng, n_images)
+    return (*_od_counts(*_od_top_k(scores), OD_THRESHOLDS), n)
 
 
 def _od_kept(target_counts: tuple[int, ...], fp_counts: tuple[int, ...]) -> NDArray[np.float64]:
@@ -581,6 +622,36 @@ def _od_capacity_point_margin(seed: int) -> float:
     return _od_capacity_bound(seed)[1]["mean"] - _od_capacity_truth()  # the plug-in ratio: no radius
 
 
+OD_ROUTE_SEEDS, OD_ROUTE_IMAGES = 20, 1_000
+
+
+def _od_route(seed: int) -> tuple[Any, list[float]]:
+    """
+    The route's bounds on seed ``seed``'s count-model images as boxes, and the count functions' bounds on the
+    constructed counts. Target j sits in slot j and any detection of it in the same slot (IoU 1); the false positives
+    sit in slots OD_B and OD_B + 1, where no target is.
+    """
+    scores, n = _od_scores(np.random.default_rng(seed), OD_ROUTE_IMAGES)
+    predictions = []
+    for row in scores:
+        slots = np.flatnonzero(~np.isnan(row))
+        boxes = np.array([_box(j) for j in slots.tolist()], dtype=np.float64).reshape(-1, 4)
+        predictions.append(_Det(boxes, np.zeros(len(slots), dtype=np.intp), row[slots]))
+    dataset = _OD([[0] * int(k) for k in n])
+    spec = TargetSpec(task="OD", metric="ap", class_name="person", threshold=0.5, iou=0.5, max_detections=OD_K)
+    out = Feasibility(seed=seed, max_objects=OD_B).evaluate(dataset, target=[spec], predictions=predictions)
+    fit, audit = split_units(resolve_detection_units(dataset, groups=None), fit_fraction=FIT_FRACTION, seed=seed)
+    kept, is_target = _od_top_k(scores)
+    present = ~np.isnan(kept[fit])
+    thresholds = detection_grid(kept[fit][present], is_target[fit][present])
+    tp, fp = _od_counts(kept[audit], is_target[audit], thresholds)
+    alpha_claim = 0.05 / 2  # a capacity claim, since K < B, and the witness's
+    return out.bounds, [
+        capacity_from_counts(n, max_objects=OD_B, max_detections=OD_K, alpha_claim=alpha_claim)[0],
+        ap_from_counts(tp, fp, n[audit], max_objects=OD_B, max_detections=OD_K, alpha_claim=alpha_claim)[0],
+    ]
+
+
 def _kink_minus_g_dfe(seed: int) -> NDArray[np.float64]:
     """Per class, the C3 AP ceiling with the kink grid minus the one with G_DFE, on the same gauss2 panels."""
     source, y, panels = _c3(seed)
@@ -674,6 +745,14 @@ def test_od_capacity_bound_covers_its_ratio():
 def test_the_od_capacity_point_ratio_without_a_radius_fails_the_harness():
     covered, _ = _covered(_od_capacity_point_margin)
     assert covered <= COVERAGE_CRITICAL, f"negative control: {covered}/{COVERAGE_SEEDS} covered"
+
+
+def test_od_route_bounds_equal_the_count_functions_on_box_scenes():
+    for seed in range(OD_ROUTE_SEEDS):
+        bounds, expected = _od_route(seed)
+        assert bounds.select("source", "alpha").rows() == [("capacity", 0.025), ("user_model", 0.025)], f"seed {seed}"
+        assert bounds["bound"].to_list() == expected, f"seed {seed}"
+        assert all(0 < b < 1 for b in expected), f"seed {seed}: a bound at 0 or 1 makes the check vacuous"
 
 
 def test_recall_witness_of_the_np_rule_covers_its_recall_and_false_positive_rate():

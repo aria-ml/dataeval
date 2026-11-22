@@ -16,17 +16,8 @@ from dataeval.performance import Feasibility
 from dataeval.performance._feasibility_detection import read_model_output
 from dataeval.performance._feasibility_model import run_model
 from tests.models.test_predictors_od import _meta
-from tests.performance.test_feasibility_detection_route import (
-    _OD,
-    NAMES,
-    _ap,
-    _box,
-    _Det,
-    _detector,
-    _no_pass,
-    _run,
-    _scenes,
-)
+from tests.performance.feasibility_helpers import _OD, OD_NAMES, _box, _Det
+from tests.performance.test_feasibility_detection_route import _ap, _detector, _no_pass, _run, _scenes
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
@@ -414,7 +405,7 @@ class _Export:
     input_name = "image"
     output_names = ["boxes", "scores"]
 
-    def __init__(self, detections: list[_Det], n_classes: int = len(NAMES)) -> None:
+    def __init__(self, detections: list[_Det], n_classes: int = len(OD_NAMES)) -> None:
         self.detections, self.n_boxes, self.n_classes = detections, max(len(d.labels) for d in detections), n_classes
 
     def run(self, tensor: Any) -> dict[str, Any]:
