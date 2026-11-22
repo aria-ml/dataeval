@@ -303,6 +303,26 @@ See {doc}`Performance limits <../concepts/PerformanceLimits>`.
   - Evidence basis
   - Validation evidence
   - Contraindications
+- - {class}`.Feasibility` ⚠️
+  - DFE consensus and operating-point constructions, with exact binomial endpoints and hybrid Hoeffding and
+    Maurer-Pontil endpoints. See [the basis of each source](../concepts/FeasibilityEvidence.md#the-basis-of-each-source),
+    and the {class}`.Feasibility` reference for object detection.
+  - Ground-truth checked, and Cross-checked for the object detection capacity and witness bounds against values from the
+    DFE reference implementation (known-answer suites in CI check each bound's coverage of a closed-form or Monte Carlo
+    truth on constructed data, and that the object detection route gives the count functions' bounds. A study in
+    November 2026, on the development code that followed v1.2.0, resampled images with replacement from three public
+    pools, VOC 2012 validation persons, DroneVehicle validation cars and M3FD people, each pool taken as the population
+    so that its truth is exact. The witnesses scored a simulated detector on the real boxes and one frozen YOLOv8s. At
+    50,000 images per call, each of four witness and three capacity claims covered its truth on all 763 seeds, and every
+    claim still passed with its radii halved, so the study catches gross errors and does not show that the bounds are
+    tight. A fresh sample of twice a witness's suggested minimum reached the threshold on about half of the seeds, 47.6%
+    and 50.6%)
+  - Experimental: the API may change or be removed. The recorded assumptions are not verified (see
+    [How a determination is made](../concepts/FeasibilityEvidence.md#how-a-determination-is-made)), and a
+    `max_objects` below the true largest count makes the object detection bounds invalid. The study covers independent
+    draws from fixed pools of three image datasets, one frozen detector and a simulated one, IoU 0.5, detections given
+    through `predictions=` and one sample size. It does not cover grouped or video object detection. A capacity
+    envelope is informative only when some images hold more than K targets.
 - - {class}`.Sufficiency`
   - Power-law learning curves
     ([Hestness et al., 2017](../concepts/PerformanceLimits.md#references)); curve fitting
