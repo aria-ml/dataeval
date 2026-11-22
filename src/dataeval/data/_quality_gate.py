@@ -9,7 +9,7 @@ from functools import cache
 from typing import Any
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from dataeval._experimental import warn_experimental_once
 from dataeval._log import get_logger
@@ -72,6 +72,16 @@ def _numeric_scalar_stats() -> tuple[str, ...]:
     return tuple(sorted(name for name, calc in _single_statistics().items() if _reads_one_number(name, calc)))
 
 
+def _masked_stats() -> tuple[str, ...]:
+    """Every statistic :class:`QualityGate` accepts under a mask, sorted: those measured over the pixels it leaves."""
+    from dataeval.core._calculators._base import ViewKind
+
+    singles = _single_statistics()
+    return tuple(
+        name for name in _numeric_scalar_stats() if singles[name][0].flags_for_view(singles[name][1], ViewKind.MASK)
+    )
+
+
 class QualityGate(FrameSelector):
     """Keep the frames whose value on one ``image_stats`` statistic lies within declared bounds.
 
@@ -101,6 +111,14 @@ class QualityGate(FrameSelector):
         Drop frames strictly below this quantile of the video's finite values.
     max_quantile : float or None, default None
         Drop frames strictly above this quantile of the video's finite values.
+    mask : ArrayLike or None, default None
+        A 2D image marking pixels to leave out of the statistic, such as a vehicle part or a burned-in HUD. Nonzero
+        marks a pixel to leave out. A mask of the frames' own size is used as it is. Any other is scaled uniformly by
+        width, with the padding rows a codec adds at the bottom left out too, which needs OpenCV (``dataeval[opencv]``).
+        It is read as :func:`~dataeval.core.image_stats` reads ``mask``, and a frame it covers entirely is unmeasured. A
+        statistic that does not read pixels, or that reads NaN under a mask, is refused with it.
+
+        .. versionadded:: 1.3
 
     Raises
     ------
@@ -108,7 +126,12 @@ class QualityGate(FrameSelector):
         If ``stat`` is not a numeric scalar statistic, if no bound is given, if a side has both an
         absolute and a quantile bound, if a quantile is outside ``[0, 1]``, if ``min`` or ``max`` is
         NaN, or if ``min > max`` or ``min_quantile > max_quantile``. An infinite bound is allowed,
-        and bounds nothing.
+        and bounds nothing. If ``mask`` is not 2D, leaves out every pixel, or is given with a statistic
+        it does not apply to: the dimension statistics, which describe the frame as a whole, and
+        ``"blur_edge_directionality"``, which reads NaN under a mask. The message lists the statistics
+        a mask accepts. Raised while selecting if ``mask`` does not fit a frame's size.
+    ImportError
+        Raised while selecting if ``mask`` must be rescaled to a frame of another size and OpenCV is not installed.
 
     Warns
     -----
@@ -133,12 +156,21 @@ class QualityGate(FrameSelector):
     kept, so a video whose values are all equal drops nothing. With quantile bounds the gate is
     ``two_pass``: it buffers one float and one position per frame, never pixels.
 
+    For the statistics a gate accepts under a mask, the value is the one ``image_stats(..., mask=mask)`` reports. So for
+    a masked result, the statement above holds only on a gate given the same mask.
+
     A frame whose value is NaN is kept, marked :attr:`~dataeval.data.FrameVerdict.unmeasured`,
     and never enters a quantile. A video with no finite value has no quantile cutoff to take, so
     a quantile bound keeps all of it, each frame marked unmeasured.
 
     Kept frames stand only for themselves (:attr:`~dataeval.data.FrameSelector.excludes`), and
     no factor is recorded: the statistic belongs to ``image_stats``.
+
+    Mask a part that stays in the frame, such as a hood or a burned-in HUD, when a bound is absolute: its pixels are in
+    every frame, so the unmasked value describes the vehicle as well as the scene. A quantile bound within one video
+    was checked for ``"sharpness"`` only: on 11 drone clips with simulated parts, the study blurred 10% of each clip's
+    frames by 5, 9 or 21 px, and a bottom-10% gate picked those frames with and without a part on 10 of the 11 clips.
+    Other statistics were not checked.
 
     Examples
     --------
@@ -165,6 +197,7 @@ class QualityGate(FrameSelector):
         max: float | None = None,  # noqa: A002
         min_quantile: float | None = None,
         max_quantile: float | None = None,
+        mask: ArrayLike | None = None,
     ) -> None:
         if min is None and max is None and min_quantile is None and max_quantile is None:
             raise ValueError("QualityGate: give at least one bound: min, max, min_quantile or max_quantile.")
@@ -198,6 +231,18 @@ class QualityGate(FrameSelector):
                 f"statistic, because it is measured only from channels declared to be sRGB red, green and blue, which "
                 f"a gate has none of."
             )
+        # Read at construction, so that a mask that leaves nothing to measure fails before any frame is read.
+        from dataeval.core._calculators._base import ViewKind
+        from dataeval.core._ego_stats import _OverlayMask
+        from dataeval.core._image_stats import _leave_out_mask
+
+        source = _leave_out_mask(mask)
+        if source is not None and not calculator[0].flags_for_view(calculator[1], ViewKind.MASK):
+            raise ValueError(
+                f"QualityGate: a mask leaves pixels out of the statistics that read pixels, and {stat!r} does not: it "
+                f"describes the frame as a whole, or reads NaN under a mask. With mask=, stat must be one of "
+                f"{', '.join(_masked_stats())}; got {stat!r}."
+            )
         # QualityGate reads the statistic without calling image_stats, where the blur flags warn.
         if calculator[1] & ImageStats.BLUR:
             warn_experimental_once("ImageStats.BLUR", details="The column names and values may change.")
@@ -208,12 +253,21 @@ class QualityGate(FrameSelector):
         self.max_quantile: float | None = None if max_quantile is None else float(max_quantile)
         self.two_pass: bool = min_quantile is not None or max_quantile is not None
         self._calculator = calculator
+        self.mask: NDArray[np.bool_] | None = source
+        # One for the gate's life, as `CameraTravel` keeps one: it fits the mask once per frame size.
+        self._overlay: _OverlayMask | None = None if source is None else _OverlayMask(source, "mask")
 
     def _measure(self, pixels: NDArray[Any]) -> float:
-        """Return one frame's value, as ``image_stats`` reports it for that frame."""
-        from dataeval.core._image_stats import _collect_calculator_stats
+        """Return one frame's value, as ``image_stats`` reports it for that frame, over the pixels a mask leaves."""
+        from dataeval.core._image_stats import _collect_calculator_stats, _fit_mask, _masked_range
 
-        stats, _, _, _ = _collect_calculator_stats([self._calculator], pixels, None)
+        fitted = value_range = None
+        if self.mask is not None:
+            fitted = _fit_mask(self.mask, (pixels.shape[-2], pixels.shape[-1]), overlay=self._overlay)
+            value_range = _masked_range(pixels, fitted, None)
+        stats, _, _, _ = _collect_calculator_stats(
+            [self._calculator], pixels, None, exclude=fitted, value_range=value_range, mask=fitted
+        )
         value = stats[0][self.stat][0]
         # image_stats reports a floating statistic as float32, so a bound read off its output meets
         # a frame's own reading exactly only when that reading is rounded the same way.

@@ -72,11 +72,13 @@ class CalculatorCache:
         :attr:`image`.
     value_range : ValueRange or None, default None
         The datum's value range, if the caller already established it. Every view of one
-        datum shares the interval and establishing it costs a scan of the whole datum, so
+        datum shares the interval and establishing it costs a scan of the datum, so
         a caller building one cache per row — as :func:`~dataeval.core.image_stats`
-        does, once per box — should read it once and pass it here. Also how a caller
-        passes a *declared* range down, which is the only way float data outside the two
-        conventional image spellings gets one at all. Found on demand when None.
+        does, once per box — should read it once and pass it here. Under a mask that
+        caller reads it over the pixels the mask leaves, so a masked part cannot set it.
+        Also how a caller passes a *declared* range down, which is the only way float data
+        outside the two conventional image spellings gets one at all. Found on demand over
+        the whole datum when None.
     context : AnnotationContext or None, default None
         The datum's boxes classified once, for a statistic that compares `box` with its peers. None unless a selected
         statistic declared a need for it. Shared by every row of one datum, and by every view of a row.
@@ -89,6 +91,11 @@ class CalculatorCache:
         A dict shared by the caches of one view of one datum, so that a measurement made on the datum's own row can be
         read by the masked pass of the same row instead of being made again. The blur calculator keeps its edge widths
         in it. None, which is what a call without `per_background` passes, stores nothing.
+    mask : NDArray[np.bool_] or None, default None
+        The ``(H, W)`` mask of :func:`~dataeval.core.image_stats`, fitted to the whole datum, True where a pixel is
+        left out, or None without one. Not applied here: `exclude` carries it, with the boxes on a background or a
+        surround. Kept apart so that a statistic can tell the mask from the boxes. See :attr:`mask_window`. The context
+        statistics read it whole, over a surround's window, since they read `raw` and not :attr:`image`.
     """
 
     def __init__(
@@ -103,6 +110,7 @@ class CalculatorCache:
         focal: int | None = None,
         settings: ImageStatsConfig | None = None,
         scratch: dict[str, Any] | None = None,
+        mask: NDArray[np.bool_] | None = None,
     ) -> None:
         is_spatial = len(datum.shape) >= 2
         self.raw = datum
@@ -119,20 +127,23 @@ class CalculatorCache:
         self.focal = focal
         self.settings = ImageStatsConfig() if settings is None else settings
         self.scratch = scratch
+        self.mask = mask
 
         # Ensure bounding box
         self.box = BoundingBox(0, 0, self.width, self.height, image_shape=datum.shape) if box is None else box
 
     @cached_property
     def value_range(self) -> ValueRange:
-        """Range of the datum, read off the whole datum rather than any view of it.
+        """Range of the datum, read once for every view of it rather than off any one view.
 
-        Anchored on :attr:`raw` so that every view of one datum — the full image, each
+        Anchored on the datum so that every view of one datum — the full image, each
         box, the background — is scaled and binned against the same interval, which is
-        what makes their statistics comparable. Reading it off a view instead lets the
-        view's own extremes pick the range: a background whose bright pixels all sat
-        inside the boxes, or a dark box within a bright image, would infer a lower depth
-        and land its histogram in a different range than the image it is compared against.
+        what makes their statistics comparable. The caller reads it off the whole datum, or
+        under a mask off the pixels the mask leaves, which every masked view then shares.
+        Reading it off a view instead lets the view's own extremes pick the range: a
+        background whose bright pixels all sat inside the boxes, or a dark box within a
+        bright image, would infer a lower depth and land its histogram in a different range
+        than the image it is compared against.
 
         Read once per datum by the caller where there is one, since a scan of the whole
         datum repeated once per box is the cost this property would otherwise carry.
@@ -238,16 +249,29 @@ class CalculatorCache:
         the datum is not part of the excluded region either; it is already NaN from the
         image's own fill and is counted as such.
         """
-        if self.exclude is None:
+        return self._windowed_mask(self.exclude)
+
+    @cached_property
+    def mask_window(self) -> NDArray[np.bool_] | None:
+        """:attr:`mask` cropped as :attr:`window_mask` crops `exclude`, False outside the image, or None when unset.
+
+        The mask alone on a box row, where `exclude` holds the same pixels, and the mask apart from the boxes on a
+        background, where `exclude` holds both.
+        """
+        return self._windowed_mask(self.mask)
+
+    def _windowed_mask(self, mask: NDArray[np.bool_] | None) -> NDArray[np.bool_] | None:
+        """Crop a whole-datum ``(H, W)`` mask to the window of :attr:`image`, False outside the image."""
+        if mask is None:
             return None
         window = self.box.xyxy_int
-        if self._has_geometry and self._is_interior(window, self.exclude.shape):
+        if self._has_geometry and self._is_interior(window, mask.shape):
             # Wholly inside, so there is nothing to fill and the mask is already a slice.
             x0, y0, x1, y1 = window
-            return self.exclude[y0:y1, x0:x1]
+            return mask[y0:y1, x0:x1]
         # A leading axis makes the (H, W) mask a one-channel image for the crop, which is
         # the only shape crop_with_fill windows; dropped again on the way out.
-        return crop_with_fill(self.exclude[None, ...], window, fill=False)[0][0]
+        return crop_with_fill(mask[None, ...], window, fill=False)[0][0]
 
     @cached_property
     def channel_count(self) -> int:

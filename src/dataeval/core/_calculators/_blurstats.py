@@ -7,14 +7,14 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.core._blur import BlurValues, background_blur, blur_values, grow_region, measure_edges
+from dataeval.core._blur import BlurValues, Edges, background_blur, blur_values, grow_region, measure_edges
 from dataeval.core._calculators._base import Calculator, Handler, ViewKind
 from dataeval.core._calculators._cache import CalculatorCache
 from dataeval.core._calculators._registry import CalculatorRegistry
 from dataeval.flags import ImageStats
 
 # A named band group is a smaller cube that averages to a picture like the whole. Directionality is left out of the
-# background view because nothing has tested it there.
+# background view, and reads NaN under a mask, because nothing has tested it there.
 _VIEWS = ViewKind.WHOLE | ViewKind.BAND
 # `blur_edge_width` answers the background view too, but not by reading it: the view holds NaN where boxes were, and the
 # smoothing would spread those holes over every edge. The edges are found on the unmasked picture and the ones outside
@@ -33,8 +33,10 @@ class BlurStatCalculator(Calculator[ImageStats]):
     warnings in `_image_stats.py` and `_quality_gate.py`, and the invalidation entries of the view operations. The
     registry would send the blur flags to `VisualStatCalculator` if that claimed them, so routing is not the reason.
     The two flags share one detection, run on first use, so asking for both costs one pass. Under `per_background`
-    that pass is also shared with the background value, through `CalculatorCache.scratch`, when the whole-image pass
-    ran first on the same datum.
+    that pass is also shared with the background value, through `CalculatorCache.scratch`: the pass that measures the
+    datum's edges first keeps them there, and the other reads them. Under the call's mask both passes find the same
+    edges, since the threshold and the cut come from the mask alone and never from the boxes. Directionality then
+    reads NaN, with the reason ``masked``, and the whole picture's values are never measured.
     """
 
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
@@ -63,12 +65,27 @@ class BlurStatCalculator(Calculator[ImageStats]):
             self.cache.scratch["edges"] = edges
         return blur_values(edges)
 
+    def _edges(self, picture: CalculatorCache) -> Edges:
+        """Measure the edges of `picture`'s gray picture, leaving the call's mask out where it reaches the window.
+
+        Under the mask, the threshold is the mean gradient outside the mask grown by the pooling margin, and the widths
+        stop at the mask grown by 1 px, so that no masked pixel sets which edges count or how wide they are. Both are
+        read off the mask alone, in the window's coordinates.
+        """
+        gray = self._gray(picture)
+        mask = self.cache.mask_window
+        if mask is None or not mask.any():
+            return measure_edges(gray)
+        return measure_edges(gray, threshold_region=~grow_region(mask), cut=grow_region(mask, 1))
+
     @cached_property
     def _background(self) -> float:
-        """The blur value over the edge points outside the boxes grown by the margin, on the unmasked picture.
+        """The blur value over the edge points outside the excluded pixels grown by the margin, on the unmasked picture.
 
-        The edges come from the whole-image pass when it ran first on this datum, otherwise from a sibling cache with
-        nothing masked. NaN where the view cannot be measured, which includes boxes that cover all of it.
+        The excluded pixels are the boxes on a background, the call's mask on a row under one, or both. The edges come
+        from `scratch` when another pass of this view of the datum measured them first, otherwise from a sibling cache
+        with nothing excluded, and are then kept in `scratch` for the other pass. NaN where the view cannot be
+        measured, which includes boxes, or a mask, that cover all of it.
         """
         cache = self.cache
         mask = cache.window_mask
@@ -83,8 +100,14 @@ class BlurStatCalculator(Calculator[ImageStats]):
                 value_range=cache.value_range,
                 bands=cache.bands,
             )
-            edges = measure_edges(self._gray(unmasked))
+            edges = self._edges(unmasked)
+            if cache.scratch is not None:
+                cache.scratch["edges"] = edges
         return background_blur(edges, grow_region(mask))
+
+    def _directionality(self) -> float:
+        """Return the `blur_edge_directionality` column: NaN under the call's mask, the whole picture's otherwise."""
+        return float("nan") if self.cache.mask is not None else self._values.directionality
 
     def _blur(self) -> float:
         """Return the `blur_edge_width` column: the background value in a masked view, the whole picture's otherwise."""
@@ -110,8 +133,12 @@ class BlurStatCalculator(Calculator[ImageStats]):
         """Return the row's status, and why directionality alone is NaN where the edge width has a value."""
         details: dict[str, list[Any]] = {"blur_status": [self._status]}
         if flags & ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY:
-            alone = self._status == "ok" and not math.isfinite(self._values.directionality)
-            details["blur_edge_directionality_reason"] = ["insufficient_axis_support" if alone else ""]
+            if self.cache.mask is not None:
+                reason = "masked"
+            else:
+                alone = self._status == "ok" and not math.isfinite(self._values.directionality)
+                reason = "insufficient_axis_support" if alone else ""
+            details["blur_edge_directionality_reason"] = [reason]
         return details
 
     def get_empty_values(self) -> dict[str, Any]:
@@ -127,6 +154,6 @@ class BlurStatCalculator(Calculator[ImageStats]):
         return {
             ImageStats.VISUAL_BLUR_EDGE_WIDTH: Handler("blur_edge_width", lambda: [self._blur()], _BLUR_VIEWS),
             ImageStats.VISUAL_BLUR_EDGE_DIRECTIONALITY: Handler(
-                "blur_edge_directionality", lambda: [self._values.directionality], _VIEWS
+                "blur_edge_directionality", lambda: [self._directionality()], _VIEWS
             ),
         }

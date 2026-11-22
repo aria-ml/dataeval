@@ -24,6 +24,9 @@ class HashStatCalculator(Calculator):
     - dhash: Gradient-based perceptual hash for near duplicates
     """
 
+    # A digest reads every pixel of the view, so a mask of `image_stats` leaves it whole.
+    masks_pixels = False
+
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache

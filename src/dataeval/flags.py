@@ -74,19 +74,23 @@ class ImageStats(Flag):
     - `VISUAL_PERCENTILES` : Display-range percentiles (0, 25, 50, 75, 100)
 
     Blur Statistics (experimental, so names and values may change; NaN without a reference, with too few edges,
-    with a NaN pixel, or for a box that extends past the image):
+    with a NaN pixel (one under a `mask` of :func:`~dataeval.core.image_stats` is left out), or for a box that extends
+    past the image):
 
     - `VISUAL_BLUR_EDGE_WIDTH` : Width of the sharpest edges, in pixels at the image's own resolution: the 5th
       percentile of edge widths, each the spread of an edge's gradient profile, after Liang et al. (2010). With
       `per_background=True` it also gives `background_blur_edge_width`, taken over the edges outside the boxes and a
-      9 px margin around them
+      9 px margin around them. Under a `mask`, an edge point must reach the mean gradient taken outside the mask grown
+      by 9 px, the edges within 9 px of the mask are left out of the 5th percentile, and the width of each edge stops
+      at the mask, so no masked pixel sets which edges count or how wide they are
     - `VISUAL_BLUR_EDGE_DIRECTIONALITY` : How different horizontal and vertical edges are: the absolute log2 ratio
-      of their median widths
+      of their median widths. NaN under a `mask`
 
     A request that includes a blur statistic also returns details: `blur_status`, `ok`, `not_applicable`,
     `invalid_box`, `missing_channel`, `unknown_range` or `insufficient_support` (which a box that extends past the
     image reads), and, with `VISUAL_BLUR_EDGE_DIRECTIONALITY`, `blur_edge_directionality_reason`,
-    `insufficient_axis_support` where directionality alone is NaN, else empty.
+    `insufficient_axis_support` where directionality alone is NaN, `masked` on every row that measures directionality
+    under a `mask`, else empty.
 
     Known limits: a width is in pixels, so values compare only at one resolution. `image_stats` warns when one call
     requests blur for images of more than one size; `Outliers` calls it once per dataset, so sizes that differ only
@@ -241,30 +245,33 @@ class ImageStats(Flag):
     :func:`~dataeval.core.image_stats`. The statistics are stable. A request that includes one also returns details, in
     the result's ``details``, one value per row, named for a band group as the columns are (see the naming rule above).
     The surround before other boxes are removed, less the box, is the candidate, and the candidate's pixels that no
-    other box covers are the retained ones:
+    other box covers are the retained ones. A `mask` of :func:`~dataeval.core.image_stats` makes the pixels under it
+    unreadable, as a pixel that is not finite or not inside the interval is, so it lowers the measurable counts and the
+    valid fractions below and leaves the candidate and the retained pixels as the boxes alone set them:
 
     - `context_status` : `ok`, `not_applicable`, `invalid_box`, `reversed_box`, `missing_channel`, `unknown_range`,
       `empty_surround` or `insufficient_support` (fewer than `surround_min_pixels` retained pixels measurable, which
-      includes a surround that other boxes cover)
+      includes a surround that other boxes cover, or that a `mask` covers)
     - `context_incomplete_geometry` : True where another box of the image is reversed or not finite, so that pixels
       of it may lie in the surround; the value is still computed from the valid boxes. False wherever the status is
       not `ok`
     - `surround_candidate_pixels`, `surround_retained_pixels`, `surround_measurable_pixels` : The candidate pixels,
-      the retained ones, and the retained ones measurable in every channel read. -1 where a count does not apply. The
-      first two are reported for the unnamed view only, since a band group does not change them
+      the retained ones, and the retained ones measurable in every channel read, that is, finite, inside the interval
+      and outside any `mask`. -1 where a count does not apply. The first two are reported for the unnamed view only,
+      since a band group does not change them
     - `surround_peer_excluded_fraction` : The share of the candidate that other boxes cover, for the unnamed view only,
       NaN where the candidate is empty or not counted
     - `surround_valid_fraction`, `target_valid_fraction` : The measurable pixels over the retained ones, and the share
-      of the box's own pixels that are finite and inside the interval in every channel read
+      of the box's own pixels that are finite, inside the interval in every channel read and outside any `mask`
     - `context_range_low`, `context_range_high` : The interval the row was measured against, NaN where none was
       established
     - `context_ratio_reason`, `target_surround_contrast_floored`, `signal_clutter_ratio_floored` : Present when a ratio
       is requested, each floored value only with its own ratio. `context_ratio_reason` is `insufficient_target_support`
-      when the surround was measured and fewer than 90% of the box's pixels are valid, which leaves both ratios NaN with
-      the surround kept, and is empty otherwise, including where a ratio is NaN because the surround is not measured,
-      which `context_status` says. A floored value is True where that ratio's denominator was below the floor, so the
-      ratio is the difference over the floor, no larger than ``1 / floor`` in size, and reads the floor and not the
-      surround. False where the ratio is NaN
+      when the surround was measured and fewer than 90% of the box's pixels are valid, a box under a `mask` included,
+      which leaves both ratios NaN with the surround kept, and is empty otherwise, including where a ratio is NaN
+      because the surround is not measured, which `context_status` says. A floored value is True where that ratio's
+      denominator was below the floor, so the ratio is the difference over the floor, no larger than ``1 / floor`` in
+      size, and reads the floor and not the surround. False where the ratio is NaN
 
     Color Statistics (experimental, so names and values may change; measured only from channels the caller declares
     are sRGB red, green and blue with `color_rgb_channels` of :func:`~dataeval.core.image_stats`, and dropped from a
@@ -297,8 +304,9 @@ class ImageStats(Flag):
       dimensions or lacks a declared channel), `unknown_range` or `insufficient_support`
     - `color_valid_fraction` : The valid pixels over the pixels of the view that lie inside the datum and that the
       view's mask does not remove, so a box that leaves the image is judged on the part inside it
-    - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the view's mask removes. -1
-      where the view is not measured, and the exclusion is still reported
+    - `color_valid_pixels`, `color_excluded_pixels` : The valid pixels, and the pixels the view's mask removes, which
+      on an image or box row are the pixels of a `mask` of :func:`~dataeval.core.image_stats`. -1 where the view is not
+      measured, and the exclusion is still reported
     - `color_hue_reason` : `achromatic` where hue is NaN for want of a chromatic pixel, else empty
 
     The result's ``measurement_specs`` records the declared channels, the settings and the range that the call

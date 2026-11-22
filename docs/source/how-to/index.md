@@ -78,6 +78,7 @@ datasets for machine learning.
 ../notebooks/h2_custom_image_stats_object_detection.py
 ../notebooks/h2_measure_channel_groups.py
 ../notebooks/h2_compare_contrast_clipping_noise.py
+../notebooks/h2_mask_a_vehicle_part.py
 ../notebooks/h2_control_factor_binning.py
 ../notebooks/h2_sync_and_cache_metadata.py
 ../notebooks/h2_reconcile_labels_ontology.py
@@ -201,6 +202,10 @@ datasets for machine learning.
   - Compare surround contrast, clipping and noise between a reference and an
     operational collection measured with the same settings
   - [![Open In Colab][colab-badge]][ccn-colab]
+- - [](../notebooks/h2_mask_a_vehicle_part.py)
+  - Leave a vehicle part or a HUD out of image statistics with a mask for each
+    sensor, and find outliers across the sensors
+  - [![Open In Colab][colab-badge]][msk-colab]
 - - [](../notebooks/h2_control_factor_binning.py)
   - Declare, review and reuse a factor's bin edges so results
     are comparable across collections
@@ -247,6 +252,7 @@ datasets for machine learning.
 [calc-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_custom_image_stats_object_detection.ipynb
 [band-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_measure_channel_groups.ipynb
 [ccn-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_compare_contrast_clipping_noise.ipynb
+[msk-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_mask_a_vehicle_part.ipynb
 [imd-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_add_intrinsic_factors.ipynb
 [ctrl-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_control_factor_binning.ipynb
 [sync-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/h2_sync_and_cache_metadata.ipynb

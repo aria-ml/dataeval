@@ -185,6 +185,9 @@ def _largest(iou: NDArray[np.float64], mask: NDArray[np.bool_], unknown: float) 
 class SpatialStatCalculator(Calculator[ImageStats]):
     """Calculator for statistics that compare a box with the other boxes of its image, or with the image's edges."""
 
+    # Boxes and edges are geometry, so a mask of `image_stats` leaves them whole.
+    masks_pixels = False
+
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache

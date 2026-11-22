@@ -4,7 +4,7 @@ import warnings
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence, Sized
 from dataclasses import dataclass, field, replace
 from enum import Flag
-from functools import partial, reduce
+from functools import lru_cache, partial, reduce
 from itertools import chain, repeat, zip_longest
 from operator import or_
 from typing import Any, cast, get_args
@@ -31,6 +31,7 @@ from dataeval.core._compute_stats import (
     _reconcile_stats,
     column_name,
 )
+from dataeval.core._ego_stats import _as_mask, _OverlayMask, _require_cv2
 from dataeval.data._unzip import _SizedIterator, _unzip_annotations
 from dataeval.flags import ImageStats
 from dataeval.protocols import (
@@ -54,6 +55,7 @@ from dataeval.utils.preprocessing import (
     ChannelGroup,
     ChannelGroupLike,
     ValueRange,
+    _decode_range,
     _validate_declared_range,
     _validate_index_selection,
     boxes_to_mask,
@@ -148,6 +150,94 @@ def _absent_band(count: int, hw: tuple[int, ...]) -> NDArray[np.float64]:
     return np.full((count, *hw), np.nan, dtype=np.float64)
 
 
+def _fit_mask(
+    mask: NDArray[np.bool_],
+    shape: tuple[int, int],
+    index: int | None = None,
+    overlay: _OverlayMask | None = None,
+) -> NDArray[np.bool_]:
+    """Fit a mask to an image of `shape` ``(H, W)`` by `ego_stats`' rule, with the image's padding rows masked.
+
+    A mask of the image's own size is used as it is, and needs no OpenCV. Any other is fitted by `_OverlayMask` as it
+    is, which scales it uniformly by the width. The rows that fit leaves past the scaled mask, codec padding of up to 1%
+    of the height or one rounding row, are not scene, so they are masked too. They are found by the same rule, by
+    fitting an all-true mask of the mask's shape, so there is one fitting rule.
+
+    `index` names the image in an error. `overlay` is an `_OverlayMask` of `mask` that the caller keeps, so that the
+    mask fits once per size. The padding rows depend only on the two shapes, and are cached for the process.
+    """
+    if mask.shape == shape:
+        return mask
+    try:
+        _require_cv2()
+    except ImportError as e:
+        raise ImportError(
+            "image_stats and QualityGate need OpenCV to rescale a mask to an image of another size: install "
+            "'opencv-python' or the extra `dataeval[opencv]`, or pass a mask of the image's own size."
+        ) from e
+    height, width = shape
+    try:
+        fitted = (overlay or _OverlayMask(mask, "mask")).fit((width, height), shape).overlay
+        padding = _padding_rows(mask.shape, shape)
+    except ValueError as e:
+        if index is None:
+            raise
+        raise ValueError(f"image {index}: {e}") from e
+    return fitted | padding
+
+
+@lru_cache(maxsize=16)
+def _padding_rows(mask_shape: tuple[int, ...], shape: tuple[int, int]) -> NDArray[np.bool_]:
+    """Return the rows a mask of `mask_shape` leaves past its scaled rows in an image of `shape` ``(H, W)``.
+
+    Found by fitting an all-true mask of that shape, so they are the rows `_OverlayMask` does not cover. A function of
+    the two shapes alone, so it is fitted once per pair, whoever asks. Read-only, because the cache hands out one array.
+    """
+    height, width = shape
+    padding = ~_OverlayMask(np.ones(mask_shape, dtype=np.bool_), "mask").fit((width, height), shape).overlay
+    padding.flags.writeable = False
+    return padding
+
+
+def _leave_out_mask(mask: ArrayLike | None) -> NDArray[np.bool_] | None:
+    """Take the caller's `mask` as a boolean image, or None for no mask. Raises for one that leaves out every pixel."""
+    source = _as_mask(mask, "mask")
+    if source is not None and source.all():
+        raise ValueError(
+            "mask leaves out every pixel, so there is nothing to measure. Nonzero marks a pixel to leave out: pass the "
+            "mask of the part or the HUD, not of the scene."
+        )
+    return source
+
+
+def _masked_range(datum: NDArray[Any], fitted: NDArray[np.bool_], declared: tuple[float, float] | None) -> ValueRange:
+    """Return the range the masked statistics of `datum` decode against, read over the pixels `fitted` leaves.
+
+    Read at the datum's own dtype, so a ``uint16`` scene under 4096 beside a HUD at 65535 decodes as 12-bit. A NaN copy
+    would decode it as float, and so as unknown. A declared range is the range, as it is without a mask. Where the mask
+    leaves no pixel, the range is decoded from the dtype alone: it is known, it does not depend on the masked pixels,
+    and nothing reads it, since every statistic it would scale is NaN there.
+    """
+    if declared is not None:
+        return get_value_range(datum, declared=declared)
+    kept = normalize_image_shape(datum)[:, ~fitted]
+    return get_value_range(kept) if kept.size else _decode_range(datum.dtype, 0.0)
+
+
+def _masked_fraction(fitted: NDArray[np.bool_], box: BoundingBox | None) -> float:
+    """Return the share of a row's region within the image that `fitted` covers: the image, or a box's part in it.
+
+    NaN for a box that is not valid, as the statuses judge it.
+    """
+    if box is None:
+        return float(fitted.mean())
+    if not box.is_valid():
+        return float("nan")
+    x0, y0, x1, y1 = box.xyxy_int
+    height, width = fitted.shape
+    return float(fitted[max(y0, 0) : min(y1, height), max(x0, 0) : min(x1, width)].mean())
+
+
 @dataclass
 class DatumResult:
     """Result from processing a single image/box combination."""
@@ -197,7 +287,8 @@ class BatchPlan:
     No field carries a default. There is one construction site and it states all of them,
     so a default would only ever hide a field someone forgot to thread — and a mutable one
     is rejected outright by `dataclasses` on Python 3.11, which is the single version where
-    ``mappingproxy`` is both unhashable and caught by that check.
+    ``mappingproxy`` is both unhashable and caught by that check. The exception is `mask`,
+    whose None is the call without one, so a plan built without it means what it did before.
     """
 
     calculators: Sequence[tuple[type[Any], Flag]]
@@ -214,6 +305,7 @@ class BatchPlan:
     unmeasurable_names: str
     needs: ContextNeed
     settings: ImageStatsConfig
+    mask: NDArray[np.bool_] | None = None
 
 
 _Item = tuple[int, NDArray[Any], Annotations | None, tuple[float, float] | None]
@@ -247,6 +339,8 @@ def _collect_calculator_stats(
     focal: int | None = None,
     settings: ImageStatsConfig | None = None,
     scratch: dict[str, Any] | None = None,
+    mask: NDArray[np.bool_] | None = None,
+    whole_range: ValueRange | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """
     Collect stats from all calculators.
@@ -262,8 +356,8 @@ def _collect_calculator_stats(
     value_range : ValueRange or None, default None
         The datum's value range, already established. Every row of one datum shares it, so
         it is read once per datum and handed down rather than rediscovered per row —
-        establishing it costs a scan of the whole datum, which a per-row cache would
-        repeat once per box.
+        establishing it costs a scan of the datum, which a per-row cache would repeat once
+        per box. Under a mask it is read over the pixels the mask leaves.
     view : ViewKind, default ViewKind.WHOLE
         Which view of the datum `datum` is, so that statistics undefined over it are
         skipped. `calculators` is expected to have been narrowed to the same view already;
@@ -279,6 +373,12 @@ def _collect_calculator_stats(
     scratch : dict[str, Any] or None, default None
         Where a measurement made here is kept for the masked pass of the same view of the same datum, which is another
         call of this function. Only the datum's own row has one; see `_shared`.
+    mask : NDArray[np.bool_] or None, default None
+        The call's mask fitted to the whole datum, handed to the cache, or None without one. With one, `exclude` and
+        `value_range` are those of the statistics the mask applies to, and a class with ``masks_pixels = False`` is
+        measured as without a mask, on a cache of its own with no `exclude` and `whole_range`.
+    whole_range : ValueRange or None, default None
+        The range of the whole datum, or of the whole band group, for those classes under a mask.
 
     Returns
     -------
@@ -304,9 +404,28 @@ def _collect_calculator_stats(
         focal=focal,
         settings=settings,
         scratch=scratch,
+        mask=mask,
+    )
+    # Under a mask, a class that keeps whole pixels is measured as without one, on a cache of its own. Chosen per
+    # calculator rather than run as two passes, so that a masked row lists its columns in registry order, as an unmasked
+    # row does. A cache computes nothing until it is read, so one no class reads costs nothing.
+    whole = (
+        processor
+        if mask is None
+        else CalculatorCache(
+            datum,
+            box,
+            normalize_pixel_values=normalize_pixel_values,
+            value_range=whole_range,
+            bands=bands,
+            context=context,
+            focal=focal,
+            settings=settings,
+            scratch=scratch,
+        )
     )
     for calculator_cls, flags in calculators:
-        calculator = calculator_cls(datum, processor)
+        calculator = calculator_cls(datum, processor if calculator_cls.masks_pixels else whole)
         computed = calculator.compute(flags, view)
         stats_list.append({column_name(prefix, name): values for name, values in computed.items()})
         # Only a calculator that reports details adds an entry: an empty one would leave
@@ -340,6 +459,7 @@ def _surround_pass(
     normalize_pixel_values: bool,
     value_range: ValueRange,
     settings: ImageStatsConfig,
+    mask: NDArray[np.bool_] | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any]]:
     """Measure a row's surround: its box widened by `surround_padding`, with every box of the datum masked out.
 
@@ -369,6 +489,7 @@ def _surround_pass(
         value_range=value_range,
         view=ViewKind.SURROUND | ViewKind.MASK,
         settings=settings,
+        mask=mask,
     )
     if box is None:
         stats = [{name: [empties.get(name, np.nan)] for name in output} for output in stats]
@@ -381,8 +502,13 @@ def _band_ranges(
     datum: NDArray[Any],
     band_plans: Mapping[str, BandPlan],
     declared_range: tuple[float, float] | None,
+    fitted: NDArray[np.bool_] | None = None,
 ) -> dict[str, ValueRange]:
-    """Return the interval each named group is measured against, read off the whole datum.
+    """Return the interval each named group is measured against, read off the group's bands of the whole datum.
+
+    Under a mask, `fitted`, read off the pixels of those bands the mask leaves instead, at the datum's dtype and with
+    the dtype-only answer where it leaves none; see `_masked_range`. The masked statistics of the group read that one,
+    and its hash and its `depth` the whole group's.
 
     Established per datum rather than per row, for the reason the whole-datum `value_range`
     is: the answer is the same for every box the datum carries, and finding it costs a scan.
@@ -398,6 +524,11 @@ def _band_ranges(
     selected bands, and no row wants that — each takes its own box's worth through
     `CalculatorCache`, which narrows the band axis after cropping.
     """
+    if fitted is not None:
+        return {
+            name: _masked_range(_band_view(datum, band.indices), fitted, band.value_range or declared_range)
+            for name, band in band_plans.items()
+        }
     return {
         name: get_value_range(_band_view(datum, band.indices), declared=band.value_range or declared_range)
         for name, band in band_plans.items()
@@ -420,6 +551,8 @@ def _collect_band_stats(
     focal: int | None = None,
     settings: ImageStatsConfig | None = None,
     scratch: dict[str, Any] | None = None,
+    mask: NDArray[np.bool_] | None = None,
+    whole_range: ValueRange | None = None,
 ) -> tuple[list[dict[str, list[Any]]], list[dict[str, list[Any]]], dict[str, Any], list[str]]:
     """Run one named band group as its own view of the datum.
 
@@ -443,6 +576,8 @@ def _collect_band_stats(
         focal=focal,
         settings=settings,
         scratch=scratch,
+        mask=mask,
+        whole_range=whole_range,
     )
 
 
@@ -549,6 +684,26 @@ def _compute_batch(  # noqa: C901
     # takes `band_ranges` instead, so it is unaffected either way.
     value_range = get_value_range(datum, declared=declared_range) if calculators else _UNKNOWN_RANGE
 
+    # The call's mask fitted to this image, or None without one. Under a mask the statistics it applies to decode
+    # against the range of the pixels it leaves, so that a bright HUD cannot change how the scene decodes, and the
+    # whole datum's range above is read only by the classes that keep whole pixels: `depth` reports the frame's
+    # encoding. Every masked row and view of the datum shares the one range.
+    # ponytail: no cache of the mask's own fit, since the pool pickles the plan with every task: a rescaled mask is
+    # fitted once per image, 1 to 2 ms warm. A cache per worker keyed on the size is the upgrade. Its padding rows are
+    # cached for the process (`_padding_rows`).
+    fitted: NDArray[np.bool_] | None = None
+    masked_range = value_range
+    shape = tuple(datum.shape)
+    if plan.mask is not None:
+        if len(shape) < 2:
+            raise ValueError(
+                f"image {i}: mask leaves pixels of an image out, and this datum of shape {datum.shape} has no image "
+                f"plane. Leave mask unset for data of fewer than two dimensions."
+            )
+        fitted = _fit_mask(plan.mask, (shape[-2], shape[-1]), i)
+        if calculators:
+            masked_range = _masked_range(datum, fitted, declared_range)
+
     # The unnamed view means *the image as a picture*, which is only defined for mono or
     # RGB. Averaged over RGB+NIR a brightness is not a brightness, and the grayscale
     # conversion a hash runs reaches a CMYK-versus-RGBA guess at four channels. Said
@@ -561,13 +716,16 @@ def _compute_batch(  # noqa: C901
     # A declaration is a claim, and one the data contradicts reads as a measurement. Said once per image, in words that
     # carry no numbers so that the aggregation below lists the images. A channel group's own range is not checked.
     # ponytail: one min/max pass over the datum, for a declared range only; a group's range would need one per group.
-    if plan.reads_range and declared_range is not None and datum.size and _leaves(datum, declared_range):
-        warnings_list.append(
-            f"{i}: values fall outside the declared value range, so the statistics that read it clip or exclude "
-            f"them. Widen value_range to cover the data, or drop a declaration the data contradicts."
-        )
+    # Under a mask only the values it leaves are measured, so only they are checked, and none may be left.
+    if plan.reads_range and declared_range is not None:
+        checked = datum if fitted is None else normalize_image_shape(datum)[:, ~fitted]
+        if checked.size and _leaves(checked, declared_range):
+            warnings_list.append(
+                f"{i}: values fall outside the declared value range, so the statistics that read it clip or exclude "
+                f"them. Widen value_range to cover the data, or drop a declaration the data contradicts."
+            )
 
-    if unmeasurable_names and not value_range.is_known:
+    if unmeasurable_names and not masked_range.is_known:
         warnings_list.append(
             f"{i}: no value range could be established, so {unmeasurable_names} are NaN. Float data spanning "
             f"more than [0, 255], and any data holding negative values, carries no encoding to decode "
@@ -591,15 +749,24 @@ def _compute_batch(  # noqa: C901
     # The surround masks the same boxes, so it reads the same mask.
     masked = per_background or bool(surround_calculators)
     exclude = boxes_to_mask(datum.shape, boxes or ()) if masked and datum.ndim >= 2 else None
+    # What the background and the surround leave out: the boxes, and under a mask the mask with them.
+    outside = exclude if exclude is None or fitted is None else exclude | fitted
     # `.all()` is vacuously True for a datum with no pixels, which is an absence of
     # background rather than a full one; `.mean()` on it is NaN and warns. Neither is
     # worth saying, so an empty datum takes neither path.
+    # One cause gives one warning: where the boxes alone cover the datum, only that is said.
     if per_background and exclude is not None and exclude.size and exclude.all():
         warnings_list.append(f"{i}: Boxes cover the entire datum, leaving no background to measure")
+    elif fitted is not None and (fitted.all() or (per_background and outside is not None and outside.all())):
+        warnings_list.append(
+            f"{i}: The mask, alone or with the boxes, covers the entire datum, so the statistics measured without "
+            f"those pixels are NaN"
+        )
 
     # Read once per datum for the same reason `value_range` is: a group's interval is a
     # property of the datum, and every row below is measured against the same one.
     band_ranges = _band_ranges(datum, band_plans, declared_range) if band_plans else {}
+    masked_band_ranges = band_ranges if fitted is None else _band_ranges(datum, band_plans, declared_range, fitted)
 
     # Two unrelated reasons a group's columns come back NaN, told apart before either is
     # reported. A datum that cannot supply the bands a group names is measured over the
@@ -622,7 +789,7 @@ def _compute_batch(  # noqa: C901
                 f"is measured all-or-nothing rather than over the bands that are present, since one "
                 f"column name has to mean one thing."
             )
-        elif band.unmeasurable_names and not band_ranges[group_name].is_known:
+        elif band.unmeasurable_names and not masked_band_ranges[group_name].is_known:
             warnings_list.append(
                 f"{i}: no value range could be established for channel group '{group_name}', so its "
                 f"{band.unmeasurable_names} are NaN. Bands carrying no encoding to decode — a "
@@ -633,7 +800,6 @@ def _compute_batch(  # noqa: C901
     # The boxes of this datum classified once, handed to every row and every view of it. Built only where a selected
     # statistic declared a need for it: the context is lazy, but a request that includes none should not pay even to
     # construct it. A datum with no annotation gets an empty one rather than None, so a consumer never branches.
-    shape = tuple(datum.shape)
     extent = (shape[-2], shape[-1]) if len(shape) >= 2 else (0, 0)
     context = AnnotationContext(annotations, extent) if plan.needs else None
 
@@ -661,11 +827,14 @@ def _compute_batch(  # noqa: C901
                 datum,
                 box,
                 normalize_pixel_values=normalize_pixel_values,
-                value_range=value_range,
+                exclude=fitted,
+                value_range=masked_range,
                 context=context,
                 focal=i_b,
                 settings=settings,
                 scratch=_shared(passes, ""),
+                mask=fitted,
+                whole_range=value_range,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -682,16 +851,18 @@ def _compute_batch(  # noqa: C901
                     band.calculators,
                     datum,
                     band.indices,
-                    band_ranges[name],
+                    masked_band_ranges[name],
                     box,
                     name,
                     normalize_pixel_values=normalize_pixel_values,
-                    exclude=None,
+                    exclude=fitted,
                     prefix="",
                     context=context,
                     focal=i_b,
                     settings=settings,
                     scratch=_shared(passes, name),
+                    mask=fitted,
+                    whole_range=band_ranges[name],
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -707,14 +878,16 @@ def _compute_batch(  # noqa: C901
                 datum,
                 box,
                 normalize_pixel_values=normalize_pixel_values,
-                exclude=exclude,
+                exclude=outside,
                 prefix=BACKGROUND_PREFIX,
-                value_range=value_range,
+                value_range=masked_range,
                 view=ViewKind.MASK,
                 context=context,
                 focal=i_b,
                 settings=settings,
                 scratch=_shared(passes, ""),
+                mask=fitted,
+                whole_range=value_range,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
@@ -723,7 +896,14 @@ def _compute_batch(  # noqa: C901
             # Emitted whatever was requested, because every other background value is
             # only as trustworthy as the share of the image it was measured over. A datum
             # with no pixels has no share to report, so it reports NaN rather than 0/0.
-            uncovered = float(1.0 - exclude.mean()) if exclude.size else float("nan")
+            if fitted is None:
+                uncovered = float(1.0 - exclude.mean()) if exclude.size else float("nan")
+            else:
+                # Under a mask, the share of the pixels it leaves that the boxes leave too. An image with nothing
+                # annotated reads 1.0 under any mask, so the mask never enters a scored statistic; `masked_fraction`
+                # says how much it took.
+                kept = np.count_nonzero(~fitted)
+                uncovered = np.count_nonzero(~(exclude | fitted)) / kept if kept else float("nan")
             calculator_stats.append({f"{BACKGROUND_PREFIX}fraction": [uncovered]})
 
             # Region first, then band: `background_nir_brightness` — is the unannotated
@@ -739,17 +919,19 @@ def _compute_batch(  # noqa: C901
                     band.background_calculators,
                     datum,
                     band.indices,
-                    band_ranges[name],
+                    masked_band_ranges[name],
                     box,
                     name,
                     normalize_pixel_values=normalize_pixel_values,
-                    exclude=exclude,
+                    exclude=outside,
                     prefix=BACKGROUND_PREFIX,
                     view=ViewKind.MASK | ViewKind.BAND,
                     context=context,
                     focal=i_b,
                     settings=settings,
                     scratch=_shared(passes, name),
+                    mask=fitted,
+                    whole_range=band_ranges[name],
                 )
                 calculator_stats.extend(stats)
                 calculator_details.extend(details)
@@ -761,15 +943,21 @@ def _compute_batch(  # noqa: C901
                 surround_calculators,
                 datum,
                 box,
-                exclude,
+                outside,
                 extent,
                 normalize_pixel_values=normalize_pixel_values,
-                value_range=value_range,
+                value_range=masked_range,
                 settings=settings,
+                mask=fitted,
             )
             calculator_stats.extend(stats)
             calculator_details.extend(details)
             empty_values_map.update(empties)
+
+        # Outside the passes, so every image and box row of a masked call says how much of it the mask took, whichever
+        # passes the row runs. A detail rather than a statistic, so results measured with different masks combine.
+        if fitted is not None:
+            calculator_details.append({"masked_fraction": [_masked_fraction(fitted, box)]})
 
         # Thread calculator warnings with index context
         for w in calc_warnings:
@@ -1280,6 +1468,7 @@ def image_stats(  # noqa: C901
     per_background: bool = False,
     per_surround: bool = False,
     channels: Mapping[str, ChannelGroupLike] | None = None,
+    mask: ArrayLike | None = None,
     normalize_pixel_values: bool = False,
     value_range: tuple[float, float] | None = None,
     saturated_atol: float = 0.0,
@@ -1363,8 +1552,8 @@ def image_stats(  # noqa: C901
         rows, under names prefixed with ``background_`` (``background_brightness``).
         They are therefore per-image values, and adding them to
         :class:`~dataeval.Metadata` places them at the media-unit level like any other
-        per-image factor. ``background_fraction`` — the share of the image left
-        unmasked — is always among them, and should be read before the rest: a
+        per-image factor. ``background_fraction`` — the share of the image that no
+        box covers — is always among them, and should be read before the rest: a
         background statistic measured over a few percent of an image is noise wearing
         a measurement's clothes.
 
@@ -1374,16 +1563,20 @@ def image_stats(  # noqa: C901
         dimension, spatial or blur directionality statistics in `stats` are computed for the image and its boxes as
         usual and skipped for the background, which has no meaningful hash and no geometry of its own.
         ``background_blur_edge_width`` is the blur value taken over the edges outside the boxes: they are found on the
-        whole image, so the masked holes cannot spread through the filters, and those within 9 pixels of a box are left
-        out, so the pool is smaller than ``background_fraction`` says.
+        whole image, so the holes the box mask leaves cannot spread through the filters, and those within 9 pixels of
+        a box are left out, so the pool is smaller than ``background_fraction`` says.
 
-        Boxes are rounded outwards and unioned into the mask, so the background
+        Boxes are rounded outwards and unioned into the box mask, so the background
         excludes slightly more than the annotations strictly cover — a retained pixel
         is background with high confidence. Where the boxes cover an image entirely,
         every background statistic for it is NaN.
 
+        Given `mask`, the background leaves out the pixels of both the box mask and `mask`, and ``background_fraction``
+        is the share of the unmasked pixels that no box covers. Where `mask` and the boxes together cover the image,
+        every background statistic for it is NaN.
+
         An image with nothing annotated has all of itself as background, so its
-        ``background_fraction`` is 1.0 and its background statistics equal its
+        ``background_fraction`` is 1.0, under any `mask` as without one, and its background statistics equal its
         whole-image ones. That holds whether the image is an unannotated member of an
         object-detection dataset or the whole dataset carries no boxes at all — the
         columns produced depend on this argument, not on the data, which is what lets
@@ -1441,6 +1634,40 @@ def image_stats(  # noqa: C901
         See :doc:`/notebooks/h2_measure_channel_groups` for a worked example.
 
         .. versionadded:: 1.1
+    mask : ArrayLike or None, default None
+        A 2D ``(height, width)`` image of the pixels to leave out, such as a part of the vehicle that is always in
+        frame or a burned-in HUD. Nonzero marks a pixel to leave out, and an all-false mask is no mask. It is fitted to
+        each image by the rule of :func:`~dataeval.core.ego_stats`: a mask of the image's own size is used as it is,
+        and any other is scaled uniformly by the width, which needs OpenCV (``dataeval[opencv]``), with any rows the
+        image is padded by at the bottom, up to 1% of its height, left out too. Draw it over every pixel the part
+        reaches in any frame, as :doc:`/concepts/ImageStatistics` describes.
+
+        By family, the pixel, visual, color and noise statistics, and the blur edge width, are measured over the pixels
+        the mask leaves, on the image row, each box row, the background, the surround and each channel group, under
+        their usual names. The blur edge width takes its edge threshold outside the mask grown by 9 pixels, leaves out
+        the edges within 9 pixels of it and stops each edge's width at the mask. Blur directionality reads NaN, with
+        ``blur_edge_directionality_reason`` ``masked``, on every row that measures it. The context statistics read a
+        masked pixel as unreadable, so a box with more than 10% of its pixels under the mask loses its ratios
+        (``context_ratio_reason`` ``insufficient_target_support``). The hash, dimension and spatial statistics
+        describe the whole frame as they do without a mask.
+
+        The value range the statistics decode against is read over the pixels the mask leaves too: a ``uint16`` scene
+        under 4096 beside a bright HUD decodes as 12-bit where the whole frame reads 16-bit, and ``uint8`` data changes
+        only where every value the mask leaves is 0 or 1. `depth` still reports the whole frame's encoding.
+
+        Mask a part that stays in the frame when a bound on a statistic is absolute, or when statistics are compared
+        across platforms, since the part's pixels are in every frame of its platform. A quantile bound within one video
+        was checked for sharpness only, with simulated parts, and needed no mask on 10 of 11 clips (see
+        :class:`~dataeval.data.QualityGate`).
+
+        Every image and box row carries the detail ``masked_fraction``, the share of the row's region within the image
+        that the mask covers, which is NaN for an invalid box. It is a detail and not a statistic, so it is never
+        scored, and results measured with different masks, or with none, combine in
+        :func:`~dataeval.core.combine_stats_results`. The result does not record which mask was used.
+        ``background_fraction`` is the share of the unmasked pixels that no box covers, so an image with nothing
+        annotated reads 1.0. A region the mask covers entirely reads NaN, and an image the mask covers is logged.
+
+        .. versionadded:: 1.3
     normalize_pixel_values : bool, default False
         If True, :attr:`~dataeval.flags.ImageStats.PIXEL` statistics are computed on
         values normalized to [0, 1] against each image's range rather than on the raw
@@ -1612,7 +1839,10 @@ def image_stats(  # noqa: C901
         metadata's `value_range` of an image is not a finite, ordered pair while a requested statistic reads a range.
         Also if two channel groups, or a channel group and the surround's columns, would give two columns or two
         details one name, which would otherwise keep only the second. Also if `stats` asks only for color statistics
-        and `color_rgb_channels` is not given.
+        and `color_rgb_channels` is not given. Also if `mask` is not a non-empty 2D image or masks every pixel, and,
+        naming the image, if an image has fewer than two dimensions or the mask cannot be fitted to it.
+    ImportError
+        If `mask` must be rescaled to an image of another size and OpenCV is not installed.
 
     Warns
     -----
@@ -1760,6 +1990,20 @@ def image_stats(  # noqa: C901
     >>> sorted(stats["stats"])
     ['background_brightness', 'background_fraction', 'brightness']
 
+    Leave a part of the frame out of the statistics, here a bright HUD in the top two rows. The mask is a 2D image in
+    which nonzero marks the pixels to leave out, and ``masked_fraction`` says how much each row lost:
+
+    >>> frame = np.full((3, 8, 8), 100, dtype=np.uint8)
+    >>> frame[:, :2] = 255
+    >>> hud = np.zeros((8, 8), dtype=bool)
+    >>> hud[:2] = True
+    >>> whole = image_stats([frame], stats=ImageStats.PIXEL_MEAN)
+    >>> masked = image_stats([frame], stats=ImageStats.PIXEL_MEAN, mask=hud)
+    >>> float(whole["stats"]["mean"][0]), float(masked["stats"]["mean"][0])
+    (138.75, 100.0)
+    >>> masked["details"]["masked_fraction"].tolist()
+    [0.25]
+
     Measure how isolated and how overlapped each box is. The spatial statistics need boxes, so
     ``per_image=False`` returns one row per box, and the class statistics read `labels`:
 
@@ -1845,6 +2089,9 @@ def image_stats(  # noqa: C901
             "labels= requires boxes=: a dataset supplies its own labels, so pass boxes= and labels= together, "
             "or neither."
         )
+
+    # Read at the call, so a mask that leaves nothing to measure fails before any image is read.
+    source_mask = _leave_out_mask(mask)
 
     source_indices: list[SourceIndex] = []
     aggregated_stats: dict[str, list[Any]] = {}
@@ -2330,6 +2577,7 @@ def image_stats(  # noqa: C901
         unmeasurable_names=unmeasurable_names,
         needs=needs,
         settings=settings,
+        mask=source_mask,
     )
 
     try:
