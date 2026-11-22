@@ -3,7 +3,6 @@
 import inspect
 import re
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -17,12 +16,11 @@ from dataeval.performance import Allowances, Feasibility, TargetSpec
 from dataeval.performance._feasibility_constants import FIT_FRACTION
 from dataeval.performance._feasibility_detection import capacity_from_counts, resolve_class_ids
 from dataeval.performance._feasibility_units import resolve_detection_units, split_units
-from dataeval.protocols import DatasetMetadata
 from tests.data.conftest import VIDEO_FACTORS, VIDEOS, FactorVideos
+from tests.performance.feasibility_helpers import _OD, _box, _Det
 
 pytestmark = pytest.mark.filterwarnings("ignore::dataeval.exceptions.ExperimentalWarning")
 
-NAMES = {0: "person", 1: "car"}
 N = 60
 NO_DETECTOR = "No detector is given (predictions= or model=)"
 CALL = (
@@ -30,46 +28,6 @@ CALL = (
     "capacity envelope, and a detector for the witness: predictions=, one detections object per image, or model=, a "
     "MAITE object detector."
 )
-
-
-@dataclass
-class _Det:
-    """One image's boxes, labels and scores: a dataset target, or a detector double's output for the image."""
-
-    boxes: Any
-    labels: Any
-    scores: Any
-
-
-def _box(slot: int, shift: float = 0.0) -> list[float]:
-    """The box of slot ``slot``: slots never overlap, so a target matches only a detection in its own slot."""
-    return [20.0 * slot + shift, 0.0, 20.0 * slot + 10.0 + shift, 10.0]
-
-
-class _OD:
-    """
-    A synthetic detection dataset: per image, a list of target labels, target ``j`` in slot ``j``.
-
-    Item ``i`` has datum id ``im{i}`` unless ``ids`` are given; ``index2label`` is declared unless it is None.
-    """
-
-    def __init__(self, images: list[list[int]], index2label: dict[int, str] | None = NAMES, ids=None) -> None:
-        self.images = [list(labels) for labels in images]
-        self.ids = list(ids) if ids is not None else [f"im{i}" for i in range(len(images))]
-        self.metadata = (
-            DatasetMetadata(id="toy-od")
-            if index2label is None
-            else DatasetMetadata(id="toy-od", index2label=index2label)
-        )
-
-    def __len__(self) -> int:
-        return len(self.images)
-
-    def __getitem__(self, i: int):
-        labels = self.images[i]
-        boxes = np.array([_box(j) for j in range(len(labels))], dtype=np.float64).reshape(-1, 4)
-        target = _Det(boxes, np.array(labels, dtype=np.intp), np.ones(len(labels)))
-        return np.zeros((3, 2, 2), dtype=np.float32), target, {"id": self.ids[i]}
 
 
 def _scenes(n: int = N) -> list[list[int]]:
