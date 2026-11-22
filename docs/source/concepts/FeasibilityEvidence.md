@@ -471,6 +471,8 @@ the [Performance limits](PerformanceLimits.md#limitations) page.
 - [Embeddings](Embeddings.md): the representation that local panels partition and the built-in witnesses read
 - [Acting on results](ActingOnResults.md#performance-limits-findings): what to do with the BER, UAP and Sufficiency
   findings that complement a determination
+- [Validation evidence](../reference/ValidationEvidence.md#performance): how Feasibility's bounds are checked in CI,
+  and a study of the object detection bounds on images resampled from real datasets
 
 ## See this in practice
 
