@@ -49,13 +49,25 @@ class Edges(NamedTuple):
     points: NDArray[np.intp]  # (N, 2) rows of (y, x), in the order of `widths`
 
 
-def _peak_mask(g: NDArray[np.floating[Any]], gg: NDArray[np.floating[Any]], axis: int) -> NDArray[np.bool_]:
-    """Pixels where the gradient `g` peaks along `axis` and is at least its mean magnitude (Eq. 1)."""
+def _peak_mask(
+    g: NDArray[np.floating[Any]],
+    gg: NDArray[np.floating[Any]],
+    axis: int,
+    region: NDArray[np.bool_] | None = None,
+) -> NDArray[np.bool_]:
+    """Pixels where the gradient `g` peaks along `axis` and is at least its mean magnitude (Eq. 1).
+
+    The mean is taken over `region` when one is given, and over every pixel otherwise. An empty region sets no
+    threshold, so no pixel is a peak.
+    """
+    if region is not None and not region.any():
+        return np.zeros(g.shape, dtype=np.bool_)
+    magnitude = np.abs(g)
     sign = np.sign(g)
     mask = (
         (sign * np.roll(gg, 1, axis=axis) > 0)
         & (sign * np.roll(gg, -1, axis=axis) < 0)
-        & (np.abs(g) >= np.abs(g).mean())
+        & (magnitude >= (magnitude.mean() if region is None else magnitude[region].mean()))
     )
     # np.roll wraps around, so the border pixels have no real neighbor
     if axis == 1:
@@ -65,25 +77,27 @@ def _peak_mask(g: NDArray[np.floating[Any]], gg: NDArray[np.floating[Any]], axis
     return mask
 
 
-def _edge_masks(gray: NDArray[np.float32]) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
-    """Horizontal-gradient and vertical-gradient edge point masks of the smoothed image."""
+def _edge_masks(
+    gray: NDArray[np.float32], region: NDArray[np.bool_] | None = None
+) -> tuple[NDArray[np.bool_], NDArray[np.bool_]]:
+    """Horizontal-gradient and vertical-gradient edge point masks of the smoothed image, thresholded on `region`."""
     smooth = ndimage.gaussian_filter(gray, _SIGMA, truncate=3.0, mode="mirror")
     gx = ndimage.sobel(smooth, axis=1, mode="mirror")
     gy = ndimage.sobel(smooth, axis=0, mode="mirror")
     return (
-        _peak_mask(gx, ndimage.sobel(gx, axis=1, mode="mirror"), axis=1),
-        _peak_mask(gy, ndimage.sobel(gy, axis=0, mode="mirror"), axis=0),
+        _peak_mask(gx, ndimage.sobel(gx, axis=1, mode="mirror"), axis=1, region=region),
+        _peak_mask(gy, ndimage.sobel(gy, axis=0, mode="mirror"), axis=0, region=region),
     )
 
 
-def edge_points(gray: NDArray[np.float32]) -> NDArray[np.intp]:
+def edge_points(gray: NDArray[np.float32], region: NDArray[np.bool_] | None = None) -> NDArray[np.intp]:
     """Edge points of a 2D float32 image, as (N, 2) rows of (y, x), sorted and unique.
 
     A pixel is an edge point where the smoothed gradient peaks along its own axis (horizontal or vertical)
-    and is at least the image's mean gradient magnitude. `np.argwhere` reads the mask row by row, so the rows
-    come out sorted and unique.
+    and is at least the mean gradient magnitude, over `region` when one is given and over the whole image otherwise.
+    `np.argwhere` reads the mask row by row, so the rows come out sorted and unique.
     """
-    hmask, vmask = _edge_masks(gray)
+    hmask, vmask = _edge_masks(gray, region)
     return np.argwhere(hmask | vmask)
 
 
@@ -121,17 +135,22 @@ def _spread_axis1(m: NDArray[np.float64], ys: NDArray[np.intp], xs: NDArray[np.i
 
 
 def edge_widths(
-    gray: NDArray[np.float32], points: NDArray[np.intp]
+    gray: NDArray[np.float32], points: NDArray[np.intp], cut: NDArray[np.bool_] | None = None
 ) -> tuple[NDArray[np.float64], NDArray[np.bool_], NDArray[np.intp]]:
     """Width of the edge at each (y, x) point, in pixels, whether its dominant gradient is horizontal, and the points.
 
     Measured on the unsmoothed Sobel gradient. A point whose unsmoothed gradient is exactly zero has no
     direction, so it is dropped: the result holds only the kept points, in their order, and the third value is
     those points, so that a width can be matched to its position.
+
+    The gradient magnitude is zeroed on `cut`, when one is given. A zero is a local minimum, so every profile ends at
+    the cut and reads nothing inside it, and every point inside it is dropped.
     """
     gx = ndimage.sobel(gray, axis=1, mode="mirror")
     gy = ndimage.sobel(gray, axis=0, mode="mirror")
     m = np.sqrt(gx**2 + gy**2).astype(np.float64)
+    if cut is not None:
+        m[cut] = 0.0
     ys, xs = points[:, 0], points[:, 1]
     keep = m[ys, xs] > 0
     ys, xs = ys[keep], xs[keep]
@@ -152,16 +171,28 @@ def edge_widths(
     return widths, horizontal, points[keep]
 
 
-def measure_edges(gray: NDArray[np.floating[Any]]) -> Edges:
+def measure_edges(
+    gray: NDArray[np.floating[Any]],
+    *,
+    threshold_region: NDArray[np.bool_] | None = None,
+    cut: NDArray[np.bool_] | None = None,
+) -> Edges:
     """Edge points and widths of a 2D grayscale image in the 0-255 display range, cast to float32.
 
     Input that is not 2D or is empty has no edges: the arrays come back empty, which every value computed from
     them reports as NaN.
+
+    `threshold_region` is where the mean gradient that an edge point must reach is taken, the whole image when None,
+    and `cut` is where the gradient magnitude the widths run along is zeroed, nowhere when None (see `edge_widths`).
+    Both have the image's shape. They leave a mask out of the measurement: the region outside it grown by
+    `BACKGROUND_MARGIN`, and the mask grown by 1 px, which covers the unsmoothed Sobel's reach.
     """
     gray = np.asarray(gray, dtype=np.float32)
     if gray.ndim != 2 or gray.size == 0:
         return Edges(np.empty(0), np.empty(0, dtype=np.bool_), np.empty((0, 2), dtype=np.intp))
-    return Edges(*edge_widths(gray, edge_points(gray)))
+    if threshold_region is None and cut is None:
+        return Edges(*edge_widths(gray, edge_points(gray)))
+    return Edges(*edge_widths(gray, edge_points(gray, threshold_region), cut))
 
 
 def _p5(widths: NDArray[np.float64]) -> float:

@@ -1076,7 +1076,11 @@ def _as_mask(mask: ArrayLike | None, name: str) -> NDArray[np.bool_] | None:
         return None
     arr = as_numpy(mask) != 0
     if arr.ndim != 2 or arr.size == 0:
-        raise ValueError(f"{name} must be a non-empty 2D (height, width) image, got shape {arr.shape}.")
+        raise ValueError(
+            f"{name} must be a non-empty 2D (height, width) image, got shape {arr.shape}. Reduce it to one plane: "
+            f"{name}.any(axis=-1) for an (H, W, 3) color image read from a PNG, {name}.any(axis=0) for a (3, H, W) "
+            f"array, or np.squeeze({name}) for a (1, H, W) array."
+        )
     return arr if arr.any() else None
 
 

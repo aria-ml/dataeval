@@ -16,6 +16,9 @@ from dataeval.utils.preprocessing import _declared_depth
 class DimensionStatCalculator(Calculator[ImageStats]):
     """Calculator for dimension and geometry statistics."""
 
+    # Geometry and the encoding describe the whole frame, so a mask of `image_stats` leaves them whole.
+    masks_pixels = False
+
     def __init__(self, datum: NDArray[Any], cache: "CalculatorCache") -> None:
         self.datum = datum
         self.cache = cache
@@ -69,8 +72,10 @@ class DimensionStatCalculator(Calculator[ImageStats]):
         return [float("nan") if dividend == 0 else mult * (1 - (divisor / dividend))]
 
     def _depth(self) -> list[float]:
-        # Through the cache rather than off `raw` directly, so a declared range is honored
-        # and the answer is the same one `scaled` and the histogram were computed against.
+        # Through the cache rather than off `raw` directly, so a declared range is honored. Without a mask it is the
+        # range `scaled` and the histogram were computed against. Under a mask this class is measured whole
+        # (`masks_pixels`), so the depth is still the whole frame's encoding, while those decode against the range of
+        # the pixels the mask leaves.
         # NaN where the data carries no encoding to read — see `ValueRange`. A declared interval is the exception for
         # integer data, where `(0, 2**n - 1)` states the depth, so it is read here and not by `ValueRange`, which other
         # readers take as "decoded from the data".

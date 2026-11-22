@@ -82,6 +82,21 @@ is. The limits of `blur_edge_width` below carry over. `blur_edge_directionality`
 object's `blur_edge_width` by `unit_background_blur_edge_width` is not a validated comparison, and no per-box ratio was
 tested.
 
+### Request the blur outside a mask
+
+With `mask=`, the edge width of the image row, of each box row and of the background is the 5th percentile of the
+widths of the edges that lie outside the mask and a margin of 9 pixels around it, as the background value is for the
+boxes. The edges are found on the whole image. Two more steps keep the masked pixels from setting which edges count or
+how wide they are. The edge threshold, the mean gradient that an edge point must reach, is taken over the pixels outside
+the mask grown by 9 pixels, so a sharp part cannot raise it. The width of each edge stops at the mask, so a profile
+never runs into the part. A NaN pixel under the mask therefore does not withhold the value.
+
+`blur_edge_directionality` is NaN under a mask, on every row that measures it, and `blur_edge_directionality_reason`
+reads `masked`, because masked edges have not been tested for it. The pool is smaller than the share of the image that
+the mask leaves, because of the margin. A mask drawn too tight lets the soft edge of the part into the pool, so draw it
+as [Masking a part of the vehicle or a HUD](ImageStatistics.md#masking-a-part-of-the-vehicle-or-a-hud) says. The values
+under a mask were checked on constructed images and not on real footage.
+
 ### Request the video statistics
 
 `VideoStats.ALL` includes the group `VideoStats.BLUR`. `VideoStats.BASIC`, the default of {func}`.video_stats` and the
@@ -118,7 +133,8 @@ A statistic with no reading reports NaN, and `blur_status` in the details says w
 - The picture has fewer than 100 edge points, as a flat picture, a tiny picture and a tiny bounding box do, or the
   median edge width is 0 (`insufficient_support`).
 - A float image holds even one NaN pixel. The answer is withheld and not computed over the part that is left
-  (`insufficient_support`).
+  (`insufficient_support`). A NaN pixel under a `mask` is the exception, because the mask leaves it out of the
+  measurement.
 - A bounding box extends past the border of the image (`insufficient_support`, while `invalid_box` is False), or lies
   outside it or has zero area (`invalid_box`).
 - The data has no value range, such as signed float data (`unknown_range`). A warning names `value_range`. Declare the
@@ -127,13 +143,15 @@ A statistic with no reading reports NaN, and `blur_status` in the details says w
 `background_blur_edge_width` has its own list. It is NaN when fewer than 100 edge points lie outside the boxes and their
 margin, as a flat background or boxes that cover most of the image leave, or when the median width of those points is 0.
 It is NaN when the boxes cover the whole image, when the image holds a NaN pixel anywhere, even inside a box, because
-the edges are found on the whole image, and when the data has no value range. A box that extends past the border is
+the edges are found on the whole image, and when the data has no value range. A NaN pixel under a `mask` is the
+exception. A box that extends past the border is
 clipped to the image and is not a NaN case for the background.
 
 Only `blur_edge_directionality` is NaN when fewer than 50 edge points have a horizontal gradient, when fewer than 50
 have a vertical gradient, or when the median edge width of one axis is 0, and `blur_edge_directionality_reason` then
 reads `insufficient_axis_support`. An image of vertical stripes reads a finite `blur_edge_width` and a NaN
-`blur_edge_directionality`.
+`blur_edge_directionality`. Under a `mask`, `blur_edge_directionality` is NaN on every row that measures it, and the
+reason reads `masked`.
 
 For a video, a sampled frame with too few edge points or a median edge width of 0 reads NaN and is left out of the
 median, and `blur_edge_width_median` is NaN only when no sampled frame has a finite value. The video path reads the
@@ -239,9 +257,10 @@ first, so they are simulated small videos. The evidence holds no blur rated by p
 real defect. The background value was checked on real frames and real boxes from two datasets, VisDrone2019-MOT frames
 and CPPE-5 images, with a blur added to the background, to the boxes, or to neither. Every added blur was built from the
 same boxes the statistic leaves out, and was a Gaussian, a circular-aperture blur or a blur that grows down the image,
-so natural depth of field is not covered, and the margin was fixed on the same data. Values were measured on one machine
-and were not compared across machines, between a CPU and a GPU, or across library versions. A second run of the video
-check gave identical saved outputs apart from the timings.
+so natural depth of field is not covered, and the margin was fixed on the same data. The measurement under a `mask` was
+checked on constructed images only. Values were measured on one machine and were not compared across machines, between
+a CPU and a GPU, or across library versions. A second run of the video check gave identical saved outputs apart from
+the timings.
 
 ## When to use the statistics
 

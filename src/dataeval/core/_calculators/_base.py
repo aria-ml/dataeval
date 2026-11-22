@@ -3,7 +3,7 @@ __all__ = []
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import Flag, auto
-from typing import Any, Generic, NamedTuple, TypeVar
+from typing import Any, ClassVar, Generic, NamedTuple, TypeVar
 
 from dataeval.types import MeasurementSpec
 
@@ -122,7 +122,16 @@ class Calculator(ABC, Generic[TFlag]):
         The raw data element to compute statistics on.
     cache : CalculatorCache
         The per-datum cache providing preprocessed/transformed views of the datum.
+
+    Attributes
+    ----------
+    masks_pixels : bool
+        Whether a mask passed to :func:`~dataeval.core.image_stats` leaves pixels out of this class's statistics. True
+        by default. A class whose statistics read shape, geometry or every pixel, and never a region of pixels, sets it
+        False, and under a mask is measured as without one: no `exclude`, and the whole frame's range.
     """
+
+    masks_pixels: ClassVar[bool] = True
 
     @abstractmethod
     def get_applicable_flags(self) -> TFlag:

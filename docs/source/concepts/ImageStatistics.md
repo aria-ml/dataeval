@@ -109,6 +109,11 @@ a `uint16` has a largest value above 4095 and is read as 16-bit. Check the acqui
 comparing intensity statistics across images, and declare the interval with `value_range` when it is known, as the next
 section describes.
 
+Under a `mask`, the reference is decoded from the unmasked pixels only, so a bright HUD cannot change how the scene is
+read: a `uint16` scene under 4096 beside a bright HUD decodes as 12-bit, where the whole frame reads 16-bit.
+`DIMENSION_DEPTH` still reports the encoding of the whole frame. [Masking a part of the vehicle or a
+HUD](#masking-a-part-of-the-vehicle-or-a-hud) describes the mask.
+
 Two of these are float conventions and not encodings. They are recognized because they are two common ways an image
 arrives as a float array: a `ToTensor`-style pipeline produces the first, and a resize or other interpolation produces
 the second.
@@ -432,6 +437,42 @@ ratios are not contrasts of physical luminance, which gamma and the sensor's res
 A ratio near 0 therefore does not establish that an object is hard to see, and a large one does not establish that it
 is easy to find.
 
+## Masking a part of the vehicle or a HUD
+
+A hood, a bow, a wing, the skids of a platform and a burned-in HUD stay in the same place in every frame the platform
+records. Every statistic of that footage then partly describes the vehicle and not the scene. The effect is on absolute
+values and on comparisons across platforms, such as {class}`.Outliers` scoring the footage of a platform with a hood
+against the footage of platforms without one, or a statistic entering {class}`.Metadata` as a factor beside platforms
+with and without a part. Within one video the part is the same in every frame, so a bound relative to the video's own
+frames may move less. That was checked for sharpness only, with simulated parts, and [Validation
+evidence](../reference/ValidationEvidence.md#image-statistics-and-hashing) records how.
+
+The `mask=` argument of {func}`~dataeval.core.image_stats` leaves a region out of the statistics that read pixels. It
+does not leave it out of the dimension, hash and spatial statistics, which describe the frame's size and encoding, its
+content as a whole and the geometry of its boxes. A mask changes what {func}`~dataeval.core.image_stats` and
+{class}`.QualityGate` measure and nothing else, so the embeddings and the hashes still see the whole frame.
+{class}`.Crop` removes a region for every evaluator, embeddings included, but only as a strip at the border of the
+frame, since it keeps one rectangle. A mask serves a part of any shape.
+
+Three limits decide what a masked value can support.
+
+- The mask has to cover every pixel the part reaches. A defocused part's edge, its vibration and its sway reach past
+  its sharp outline, so a mask traced from one sharp frame is too tight. Draw it over the widest extent the part reaches
+  in any frame, or dilate it with `scipy.ndimage.binary_dilation` or `cv2.dilate`. How far a defocused edge reaches past
+  a drawn mask was not measured, so this rests on the mechanism and not on a number.
+- The blur edge width allows for the mask's edge itself. It leaves out the edges within 9 pixels of the mask, takes its
+  edge threshold outside that margin and stops each edge's width at the mask. The other statistics use the mask exactly
+  as drawn.
+- The mask is fitted to each image by the rule {func}`~dataeval.core.ego_stats` uses, which checks only the aspect
+  ratio. A crop that keeps the aspect ratio misaligns the mask without an error. So do an inverted mask, a mask
+  forgotten for one platform and a transposed mask on a square frame. Bind each mask to the name of its platform, and
+  read the detail `masked_fraction`, the share of a row that the mask removed, which makes an inverted mask visible.
+
+Results measured with different masks, or with none, combine, and a result does not record which mask produced it. A
+comparison across platforms then compares each platform's scene as its own part leaves it, and not one region shared
+by every frame. [Mask a vehicle part out of image statistics](../notebooks/h2_mask_a_vehicle_part.py) shows it on
+constructed frames.
+
 ## Transforms and the statistics they invalidate
 
 A transform can be placed in the view or in the extractor, and the wrong placement raises no error. Model
@@ -447,13 +488,15 @@ unambiguous rewrite of the targets, and {class}`.TorchvisionTransform` for any o
 | Kind | Example | Placement |
 | --- | --- | --- |
 | Model-input adaptation | resize-to-224, ImageNet normalize, dtype cast | the extractor's `transforms=` |
-| Dataset definition | crop out a HUD, downsample to the deployed resolution, band selection | {class}`.Resize`, {class}`.Crop` and {class}`.SelectChannels` in a view |
+| Dataset definition | crop out a border banner, downsample to the deployed resolution, band selection | {class}`.Resize`, {class}`.Crop` and {class}`.SelectChannels` in a view |
 | Augmentation or corruption | random flip, color jitter, blur | {class}`.TorchvisionTransform` |
 
 Use {class}`.Resize` for the resolution your system deploys at, because that is a fact about the data under evaluation
-and not about the model. Use {class}`.Crop` to remove a fixed region that is never evidence, such as a burned-in
-overlay, a scan border or a dead sensor region. Use {class}`.SelectChannels` to narrow or combine channels, for a mono
-sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
+and not about the model. Use {class}`.Crop` to remove a fixed strip at the border of the frame that is never evidence,
+such as a burned-in banner, a scan border or a dead sensor region, for every evaluator. A region of another shape, such
+as a hood, is left out of the image statistics only, with a mask, as [Masking a part of the vehicle or a
+HUD](#masking-a-part-of-the-vehicle-or-a-hud) describes. Use {class}`.SelectChannels` to narrow or combine channels, for
+a mono sensor stored as RGB or for the bands of a multispectral cube that you evaluate.
 
 Every operation declares the statistics it invalidates. A resize makes the dimension statistics, such as `width`,
 `height` and `aspect_ratio`, report the resize target, makes `sharpness` measure the interpolation kernel, and rescales
@@ -494,6 +537,8 @@ a multi-line `repr`, and a lambda inside one records nothing recoverable.
   that each group is measured separately
 - [Compare surround contrast, clipping and noise between two collections](../notebooks/h2_compare_contrast_clipping_noise.py):
   the context, saturation and noise statistics of two collections measured with the same settings
+- [Mask a vehicle part out of image statistics](../notebooks/h2_mask_a_vehicle_part.py): a mask for each sensor,
+  measured and compared with {class}`.Outliers`
 - [Respond to a StatsInvalidatedWarning](../notebooks/h2_place_transforms.py): what an operation invalidates
   and the three ways to respond
 - [Specify custom statistics on object detection datasets](../notebooks/h2_custom_image_stats_object_detection.py):

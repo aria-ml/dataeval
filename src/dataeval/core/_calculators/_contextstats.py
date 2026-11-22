@@ -126,6 +126,7 @@ def read_surround(
     retained: NDArray[np.bool_],
     low: float,
     high: float,
+    excluded: NDArray[np.bool_] | None = None,
 ) -> Reading:
     """
     Read the intensity of a box's surround.
@@ -142,19 +143,26 @@ def read_surround(
         Shaped like the window: True where a pixel is in the surround, that is, no box of the image covers it.
     low, high : float
         The interval the values are mapped from to ``[0, 1]``. ``low < high``, both finite.
+    excluded : NDArray[np.bool_] or None, default None
+        Shaped like the window: True where the call's mask leaves a pixel out, which is the whole-frame mask sliced over
+        the window and not the box-sized crop a cache keeps. Such a pixel is unreadable, in the surround and the
+        target alike, whatever it holds. None, without a mask.
 
     Returns
     -------
     Reading
         The count, mean and standard deviation of the measurable surround pixels, and the target's valid fraction and
-        mean. A pixel is measurable only if every channel read is within ``[low, high]``, and a value outside is never
-        clipped, so NaN and infinity, which no finite interval holds, are excluded by the same test. The target's mean
-        is over the pixels that pass it too.
+        mean. A pixel is measurable only if it is not excluded and every channel read is within ``[low, high]``, and a
+        value outside is never clipped, so NaN and infinity, which no finite interval holds, are excluded by the same
+        test. The target's mean is over the pixels that pass it too.
     """
     x0, y0, x1, y1 = regions.window
     tx0, ty0, tx1, ty1 = regions.target
     measurable = retained.copy()
     target_valid = np.ones((ty1 - ty0, tx1 - tx0), dtype=np.bool_)
+    if excluded is not None:
+        measurable &= ~excluded
+        target_valid &= ~excluded[ty0 - y0 : ty1 - y0, tx0 - x0 : tx1 - x0]
     total = np.zeros(retained.shape, dtype=np.float64)
     channels = tuple(channels)
     scale = high - low
@@ -275,7 +283,11 @@ class ContextStatCalculator(Calculator[ImageStats]):
         image = normalize_image_shape(self.cache.raw)
         bands = self.cache.bands
         channels = range(image.shape[0]) if bands is None else bands
-        return read_surround(image, channels, geometry.regions, geometry.retained_mask, low, high)
+        # The whole-frame mask over the surround's window: `window_mask` and `mask_window` are cropped to the box.
+        x0, y0, x1, y1 = geometry.regions.window
+        mask = self.cache.mask
+        excluded = None if mask is None else mask[y0:y1, x0:x1]
+        return read_surround(image, channels, geometry.regions, geometry.retained_mask, low, high, excluded)
 
     @cached_property
     def _surround(self) -> _Surround:

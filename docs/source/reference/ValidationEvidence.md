@@ -493,11 +493,15 @@ statistical and computational.
   - Cross-checked (skew, kurtosis, and entropy verified against SciPy in CI)
   - Descriptive only. A statistic being unusual is not evidence a sample is
     bad. Every pixel counts, so a part of the vehicle in frame shifts the
-    statistics. On real drone footage, a hood covering about a fifth of the
-    frame lowered sharpness to 89% of the clean value, against 93% for lens
-    vignetting alone. Compare absolute values only within footage from one
-    platform. Within one video, a part did not change which frames a sharpness
-    gate dropped.
+    statistics. On real drone frames with a hood drawn over them by a harness,
+    so the part was simulated, a hood covering about a fifth of the frame
+    lowered sharpness to 89% of the clean value (median over 11 clips), against
+    93% for lens vignetting alone. Compare absolute values only within footage
+    from one platform, or mask the part. Within one video, with the same
+    simulated parts and 10% of the frames blurred by the test, a bottom-10%
+    sharpness gate dropped the blurred frames with or without a part on 10 of
+    11 clips. The mask itself was checked on constructed images, and how far a
+    defocused edge reaches past a drawn mask was not measured.
 - - {func}`.image_stats` (`ImageStats.BLUR`) and {func}`.video_stats` (`VideoStats.BLUR`)
   - Edge width after Liang et al. (2010), with a percentile summary in place of the paper's own score.
   - Internal only (the vectorized edge widths match a slower per-point loop kept in the tests, from the team's earlier
@@ -640,7 +644,8 @@ statistical and computational.
     where a mild drag can stay trusted and a drag that leaves the samples
     reading better as two motions is refused. Passing the overlay as `mask=`
     excludes it. A part of the vehicle in view, such as a hood or a bow, reads
-    as scene content the same way. On real drone footage, an unmasked hood
+    as scene content the same way. On real drone footage with a hood drawn
+    over it by a harness, so the part was simulated, an unmasked hood
     covering about a fifth of the frame read about one pair in twelve wrong
     while trusting it, and a mask brought that under one in a hundred. A mover
     pulling the fit toward its own motion is refused once its pull stands well

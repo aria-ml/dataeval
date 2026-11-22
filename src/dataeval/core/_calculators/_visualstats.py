@@ -99,9 +99,13 @@ class VisualStatCalculator(Calculator[ImageStats]):
         """Spread of `values`, NaN-aware only where the view it came from can hold NaN.
 
         `np.nanstd` scans for NaN before it reduces, which over a megapixel edge image is
-        a second pass for an answer the view already knows.
+        a second pass for an answer the view already knows. When no value is finite (a box whose
+        only unmeasured part is a row or two, or a mask that leaves a pixel), the spread is NaN, and
+        `np.nanstd` would warn "Degrees of freedom <= 0" to say so.
         """
-        return np.std(values, **kwargs) if self.cache.is_fully_measured else np.nanstd(values, **kwargs)
+        if self.cache.is_fully_measured:
+            return np.std(values, **kwargs)
+        return np.nan if np.isnan(values).all() else np.nanstd(values, **kwargs)
 
     def _sharpness(self) -> list[float]:
         # Sharpness requires 2D spatial data; return NaN for low-dimensional or unreadable data
