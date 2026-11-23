@@ -74,6 +74,13 @@ def _validate_params(region: str, padding: float, min_size: int, square: str, fi
         raise ValueError(f"min_size must be >= 0; got {min_size}.")
 
 
+def _has_pixels(image_shape: tuple[int, ...], box: NDArray[np.float64]) -> bool:
+    """Whether `box`, before any padding, covers part of an image of shape ``(..., H, W)``."""
+    height, width = image_shape[-2:]
+    x0, y0, x1, y1 = (float(v) for v in box)
+    return max(0.0, x0) < min(width, x1) and max(0.0, y0) < min(height, y1)
+
+
 class CropPolicy:
     """How a detection's box becomes a crop: region, padding, squaring and fill.
 
@@ -156,6 +163,9 @@ class CropPolicy:
     def crop(self, image: NDArray[Any], box: NDArray[np.float64]) -> NDArray[Any]:
         """Cut one box out of one image, honoring this policy.
 
+        .. versionchanged:: 1.3
+            A box with no pixels in its image raises instead of returning fill.
+
         Parameters
         ----------
         image : NDArray
@@ -166,10 +176,21 @@ class CropPolicy:
         Returns
         -------
         NDArray
-            The crop, as ``(C, H, W)``, in `image`'s dtype. Never empty: a box that clips
-            to nothing still yields one pixel.
+            The crop, as ``(C, H, W)``, in `image`'s dtype, never empty.
+
+        Raises
+        ------
+        ValueError
+            When the box, before padding, covers no pixel of `image`: it lies wholly outside
+            the image, it has no area, or the image has no pixels. Padding or squaring would
+            otherwise make the whole crop out of fill.
         """
         x0, y0, x1, y1 = (float(v) for v in box)
+        if not _has_pixels(image.shape, box):
+            raise ValueError(
+                f"the box {[x0, y0, x1, y1]} has no pixels in its {image.shape[-1]}x{image.shape[-2]} image, "
+                "so there is nothing to crop."
+            )
 
         # Box widened by `padding` on each side (the region for all crops).
         pad_x, pad_y = self._padding * (x1 - x0), self._padding * (y1 - y0)
@@ -369,6 +390,16 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
     as one observation of any factor that is constant within it. The grouping holds through a
     :class:`~dataeval.data.View` and through :func:`~dataeval.data.merge_datasets`, where crop views
     built over the same dataset object share its images.
+
+    A crop is cut when it is read, and construction reads only the targets. So a box with no
+    pixels in its image, such as a box on an image with no pixels or a box wholly outside its
+    image, raises ``ValueError`` when its crop is read, rather than yielding a crop made of
+    fill. The message names the datum and how to leave it out. Every tool that reads the
+    view's items meets the error, :class:`~dataeval.Metadata` built on the view among them,
+    and so :class:`~dataeval.bias.Balance` and :class:`~dataeval.bias.Parity` on that metadata.
+
+    .. versionchanged:: 1.3
+        A box with no pixels in its image raises when read instead of returning fill.
 
     Examples
     --------
@@ -712,7 +743,16 @@ class DetectionCrops(AnnotatedDataset[DetectionCropDatum]):
 
     def __getitem__(self, index: int) -> DetectionCropDatum:
         item_index, target_index, label, box = self._index_map[index]
-        crop = self._policy.crop(self._read_image(item_index), box)
+        image = self._read_image(item_index)
+        # Checked here as well as in the policy, so the message can name the datum and the way to leave it out.
+        if not _has_pixels(image.shape, box):
+            raise ValueError(
+                f"crop {index} is target {target_index} of the datum with id {self._source_ids[item_index]!r}, "
+                f"whose box {box.tolist()} has no pixels in its {image.shape[-1]}x{image.shape[-2]} image. Leave "
+                f"the datum out of the dataset these crops wrap with View(dataset, Indices([{item_index}], "
+                "exclude=True)), or fix the box."
+            )
+        crop = self._policy.crop(image, box)
         onehot = np.zeros(self._n_classes, dtype=np.float32)
         onehot[label] = 1.0
         meta: _CropDatumMetadata = {
