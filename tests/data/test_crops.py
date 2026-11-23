@@ -7,6 +7,7 @@ import pytest
 
 from dataeval import Metadata
 from dataeval.data import DetectionCrops, Reverse, SequenceFrames, View
+from dataeval.data._crops import CropPolicy
 from dataeval.exceptions import MaiteShapeError
 from dataeval.protocols import Array, DatasetMetadata, DatumMetadata, ObjectDetectionTarget
 from tests.data.test_frames import make_dataset_of, make_frame_target
@@ -363,9 +364,10 @@ class TestSurroundMaskEdges:
     def test_degenerate_mask_box_is_a_noop(self):
         """A box whose masked region collapses to zero area hits the early return (line 356)."""
         images = np.stack([_positional_image(20, 20)])
-        # Box's left edge sits at the image's right boundary: the (clipped) crop is a 1px column
-        # to the left of the box, so the box maps to an empty region in crop coordinates.
-        ds = _ODDataset(images, [_ODTarget([[20, 5, 25, 15]], [0])], index2label={0: "a"})
+        # Box's left edge sits 0.4 px inside the image's right boundary: the (clipped) crop is a 1px
+        # column, and the box rounds to an empty region in crop coordinates. A box starting at the
+        # boundary itself has no pixels in the image and raises (TestNoPixels).
+        ds = _ODDataset(images, [_ODTarget([[19.6, 5, 25, 15]], [0])], index2label={0: "a"})
         crops = DetectionCrops(ds, region="surround", padding=0.1, square="off", fill="zero")
         crop = crops[0][0]  # must not raise; nothing is masked
         assert crop.shape[-1] == 1  # the degenerate 1px-wide clip
@@ -523,3 +525,61 @@ class TestBoxesAndLabels:
             crops.boxes[0, 0] = 1.0
         with pytest.raises(ValueError, match="read-only"):
             crops.labels[0] = 1
+
+
+@pytest.mark.required
+class TestNoPixels:
+    """A box with no pixels in its image raises on access rather than yielding made-up pixels."""
+
+    @staticmethod
+    def _dataset(boxes, image=None) -> _ODDataset:
+        image = _positional_image(16, 16) if image is None else image
+        # Two boxes on the first datum, so a crop's position and its datum's position differ.
+        return _ODDataset(
+            [_positional_image(16, 16), image],
+            [_ODTarget([[0, 0, 4, 4], [4, 4, 8, 8]], [0, 0]), _ODTarget(boxes, [1] * len(boxes))],
+            ids=["first", "second"],
+        )
+
+    def test_box_on_a_zero_size_image_raises_on_access(self):
+        crops = DetectionCrops(self._dataset([[2, 2, 8, 8]], image=np.zeros((3, 0, 0), dtype=np.int32)))
+        assert len(crops) == 3
+        assert crops[0][0].shape[0] == 3
+        with pytest.raises(ValueError, match=r"Indices\(\[1\], exclude=True\)") as error:
+            crops[2]
+        message = str(error.value)
+        for part in ("crop 2", "'second'", "target 0", "[2.0, 2.0, 8.0, 8.0]", "0x0", "the dataset these crops wrap"):
+            assert part in message
+
+    def test_metadata_over_the_crops_meets_the_error(self):
+        """Metadata reads every crop view item, so it, and Balance and Parity on it, raise too."""
+        crops = DetectionCrops(self._dataset([[20, 20, 30, 30]]))
+        with pytest.raises(ValueError, match="no pixels"):
+            _ = Metadata(crops).class_labels
+
+    @pytest.mark.parametrize("square", ["off", "expand", "pad"])
+    def test_box_wholly_outside_raises(self, square):
+        crops = DetectionCrops(self._dataset([[20, 20, 30, 30]]), square=square)
+        with pytest.raises(ValueError, match="no pixels in its 16x16 image"):
+            crops[2]
+
+    def test_padding_does_not_rescue_a_box_outside(self):
+        crops = DetectionCrops(self._dataset([[17, 0, 20, 4]]), region="context", padding=0.5)
+        with pytest.raises(ValueError, match="no pixels"):
+            crops[2]
+
+    def test_box_overlapping_the_edge_crops_as_before(self):
+        image = _positional_image(16, 16)
+        crops = DetectionCrops(self._dataset([[-5, -5, 4, 4], [15.5, 0, 17, 4]], image=image), square="off")
+        assert np.array_equal(crops[2][0], image[..., 0:4, 0:4])
+        assert crops[3][0].shape[-1] == 1
+
+    def test_zero_extent_boxes_are_still_dropped_and_counted(self):
+        crops = DetectionCrops(self._dataset([[5, 5, 5, 9], [2, 2, 8, 8]]))
+        assert crops.n_dropped == 1
+        assert len(crops) == 3
+        crops[2]
+
+    def test_policy_crop_raises_with_box_and_size(self):
+        with pytest.raises(ValueError, match=r"\[0\.0, 0\.0, 2\.0, 2\.0\] has no pixels in its 0x0 image"):
+            CropPolicy().crop(np.zeros((3, 0, 0)), np.array([0.0, 0.0, 2.0, 2.0]))

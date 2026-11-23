@@ -995,6 +995,24 @@ class TestTheCropPolicyIsHandedOverRatherThanRestated:
         with pytest.raises(ValueError, match="lies outside its 16x16 raster"):
             found.crop()
 
+    def test_crop_with_expand_on_a_box_outside_raises(self):
+        """`square="expand"` used to fill a box that lies outside its raster with made-up pixels."""
+        dataset = _od_dataset()
+        _, target, _ = dataset[0]
+        target.boxes[0] = [100.0, 100.0, 110.0, 110.0]
+        found = SourceLocator(dataset)[SourceIndex(0, 0)]
+        with pytest.raises(ValueError, match="lies outside its 16x16 raster"):
+            found.crop(square="expand")
+
+    def test_crop_of_a_zero_area_box_raises(self):
+        """A point inside the raster has no pixels; it used to give a crop of one pixel."""
+        dataset = _od_dataset()
+        _, target, _ = dataset[0]
+        target.boxes[0] = [5.0, 5.0, 5.0, 5.0]
+        found = SourceLocator(dataset)[SourceIndex(0, 0)]
+        with pytest.raises(ValueError, match="has no area"):
+            found.crop()
+
 
 @pytest.mark.required
 class TestRastersAreNotWritable:

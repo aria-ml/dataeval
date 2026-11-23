@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from dataeval.data._crops import CropPolicy, FillType, RegionType, SquareType
+from dataeval.data._crops import CropPolicy, FillType, RegionType, SquareType, _has_pixels
 from dataeval.data._tracks import build_tracks
 from dataeval.data._video_proxies import as_tracking
 from dataeval.data._view import View
@@ -400,6 +400,10 @@ class SourceItem:
         model wants. To reproduce a particular view's crops exactly, hand over its
         :attr:`~dataeval.data.DetectionCrops.policy` rather than restating four arguments.
 
+        .. versionchanged:: 1.3
+            A box with no area, or a box wholly outside the raster under ``square="expand"``
+            or ``"pad"``, raises instead of returning one pixel or a crop made of fill.
+
         Parameters
         ----------
         policy : CropPolicy or None, default None
@@ -431,8 +435,8 @@ class SourceItem:
             When this address is not at ``instance`` level, and so names no box, or when
             `policy` is given alongside any of the four parameters it already supplies.
         ValueError
-            When the parameters do not describe a crop, or when the box lies wholly outside
-            the raster and there is nothing to cut.
+            When the parameters do not describe a crop, or when the box has no pixels in the
+            raster: it lies wholly outside it or has no area.
         """
         if self.level != "instance":
             raise TypeError(
@@ -446,18 +450,16 @@ class SourceItem:
                 "pass policy= or the individual crop parameters, not both; a policy already supplies "
                 "region, padding, square and fill.",
             )
-        crop = policy.crop(self.pixels, self.box)
-        # A box wholly off the raster clips to nothing. Caught here rather than handed back,
-        # because an empty array reaches a plot as "Invalid shape (3, 0, 0)" — a message
-        # about matplotlib rather than about the detection that produced it.
-        if crop.size == 0:
+        # Checked here as well as in the policy, so the message can name the address and the
+        # usual cause of a box off its raster.
+        if not _has_pixels(self.pixels.shape, self.box):
             raise ValueError(
                 f"{self.address!r} names the box {self.box.tolist()}, which lies outside its "
-                f"{self.pixels.shape[-1]}x{self.pixels.shape[-2]} raster, so the crop is empty. A box "
-                "in another coordinate space — source coordinates read through a resizing view, or a "
-                "tracker's predicted box — is the usual cause.",
+                f"{self.pixels.shape[-1]}x{self.pixels.shape[-2]} raster or has no area, so there is "
+                "nothing to crop. A box in another coordinate space — source coordinates read through a "
+                "resizing view, or a tracker's predicted box — is the usual cause of one outside.",
             )
-        return crop
+        return policy.crop(self.pixels, self.box)
 
 
 class SourceLocator:
