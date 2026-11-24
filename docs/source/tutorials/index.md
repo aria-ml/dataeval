@@ -38,6 +38,7 @@ local checkout.
 ../notebooks/tt_augmentation_duplicates.py
 ../notebooks/tt_identify_duplicate_video.py
 ../notebooks/tt_check_drone_footage.py
+../notebooks/tt_find_label_and_image_defects.py
 ../notebooks/tt_compare_objects_to_surroundings.py
 ```
 
@@ -82,6 +83,10 @@ local checkout.
   - Learn how to check real drone footage for what may hinder training a vehicle detector: how many distinct
     views it holds, how the camera moves, whether labels stay consistent and how large the vehicles are.
   - [![Open In Colab][colab-badge]][drone-colab]
+* - [](../notebooks/tt_find_label_and_image_defects.py)
+  - Learn how to find class names that are not on a dataset's class list and images with no content, how to decide
+    what each one is, and how to fix the labels without losing a box silently.
+  - [![Open In Colab][colab-badge]][defects-colab]
 * - [](../notebooks/tt_compare_objects_to_surroundings.py)
   - Compare detections against their surroundings and against each other
     to find hard-to-see objects and background shortcuts.
@@ -101,6 +106,7 @@ local checkout.
 [augs-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_augmentation_duplicates.ipynb
 [vdupe-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_identify_duplicate_video.ipynb
 [drone-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_check_drone_footage.ipynb
+[defects-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_find_label_and_image_defects.ipynb
 [surr-colab]: https://colab.research.google.com/github/aria-ml/dataeval/blob/docs-artifacts/v1.2.0/notebooks/tt_compare_objects_to_surroundings.ipynb
 
 <!-- markdownlint-enable MD053 -->

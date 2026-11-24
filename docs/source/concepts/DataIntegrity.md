@@ -528,6 +528,8 @@ run deduplication across the train/validation split boundary.
   detection's statistics with its background and with other detections
 - [Identify duplicate video](../notebooks/tt_identify_duplicate_video.py): finding duplicate sequences and redundant
   footage in a tracking dataset
+- [Find misspelled class names and empty images in a detection dataset](../notebooks/tt_find_label_and_image_defects.py):
+  finding images with no content and labels outside the class list
 
 ## References
 
