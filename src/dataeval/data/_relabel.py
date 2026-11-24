@@ -99,7 +99,7 @@ class Relabel(Operation):
     ``target`` vocabulary using a ``class_remap`` (source class name to target
     concept), and replaces the dataset's ``index2label`` with the target's. Scores
     move with the labels — see Notes, which is where the two tasks differ. The
-    ``class_remap`` is typically the ``remap`` of a
+    ``class_remap`` is typically the ``class_remap`` of a
     :func:`~dataeval.core.label_alignment` result, but may be any hand-written
     mapping — equivalences are renamed and coarsenings collapse, so two source
     classes may map to one target class. Source classes with no entry in

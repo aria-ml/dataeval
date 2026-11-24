@@ -569,6 +569,8 @@ a model is queried with rather than a fixed integer label map.
 
 - [Identify gaps in a labeled dataset](../notebooks/tt_identify_dataset_gaps.py): an ontology, label counts and
   embeddings combined into one per-class gap report.
+- [Find misspelled class names and empty images in a detection dataset](../notebooks/tt_find_label_and_image_defects.py):
+  class names checked against a class list, then fixed with a reviewed mapping.
 
 ## References
 
